@@ -1,6 +1,6 @@
-mod models;
 mod handlers;
 mod matching;
+mod generated;
 
 use axum::{
     routing::{get, post},

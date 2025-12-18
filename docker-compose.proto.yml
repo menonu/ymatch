@@ -1,0 +1,14 @@
+services:
+  proto-gen:
+    build:
+      context: ./scripts
+      dockerfile: gen-proto.Dockerfile
+    image: ymatch-proto-gen
+    volumes:
+      - .:/workspace
+      # Caching for Rust to speed up compilation
+      - rust_cargo_cache:/usr/local/cargo
+    working_dir: /workspace
+
+volumes:
+  rust_cargo_cache:

@@ -3,30 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services/api_client.dart';
 import '../providers/providers.dart';
+import '../models/models.dart';
 
-// Simple model for Match
-class MatchModel {
-  final int id;
-  final int user1_id;
-  final int user2_id;
-  final String status;
-
-  MatchModel({required this.id, required this.user1_id, required this.user2_id, required this.status});
-
-  factory MatchModel.fromJson(Map<String, dynamic> json) {
-    return MatchModel(
-      id: json['id'],
-      user1_id: json['user1_id'],
-      user2_id: json['user2_id'],
-      status: json['status'],
-    );
-  }
-}
-
-final matchesProvider = FutureProvider.family<List<MatchModel>, int>((ref, userId) async {
+final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((ref, userId) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/matches/user/$userId');
-  return (json as List).map((e) => MatchModel.fromJson(e)).toList();
+  return (json as List).map((e) => TradeMatch()..mergeFromProto3Json(e)).toList();
 });
 
 class TradeListScreen extends ConsumerWidget {

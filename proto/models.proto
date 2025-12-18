@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package ymatch;
+
+option go_package = "gen/ymatch";
+
+// Core Models
+message User {
+  int32 id = 1;
+  string username = 2;
+  optional string uuid = 3;
+  optional string device_token = 4;
+  optional string created_at = 5;
+}
+
+message Event {
+  int32 id = 1;
+  string name = 2;
+  optional int32 creator_id = 3;
+  optional string created_at = 4;
+}
+
+message Merchandise {
+  int32 id = 1;
+  int32 event_id = 2;
+  string name = 3;
+  optional string photo_url = 4;
+}
+
+message InventoryItem {
+  int32 id = 1;
+  int32 user_id = 2;
+  int32 merch_id = 3;
+  string status = 4; // "HAVE" or "WANT"
+  int32 quantity = 5;
+  optional string merch_name = 6;
+  optional string photo_url = 7;
+}
+
+message TradeMatch {
+  int32 id = 1;
+  int32 user1_id = 2;
+  int32 user2_id = 3;
+  string status = 4; // "PROPOSED", "ACCEPTED", "REJECTED", "COMPLETED"
+  optional string created_at = 5;
+
+  optional User other_user = 6;
+  repeated InventoryItem user_haves = 7;
+  repeated InventoryItem user_wants = 8;
+}
+
+// Request/Response Models
+message GuestLoginRequest {
+  string uuid = 1;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string password = 2;
+  optional string device_token = 3;
+}
+
+message CreateEventRequest {
+  string name = 1;
+  int32 creator_id = 2;
+}
+
+message UpdateInventoryRequest {
+  int32 user_id = 1;
+  int32 merch_id = 2;
+  string status = 3;
+  int32 quantity = 4;
+}
+
+message CreateMerchRequest {
+  string name = 1;
+  optional string photo_url = 2;
+}

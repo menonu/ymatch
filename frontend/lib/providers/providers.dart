@@ -35,7 +35,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       final json = await client.post('/api/v1/auth/guest', {
         'uuid': uuid,
       });
-      final user = User.fromJson(json);
+      final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -56,7 +56,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
         'username': username,
         'password': password,
       });
-      final user = User.fromJson(json);
+      final user = User()..mergeFromProto3Json(json);
       // Also save UUID if this user has one? For now just session.
       state = AsyncValue.data(user);
     } catch (e, st) {
@@ -73,7 +73,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
          'password': password,
          'device_token': 'web-v1',
       });
-      final user = User.fromJson(json);
+      final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -99,10 +99,10 @@ final currentUserProvider = Provider<User?>((ref) {
 });
 
 // --- Events ---
-final eventsProvider = FutureProvider<List<EventGroup>>((ref) async {
+final eventsProvider = FutureProvider<List<Event>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/events');
-  return (json as List).map((e) => EventGroup.fromJson(e)).toList();
+  return (json as List).map((e) => Event()..mergeFromProto3Json(e)).toList();
 });
 
 class EventsController extends StateNotifier<AsyncValue<void>> {
@@ -131,7 +131,7 @@ final eventsControllerProvider = StateNotifierProvider<EventsController, AsyncVa
 final merchProvider = FutureProvider.family<List<Merchandise>, int>((ref, eventId) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/events/$eventId/merch');
-  return (json as List).map((e) => Merchandise.fromJson(e)).toList();
+  return (json as List).map((e) => Merchandise()..mergeFromProto3Json(e)).toList();
 });
 
 class MerchController extends StateNotifier<AsyncValue<void>> {
@@ -164,7 +164,7 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
   Future<List<InventoryItem>> build(int arg) async {
     final client = ref.watch(apiClientProvider);
     final json = await client.get('/api/v1/user/$arg/inventory');
-    return (json as List).map((e) => InventoryItem.fromJson(e)).toList();
+    return (json as List).map((e) => InventoryItem()..mergeFromProto3Json(e)).toList();
   }
 
   Future<void> updateItem(int merchId, String status, int quantity) async {
@@ -178,20 +178,19 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
       final newList = currentList.map((item) {
         if (item.merchId == merchId && item.status == status) {
           found = true;
-          return item.copyWith(quantity: quantity);
+          return item.copyWith((m) => m.quantity = quantity);
         }
         return item;
       }).toList();
 
       if (!found && quantity > 0) {
-        newList.add(InventoryItem(
-          id: 0,
-          userId: userId,
-          merchId: merchId,
-          status: status,
-          quantity: quantity,
-          merchName: '',
-        ));
+        newList.add(InventoryItem()
+          ..id = 0
+          ..userId = userId
+          ..merchId = merchId
+          ..status = status
+          ..quantity = quantity
+          ..merchName = '');
       }
       // filter out 0 quantity if desired, but for now just keep
       state = AsyncValue.data(newList);
