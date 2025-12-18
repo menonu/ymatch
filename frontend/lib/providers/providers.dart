@@ -14,8 +14,28 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> checkLogin() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? uuid = prefs.getString('user_uuid');
 
+    // Support dev_user URL parameter for easier testing (multi-tab support)
+    String? devUser;
+    try {
+      // Try to find dev_user in query parameters (handling both normal and hash-based URLs)
+      devUser = Uri.base.queryParameters['dev_user'];
+      if (devUser == null && Uri.base.fragment.contains('dev_user=')) {
+        final fragmentUri = Uri.parse(Uri.base.fragment.replaceFirst('/', ''));
+        devUser = fragmentUri.queryParameters['dev_user'];
+      }
+    } catch (_) {
+      // Fallback for non-web environments if necessary
+    }
+
+    if (devUser != null && devUser.isNotEmpty) {
+      // Do NOT persist dev_user to SharedPreferences - each tab uses its own dev session
+      await guestLogin(devUser);
+      return;
+    }
+
+    // Normal flow: check for saved UUID
+    final String? uuid = prefs.getString('user_uuid');
     if (uuid != null) {
       await guestLogin(uuid);
     }

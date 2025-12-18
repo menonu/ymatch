@@ -87,3 +87,9 @@ flutter run -d web-server --web-port 8081
 - [Use Cases](./docs/use_cases.md)
 - [UI Specs](./docs/ui_specs.md)
 
+## 7. Development Guidelines
+
+- **Always Rebuild and Restart**: Before testing any changes, ensure the application (Backend/Frontend) is rebuilt and restarted to apply the latest code.
+- **Verify Version**: Confirm that the version/build being tested reflects the most recent changes before proceeding with verification.
+- **Verify Process and Port Status**: Before test, confirm that backend and frontend is working by checking process alive and port is opened (e.g., using `lsof` or `netstat`).
+- **Protobuf First**: Any changes to data structures must be applied to `proto/models.proto` first, then regenerated.

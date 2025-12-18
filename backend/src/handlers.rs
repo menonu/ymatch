@@ -29,8 +29,9 @@ pub async fn guest_login(
         }));
     }
 
-    // 2. Create new Guest User
-    let new_username = format!("Guest_{}", &payload.uuid[..8]);
+    // 2. Create new Guest User (safely truncate UUID for username)
+    let uuid_prefix = &payload.uuid[..std::cmp::min(8, payload.uuid.len())];
+    let new_username = format!("Guest_{}", uuid_prefix);
     let row = sqlx::query(
         "INSERT INTO users (username, uuid) VALUES ($1, $2) RETURNING id, username, uuid, device_token, created_at"
     )
