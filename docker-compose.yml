@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # Main Database (PostgreSQL)
+  db:
+    image: postgres:16-alpine
+    container_name: ymatch_db
+    environment:
+      POSTGRES_USER: ymatch_user
+      POSTGRES_PASSWORD: secure_dev_password
+      POSTGRES_DB: ymatch_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ymatch_net
+
+  # Database Admin UI (Optional)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: ymatch_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ymatch.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - ymatch_net
+    restart: unless-stopped
+
+networks:
+  ymatch_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
