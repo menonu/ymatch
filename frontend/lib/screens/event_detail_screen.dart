@@ -37,6 +37,42 @@ class EventDetailScreen extends ConsumerWidget {
               ref.read(viewModeProvider.notifier).state = next;
             },
           ),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'want_missing') {
+                final currentMerch = merchAsync.valueOrNull;
+                if (currentMerch == null || user == null) return;
+                
+                final currentInv = inventoryAsync?.valueOrNull ?? [];
+                // Find all items we have at least 1 HAVE or WANT
+                final ownedOrWantedIds = currentInv
+                    .where((inv) => inv.quantity > 0)
+                    .map((inv) => inv.merchId)
+                    .toSet();
+
+                int addedCount = 0;
+                // Add to WANT if we don't have it and don't want it yet
+                for (final item in currentMerch) {
+                  if (!ownedOrWantedIds.contains(item.id)) {
+                    ref.read(inventoryProvider(user.id).notifier).updateItem(item.id, 'WANT', 1);
+                    addedCount++;
+                  }
+                }
+                
+                if (context.mounted && addedCount > 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added $addedCount missing items to WANT')));
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No missing items found')));
+                }
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(
+                value: 'want_missing',
+                child: Text('Want All Missing'),
+              ),
+            ],
+          ),
         ],
       ),
       body: merchAsync.when(
