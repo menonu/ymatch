@@ -19,148 +19,141 @@ class EventDetailScreen extends ConsumerWidget {
     final inventoryAsync = user != null ? ref.watch(inventoryProvider(user.id)) : null;
     final viewMode = ref.watch(viewModeProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Event Inventory'),
-        actions: [
-          IconButton(
-            icon: Icon(
-              viewMode == ViewMode.detailed
-                  ? Icons.view_agenda_outlined
-                  : viewMode == ViewMode.grid
-                      ? Icons.grid_view
-                      : Icons.view_list,
+    return merchAsync.when(
+      data: (merch) {
+        if (merch.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Event Inventory')),
+            body: _buildEmptyState(context, ref),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => _showAddMerchDialog(context, ref, eventId),
+              label: const Text('Add Merch'),
+              icon: const Icon(Icons.add_photo_alternate),
             ),
-            tooltip: 'Switch View Mode',
-            onPressed: () {
-              final next = ViewMode.values[(viewMode.index + 1) % ViewMode.values.length];
-              ref.read(viewModeProvider.notifier).state = next;
-            },
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'want_missing') {
-                final currentMerch = merchAsync.valueOrNull;
-                if (currentMerch == null || user == null) return;
-                
-                final currentInv = inventoryAsync?.valueOrNull ?? [];
-                // Find all items we have at least 1 HAVE or WANT
-                final ownedOrWantedIds = currentInv
-                    .where((inv) => inv.quantity > 0)
-                    .map((inv) => inv.merchId)
-                    .toSet();
-
-                int addedCount = 0;
-                // Add to WANT if we don't have it and don't want it yet
-                for (final item in currentMerch) {
-                  if (!ownedOrWantedIds.contains(item.id)) {
-                    ref.read(inventoryProvider(user.id).notifier).updateItem(item.id, 'WANT', 1);
-                    addedCount++;
-                  }
-                }
-                
-                if (context.mounted && addedCount > 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added $addedCount missing items to WANT')));
-                } else if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No missing items found')));
-                }
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'want_missing',
-                child: Text('Want All Missing'),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: merchAsync.when(
-        data: (merch) {
-          if (merch.isEmpty) return _buildEmptyState(context, ref);
-
-          final Map<int, Map<String, int>> inventoryLookup = {};
-          if (inventoryAsync != null && inventoryAsync.hasValue) {
-            for (final inv in inventoryAsync.value!) {
-              inventoryLookup.putIfAbsent(inv.merchId, () => {})[inv.status] = inv.quantity;
-            }
-          }
-
-          // Group the merchandise
-          final groupedMerch = <String, List<Merchandise>>{};
-          for (final item in merch) {
-            final gName = item.hasGroupName() && item.groupName.isNotEmpty ? item.groupName : 'Other Items';
-            groupedMerch.putIfAbsent(gName, () => []).add(item);
-          }
-
-          final groupKeys = groupedMerch.keys.toList();
-          groupKeys.sort((a, b) {
-            if (a == 'Other Items') return 1;
-            if (b == 'Other Items') return -1;
-            return a.compareTo(b);
-          });
-
-          return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: groupKeys.length,
-            itemBuilder: (context, groupIndex) {
-              final groupName = groupKeys[groupIndex];
-              final items = groupedMerch[groupName]!;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    color: Colors.grey[100],
-                    child: Text(
-                      groupName,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  if (viewMode == ViewMode.grid)
-                    GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 0.55,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup),
-                    )
-                  else if (viewMode == ViewMode.list)
-                    ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
-                    )
-                  else
-                    ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) => _buildDetailedListItem(context, ref, user, items[index], inventoryLookup),
-                    ),
-                ],
-              );
-            },
           );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddMerchDialog(context, ref, eventId),
-        label: const Text('Add Merch'),
-        icon: const Icon(Icons.add_photo_alternate),
-      ),
+        }
+
+        final Map<int, Map<String, int>> inventoryLookup = {};
+        if (inventoryAsync != null && inventoryAsync.hasValue) {
+          for (final inv in inventoryAsync.value!) {
+            inventoryLookup.putIfAbsent(inv.merchId, () => {})[inv.status] = inv.quantity;
+          }
+        }
+
+        // Group the merchandise
+        final groupedMerch = <String, List<Merchandise>>{};
+        for (final item in merch) {
+          final gName = item.hasGroupName() && item.groupName.isNotEmpty ? item.groupName : 'Other Items';
+          groupedMerch.putIfAbsent(gName, () => []).add(item);
+        }
+
+        final groupKeys = groupedMerch.keys.toList();
+        groupKeys.sort((a, b) {
+          if (a == 'Other Items') return 1;
+          if (b == 'Other Items') return -1;
+          return a.compareTo(b);
+        });
+
+        return DefaultTabController(
+          length: groupKeys.length,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Event Inventory'),
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    viewMode == ViewMode.detailed
+                        ? Icons.view_agenda_outlined
+                        : viewMode == ViewMode.grid
+                            ? Icons.grid_view
+                            : Icons.view_list,
+                  ),
+                  tooltip: 'Switch View Mode',
+                  onPressed: () {
+                    final next = ViewMode.values[(viewMode.index + 1) % ViewMode.values.length];
+                    ref.read(viewModeProvider.notifier).state = next;
+                  },
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'want_missing') {
+                      if (user == null) return;
+                      
+                      final currentInv = inventoryAsync?.valueOrNull ?? [];
+                      final ownedOrWantedIds = currentInv
+                          .where((inv) => inv.quantity > 0)
+                          .map((inv) => inv.merchId)
+                          .toSet();
+
+                      int addedCount = 0;
+                      for (final item in merch) {
+                        if (!ownedOrWantedIds.contains(item.id)) {
+                          ref.read(inventoryProvider(user.id).notifier).updateItem(item.id, 'WANT', 1);
+                          addedCount++;
+                        }
+                      }
+                      
+                      if (context.mounted && addedCount > 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added $addedCount missing items to WANT')));
+                      } else if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No missing items found')));
+                      }
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem(
+                      value: 'want_missing',
+                      child: Text('Want All Missing'),
+                    ),
+                  ],
+                ),
+              ],
+              bottom: TabBar(
+                isScrollable: true,
+                tabs: groupKeys.map((name) => Tab(text: name)).toList(),
+              ),
+            ),
+            body: TabBarView(
+              children: groupKeys.map((groupName) {
+                final items = groupedMerch[groupName]!;
+                
+                if (viewMode == ViewMode.grid) {
+                  return GridView.builder(
+                    padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 0.55,
+                    ),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup),
+                  );
+                } else if (viewMode == ViewMode.list) {
+                  return ListView.builder(
+                    padding: const EdgeInsets.only(top: 8, bottom: 80),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
+                  );
+                } else {
+                  return ListView.builder(
+                    padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) => _buildDetailedListItem(context, ref, user, items[index], inventoryLookup),
+                  );
+                }
+              }).toList(),
+            ),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => _showAddMerchDialog(context, ref, eventId),
+              label: const Text('Add Merch'),
+              icon: const Icon(Icons.add_photo_alternate),
+            ),
+          ),
+        );
+      },
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
     );
   }
 
