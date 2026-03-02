@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
+import '../theme/app_theme.dart';
+
+enum ViewMode { detailed, grid, list }
+final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
 
 class EventDetailScreen extends ConsumerWidget {
   final int eventId;
@@ -13,14 +17,32 @@ class EventDetailScreen extends ConsumerWidget {
     final merchAsync = ref.watch(merchProvider(eventId));
     final user = ref.watch(currentUserProvider);
     final inventoryAsync = user != null ? ref.watch(inventoryProvider(user.id)) : null;
+    final viewMode = ref.watch(viewModeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Event $eventId Inventory')),
+      appBar: AppBar(
+        title: const Text('Event Inventory'),
+        actions: [
+          IconButton(
+            icon: Icon(
+              viewMode == ViewMode.detailed
+                  ? Icons.view_agenda_outlined
+                  : viewMode == ViewMode.grid
+                      ? Icons.grid_view
+                      : Icons.view_list,
+            ),
+            tooltip: 'Switch View Mode',
+            onPressed: () {
+              final next = ViewMode.values[(viewMode.index + 1) % ViewMode.values.length];
+              ref.read(viewModeProvider.notifier).state = next;
+            },
+          ),
+        ],
+      ),
       body: merchAsync.when(
         data: (merch) {
-          if (merch.isEmpty) return const Center(child: Text('No merchandise found. Add some!'));
+          if (merch.isEmpty) return _buildEmptyState(context, ref);
 
-          // Build map of user's inventory for quick lookup (multi-map for HAVE/WANT)
           final Map<int, Map<String, int>> inventoryLookup = {};
           if (inventoryAsync != null && inventoryAsync.hasValue) {
             for (final inv in inventoryAsync.value!) {
@@ -28,69 +50,31 @@ class EventDetailScreen extends ConsumerWidget {
             }
           }
 
-          return ListView.builder(
-            itemCount: merch.length,
-            itemBuilder: (context, index) {
-              final item = merch[index];
-              final merchInv = inventoryLookup[item.id] ?? {};
-              final haveQty = merchInv['HAVE'] ?? 0;
-              final wantQty = merchInv['WANT'] ?? 0;
-
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      // Item Photo
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: item.photoUrl != null && item.photoUrl!.isNotEmpty
-                            ? Image.network(item.photoUrl!, width: 70, height: 70, fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 70))
-                            : Container(width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.image, size: 40, color: Colors.grey)),
-                      ),
-                      const SizedBox(width: 16),
-                      // Item Name
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(item.name,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                            const SizedBox(height: 4),
-                            Text('Event Merch', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      // Inventory Controls
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                           _buildStepper(
-                            label: 'HAVE',
-                            color: Colors.teal,
-                            qty: haveQty,
-                            onUpdate: (newQty) => ref.read(inventoryProvider(user!.id).notifier).updateItem(item.id, 'HAVE', newQty),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildStepper(
-                            label: 'WANT',
-                            color: Colors.orangeAccent,
-                            qty: wantQty,
-                            onUpdate: (newQty) => ref.read(inventoryProvider(user!.id).notifier).updateItem(item.id, 'WANT', newQty),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
+          if (viewMode == ViewMode.grid) {
+            return GridView.builder(
+              padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.55,
+              ),
+              itemCount: merch.length,
+              itemBuilder: (context, index) => _buildGridItem(context, ref, user, merch[index], inventoryLookup),
+            );
+          } else if (viewMode == ViewMode.list) {
+            return ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 80),
+              itemCount: merch.length,
+              itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, merch[index], inventoryLookup),
+            );
+          } else {
+            return ListView.builder(
+              padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+              itemCount: merch.length,
+              itemBuilder: (context, index) => _buildDetailedListItem(context, ref, user, merch[index], inventoryLookup),
+            );
+          }
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
@@ -103,87 +87,244 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStepper({
-    required String label,
-    required Color color,
-    required int qty,
-    required Function(int) onUpdate,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
+  // --- Grid View Item ---
+  Widget _buildGridItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup) {
+    final merchInv = lookup[item.id] ?? {};
+    final haveQty = merchInv['HAVE'] ?? 0;
+    final wantQty = merchInv['WANT'] ?? 0;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: color)),
-          const SizedBox(height: 4),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _StepperButton(
-                icon: Icons.add,
-                color: color,
-                onTap: () => onUpdate(qty + 1),
-                label: 'Increase $label',
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text('$qty', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-              ),
-              _StepperButton(
-                icon: Icons.remove,
-                color: color,
-                onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
-                label: 'Decrease $label',
-              ),
-            ],
+          Expanded(
+            child: item.photoUrl != null && item.photoUrl!.isNotEmpty
+                ? Image.network(item.photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildGridPlaceholder())
+                : _buildGridPlaceholder(),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Text(
+              item.name,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildGridCounter(context, 'H', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q))),
+              Expanded(child: _buildGridCounter(context, 'W', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q))),
+            ],
+          )
         ],
       ),
     );
   }
-}
 
-class _StepperButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final VoidCallback? onTap;
-  final String label;
+  Widget _buildGridPlaceholder() {
+    return Container(
+      color: Colors.grey[200],
+      child: Icon(Icons.image_outlined, size: 24, color: Colors.grey[400]),
+    );
+  }
 
-  const _StepperButton({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: label,
-      button: true,
-      enabled: onTap != null,
-      child: Material(
-        color: onTap != null ? color : Colors.grey[300],
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Container(
-            width: 44, // Large hit target
-            height: 44,
-            alignment: Alignment.center,
-            child: Icon(icon, color: Colors.white, size: 28),
-          ),
+  Widget _buildGridCounter(BuildContext context, String label, int qty, Color color, Function(int) onUpdate) {
+    return GestureDetector(
+      onTap: () => onUpdate(qty + 1),
+      onLongPress: () => qty > 0 ? onUpdate(qty - 1) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: qty > 0 ? color.withValues(alpha: 0.1) : Colors.transparent,
+          border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.bold)),
+            Text('$qty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: qty > 0 ? color : Colors.grey)),
+          ],
         ),
       ),
     );
   }
-}
 
+  // --- Compact List View Item ---
+  Widget _buildCompactListItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup) {
+    final merchInv = lookup[item.id] ?? {};
+    final haveQty = merchInv['HAVE'] ?? 0;
+    final wantQty = merchInv['WANT'] ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: item.photoUrl != null && item.photoUrl!.isNotEmpty
+              ? Image.network(item.photoUrl!, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildCompactPlaceholder())
+              : _buildCompactPlaceholder(),
+        ),
+        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildCompactCounter(context, 'HAVE', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
+            const SizedBox(width: 8),
+            _buildCompactCounter(context, 'WANT', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactPlaceholder() {
+    return Container(
+      width: 40,
+      height: 40,
+      color: Colors.grey[200],
+      child: Icon(Icons.image_outlined, size: 20, color: Colors.grey[400]),
+    );
+  }
+
+  Widget _buildCompactCounter(BuildContext context, String label, int qty, Color color, Function(int) onUpdate) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label[0], style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 4),
+        Container(
+          height: 32,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove, size: 14),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28),
+                color: color,
+                onPressed: qty > 0 ? () => onUpdate(qty - 1) : null,
+              ),
+              Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              IconButton(
+                icon: const Icon(Icons.add, size: 14),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28),
+                color: color,
+                onPressed: () => onUpdate(qty + 1),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- Detailed List View Item (Original) ---
+  Widget _buildDetailedListItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup) {
+    final merchInv = lookup[item.id] ?? {};
+    final haveQty = merchInv['HAVE'] ?? 0;
+    final wantQty = merchInv['WANT'] ?? 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: item.photoUrl != null && item.photoUrl!.isNotEmpty
+                  ? Image.network(item.photoUrl!, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildImagePlaceholder())
+                  : _buildImagePlaceholder(),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildStepper(label: 'HAVE', color: AppTheme.haveColor, qty: haveQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
+                      const SizedBox(width: 12),
+                      _buildStepper(label: 'WANT', color: AppTheme.wantColor, qty: wantQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'WANT', q)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateInv(WidgetRef ref, User? user, int merchId, String status, int qty) {
+    if (user != null) {
+      ref.read(inventoryProvider(user.id).notifier).updateItem(merchId, status, qty);
+    }
+  }
+
+  // ... rest of the helpers
+  Widget _buildImagePlaceholder() {
+    return Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)), child: Icon(Icons.image_outlined, size: 32, color: Colors.grey[400]));
+  }
+
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text('No merchandise yet', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.grey[600])),
+          const SizedBox(height: 8),
+          Text('Add items to start building your inventory.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[500])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepper({required String label, required Color color, required int qty, required Function(int) onUpdate}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.2))),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: color)),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _StepperButton(icon: Icons.remove, color: color, onTap: qty > 0 ? () => onUpdate(qty - 1) : null, label: 'Decrease $label'),
+                Expanded(child: Text('$qty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                _StepperButton(icon: Icons.add, color: color, onTap: () => onUpdate(qty + 1), label: 'Increase $label'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showAddMerchDialog(BuildContext context, WidgetRef ref, int eventId) {
     final nameController = TextEditingController();
@@ -195,21 +336,13 @@ class _StepperButton extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Item Name'),
-            ),
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(labelText: 'Photo URL (Optional)'),
-            ),
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Item Name'), autofocus: true),
+            const SizedBox(height: 16),
+            TextField(controller: urlController, decoration: const InputDecoration(labelText: 'Photo URL (Optional)')),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
@@ -225,3 +358,32 @@ class _StepperButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+  final String label;
+
+  const _StepperButton({required this.icon, required this.color, required this.onTap, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = onTap != null;
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: isEnabled,
+      child: Material(
+        color: isEnabled ? color : Colors.grey[300],
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: onTap,
+          child: SizedBox(width: 28, height: 28, child: Icon(icon, color: isEnabled ? Colors.white : Colors.grey[500], size: 18)),
+        ),
+      ),
+    );
+  }
+}
