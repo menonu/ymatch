@@ -182,16 +182,28 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       });
       final event = Event()..mergeFromProto3Json(eventJson);
 
-      // 2. Generate 30 items in parallel
+      // 2. Generate 30 items in parallel across 3 groups
       final futures = <Future>[];
       for (int i = 1; i <= 30; i++) {
         final hasIcon = (i % 5 != 0); // Every 5th item has no icon
         final photoUrl = hasIcon ? 'https://picsum.photos/seed/${event.id}_$i/200' : '';
+        
+        // Group items into 3 categories
+        String groupName;
+        if (i <= 10) {
+          groupName = 'Photo Cards';
+        } else if (i <= 20) {
+          groupName = 'Badges';
+        } else {
+          groupName = 'Acrylic Stands';
+        }
+        
         futures.add(
           client.post('/api/v1/events/${event.id}/merch', {
             'event_id': event.id,
             'name': 'Item #${i.toString().padLeft(2, '0')}',
             'photo_url': photoUrl,
+            'group_name': groupName,
           })
         );
       }
@@ -219,14 +231,19 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
   MerchController(this.client) : super(const AsyncValue.data(null));
 
-  Future<void> addMerch(int eventId, String name, String photoUrl) async {
+  Future<void> addMerch(int eventId, String name, String photoUrl, [String? groupName]) async {
     state = const AsyncValue.loading();
     try {
-      await client.post('/api/v1/events/$eventId/merch', {
+      final payload = {
         'event_id': eventId,
         'name': name,
         'photo_url': photoUrl,
-      });
+      };
+      if (groupName != null && groupName.isNotEmpty) {
+        payload['group_name'] = groupName;
+      }
+      
+      await client.post('/api/v1/events/$eventId/merch', payload);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

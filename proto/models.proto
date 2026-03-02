@@ -28,6 +28,7 @@ message Merchandise {
   int32 event_id = 2;
   string name = 3;
   optional string photo_url = 4;
+  optional string group_name = 5;
 }
 
 message InventoryItem {
@@ -38,6 +39,7 @@ message InventoryItem {
   int32 quantity = 5;
   optional string merch_name = 6;
   optional string photo_url = 7;
+  optional string group_name = 8;
 }
 
 message TradeMatch {
@@ -83,4 +85,5 @@ message UpdateInventoryRequest {
 message CreateMerchRequest {
   string name = 1;
   optional string photo_url = 2;
+  optional string group_name = 3;
 }

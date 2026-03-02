@@ -1,0 +1,1 @@
+ALTER TABLE merchandise ADD COLUMN group_name TEXT;

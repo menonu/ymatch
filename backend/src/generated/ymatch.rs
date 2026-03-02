@@ -49,6 +49,8 @@ pub struct Merchandise {
     pub name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "4")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -70,6 +72,8 @@ pub struct InventoryItem {
     pub merch_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "7")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "8")]
+    pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -158,4 +162,6 @@ pub struct CreateMerchRequest {
     pub name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "2")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }

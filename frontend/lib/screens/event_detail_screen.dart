@@ -86,31 +86,72 @@ class EventDetailScreen extends ConsumerWidget {
             }
           }
 
-          if (viewMode == ViewMode.grid) {
-            return GridView.builder(
-              padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: 0.55,
-              ),
-              itemCount: merch.length,
-              itemBuilder: (context, index) => _buildGridItem(context, ref, user, merch[index], inventoryLookup),
-            );
-          } else if (viewMode == ViewMode.list) {
-            return ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 80),
-              itemCount: merch.length,
-              itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, merch[index], inventoryLookup),
-            );
-          } else {
-            return ListView.builder(
-              padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
-              itemCount: merch.length,
-              itemBuilder: (context, index) => _buildDetailedListItem(context, ref, user, merch[index], inventoryLookup),
-            );
+          // Group the merchandise
+          final groupedMerch = <String, List<Merchandise>>{};
+          for (final item in merch) {
+            final gName = item.hasGroupName() && item.groupName.isNotEmpty ? item.groupName : 'Other Items';
+            groupedMerch.putIfAbsent(gName, () => []).add(item);
           }
+
+          final groupKeys = groupedMerch.keys.toList();
+          groupKeys.sort((a, b) {
+            if (a == 'Other Items') return 1;
+            if (b == 'Other Items') return -1;
+            return a.compareTo(b);
+          });
+
+          return ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80),
+            itemCount: groupKeys.length,
+            itemBuilder: (context, groupIndex) {
+              final groupName = groupKeys[groupIndex];
+              final items = groupedMerch[groupName]!;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    color: Colors.grey[100],
+                    child: Text(
+                      groupName,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (viewMode == ViewMode.grid)
+                    GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 0.55,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup),
+                    )
+                  else if (viewMode == ViewMode.list)
+                    ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
+                    )
+                  else
+                    ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => _buildDetailedListItem(context, ref, user, items[index], inventoryLookup),
+                    ),
+                ],
+              );
+            },
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
@@ -389,6 +430,7 @@ class EventDetailScreen extends ConsumerWidget {
   void _showAddMerchDialog(BuildContext context, WidgetRef ref, int eventId) {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
+    final groupController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -397,6 +439,8 @@ class EventDetailScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Item Name'), autofocus: true),
+            const SizedBox(height: 16),
+            TextField(controller: groupController, decoration: const InputDecoration(labelText: 'Group Name (e.g. Badges) (Optional)')),
             const SizedBox(height: 16),
             TextField(controller: urlController, decoration: const InputDecoration(labelText: 'Photo URL (Optional)')),
           ],
@@ -407,7 +451,12 @@ class EventDetailScreen extends ConsumerWidget {
             onPressed: () async {
               final name = nameController.text.trim();
               if (name.isNotEmpty) {
-                await ref.read(merchControllerProvider.notifier).addMerch(eventId, name, urlController.text.trim());
+                await ref.read(merchControllerProvider.notifier).addMerch(
+                      eventId,
+                      name,
+                      urlController.text.trim(),
+                      groupController.text.trim(),
+                    );
                 ref.invalidate(merchProvider(eventId));
                 if (context.mounted) Navigator.pop(context);
               }

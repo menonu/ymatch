@@ -239,7 +239,7 @@ pub async fn list_merch(
     State(pool): State<PgPool>,
     Path(event_id): Path<i32>,
 ) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
-    let rows = sqlx::query("SELECT id, event_id, name, photo_url FROM merchandise WHERE event_id = $1")
+    let rows = sqlx::query("SELECT id, event_id, name, photo_url, group_name FROM merchandise WHERE event_id = $1")
         .bind(event_id)
         .fetch_all(&pool)
         .await
@@ -250,6 +250,7 @@ pub async fn list_merch(
         event_id: row.get("event_id"),
         name: row.get("name"),
         photo_url: row.get("photo_url"),
+        group_name: row.get("group_name"),
     }).collect();
 
     Ok(Json(merch))
@@ -261,11 +262,12 @@ pub async fn create_merch(
     Json(payload): Json<CreateMerchRequest>,
 ) -> Result<Json<Merchandise>, (StatusCode, String)> {
     let row = sqlx::query(
-        "INSERT INTO merchandise (event_id, name, photo_url) VALUES ($1, $2, $3) RETURNING id, event_id, name, photo_url"
+        "INSERT INTO merchandise (event_id, name, photo_url, group_name) VALUES ($1, $2, $3, $4) RETURNING id, event_id, name, photo_url, group_name"
     )
     .bind(event_id)
     .bind(payload.name)
     .bind(payload.photo_url)
+    .bind(payload.group_name)
     .fetch_one(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -275,6 +277,7 @@ pub async fn create_merch(
         event_id: row.get("event_id"),
         name: row.get("name"),
         photo_url: row.get("photo_url"),
+        group_name: row.get("group_name"),
     }))
 }
 
@@ -309,6 +312,7 @@ pub async fn update_inventory(
         quantity: row.get("quantity"),
         merch_name: Some("".to_string()), // Filled in details handler
         photo_url: None,
+        group_name: None,
     }))
 }
 
@@ -318,9 +322,9 @@ pub async fn get_user_inventory(
 ) -> Result<Json<Vec<InventoryItem>>, (StatusCode, String)> {
     let rows = sqlx::query(
         r#"
-        SELECT
+        SELECT 
             i.id, i.user_id, i.merch_id, i.status, i.quantity,
-            m.name as merch_name, m.photo_url
+            m.name as merch_name, m.photo_url, m.group_name
         FROM inventory i
         JOIN merchandise m ON i.merch_id = m.id
         WHERE i.user_id = $1
@@ -337,8 +341,9 @@ pub async fn get_user_inventory(
         merch_id: row.get("merch_id"),
         status: row.get("status"),
         quantity: row.get("quantity"),
-        merch_name: row.get("merch_name"),
+        merch_name: Some(row.get("merch_name")),
         photo_url: row.get("photo_url"),
+        group_name: row.get("group_name"),
     }).collect();
 
     Ok(Json(items))
