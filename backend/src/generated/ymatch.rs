@@ -29,6 +29,12 @@ pub struct Event {
     pub creator_id: ::core::option::Option<i32>,
     #[prost(string, optional, tag = "4")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, optional, tag = "5")]
+    pub unique_views: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag = "6")]
+    pub active_participants: ::core::option::Option<i32>,
+    #[prost(bool, optional, tag = "7")]
+    pub is_favorite: ::core::option::Option<bool>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]

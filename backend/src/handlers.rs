@@ -126,17 +126,44 @@ pub async fn list_users(State(pool): State<PgPool>) -> Result<Json<Vec<User>>, (
 
 // --- Events ---
 pub async fn list_events(State(pool): State<PgPool>) -> Result<Json<Vec<Event>>, (StatusCode, String)> {
-    let rows = sqlx::query("SELECT id, name, creator_id, created_at FROM events ORDER BY created_at DESC")
+    // We calculate active_participants as the number of distinct users who have inventory (HAVE or WANT) for merchandise in this event.
+    // We'll also fetch unique_views. Since we don't have user authentication in list_events yet, is_favorite will be false by default.
+    let rows = sqlx::query(
+        r#"
+        SELECT 
+            e.id, 
+            e.name, 
+            e.creator_id, 
+            e.created_at,
+            e.unique_views,
+            (
+                SELECT COUNT(DISTINCT i.user_id)
+                FROM inventory i
+                JOIN merchandise m ON m.id = i.merch_id
+                WHERE m.event_id = e.id AND i.quantity > 0
+            ) as active_participants
+        FROM events e 
+        ORDER BY e.created_at DESC
+        "#
+    )
         .fetch_all(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let events = rows.into_iter().map(|row| Event {
-        id: row.get("id"),
-        name: row.get("name"),
-        creator_id: row.get("creator_id"),
-        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-            .map(|dt| dt.to_rfc3339()),
+    let events = rows.into_iter().map(|row| {
+        let active_participants: i64 = row.get("active_participants");
+        let unique_views: Option<i32> = row.get("unique_views");
+        
+        Event {
+            id: row.get("id"),
+            name: row.get("name"),
+            creator_id: row.get("creator_id"),
+            created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                .map(|dt| dt.to_rfc3339()),
+            unique_views,
+            active_participants: Some(active_participants as i32),
+            is_favorite: Some(false), // Needs to be fetched per-user in the future
+        }
     }).collect();
 
     Ok(Json(events))
