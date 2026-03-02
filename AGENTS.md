@@ -36,7 +36,8 @@ flutter run -d web-server --web-port 8081
 ### Development Guidelines
 - **Always Rebuild and Restart**: Before testing any changes, ensure the application (Backend/Frontend) is rebuilt and restarted to apply the latest code.
 - **Verify Version**: Confirm that the version/build being tested reflects the most recent changes before proceeding with verification.
-- **Verify Process and Port Status**: Before test, confirm that backend and frontend is working by checking process alive and port is opened (e.g., using `lsof` or `netstat`).
+- **Verify Process and Port Status**: Before test, confirm that backend and frontend is working by checking process alive and port is opened (e.g., using `netstat`). Do NOT use `lsof` to kill processes as it may accidentally terminate SSH connections or workspace extensions in this environment. Manage background processes manually using PID files (`backend.pid`, `flutter.pid`).
+- **Keep Environment Running**: Maintain a running instance of the backend (`cargo run`) and frontend (`flutter run -d web-server --web-port 8081`) in the background during development to facilitate continuous UI/UX verification. **You must re-deploy (restart) the dev servers after making any codebase changes.**
 - **Protobuf First**: Any changes to data structures must be applied to `proto/models.proto` first, then regenerated.
 
 ## How to Manage Tasks
