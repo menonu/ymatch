@@ -141,6 +141,37 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       state = AsyncValue.error(e, st);
     }
   }
+
+  Future<void> generateDebugData(int creatorId) async {
+    state = const AsyncValue.loading();
+    try {
+      // 1. Create a debug event
+      final eventJson = await client.post('/api/v1/events', {
+        'name': 'Debug Event ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+        'creator_id': creatorId,
+      });
+      final event = Event()..mergeFromProto3Json(eventJson);
+
+      // 2. Generate 30 items in parallel
+      final futures = <Future>[];
+      for (int i = 1; i <= 30; i++) {
+        final hasIcon = (i % 5 != 0); // Every 5th item has no icon
+        final photoUrl = hasIcon ? 'https://picsum.photos/seed/${event.id}_$i/200' : '';
+        futures.add(
+          client.post('/api/v1/events/${event.id}/merch', {
+            'event_id': event.id,
+            'name': 'Item #${i.toString().padLeft(2, '0')}',
+            'photo_url': photoUrl,
+          })
+        );
+      }
+      await Future.wait(futures);
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
 }
 
 final eventsControllerProvider = StateNotifierProvider<EventsController, AsyncValue<void>>((ref) {
