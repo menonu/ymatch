@@ -169,7 +169,7 @@ class ProfileScreen extends ConsumerWidget {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.add_to_photos),
-                        label: const Text('Generate Test Event (30 items)'),
+                        label: const Text('Generate Test Event (50 items in 5 tabs)'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.amber[800],
                           foregroundColor: Colors.white,
@@ -180,7 +180,7 @@ class ProfileScreen extends ConsumerWidget {
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('Generate Data?'),
-                              content: const Text('This will create a dummy event with 30 items. Proceed?'),
+                              content: const Text('This will create a dummy event with 50 items spread across 5 group tabs. Proceed?'),
                               actions: [
                                 TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
                                 ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Generate')),

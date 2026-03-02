@@ -182,30 +182,25 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       });
       final event = Event()..mergeFromProto3Json(eventJson);
 
-      // 2. Generate 30 items in parallel across 3 groups
+      // 2. Generate 50 items in parallel across 5 groups (10 items each)
       final futures = <Future>[];
-      for (int i = 1; i <= 30; i++) {
-        final hasIcon = (i % 5 != 0); // Every 5th item has no icon
-        final photoUrl = hasIcon ? 'https://picsum.photos/seed/${event.id}_$i/200' : '';
-        
-        // Group items into 3 categories
-        String groupName;
-        if (i <= 10) {
-          groupName = 'Photo Cards';
-        } else if (i <= 20) {
-          groupName = 'Badges';
-        } else {
-          groupName = 'Acrylic Stands';
+      final groups = ['Photo Cards', 'Badges', 'Acrylic Stands', 'Posters', 'T-Shirts'];
+      
+      for (int g = 0; g < groups.length; g++) {
+        for (int i = 1; i <= 10; i++) {
+          final globalIndex = (g * 10) + i;
+          final hasIcon = (globalIndex % 4 != 0); // Every 4th item has no icon
+          final photoUrl = hasIcon ? 'https://picsum.photos/seed/${event.id}_$globalIndex/200' : '';
+          
+          futures.add(
+            client.post('/api/v1/events/${event.id}/merch', {
+              'event_id': event.id,
+              'name': '${groups[g]} #$i',
+              'photo_url': photoUrl,
+              'group_name': groups[g],
+            })
+          );
         }
-        
-        futures.add(
-          client.post('/api/v1/events/${event.id}/merch', {
-            'event_id': event.id,
-            'name': 'Item #${i.toString().padLeft(2, '0')}',
-            'photo_url': photoUrl,
-            'group_name': groupName,
-          })
-        );
       }
       await Future.wait(futures);
 
