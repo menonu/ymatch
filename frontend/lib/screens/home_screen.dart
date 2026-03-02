@@ -87,7 +87,20 @@ class HomeScreen extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: Colors.grey),
+                            IconButton(
+                              icon: Icon(
+                                event.hasIsFavorite() && event.isFavorite ? Icons.star : Icons.star_border,
+                                color: event.hasIsFavorite() && event.isFavorite ? Colors.amber : Colors.grey,
+                              ),
+                              onPressed: () async {
+                                final user = ref.read(currentUserProvider);
+                                if (user != null) {
+                                  final newStatus = !(event.hasIsFavorite() && event.isFavorite);
+                                  await ref.read(eventsControllerProvider.notifier).toggleFavorite(event.id, user.id, newStatus);
+                                  ref.invalidate(eventsProvider);
+                                }
+                              },
+                            ),
                           ],
                         ),
                       ),

@@ -121,8 +121,25 @@ final currentUserProvider = Provider<User?>((ref) {
 // --- Events ---
 final eventsProvider = FutureProvider<List<Event>>((ref) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/events');
-  return (json as List).map((e) => Event()..mergeFromProto3Json(e)).toList();
+  final user = ref.watch(currentUserProvider);
+  
+  String url = '/api/v1/events';
+  if (user != null) {
+    url += '?user_id=${user.id}';
+  }
+  
+  final json = await client.get(url);
+  final events = (json as List).map((e) => Event()..mergeFromProto3Json(e)).toList();
+  
+  // Sort favorites to the top
+  events.sort((a, b) {
+    if (a.hasIsFavorite() && a.isFavorite && (!b.hasIsFavorite() || !b.isFavorite)) return -1;
+    if ((!a.hasIsFavorite() || !a.isFavorite) && b.hasIsFavorite() && b.isFavorite) return 1;
+    // Otherwise sort by id descending (newest first)
+    return b.id.compareTo(a.id);
+  });
+  
+  return events;
 });
 
 class EventsController extends StateNotifier<AsyncValue<void>> {
@@ -139,6 +156,19 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> toggleFavorite(int eventId, int userId, bool isFavorite) async {
+    // We don't necessarily need to set state to loading here if we do optimistic update,
+    // but we can just fire and forget, then invalidate the provider.
+    try {
+      await client.post('/api/v1/events/$eventId/favorite', {
+        'user_id': userId,
+        'is_favorite': isFavorite,
+      });
+    } catch (e) {
+      // Handle error if needed
     }
   }
 

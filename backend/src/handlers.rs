@@ -124,10 +124,18 @@ pub async fn list_users(State(pool): State<PgPool>) -> Result<Json<Vec<User>>, (
     Ok(Json(users))
 }
 
+#[derive(serde::Deserialize)]
+pub struct ListEventsQuery {
+    pub user_id: Option<i32>,
+}
+
 // --- Events ---
-pub async fn list_events(State(pool): State<PgPool>) -> Result<Json<Vec<Event>>, (StatusCode, String)> {
+pub async fn list_events(
+    State(pool): State<PgPool>,
+    axum::extract::Query(query): axum::extract::Query<ListEventsQuery>,
+) -> Result<Json<Vec<Event>>, (StatusCode, String)> {
     // We calculate active_participants as the number of distinct users who have inventory (HAVE or WANT) for merchandise in this event.
-    // We'll also fetch unique_views. Since we don't have user authentication in list_events yet, is_favorite will be false by default.
+    // If user_id is provided, we join with event_favorites to set is_favorite.
     let rows = sqlx::query(
         r#"
         SELECT 
@@ -141,11 +149,13 @@ pub async fn list_events(State(pool): State<PgPool>) -> Result<Json<Vec<Event>>,
                 FROM inventory i
                 JOIN merchandise m ON m.id = i.merch_id
                 WHERE m.event_id = e.id AND i.quantity > 0
-            ) as active_participants
+            ) as active_participants,
+            EXISTS(SELECT 1 FROM event_favorites f WHERE f.event_id = e.id AND f.user_id = $1) as is_favorite
         FROM events e 
         ORDER BY e.created_at DESC
         "#
     )
+        .bind(query.user_id)
         .fetch_all(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -153,6 +163,7 @@ pub async fn list_events(State(pool): State<PgPool>) -> Result<Json<Vec<Event>>,
     let events = rows.into_iter().map(|row| {
         let active_participants: i64 = row.get("active_participants");
         let unique_views: Option<i32> = row.get("unique_views");
+        let is_favorite: bool = row.get("is_favorite");
         
         Event {
             id: row.get("id"),
@@ -162,11 +173,40 @@ pub async fn list_events(State(pool): State<PgPool>) -> Result<Json<Vec<Event>>,
                 .map(|dt| dt.to_rfc3339()),
             unique_views,
             active_participants: Some(active_participants as i32),
-            is_favorite: Some(false), // Needs to be fetched per-user in the future
+            is_favorite: Some(is_favorite),
         }
     }).collect();
 
     Ok(Json(events))
+}
+
+#[derive(serde::Deserialize)]
+pub struct ToggleFavoriteRequest {
+    pub user_id: i32,
+    pub is_favorite: bool,
+}
+
+pub async fn toggle_favorite(
+    State(pool): State<PgPool>,
+    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    Json(payload): Json<ToggleFavoriteRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    if payload.is_favorite {
+        sqlx::query("INSERT INTO event_favorites (user_id, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+            .bind(payload.user_id)
+            .bind(event_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    } else {
+        sqlx::query("DELETE FROM event_favorites WHERE user_id = $1 AND event_id = $2")
+            .bind(payload.user_id)
+            .bind(event_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    Ok(StatusCode::OK)
 }
 
 pub async fn create_event(
@@ -188,6 +228,9 @@ pub async fn create_event(
         creator_id: row.get("creator_id"),
         created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
             .map(|dt| dt.to_rfc3339()),
+        unique_views: Some(0),
+        active_participants: Some(0),
+        is_favorite: Some(false),
     }))
 }
 
