@@ -173,21 +173,45 @@ class EventDetailScreen extends ConsumerWidget {
   }
 
   Widget _buildGridCounter(BuildContext context, String label, int qty, Color color, Function(int) onUpdate) {
-    return GestureDetector(
-      onTap: () => onUpdate(qty + 1),
-      onLongPress: () => qty > 0 ? onUpdate(qty - 1) : null,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: qty > 0 ? color.withValues(alpha: 0.1) : Colors.transparent,
-          border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
-        ),
-        child: Column(
-          children: [
-            Text(label, style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.bold)),
-            Text('$qty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: qty > 0 ? color : Colors.grey)),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: qty > 0 ? color.withValues(alpha: 0.1) : Colors.transparent,
+        border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(label, style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.bold)),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+                  child: Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Icon(Icons.remove, size: 12, color: qty > 0 ? color : Colors.grey),
+                  ),
+                ),
+              ),
+              Text('$qty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: qty > 0 ? color : Colors.grey)),
+              Expanded(
+                child: InkWell(
+                  onTap: () => onUpdate(qty + 1),
+                  child: Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Icon(Icons.add, size: 12, color: color),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
