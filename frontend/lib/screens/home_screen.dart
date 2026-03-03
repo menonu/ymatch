@@ -6,6 +6,9 @@ import '../providers/providers.dart';
 enum EventSort { recent, popular, alphabetical }
 final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
 
+enum EventFilter { all, mine }
+final eventFilterProvider = StateProvider<EventFilter>((ref) => EventFilter.all);
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -13,6 +16,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(eventsProvider);
     final sortMode = ref.watch(eventSortProvider);
+    final filterMode = ref.watch(eventFilterProvider);
+    final user = ref.watch(currentUserProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -41,130 +46,161 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: eventsAsync.when(
-        data: (originalEvents) {
-          if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
-          
-          final events = List.of(originalEvents);
-          
-          events.sort((a, b) {
-            // Favorites always at the top regardless of sort mode
-            final aFav = a.hasIsFavorite() && a.isFavorite;
-            final bFav = b.hasIsFavorite() && b.isFavorite;
-            if (aFav && !bFav) return -1;
-            if (!aFav && bFav) return 1;
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.white,
+            child: SegmentedButton<EventFilter>(
+              segments: const [
+                ButtonSegment(value: EventFilter.all, label: Text('All Events')),
+                ButtonSegment(value: EventFilter.mine, label: Text('My Events')),
+              ],
+              selected: {filterMode},
+              onSelectionChanged: (Set<EventFilter> newSelection) {
+                ref.read(eventFilterProvider.notifier).state = newSelection.first;
+              },
+              style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ),
+          Expanded(
+            child: eventsAsync.when(
+              data: (originalEvents) {
+                if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
+                
+                var events = originalEvents.where((e) {
+                  if (filterMode == EventFilter.mine) {
+                    return user != null && e.creatorId == user.id;
+                  }
+                  return true;
+                }).toList();
 
-            // Apply selected sort mode
-            switch (sortMode) {
-              case EventSort.popular:
-                final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
-                final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
-                return bPop.compareTo(aPop); // Descending popularity
-              case EventSort.alphabetical:
-                return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-              case EventSort.recent:
-              default:
-                return b.id.compareTo(a.id); // Descending ID (newest)
-            }
-          });
+                if (events.isEmpty) {
+                  return const Center(child: Text('No events match this filter.', style: TextStyle(color: Colors.grey)));
+                }
+                
+                events.sort((a, b) {
+                  // Favorites always at the top regardless of sort mode
+                  final aFav = a.hasIsFavorite() && a.isFavorite;
+                  final bFav = b.hasIsFavorite() && b.isFavorite;
+                  if (aFav && !bFav) return -1;
+                  if (!aFav && bFav) return 1;
 
-          return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: events.length,
-                itemBuilder: (context, index) {
-                  final event = events[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: () => context.go('/event/${event.id}'),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
+                  // Apply selected sort mode
+                  switch (sortMode) {
+                    case EventSort.popular:
+                      final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
+                      final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
+                      return bPop.compareTo(aPop); // Descending popularity
+                    case EventSort.alphabetical:
+                      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                    case EventSort.recent:
+                    default:
+                      return b.id.compareTo(a.id); // Descending ID (newest)
+                  }
+                });
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final event = events[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => context.go('/event/${event.id}'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.confirmation_number_outlined,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 28,
+                                ),
                               ),
-                              child: Icon(
-                                Icons.confirmation_number_outlined,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    event.name,
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.w600,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      event.name,
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${event.hasActiveParticipants() ? event.activeParticipants : 0} traders',
+                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
                                         ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${event.hasActiveParticipants() ? event.activeParticipants : 0} traders',
-                                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Icon(Icons.visibility_outlined, size: 14, color: Colors.grey[600]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${event.hasUniqueViews() ? event.uniqueViews : 0} views',
-                                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey[600]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatDate(event.createdAt),
-                                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                        const SizedBox(width: 12),
+                                        Icon(Icons.visibility_outlined, size: 14, color: Colors.grey[600]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${event.hasUniqueViews() ? event.uniqueViews : 0} views',
+                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey[600]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _formatDate(event.createdAt),
+                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                event.hasIsFavorite() && event.isFavorite ? Icons.star : Icons.star_border,
-                                color: event.hasIsFavorite() && event.isFavorite ? Colors.amber : Colors.grey,
+                              IconButton(
+                                icon: Icon(
+                                  event.hasIsFavorite() && event.isFavorite ? Icons.star : Icons.star_border,
+                                  color: event.hasIsFavorite() && event.isFavorite ? Colors.amber : Colors.grey,
+                                ),
+                                onPressed: () async {
+                                  if (user != null) {
+                                    final newStatus = !(event.hasIsFavorite() && event.isFavorite);
+                                    await ref.read(eventsControllerProvider.notifier).toggleFavorite(event.id, user.id, newStatus);
+                                    ref.invalidate(eventsProvider);
+                                  }
+                                },
                               ),
-                              onPressed: () async {
-                                final user = ref.read(currentUserProvider);
-                                if (user != null) {
-                                  final newStatus = !(event.hasIsFavorite() && event.isFavorite);
-                                  await ref.read(eventsControllerProvider.notifier).toggleFavorite(event.id, user.id, newStatus);
-                                  ref.invalidate(eventsProvider);
-                                }
-                              },
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('Error: $err')),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddEventDialog(context, ref),
+        icon: const Icon(Icons.add),
         label: const Text('New Event'),
       ),
     );
