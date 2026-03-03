@@ -52,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/events", get(handlers::list_events).post(handlers::create_event))
         .route("/api/v1/events/:id/favorite", post(handlers::toggle_favorite))
         .route("/api/v1/events/:id/merch", get(handlers::list_merch).post(handlers::create_merch))
+        .route("/api/v1/events/:id/merch/sort", post(handlers::update_merch_sort_order))
         // Inventory
         .route("/api/v1/user/inventory", post(handlers::update_inventory))
         .route("/api/v1/user/:id/inventory", get(handlers::get_user_inventory))

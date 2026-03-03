@@ -137,10 +137,30 @@ class EventDetailScreen extends ConsumerWidget {
                     itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
                   );
                 } else {
-                  return ListView.builder(
+                  return ReorderableListView.builder(
                     padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
                     itemCount: items.length,
-                    itemBuilder: (context, index) => _buildDetailedListItem(context, ref, user, items[index], inventoryLookup),
+                    onReorder: (oldIndex, newIndex) {
+                      if (oldIndex < newIndex) newIndex -= 1;
+                      final item = items.removeAt(oldIndex);
+                      items.insert(newIndex, item);
+                      
+                      // Calculate new sort orders
+                      final Map<int, int> newSortOrders = {};
+                      for (int i = 0; i < items.length; i++) {
+                        newSortOrders[items[i].id] = i;
+                      }
+                      
+                      // Optimistically update DB
+                      ref.read(merchControllerProvider.notifier).updateSortOrder(eventId, newSortOrders);
+                    },
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return Container(
+                        key: ValueKey(item.id),
+                        child: _buildDetailedListItem(context, ref, user, item, inventoryLookup),
+                      );
+                    },
                   );
                 }
               }).toList(),

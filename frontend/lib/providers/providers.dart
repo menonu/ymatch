@@ -244,6 +244,17 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
       state = AsyncValue.error(e, st);
     }
   }
+
+  Future<void> updateSortOrder(int eventId, Map<int, int> sortOrders) async {
+    try {
+      await client.post('/api/v1/events/$eventId/merch/sort', {
+        'event_id': eventId,
+        'sort_orders': sortOrders.map((k, v) => MapEntry(k.toString(), v)), // JSON keys must be strings
+      });
+    } catch (e) {
+      // Ignore errors for optimistic UI or show a toast
+    }
+  }
 }
 
 final merchControllerProvider = StateNotifierProvider<MerchController, AsyncValue<void>>((ref) {
