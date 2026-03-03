@@ -29,9 +29,13 @@ pub async fn guest_login(
         }));
     }
 
-    // 2. Create new Guest User (safely truncate UUID for username)
-    let uuid_prefix = &payload.uuid[..std::cmp::min(8, payload.uuid.len())];
-    let new_username = format!("Guest_{}", uuid_prefix);
+    // 2. Create new Guest User
+    // Use the last 8 characters of the UUID for the username, or fallback to the whole string if it's too short.
+    let suffix_len = std::cmp::min(8, payload.uuid.len());
+    let uuid_suffix = &payload.uuid[payload.uuid.len() - suffix_len..];
+    // Use standard uuid to guarantee uniqueness to avoid database constraint violations during rapid smoke testing
+    let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
+    let new_username = format!("Guest_{}_{}", uuid_suffix, unique_id);
     let row = sqlx::query(
         "INSERT INTO users (username, uuid) VALUES ($1, $2) RETURNING id, username, uuid, device_token, created_at"
     )

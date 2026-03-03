@@ -38,6 +38,7 @@ flutter run -d web-server --web-port 8081
 - **Verify Version**: Confirm that the version/build being tested reflects the most recent changes before proceeding with verification.
 - **Verify Process and Port Status**: Before test, confirm that backend and frontend is working by checking process alive and port is opened (e.g., using `netstat`). Do NOT use `lsof` to kill processes as it may accidentally terminate SSH connections or workspace extensions in this environment. Manage background processes manually using PID files (`backend.pid`, `flutter.pid`).
 - **Keep Environment Running**: Maintain a running instance of the backend (`cargo run`) and frontend (`flutter run -d web-server --web-port 8081`) in the background during development to facilitate continuous UI/UX verification. **You must re-deploy (restart) the dev servers after making any codebase changes.**
+- **Smoke Tests Mandatory**: After re-deploying the backend, you must run the API smoke tests to verify the core endpoints are not broken. Run `./scripts/smoke_test.sh` from the project root.
 - **Protobuf First**: Any changes to data structures must be applied to `proto/models.proto` first, then regenerated.
 
 ## How to Manage Tasks
