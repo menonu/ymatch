@@ -8,6 +8,9 @@ import 'add_merch_screen.dart';
 enum ViewMode { detailed, grid, list }
 final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
 
+enum MerchFilter { all, have, want, missing }
+final merchFilterProvider = StateProvider<MerchFilter>((ref) => MerchFilter.all);
+
 class EventDetailScreen extends ConsumerWidget {
   final int eventId;
 
@@ -19,6 +22,7 @@ class EventDetailScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final inventoryAsync = user != null ? ref.watch(inventoryProvider(user.id)) : null;
     final viewMode = ref.watch(viewModeProvider);
+    final filterMode = ref.watch(merchFilterProvider);
 
     return merchAsync.when(
       data: (merch) {
@@ -27,7 +31,15 @@ class EventDetailScreen extends ConsumerWidget {
             appBar: AppBar(title: const Text('Event Inventory')),
             body: _buildEmptyState(context, ref),
             floatingActionButton: FloatingActionButton.extended(
-              onPressed: () => _showAddMerchDialog(context, ref, eventId),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddMerchScreen(eventId: eventId),
+                    fullscreenDialog: true,
+                  ),
+                );
+              },
               label: const Text('Add Merch'),
               icon: const Icon(Icons.add_photo_alternate),
             ),
@@ -41,9 +53,22 @@ class EventDetailScreen extends ConsumerWidget {
           }
         }
 
+        // Apply Filter
+        final filteredMerch = merch.where((item) {
+          if (filterMode == MerchFilter.all) return true;
+          final inv = inventoryLookup[item.id] ?? {};
+          final have = inv['HAVE'] ?? 0;
+          final want = inv['WANT'] ?? 0;
+          
+          if (filterMode == MerchFilter.have) return have > 0;
+          if (filterMode == MerchFilter.want) return want > 0;
+          if (filterMode == MerchFilter.missing) return have == 0 && want == 0;
+          return true;
+        }).toList();
+
         // Group the merchandise
         final groupedMerch = <String, List<Merchandise>>{};
-        for (final item in merch) {
+        for (final item in filteredMerch) {
           final gName = item.hasGroupName() && item.groupName.isNotEmpty ? item.groupName : 'Other Items';
           groupedMerch.putIfAbsent(gName, () => []).add(item);
         }
@@ -114,56 +139,90 @@ class EventDetailScreen extends ConsumerWidget {
                 tabs: groupKeys.map((name) => Tab(text: name)).toList(),
               ),
             ),
-            body: TabBarView(
-              children: groupKeys.map((groupName) {
-                final items = groupedMerch[groupName]!;
-                
-                if (viewMode == ViewMode.grid) {
-                  return GridView.builder(
-                    padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.55,
+            body: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<MerchFilter>(
+                      segments: const [
+                        ButtonSegment(value: MerchFilter.all, label: Text('All')),
+                        ButtonSegment(value: MerchFilter.have, label: Text('HAVE')),
+                        ButtonSegment(value: MerchFilter.want, label: Text('WANT')),
+                        ButtonSegment(value: MerchFilter.missing, label: Text('Missing')),
+                      ],
+                      selected: {filterMode},
+                      onSelectionChanged: (Set<MerchFilter> newSelection) {
+                        ref.read(merchFilterProvider.notifier).state = newSelection.first;
+                      },
+                      style: SegmentedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
                     ),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup),
-                  );
-                } else if (viewMode == ViewMode.list) {
-                  return ListView.builder(
-                    padding: const EdgeInsets.only(top: 8, bottom: 80),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
-                  );
-                } else {
-                  return ReorderableListView.builder(
-                    padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
-                    itemCount: items.length,
-                    onReorder: (oldIndex, newIndex) {
-                      if (oldIndex < newIndex) newIndex -= 1;
-                      final item = items.removeAt(oldIndex);
-                      items.insert(newIndex, item);
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: groupKeys.map((groupName) {
+                      final items = groupedMerch[groupName]!;
                       
-                      // Calculate new sort orders
-                      final Map<int, int> newSortOrders = {};
-                      for (int i = 0; i < items.length; i++) {
-                        newSortOrders[items[i].id] = i;
+                      if (items.isEmpty) {
+                        return const Center(child: Text('No items match this filter.', style: TextStyle(color: Colors.grey)));
                       }
                       
-                      // Optimistically update DB
-                      ref.read(merchControllerProvider.notifier).updateSortOrder(eventId, newSortOrders);
-                    },
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return Container(
-                        key: ValueKey(item.id),
-                        child: _buildDetailedListItem(context, ref, user, item, inventoryLookup),
-                      );
-                    },
-                  );
-                }
-              }).toList(),
+                      if (viewMode == ViewMode.grid) {
+                        return GridView.builder(
+                          padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 0.55,
+                          ),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup),
+                        );
+                      } else if (viewMode == ViewMode.list) {
+                        return ListView.builder(
+                          padding: const EdgeInsets.only(top: 8, bottom: 80),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
+                        );
+                      } else {
+                        return ReorderableListView.builder(
+                          padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                          itemCount: items.length,
+                          onReorder: (oldIndex, newIndex) {
+                            if (oldIndex < newIndex) newIndex -= 1;
+                            final item = items.removeAt(oldIndex);
+                            items.insert(newIndex, item);
+                            
+                            // Calculate new sort orders
+                            final Map<int, int> newSortOrders = {};
+                            for (int i = 0; i < items.length; i++) {
+                              newSortOrders[items[i].id] = i;
+                            }
+                            
+                            // Optimistically update DB
+                            ref.read(merchControllerProvider.notifier).updateSortOrder(eventId, newSortOrders);
+                          },
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            return Container(
+                              key: ValueKey(item.id),
+                              child: _buildDetailedListItem(context, ref, user, item, inventoryLookup),
+                            );
+                          },
+                        );
+                      }
+                    }).toList(),
+                  ),
+                ),
+              ],
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () {
