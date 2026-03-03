@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import 'add_merch_screen.dart';
 
 enum ViewMode { detailed, grid, list }
 final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
@@ -145,7 +146,15 @@ class EventDetailScreen extends ConsumerWidget {
               }).toList(),
             ),
             floatingActionButton: FloatingActionButton.extended(
-              onPressed: () => _showAddMerchDialog(context, ref, eventId),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddMerchScreen(eventId: eventId),
+                    fullscreenDialog: true,
+                  ),
+                );
+              },
               label: const Text('Add Merch'),
               icon: const Icon(Icons.add_photo_alternate),
             ),
