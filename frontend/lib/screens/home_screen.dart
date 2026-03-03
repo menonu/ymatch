@@ -3,21 +3,72 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 
+enum EventSort { recent, popular, alphabetical }
+final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(eventsProvider);
+    final sortMode = ref.watch(eventSortProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Events'),
+        actions: [
+          PopupMenuButton<EventSort>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort Events',
+            onSelected: (EventSort result) {
+              ref.read(eventSortProvider.notifier).state = result;
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<EventSort>>[
+              const PopupMenuItem<EventSort>(
+                value: EventSort.recent,
+                child: Text('Newest First'),
+              ),
+              const PopupMenuItem<EventSort>(
+                value: EventSort.popular,
+                child: Text('Most Popular'),
+              ),
+              const PopupMenuItem<EventSort>(
+                value: EventSort.alphabetical,
+                child: Text('Alphabetical'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: eventsAsync.when(
-        data: (events) => events.isEmpty
-            ? _buildEmptyState(context, ref)
-            : ListView.builder(
+        data: (originalEvents) {
+          if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
+          
+          final events = List.of(originalEvents);
+          
+          events.sort((a, b) {
+            // Favorites always at the top regardless of sort mode
+            final aFav = a.hasIsFavorite() && a.isFavorite;
+            final bFav = b.hasIsFavorite() && b.isFavorite;
+            if (aFav && !bFav) return -1;
+            if (!aFav && bFav) return 1;
+
+            // Apply selected sort mode
+            switch (sortMode) {
+              case EventSort.popular:
+                final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
+                final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
+                return bPop.compareTo(aPop); // Descending popularity
+              case EventSort.alphabetical:
+                return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+              case EventSort.recent:
+              default:
+                return b.id.compareTo(a.id); // Descending ID (newest)
+            }
+          });
+
+          return ListView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: events.length,
                 itemBuilder: (context, index) {
@@ -107,13 +158,13 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   );
                 },
-              ),
+              );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddEventDialog(context, ref),
-        icon: const Icon(Icons.add),
         label: const Text('New Event'),
       ),
     );
