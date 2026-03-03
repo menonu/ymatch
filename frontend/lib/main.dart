@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/home_screen.dart';
@@ -8,6 +9,16 @@ import 'screens/trade_list_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 import 'screens/login_screen.dart';
 import 'providers/providers.dart';
+import 'theme/app_theme.dart';
+
+class CustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+      };
+}
 
 void main() {
   runApp(const ProviderScope(child: MyApp()));
@@ -109,11 +120,10 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'ymatch',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
+      scrollBehavior: CustomScrollBehavior(),
       routerConfig: router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }
