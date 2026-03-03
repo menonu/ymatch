@@ -11,14 +11,33 @@ final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
 enum MerchFilter { all, have, want, missing }
 final merchFilterProvider = StateProvider<MerchFilter>((ref) => MerchFilter.all);
 
-class EventDetailScreen extends ConsumerWidget {
+class EventDetailScreen extends ConsumerStatefulWidget {
   final int eventId;
 
   const EventDetailScreen({super.key, required this.eventId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final merchAsync = ref.watch(merchProvider(eventId));
+  ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
+
+  @override
+  void initState() {
+    super.initState();
+    // Register the view when the screen is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(currentUserProvider);
+      if (user != null) {
+        ref.read(eventsControllerProvider.notifier).registerView(widget.eventId, user.id);
+        // We do not invalidate immediately to avoid jitter, it will refresh next time Home is opened.
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final merchAsync = ref.watch(merchProvider(widget.eventId));
     final user = ref.watch(currentUserProvider);
     final inventoryAsync = user != null ? ref.watch(inventoryProvider(user.id)) : null;
     final viewMode = ref.watch(viewModeProvider);
@@ -35,7 +54,7 @@ class EventDetailScreen extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AddMerchScreen(eventId: eventId),
+                    builder: (context) => AddMerchScreen(eventId: widget.eventId),
                     fullscreenDialog: true,
                   ),
                 );
@@ -208,7 +227,7 @@ class EventDetailScreen extends ConsumerWidget {
                             }
                             
                             // Optimistically update DB
-                            ref.read(merchControllerProvider.notifier).updateSortOrder(eventId, newSortOrders);
+                            ref.read(merchControllerProvider.notifier).updateSortOrder(widget.eventId, newSortOrders);
                           },
                           itemBuilder: (context, index) {
                             final item = items[index];
@@ -229,7 +248,7 @@ class EventDetailScreen extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AddMerchScreen(eventId: eventId),
+                    builder: (context) => AddMerchScreen(eventId: widget.eventId),
                     fullscreenDialog: true,
                   ),
                 );

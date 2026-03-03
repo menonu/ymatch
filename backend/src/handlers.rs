@@ -133,6 +133,26 @@ pub struct ListEventsQuery {
     pub user_id: Option<i32>,
 }
 
+#[derive(serde::Deserialize)]
+pub struct RegisterViewRequest {
+    pub user_id: i32,
+}
+
+pub async fn register_event_view(
+    State(pool): State<PgPool>,
+    Path(event_id): Path<i32>,
+    Json(payload): Json<RegisterViewRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    sqlx::query("INSERT INTO event_views (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+        .bind(event_id)
+        .bind(payload.user_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
 // --- Events ---
 pub async fn list_events(
     State(pool): State<PgPool>,
@@ -147,7 +167,7 @@ pub async fn list_events(
             e.name, 
             e.creator_id, 
             e.created_at,
-            e.unique_views,
+            (SELECT COUNT(*) FROM event_views v WHERE v.event_id = e.id) as unique_views,
             (
                 SELECT COUNT(DISTINCT i.user_id)
                 FROM inventory i

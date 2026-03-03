@@ -172,6 +172,16 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> registerView(int eventId, int userId) async {
+    try {
+      await client.post('/api/v1/events/$eventId/view', {
+        'user_id': userId,
+      });
+    } catch (e) {
+      // Ignore errors for analytics
+    }
+  }
+
   Future<void> generateDebugData(int creatorId) async {
     state = const AsyncValue.loading();
     try {
