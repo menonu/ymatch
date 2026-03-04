@@ -5,18 +5,19 @@ import 'config_service.dart';
 
 class ApiClient {
   final ConfigService config;
+  final http.Client _client;
 
-  ApiClient(this.config);
+  ApiClient(this.config, {http.Client? client}) : _client = client ?? http.Client();
 
   Future<dynamic> get(String endpoint) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');
-    final response = await http.get(uri);
+    final response = await _client.get(uri);
     return _handleResponse(response);
   }
 
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');
-    final response = await http.post(
+    final response = await _client.post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
