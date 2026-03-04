@@ -2294,3 +2294,5 @@ backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b
 backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b4lx7t3td6asgmi198em5b/f32qln3h50qgbqjjccapxcj7q.o
 backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b4lx7t3td6asgmi198em5b/query-cache.bin
 backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b4lx7t3td6asgmi198em5b/work-products.bin
+*.pid
+.gemini/
