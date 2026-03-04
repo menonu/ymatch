@@ -269,6 +269,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
+    final tradeQty = merchInv['TRADE'] ?? 0;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -299,6 +300,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             children: [
               Expanded(child: _buildGridCounter(context, 'H', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q))),
               Expanded(child: _buildGridCounter(context, 'W', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q))),
+              Expanded(child: _buildGridCounter(context, 'T', tradeQty, AppTheme.tradeColor, (q) => _updateInv(ref, user, item.id, 'TRADE', q))),
             ],
           )
         ],
@@ -362,6 +364,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
+    final tradeQty = merchInv['TRADE'] ?? 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -376,13 +379,18 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               : _buildCompactPlaceholder(),
         ),
         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildCompactCounter(context, 'HAVE', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
-            const SizedBox(width: 8),
-            _buildCompactCounter(context, 'WANT', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q)),
-          ],
+        trailing: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildCompactCounter(context, 'HAVE', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
+              const SizedBox(width: 8),
+              _buildCompactCounter(context, 'WANT', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q)),
+              const SizedBox(width: 8),
+              _buildCompactCounter(context, 'TRADE', tradeQty, AppTheme.tradeColor, (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
+            ],
+          ),
         ),
       ),
     );
@@ -440,6 +448,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
+    final tradeQty = merchInv['TRADE'] ?? 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -465,8 +474,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   Row(
                     children: [
                       _buildStepper(label: 'HAVE', color: AppTheme.haveColor, qty: haveQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       _buildStepper(label: 'WANT', color: AppTheme.wantColor, qty: wantQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'WANT', q)),
+                      const SizedBox(width: 8),
+                      _buildStepper(label: 'TRADE', color: AppTheme.tradeColor, qty: tradeQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
                     ],
                   ),
                 ],
