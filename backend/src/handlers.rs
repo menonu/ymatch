@@ -534,3 +534,109 @@ pub async fn list_matches(
 
     Ok(Json(matches))
 }
+
+pub async fn update_match_status(
+    State(pool): State<PgPool>,
+    Path(match_id): Path<i32>,
+    Json(payload): Json<UpdateMatchStatusRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Basic validation of status
+    let valid_statuses = ["ACCEPTED", "REJECTED", "COMPLETED"];
+    if !valid_statuses.contains(&payload.status.as_str()) {
+        return Err((StatusCode::BAD_REQUEST, "Invalid status".to_string()));
+    }
+
+    let mut tx = pool.begin().await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Update the status of this match
+    sqlx::query("UPDATE matches SET status = $1 WHERE id = $2")
+        .bind(&payload.status)
+        .bind(match_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // If accepting, delete competing PENDING matches for the same users to prevent double-booking
+    if payload.status == "ACCEPTED" {
+        // Fetch the users involved in this match
+        let match_row = sqlx::query("SELECT user1_id, user2_id FROM matches WHERE id = $1")
+            .bind(match_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            
+        let u1: i32 = match_row.get("user1_id");
+        let u2: i32 = match_row.get("user2_id");
+
+        // Delete any PENDING matches that involve either user to clear out competing proposals.
+        // NOTE: A more complex system might only delete matches involving the EXACT SAME items, 
+        // but since we only have user-level matching right now, we clear other pending matches between them.
+        sqlx::query("DELETE FROM matches WHERE status = 'PENDING' AND id != $1 AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))")
+            .bind(match_id)
+            .bind(u1)
+            .bind(u2)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit().await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+// --- Messages ---
+
+pub async fn list_messages(
+    State(pool): State<PgPool>,
+    Path(match_id): Path<i32>,
+) -> Result<Json<Vec<Message>>, (StatusCode, String)> {
+    let rows = sqlx::query(
+        "SELECT id, match_id, sender_id, content, created_at FROM messages WHERE match_id = $1 ORDER BY created_at ASC"
+    )
+    .bind(match_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let messages = rows
+        .into_iter()
+        .map(|row| Message {
+            id: row.get("id"),
+            match_id: row.get("match_id"),
+            sender_id: row.get("sender_id"),
+            content: row.get("content"),
+            created_at: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                .map(|dt| dt.to_rfc3339()),
+        })
+        .collect();
+
+    Ok(Json(messages))
+}
+
+pub async fn send_message(
+    State(pool): State<PgPool>,
+    Path(match_id): Path<i32>,
+    Json(payload): Json<SendMessageRequest>,
+) -> Result<Json<Message>, (StatusCode, String)> {
+    let row = sqlx::query(
+        "INSERT INTO messages (match_id, sender_id, content) VALUES ($1, $2, $3) RETURNING id, match_id, sender_id, content, created_at"
+    )
+    .bind(match_id)
+    .bind(payload.sender_id)
+    .bind(payload.content)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(Message {
+        id: row.get("id"),
+        match_id: row.get("match_id"),
+        sender_id: row.get("sender_id"),
+        content: row.get("content"),
+        created_at: row
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+            .map(|dt| dt.to_rfc3339()),
+    }))
+}

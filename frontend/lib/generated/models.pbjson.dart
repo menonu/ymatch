@@ -441,3 +441,60 @@ final $typed_data.Uint8List createMerchRequestDescriptor = $convert.base64Decode
     'ChJDcmVhdGVNZXJjaFJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRIgCglwaG90b191cmwYAi'
     'ABKAlIAFIIcGhvdG9VcmyIAQESIgoKZ3JvdXBfbmFtZRgDIAEoCUgBUglncm91cE5hbWWIAQFC'
     'DAoKX3Bob3RvX3VybEINCgtfZ3JvdXBfbmFtZQ==');
+
+@$core.Deprecated('Use updateMatchStatusRequestDescriptor instead')
+const UpdateMatchStatusRequest$json = {
+  '1': 'UpdateMatchStatusRequest',
+  '2': [
+    {'1': 'status', '3': 1, '4': 1, '5': 9, '10': 'status'},
+  ],
+};
+
+/// Descriptor for `UpdateMatchStatusRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateMatchStatusRequestDescriptor =
+    $convert.base64Decode(
+        'ChhVcGRhdGVNYXRjaFN0YXR1c1JlcXVlc3QSFgoGc3RhdHVzGAEgASgJUgZzdGF0dXM=');
+
+@$core.Deprecated('Use messageDescriptor instead')
+const Message$json = {
+  '1': 'Message',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 5, '10': 'id'},
+    {'1': 'match_id', '3': 2, '4': 1, '5': 5, '10': 'matchId'},
+    {'1': 'sender_id', '3': 3, '4': 1, '5': 5, '10': 'senderId'},
+    {'1': 'content', '3': 4, '4': 1, '5': 9, '10': 'content'},
+    {
+      '1': 'created_at',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'createdAt',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_created_at'},
+  ],
+};
+
+/// Descriptor for `Message`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List messageDescriptor = $convert.base64Decode(
+    'CgdNZXNzYWdlEg4KAmlkGAEgASgFUgJpZBIZCghtYXRjaF9pZBgCIAEoBVIHbWF0Y2hJZBIbCg'
+    'lzZW5kZXJfaWQYAyABKAVSCHNlbmRlcklkEhgKB2NvbnRlbnQYBCABKAlSB2NvbnRlbnQSIgoK'
+    'Y3JlYXRlZF9hdBgFIAEoCUgAUgljcmVhdGVkQXSIAQFCDQoLX2NyZWF0ZWRfYXQ=');
+
+@$core.Deprecated('Use sendMessageRequestDescriptor instead')
+const SendMessageRequest$json = {
+  '1': 'SendMessageRequest',
+  '2': [
+    {'1': 'match_id', '3': 1, '4': 1, '5': 5, '10': 'matchId'},
+    {'1': 'sender_id', '3': 2, '4': 1, '5': 5, '10': 'senderId'},
+    {'1': 'content', '3': 3, '4': 1, '5': 9, '10': 'content'},
+  ],
+};
+
+/// Descriptor for `SendMessageRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sendMessageRequestDescriptor = $convert.base64Decode(
+    'ChJTZW5kTWVzc2FnZVJlcXVlc3QSGQoIbWF0Y2hfaWQYASABKAVSB21hdGNoSWQSGwoJc2VuZG'
+    'VyX2lkGAIgASgFUghzZW5kZXJJZBIYCgdjb250ZW50GAMgASgJUgdjb250ZW50');

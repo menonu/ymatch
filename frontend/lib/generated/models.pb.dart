@@ -1126,6 +1126,240 @@ class CreateMerchRequest extends $pb.GeneratedMessage {
   void clearGroupName() => $_clearField(3);
 }
 
+class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
+  factory UpdateMatchStatusRequest({
+    $core.String? status,
+  }) {
+    final result = create();
+    if (status != null) result.status = status;
+    return result;
+  }
+
+  UpdateMatchStatusRequest._();
+
+  factory UpdateMatchStatusRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateMatchStatusRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateMatchStatusRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'status')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateMatchStatusRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateMatchStatusRequest copyWith(
+          void Function(UpdateMatchStatusRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateMatchStatusRequest))
+          as UpdateMatchStatusRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateMatchStatusRequest create() => UpdateMatchStatusRequest._();
+  @$core.override
+  UpdateMatchStatusRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateMatchStatusRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateMatchStatusRequest>(create);
+  static UpdateMatchStatusRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get status => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set status($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStatus() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStatus() => $_clearField(1);
+}
+
+class Message extends $pb.GeneratedMessage {
+  factory Message({
+    $core.int? id,
+    $core.int? matchId,
+    $core.int? senderId,
+    $core.String? content,
+    $core.String? createdAt,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (matchId != null) result.matchId = matchId;
+    if (senderId != null) result.senderId = senderId;
+    if (content != null) result.content = content;
+    if (createdAt != null) result.createdAt = createdAt;
+    return result;
+  }
+
+  Message._();
+
+  factory Message.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Message.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Message',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'id')
+    ..aI(2, _omitFieldNames ? '' : 'matchId')
+    ..aI(3, _omitFieldNames ? '' : 'senderId')
+    ..aOS(4, _omitFieldNames ? '' : 'content')
+    ..aOS(5, _omitFieldNames ? '' : 'createdAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Message clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Message copyWith(void Function(Message) updates) =>
+      super.copyWith((message) => updates(message as Message)) as Message;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Message create() => Message._();
+  @$core.override
+  Message createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Message getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Message>(create);
+  static Message? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get id => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set id($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get matchId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set matchId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMatchId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMatchId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get senderId => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set senderId($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSenderId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSenderId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get content => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set content($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasContent() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContent() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get createdAt => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set createdAt($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCreatedAt() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCreatedAt() => $_clearField(5);
+}
+
+class SendMessageRequest extends $pb.GeneratedMessage {
+  factory SendMessageRequest({
+    $core.int? matchId,
+    $core.int? senderId,
+    $core.String? content,
+  }) {
+    final result = create();
+    if (matchId != null) result.matchId = matchId;
+    if (senderId != null) result.senderId = senderId;
+    if (content != null) result.content = content;
+    return result;
+  }
+
+  SendMessageRequest._();
+
+  factory SendMessageRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SendMessageRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SendMessageRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'matchId')
+    ..aI(2, _omitFieldNames ? '' : 'senderId')
+    ..aOS(3, _omitFieldNames ? '' : 'content')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendMessageRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SendMessageRequest copyWith(void Function(SendMessageRequest) updates) =>
+      super.copyWith((message) => updates(message as SendMessageRequest))
+          as SendMessageRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SendMessageRequest create() => SendMessageRequest._();
+  @$core.override
+  SendMessageRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SendMessageRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SendMessageRequest>(create);
+  static SendMessageRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get matchId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set matchId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMatchId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMatchId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get senderId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set senderId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSenderId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSenderId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get content => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set content($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasContent() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearContent() => $_clearField(3);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =
