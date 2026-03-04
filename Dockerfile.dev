@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM public.ecr.aws/ubuntu/ubuntu:22.04
 
 # Avoid prompts during apt installs
 ENV DEBIAN_FRONTEND=noninteractive
@@ -12,7 +12,23 @@ RUN apt-get update && apt-get install -y \
     docker.io \
     iptables \
     openssh-server \
+    libssl-dev \
+    pkg-config \
+    postgresql-client \
+    protobuf-compiler \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Flutter
+RUN git clone https://github.com/flutter/flutter.git -b stable /usr/local/flutter
+ENV PATH="/usr/local/flutter/bin:${PATH}"
+RUN git config --global --add safe.directory /usr/local/flutter
+RUN flutter config --no-analytics
+RUN flutter precache
 
 # Setup SSH Server
 RUN mkdir /var/run/sshd
@@ -28,6 +44,12 @@ RUN useradd -ms /bin/bash dev && \
     usermod -aG sudo dev && \
     usermod -aG docker dev && \
     echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Ensure the dev user also has the correct PATH
+USER dev
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/home/dev/.cargo/bin:/usr/local/flutter/bin:${PATH}"
+USER root
 
 # Create working directory
 WORKDIR /workspace
