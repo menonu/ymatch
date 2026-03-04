@@ -74,3 +74,53 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
     Ok(matches_created)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::PgPool;
+
+    #[sqlx::test]
+    async fn test_run_matching_algorithm(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
+        // 1. Setup users
+        sqlx::query("INSERT INTO users (id, username, password_hash, created_at) VALUES (1, 'user1', 'hash', NOW()), (2, 'user2', 'hash', NOW())")
+            .execute(&pool)
+            .await?;
+
+        // 2. Setup events and merch
+        sqlx::query("INSERT INTO events (id, name, creator_id, created_at) VALUES (1, 'Test Event', 1, NOW())")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO merchandise (id, event_id, name, group_name) VALUES (1, 1, 'Merch 1', 'Group 1'), (2, 1, 'Merch 2', 'Group 1')")
+            .execute(&pool)
+            .await?;
+
+        // 3. Setup inventory
+        // User 1 WANTS Merch 1, HAS Merch 2
+        // User 2 HAS Merch 1, WANTS Merch 2
+        sqlx::query("INSERT INTO inventory (user_id, merch_id, status, quantity, updated_at) VALUES
+            (1, 1, 'WANT', 1, NOW()),
+            (1, 2, 'HAVE', 1, NOW()),
+            (2, 1, 'HAVE', 1, NOW()),
+            (2, 2, 'WANT', 1, NOW())")
+            .execute(&pool)
+            .await?;
+
+        // 4. Run matching
+        let matches_created = run_matching_algorithm(&pool).await?;
+
+        // 5. Assert
+        assert_eq!(matches_created, 1);
+
+        // Verify match exists in db
+        let match_row = sqlx::query("SELECT user1_id, user2_id, status FROM matches")
+            .fetch_one(&pool)
+            .await?;
+
+        let u1: i32 = match_row.get("user1_id");
+        let u2: i32 = match_row.get("user2_id");
+        assert!((u1 == 1 && u2 == 2) || (u1 == 2 && u2 == 1));
+
+        Ok(())
+    }
+}

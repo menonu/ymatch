@@ -7,17 +7,25 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('end-to-end test', () {
-    testWidgets('tap on the floating action button, verify counter',
+    testWidgets('Guest login and navigate to events screen',
         (tester) async {
       app.main();
       await tester.pumpAndSettle();
 
-      // Verify that the app starts.
-      // You can add more specific expectations here.
-      // Check if loading
-      expect(find.byType(MaterialApp), findsOneWidget);
+      // Verify that the app starts and LoginScreen is shown.
+      expect(find.text('Welcome to ymatch'), findsOneWidget);
+
+      // Find the 'Start' button and tap it.
+      final startButton = find.widgetWithText(ElevatedButton, 'Start');
+      expect(startButton, findsOneWidget);
+      await tester.tap(startButton);
+
+      // Wait for login request and navigation.
       await tester.pumpAndSettle();
-      expect(find.byType(Scaffold), findsOneWidget);
+
+      // Verify that HomeScreen is shown.
+      expect(find.text('Events'), findsOneWidget);
+      expect(find.text('All Events'), findsOneWidget);
     });
   });
 }
