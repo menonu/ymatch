@@ -1,8 +1,16 @@
 use sqlx::{PgPool, Row};
 
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
-    // 1. Fetch all 'WANT' items
-    let rows = sqlx::query("SELECT id, user_id, merch_id, status, quantity FROM inventory WHERE status = 'WANT' ORDER BY updated_at ASC")
+    // 1. Fetch all 'WANT' items, joining with merchandise to get group_name
+    let rows = sqlx::query(
+        r#"
+        SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity, m.group_name 
+        FROM inventory i
+        JOIN merchandise m ON i.merch_id = m.id
+        WHERE i.status = 'WANT' 
+        ORDER BY i.updated_at ASC
+        "#
+    )
         .fetch_all(pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -12,6 +20,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     for want_row in rows {
         let want_user_id: i32 = want_row.get("user_id");
         let want_merch_id: i32 = want_row.get("merch_id");
+        let want_group_name: Option<String> = want_row.get("group_name");
 
         // Potential partners who are TRADING what User A wants
         let potential_partners = sqlx::query("SELECT user_id, merch_id FROM inventory WHERE merch_id = $1 AND status = 'TRADE' AND user_id != $2")
@@ -24,11 +33,18 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         for partner_row in potential_partners {
             let partner_id: i32 = partner_row.get("user_id");
 
-            // Does Partner (User B) WANT anything that User A is TRADING?
+            // Does Partner (User B) WANT anything that User A is TRADING, AND is it in the same group?
             let user_a_trades = sqlx::query(
-                "SELECT merch_id FROM inventory WHERE user_id = $1 AND status = 'TRADE'",
+                r#"
+                SELECT i.merch_id 
+                FROM inventory i
+                JOIN merchandise m ON i.merch_id = m.id
+                WHERE i.user_id = $1 AND i.status = 'TRADE'
+                  AND (m.group_name = $2 OR ($2 IS NULL AND m.group_name IS NULL))
+                "#
             )
             .bind(want_user_id)
+            .bind(&want_group_name)
             .fetch_all(pool)
             .await
             .map_err(|e| e.to_string())?;

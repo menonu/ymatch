@@ -131,6 +131,15 @@ class TradeListScreen extends ConsumerWidget {
                               const Icon(Icons.chat_bubble_outline, color: Colors.grey),
                           ],
                         ),
+                        // Show what is being traded
+                        if (match.userHaves.isNotEmpty || match.userWants.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text('You Give:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                          ...match.userHaves.map((item) => Text('• ${item.merchName} (Qty: ${item.quantity})', style: const TextStyle(fontSize: 12))),
+                          const SizedBox(height: 4),
+                          Text('You Receive:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                          ...match.userWants.map((item) => Text('• ${item.merchName} (Qty: ${item.quantity})', style: const TextStyle(fontSize: 12))),
+                        ],
                         // Action Buttons based on lifecycle
                         if (isPending) ...[
                           const SizedBox(height: 16),
@@ -146,7 +155,35 @@ class TradeListScreen extends ConsumerWidget {
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
-                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'ACCEPTED'),
+                                onPressed: () async {
+                                  // Show a dialog to confirm the specific items
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Confirm Trade Offer'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('You will give:'),
+                                          ...match.userHaves.map((i) => Text('• ${i.merchName}')),
+                                          const SizedBox(height: 16),
+                                          const Text('You will receive:'),
+                                          ...match.userWants.map((i) => Text('• ${i.merchName}')),
+                                          const SizedBox(height: 16),
+                                          const Text('Are you sure you want to accept this match?', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                        ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true && context.mounted) {
+                                    _updateStatus(context, ref, user.id, match.id, 'ACCEPTED');
+                                  }
+                                },
                                 child: const Text('Accept Match'),
                               ),
                             ],
