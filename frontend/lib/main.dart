@@ -8,6 +8,7 @@ import 'screens/profile_screen.dart';
 import 'screens/trade_list_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 import 'screens/login_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
 import 'providers/providers.dart';
 import 'theme/app_theme.dart';
 
@@ -53,6 +54,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminDashboardScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

@@ -402,6 +402,47 @@ pub async fn get_user_inventory(
 }
 
 // --- Matches ---
+pub async fn list_all_merch(State(pool): State<PgPool>) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
+    let rows = sqlx::query("SELECT id, event_id, name, photo_url, group_name, sort_order FROM merchandise ORDER BY event_id ASC, sort_order ASC, id ASC")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let merch = rows.into_iter().map(|row| Merchandise {
+        id: row.get("id"),
+        event_id: row.get("event_id"),
+        name: row.get("name"),
+        photo_url: row.get("photo_url"),
+        group_name: row.get("group_name"),
+        sort_order: Some(row.get("sort_order")),
+    }).collect();
+
+    Ok(Json(merch))
+}
+
+pub async fn list_all_matches(State(pool): State<PgPool>) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
+    let rows = sqlx::query(
+        "SELECT id, user1_id, user2_id, status, created_at FROM matches ORDER BY created_at DESC"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let matches = rows.into_iter().map(|row| TradeMatch {
+        id: row.get("id"),
+        user1_id: row.get("user1_id"),
+        user2_id: row.get("user2_id"),
+        status: row.get("status"),
+        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+            .map(|dt| dt.to_rfc3339()),
+        other_user: None,
+        user_haves: vec![],
+        user_wants: vec![],
+    }).collect();
+
+    Ok(Json(matches))
+}
+
 pub async fn trigger_matching(State(pool): State<PgPool>) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let count = crate::matching::run_matching_algorithm(&pool).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
