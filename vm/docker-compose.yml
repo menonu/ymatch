@@ -1,0 +1,25 @@
+services:
+  ubuntu:
+    build: .
+    container_name: ubuntu_vm
+    privileged: true
+    ports:
+      - "2222:22"
+    volumes:
+      - /home/menonu/ws:/home/ubuntu/ws
+      - gemini-data:/home/ubuntu/.gemini
+      - docker-data:/var/lib/docker
+      - gh-config:/home/ubuntu/.config/gh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, video, utility]
+    restart: unless-stopped
+
+volumes:
+  docker-data:
+  gemini-data:
+  gh-config:
