@@ -22,15 +22,18 @@ class ScaffoldWithNavBar extends ConsumerWidget {
 
     final destinations = <NavigationDestination>[
       const NavigationDestination(
-        icon: Icon(Icons.event),
+        icon: Icon(Icons.event_outlined),
+        selectedIcon: Icon(Icons.event),
         label: 'Events',
       ),
       const NavigationDestination(
-        icon: Icon(Icons.swap_horiz),
+        icon: Icon(Icons.swap_horiz_outlined),
+        selectedIcon: Icon(Icons.swap_horiz),
         label: 'Matches',
       ),
       const NavigationDestination(
-        icon: Icon(Icons.person),
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
         label: 'Profile',
       ),
     ];
@@ -38,7 +41,8 @@ class ScaffoldWithNavBar extends ConsumerWidget {
     if (showAdmin) {
       destinations.add(
         const NavigationDestination(
-          icon: Icon(Icons.admin_panel_settings),
+          icon: Icon(Icons.admin_panel_settings_outlined),
+          selectedIcon: Icon(Icons.admin_panel_settings),
           label: 'Admin',
         ),
       );
