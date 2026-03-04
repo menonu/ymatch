@@ -330,3 +330,16 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
 final inventoryProvider = AsyncNotifierProviderFamily<UserInventoryNotifier, List<InventoryItem>, int>(() {
   return UserInventoryNotifier();
 });
+
+// --- Admin ---
+final adminMerchProvider = FutureProvider<List<Merchandise>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/admin/merch');
+  return (json as List).map((e) => Merchandise()..mergeFromProto3Json(e)).toList();
+});
+
+final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/admin/matches');
+  return (json as List).map((e) => TradeMatch()..mergeFromProto3Json(e)).toList();
+});

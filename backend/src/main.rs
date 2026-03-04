@@ -78,6 +78,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/api/v1/user/:id/inventory",
             get(handlers::get_user_inventory),
         )
+        // Admin
+        .route("/api/v1/admin/merch", get(handlers::list_all_merch))
+        .route("/api/v1/admin/matches", get(handlers::list_all_matches))
         // Matches
         .route("/api/v1/matches/trigger", post(handlers::trigger_matching))
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
