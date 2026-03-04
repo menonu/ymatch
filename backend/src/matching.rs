@@ -13,8 +13,8 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         let want_user_id: i32 = want_row.get("user_id");
         let want_merch_id: i32 = want_row.get("merch_id");
 
-        // Potential partners who HAVE what User A wants
-        let potential_partners = sqlx::query("SELECT user_id, merch_id FROM inventory WHERE merch_id = $1 AND status = 'HAVE' AND user_id != $2")
+        // Potential partners who are TRADING what User A wants
+        let potential_partners = sqlx::query("SELECT user_id, merch_id FROM inventory WHERE merch_id = $1 AND status = 'TRADE' AND user_id != $2")
             .bind(want_merch_id)
             .bind(want_user_id)
             .fetch_all(pool)
@@ -24,22 +24,22 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         for partner_row in potential_partners {
             let partner_id: i32 = partner_row.get("user_id");
 
-            // Does Partner (User B) WANT anything that User A HAS?
-            let user_a_haves = sqlx::query(
-                "SELECT merch_id FROM inventory WHERE user_id = $1 AND status = 'HAVE'",
+            // Does Partner (User B) WANT anything that User A is TRADING?
+            let user_a_trades = sqlx::query(
+                "SELECT merch_id FROM inventory WHERE user_id = $1 AND status = 'TRADE'",
             )
             .bind(want_user_id)
             .fetch_all(pool)
             .await
             .map_err(|e| e.to_string())?;
 
-            for a_have_row in user_a_haves {
-                let a_have_merch_id: i32 = a_have_row.get("merch_id");
+            for a_trade_row in user_a_trades {
+                let a_trade_merch_id: i32 = a_trade_row.get("merch_id");
 
                 // Check if Partner WANTS this item
                 let partner_want = sqlx::query("SELECT id FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'")
                     .bind(partner_id)
-                    .bind(a_have_merch_id)
+                    .bind(a_trade_merch_id)
                     .fetch_optional(pool)
                     .await
                     .map_err(|e| e.to_string())?;

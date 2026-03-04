@@ -14,6 +14,7 @@ class AppTheme {
   // Status Colors
   static const Color haveColor = Colors.indigo; // Color for HAVE
   static const Color wantColor = Colors.pinkAccent; // Color for WANT
+  static const Color tradeColor = Colors.teal; // Color for TRADE (OFFER)
 
   static ThemeData get lightTheme {
     return ThemeData(
