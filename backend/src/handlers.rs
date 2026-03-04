@@ -6,6 +6,14 @@ use axum::{
 };
 use sqlx::{PgPool, Row};
 
+// --- System ---
+pub async fn get_version() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let rev = option_env!("GIT_HASH").unwrap_or("unknown");
+    Ok(Json(serde_json::json!({
+        "backend_version": rev,
+    })))
+}
+
 // --- Auth ---
 pub async fn guest_login(
     State(pool): State<PgPool>,

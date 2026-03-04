@@ -165,6 +165,8 @@ class ProfileScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    _buildVersionInfo(context, ref),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -254,6 +256,33 @@ class ProfileScreen extends ConsumerWidget {
               text,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionInfo(BuildContext context, WidgetRef ref) {
+    final backendVer = ref.watch(backendVersionProvider);
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Versions',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[900], fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          backendVer.when(
+            data: (ver) => SelectableText('Backend (Git Hash): $ver', style: TextStyle(color: Colors.amber[900], fontSize: 13, fontFamily: 'monospace')),
+            loading: () => const Text('Backend: Loading...'),
+            error: (_, __) => const Text('Backend: Error fetching version'),
           ),
         ],
       ),
