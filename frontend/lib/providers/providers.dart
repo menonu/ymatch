@@ -4,6 +4,17 @@ import 'package:uuid/uuid.dart';
 import '../services/api_client.dart';
 import '../models/models.dart';
 
+// --- System ---
+final backendVersionProvider = FutureProvider<String>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  try {
+    final response = await client.get('/api/v1/version');
+    return response['backend_version'] as String? ?? 'unknown';
+  } catch (e) {
+    return 'error';
+  }
+});
+
 // --- Auth / Current User ---
 class AuthController extends StateNotifier<AsyncValue<User?>> {
   final ApiClient client;
