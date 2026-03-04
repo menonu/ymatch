@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/trade_list_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 import 'screens/login_screen.dart';
 import 'providers/providers.dart';
@@ -28,6 +29,7 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorEventsKey = GlobalKey<NavigatorState>(debugLabel: 'events');
 final _shellNavigatorMatchesKey = GlobalKey<NavigatorState>(debugLabel: 'matches');
 final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
+final _shellNavigatorAdminKey = GlobalKey<NavigatorState>(debugLabel: 'admin');
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Assuming authProvider is defined elsewhere and provides a value that indicates auth status.
@@ -102,6 +104,16 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
+          // Admin Branch
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorAdminKey,
+            routes: [
+              GoRoute(
+                path: '/admin',
+                builder: (context, state) => const AdminDashboardScreen(),
               ),
             ],
           ),

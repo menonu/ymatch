@@ -277,6 +277,29 @@ pub async fn create_event(
 }
 
 // --- Merchandise ---
+pub async fn list_all_merch(
+    State(pool): State<PgPool>,
+) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
+    let rows = sqlx::query("SELECT id, event_id, name, photo_url, group_name, sort_order FROM merchandise ORDER BY id ASC")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let merch = rows
+        .into_iter()
+        .map(|row| Merchandise {
+            id: row.get("id"),
+            event_id: row.get("event_id"),
+            name: row.get("name"),
+            photo_url: row.get("photo_url"),
+            group_name: row.get("group_name"),
+            sort_order: Some(row.get("sort_order")),
+        })
+        .collect();
+
+    Ok(Json(merch))
+}
+
 pub async fn list_merch(
     State(pool): State<PgPool>,
     Path(event_id): Path<i32>,
@@ -439,6 +462,38 @@ pub async fn trigger_matching(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     Ok(Json(serde_json::json!({ "matches_created": count })))
+}
+
+pub async fn list_all_matches(
+    State(pool): State<PgPool>,
+) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
+    let rows = sqlx::query(
+        "SELECT id, user1_id, user2_id, status, created_at FROM matches ORDER BY created_at DESC"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let mut matches = Vec::new();
+    for row in rows {
+        let match_id: i32 = row.get("id");
+        let mut trade_match = TradeMatch {
+            id: match_id,
+            user1_id: row.get("user1_id"),
+            user2_id: row.get("user2_id"),
+            status: row.get("status"),
+            created_at: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                .map(|dt| dt.to_rfc3339()),
+            other_user: None,
+            user_haves: vec![],
+            user_wants: vec![],
+        };
+
+        matches.push(trade_match);
+    }
+
+    Ok(Json(matches))
 }
 
 pub async fn list_matches(
