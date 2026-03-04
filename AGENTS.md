@@ -11,6 +11,7 @@ This document serves as the main entry point and guide for the `ymatch` merchand
 - **`proto/`**: Protobuf definitions for data models shared across boundaries.
 - **`docs/`**: Project documentation, specifications, and architecture.
 - **`scripts/`**: Utility scripts (e.g., protobuf generation).
+- **`vm/`**: Development container (devcontainer) environment setup and configurations.
 
 ## How to Build and Test
 
