@@ -86,6 +86,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Matches
         .route("/api/v1/matches/trigger", post(handlers::trigger_matching))
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
+        .route("/api/v1/matches/:id/status", post(handlers::update_match_status))
+        // Messages
+        .route("/api/v1/matches/:id/messages", get(handlers::list_messages).post(handlers::send_message))
         .with_state(pool)
         .layer(cors);
 

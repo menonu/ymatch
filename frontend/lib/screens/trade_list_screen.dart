@@ -15,6 +15,18 @@ final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((ref, userI
 class TradeListScreen extends ConsumerWidget {
   const TradeListScreen({super.key});
 
+  Future<void> _updateStatus(BuildContext context, WidgetRef ref, int userId, int matchId, String newStatus) async {
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.post('/api/v1/matches/$matchId/status', {'status': newStatus});
+      ref.invalidate(matchesProvider(userId));
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
@@ -55,55 +67,111 @@ class TradeListScreen extends ConsumerWidget {
             itemCount: matches.length,
             itemBuilder: (context, index) {
               final match = matches[index];
+              final isPending = match.status == 'PENDING';
+              final isAccepted = match.status == 'ACCEPTED';
+              final isCompleted = match.status == 'COMPLETED';
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: () => context.go('/chat/${match.id}'),
+                  onTap: () {
+                    // Navigate to chat if it's an active trade
+                    if (isPending || isAccepted) {
+                      context.go('/matches/chat/${match.id}');
+                    }
+                  },
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppTheme.secondaryColor.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.handshake_outlined, color: AppTheme.secondaryColor),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Trade Match #${match.id}',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppTheme.secondaryColor.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
                               ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(match.status).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  match.status,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: _getStatusColor(match.status),
+                              child: const Icon(Icons.handshake_outlined, color: AppTheme.secondaryColor),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Trade Match #${match.id}',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                   ),
-                                ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(match.status).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      match.status,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: _getStatusColor(match.status),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isPending || isAccepted)
+                              const Icon(Icons.chat_bubble_outline, color: Colors.grey),
+                          ],
+                        ),
+                        // Action Buttons based on lifecycle
+                        if (isPending) ...[
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'REJECTED'),
+                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                child: const Text('Reject'),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'ACCEPTED'),
+                                child: const Text('Accept Match'),
                               ),
                             ],
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right, color: Colors.grey),
+                          )
+                        ] else if (isAccepted) ...[
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'REJECTED'),
+                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                child: const Text('Cancel Trade'),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'COMPLETED'),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                child: const Text('Mark as Completed'),
+                              ),
+                            ],
+                          )
+                        ]
                       ],
                     ),
                   ),
@@ -126,6 +194,8 @@ class TradeListScreen extends ConsumerWidget {
         return Colors.blue;
       case 'COMPLETED':
         return Colors.green;
+      case 'REJECTED':
+        return Colors.red;
       default:
         return Colors.grey;
     }

@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/trade_list_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 import 'screens/login_screen.dart';
@@ -91,7 +92,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'chat/:id', // Define sub-route for chat later
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const Placeholder(), // TODO
+                    builder: (context, state) {
+                      final id = int.parse(state.pathParameters['id']!);
+                      return ChatScreen(matchId: id);
+                    },
                   ),
                 ],
               ),

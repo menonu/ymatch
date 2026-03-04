@@ -178,3 +178,40 @@ pub struct CreateMerchRequest {
     #[prost(string, optional, tag = "3")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateMatchStatusRequest {
+    /// "ACCEPTED", "REJECTED", "COMPLETED"
+    #[prost(string, tag = "1")]
+    pub status: ::prost::alloc::string::String,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Message {
+    #[prost(int32, tag = "1")]
+    pub id: i32,
+    #[prost(int32, tag = "2")]
+    pub match_id: i32,
+    #[prost(int32, tag = "3")]
+    pub sender_id: i32,
+    #[prost(string, tag = "4")]
+    pub content: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "5")]
+    pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SendMessageRequest {
+    #[prost(int32, tag = "1")]
+    pub match_id: i32,
+    #[prost(int32, tag = "2")]
+    pub sender_id: i32,
+    #[prost(string, tag = "3")]
+    pub content: ::prost::alloc::string::String,
+}

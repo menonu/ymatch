@@ -93,3 +93,21 @@ message CreateMerchRequest {
   optional string photo_url = 2;
   optional string group_name = 3;
 }
+
+message UpdateMatchStatusRequest {
+  string status = 1; // "ACCEPTED", "REJECTED", "COMPLETED"
+}
+
+message Message {
+  int32 id = 1;
+  int32 match_id = 2;
+  int32 sender_id = 3;
+  string content = 4;
+  optional string created_at = 5;
+}
+
+message SendMessageRequest {
+  int32 match_id = 1;
+  int32 sender_id = 2;
+  string content = 3;
+}
