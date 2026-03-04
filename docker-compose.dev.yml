@@ -1,0 +1,18 @@
+services:
+  dev_env:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ymatch_dev_env
+    privileged: true
+    ports:
+      - "2222:22"
+    volumes:
+      - .:/workspace
+      # Map the docker socket if you want sibling docker containers rather than nested,
+      # but since we want true dind (dockerd running inside), we just need privileged: true.
+      # You can persist docker data inside the container using a named volume if desired:
+      - dind-data:/var/lib/docker
+
+volumes:
+  dind-data:

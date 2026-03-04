@@ -1,0 +1,43 @@
+FROM ubuntu:22.04
+
+# Avoid prompts during apt installs
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies for development, dind, and ssh
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    sudo \
+    docker.io \
+    iptables \
+    openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Setup SSH Server
+RUN mkdir /var/run/sshd
+# Allow root login and password authentication (for development only)
+RUN echo 'root:root' | chpasswd
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+# SSH login fix
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+# Add development user (optional, but good practice. Here we just use root for simplicity if needed, but let's add a dev user)
+RUN useradd -ms /bin/bash dev && \
+    echo 'dev:dev' | chpasswd && \
+    usermod -aG sudo dev && \
+    usermod -aG docker dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create working directory
+WORKDIR /workspace
+
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Expose SSH port
+EXPOSE 22
+
+# Start dockerd and sshd
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
