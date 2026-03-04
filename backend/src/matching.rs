@@ -1,5 +1,4 @@
 use sqlx::{PgPool, Row};
-use crate::generated::ymatch::InventoryItem;
 
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     // 1. Fetch all 'WANT' items
