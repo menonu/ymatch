@@ -2296,3 +2296,7 @@ backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b
 backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b4lx7t3td6asgmi198em5b/work-products.bin
 *.pid
 .gemini/
+
+*.pid
+.gemini/
+*.log
