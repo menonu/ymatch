@@ -79,10 +79,40 @@ const Event$json = {
       '10': 'createdAt',
       '17': true
     },
+    {
+      '1': 'unique_views',
+      '3': 5,
+      '4': 1,
+      '5': 5,
+      '9': 2,
+      '10': 'uniqueViews',
+      '17': true
+    },
+    {
+      '1': 'active_participants',
+      '3': 6,
+      '4': 1,
+      '5': 5,
+      '9': 3,
+      '10': 'activeParticipants',
+      '17': true
+    },
+    {
+      '1': 'is_favorite',
+      '3': 7,
+      '4': 1,
+      '5': 8,
+      '9': 4,
+      '10': 'isFavorite',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_creator_id'},
     {'1': '_created_at'},
+    {'1': '_unique_views'},
+    {'1': '_active_participants'},
+    {'1': '_is_favorite'},
   ],
 };
 
@@ -90,7 +120,11 @@ const Event$json = {
 final $typed_data.Uint8List eventDescriptor = $convert.base64Decode(
     'CgVFdmVudBIOCgJpZBgBIAEoBVICaWQSEgoEbmFtZRgCIAEoCVIEbmFtZRIiCgpjcmVhdG9yX2'
     'lkGAMgASgFSABSCWNyZWF0b3JJZIgBARIiCgpjcmVhdGVkX2F0GAQgASgJSAFSCWNyZWF0ZWRB'
-    'dIgBAUINCgtfY3JlYXRvcl9pZEINCgtfY3JlYXRlZF9hdA==');
+    'dIgBARImCgx1bmlxdWVfdmlld3MYBSABKAVIAlILdW5pcXVlVmlld3OIAQESNAoTYWN0aXZlX3'
+    'BhcnRpY2lwYW50cxgGIAEoBUgDUhJhY3RpdmVQYXJ0aWNpcGFudHOIAQESJAoLaXNfZmF2b3Jp'
+    'dGUYByABKAhIBFIKaXNGYXZvcml0ZYgBAUINCgtfY3JlYXRvcl9pZEINCgtfY3JlYXRlZF9hdE'
+    'IPCg1fdW5pcXVlX3ZpZXdzQhYKFF9hY3RpdmVfcGFydGljaXBhbnRzQg4KDF9pc19mYXZvcml0'
+    'ZQ==');
 
 @$core.Deprecated('Use merchandiseDescriptor instead')
 const Merchandise$json = {
@@ -108,17 +142,39 @@ const Merchandise$json = {
       '10': 'photoUrl',
       '17': true
     },
+    {
+      '1': 'group_name',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'groupName',
+      '17': true
+    },
+    {
+      '1': 'sort_order',
+      '3': 6,
+      '4': 1,
+      '5': 5,
+      '9': 2,
+      '10': 'sortOrder',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_photo_url'},
+    {'1': '_group_name'},
+    {'1': '_sort_order'},
   ],
 };
 
 /// Descriptor for `Merchandise`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List merchandiseDescriptor = $convert.base64Decode(
     'CgtNZXJjaGFuZGlzZRIOCgJpZBgBIAEoBVICaWQSGQoIZXZlbnRfaWQYAiABKAVSB2V2ZW50SW'
-    'QSEgoEbmFtZRgDIAEoCVIEbmFtZRIgCglwaG90b191cmwYBCABKAlIAFIIcGhvdG9VcmyIAQFC'
-    'DAoKX3Bob3RvX3VybA==');
+    'QSEgoEbmFtZRgDIAEoCVIEbmFtZRIgCglwaG90b191cmwYBCABKAlIAFIIcGhvdG9VcmyIAQES'
+    'IgoKZ3JvdXBfbmFtZRgFIAEoCUgBUglncm91cE5hbWWIAQESIgoKc29ydF9vcmRlchgGIAEoBU'
+    'gCUglzb3J0T3JkZXKIAQFCDAoKX3Bob3RvX3VybEINCgtfZ3JvdXBfbmFtZUINCgtfc29ydF9v'
+    'cmRlcg==');
 
 @$core.Deprecated('Use inventoryItemDescriptor instead')
 const InventoryItem$json = {
@@ -147,10 +203,20 @@ const InventoryItem$json = {
       '10': 'photoUrl',
       '17': true
     },
+    {
+      '1': 'group_name',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'groupName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_merch_name'},
     {'1': '_photo_url'},
+    {'1': '_group_name'},
   ],
 };
 
@@ -159,8 +225,9 @@ final $typed_data.Uint8List inventoryItemDescriptor = $convert.base64Decode(
     'Cg1JbnZlbnRvcnlJdGVtEg4KAmlkGAEgASgFUgJpZBIXCgd1c2VyX2lkGAIgASgFUgZ1c2VySW'
     'QSGQoIbWVyY2hfaWQYAyABKAVSB21lcmNoSWQSFgoGc3RhdHVzGAQgASgJUgZzdGF0dXMSGgoI'
     'cXVhbnRpdHkYBSABKAVSCHF1YW50aXR5EiIKCm1lcmNoX25hbWUYBiABKAlIAFIJbWVyY2hOYW'
-    '1liAEBEiAKCXBob3RvX3VybBgHIAEoCUgBUghwaG90b1VybIgBAUINCgtfbWVyY2hfbmFtZUIM'
-    'CgpfcGhvdG9fdXJs');
+    '1liAEBEiAKCXBob3RvX3VybBgHIAEoCUgBUghwaG90b1VybIgBARIiCgpncm91cF9uYW1lGAgg'
+    'ASgJSAJSCWdyb3VwTmFtZYgBAUINCgtfbWVyY2hfbmFtZUIMCgpfcGhvdG9fdXJsQg0KC19ncm'
+    '91cF9uYW1l');
 
 @$core.Deprecated('Use tradeMatchDescriptor instead')
 const TradeMatch$json = {
@@ -305,6 +372,40 @@ final $typed_data.Uint8List updateInventoryRequestDescriptor = $convert.base64De
     'JjaF9pZBgCIAEoBVIHbWVyY2hJZBIWCgZzdGF0dXMYAyABKAlSBnN0YXR1cxIaCghxdWFudGl0'
     'eRgEIAEoBVIIcXVhbnRpdHk=');
 
+@$core.Deprecated('Use updateMerchSortOrderRequestDescriptor instead')
+const UpdateMerchSortOrderRequest$json = {
+  '1': 'UpdateMerchSortOrderRequest',
+  '2': [
+    {'1': 'event_id', '3': 1, '4': 1, '5': 5, '10': 'eventId'},
+    {
+      '1': 'sort_orders',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.ymatch.UpdateMerchSortOrderRequest.SortOrdersEntry',
+      '10': 'sortOrders'
+    },
+  ],
+  '3': [UpdateMerchSortOrderRequest_SortOrdersEntry$json],
+};
+
+@$core.Deprecated('Use updateMerchSortOrderRequestDescriptor instead')
+const UpdateMerchSortOrderRequest_SortOrdersEntry$json = {
+  '1': 'SortOrdersEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 5, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 5, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `UpdateMerchSortOrderRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateMerchSortOrderRequestDescriptor = $convert.base64Decode(
+    'ChtVcGRhdGVNZXJjaFNvcnRPcmRlclJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SW'
+    'QSVAoLc29ydF9vcmRlcnMYAiADKAsyMy55bWF0Y2guVXBkYXRlTWVyY2hTb3J0T3JkZXJSZXF1'
+    'ZXN0LlNvcnRPcmRlcnNFbnRyeVIKc29ydE9yZGVycxo9Cg9Tb3J0T3JkZXJzRW50cnkSEAoDa2'
+    'V5GAEgASgFUgNrZXkSFAoFdmFsdWUYAiABKAVSBXZhbHVlOgI4AQ==');
+
 @$core.Deprecated('Use createMerchRequestDescriptor instead')
 const CreateMerchRequest$json = {
   '1': 'CreateMerchRequest',
@@ -319,13 +420,24 @@ const CreateMerchRequest$json = {
       '10': 'photoUrl',
       '17': true
     },
+    {
+      '1': 'group_name',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'groupName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_photo_url'},
+    {'1': '_group_name'},
   ],
 };
 
 /// Descriptor for `CreateMerchRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List createMerchRequestDescriptor = $convert.base64Decode(
     'ChJDcmVhdGVNZXJjaFJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRIgCglwaG90b191cmwYAi'
-    'ABKAlIAFIIcGhvdG9VcmyIAQFCDAoKX3Bob3RvX3VybA==');
+    'ABKAlIAFIIcGhvdG9VcmyIAQESIgoKZ3JvdXBfbmFtZRgDIAEoCUgBUglncm91cE5hbWWIAQFC'
+    'DAoKX3Bob3RvX3VybEINCgtfZ3JvdXBfbmFtZQ==');

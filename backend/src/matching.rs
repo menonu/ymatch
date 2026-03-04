@@ -1,5 +1,4 @@
 use sqlx::{PgPool, Row};
-use crate::generated::ymatch::InventoryItem;
 
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     // 1. Fetch all 'WANT' items
@@ -26,11 +25,13 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
             let partner_id: i32 = partner_row.get("user_id");
 
             // Does Partner (User B) WANT anything that User A HAS?
-            let user_a_haves = sqlx::query("SELECT merch_id FROM inventory WHERE user_id = $1 AND status = 'HAVE'")
-                .bind(want_user_id)
-                .fetch_all(pool)
-                .await
-                .map_err(|e| e.to_string())?;
+            let user_a_haves = sqlx::query(
+                "SELECT merch_id FROM inventory WHERE user_id = $1 AND status = 'HAVE'",
+            )
+            .bind(want_user_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| e.to_string())?;
 
             for a_have_row in user_a_haves {
                 let a_have_merch_id: i32 = a_have_row.get("merch_id");

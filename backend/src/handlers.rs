@@ -1,10 +1,10 @@
+use crate::generated::ymatch::*;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Json,
 };
 use sqlx::{PgPool, Row};
-use crate::generated::ymatch::*;
 
 // --- Auth ---
 pub async fn guest_login(
@@ -12,11 +12,13 @@ pub async fn guest_login(
     Json(payload): Json<GuestLoginRequest>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     // 1. Try to find existing user by UUID
-    let row = sqlx::query("SELECT id, username, uuid, device_token, created_at FROM users WHERE uuid = $1")
-        .bind(&payload.uuid)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let row = sqlx::query(
+        "SELECT id, username, uuid, device_token, created_at FROM users WHERE uuid = $1",
+    )
+    .bind(&payload.uuid)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if let Some(row) = row {
         return Ok(Json(User {
@@ -24,7 +26,8 @@ pub async fn guest_login(
             username: row.get("username"),
             uuid: row.get("uuid"),
             device_token: row.get("device_token"),
-            created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+            created_at: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
         }));
     }
@@ -50,7 +53,8 @@ pub async fn guest_login(
         username: row.get("username"),
         uuid: row.get("uuid"),
         device_token: row.get("device_token"),
-        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+        created_at: row
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
             .map(|dt| dt.to_rfc3339()),
     }))
 }
@@ -74,7 +78,8 @@ pub async fn login(
                 username: row.get("username"),
                 uuid: row.get("uuid"),
                 device_token: row.get("device_token"),
-                created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                created_at: row
+                    .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                     .map(|dt| dt.to_rfc3339()),
             }))
         } else {
@@ -84,7 +89,6 @@ pub async fn login(
         Err((StatusCode::UNAUTHORIZED, "Invalid credentials".to_string()))
     }
 }
-
 
 pub async fn signup(
     State(pool): State<PgPool>,
@@ -105,25 +109,32 @@ pub async fn signup(
         username: row.get("username"),
         uuid: row.get("uuid"),
         device_token: row.get("device_token"),
-        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+        created_at: row
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
             .map(|dt| dt.to_rfc3339()),
     }))
 }
 
-pub async fn list_users(State(pool): State<PgPool>) -> Result<Json<Vec<User>>, (StatusCode, String)> {
+pub async fn list_users(
+    State(pool): State<PgPool>,
+) -> Result<Json<Vec<User>>, (StatusCode, String)> {
     let rows = sqlx::query("SELECT id, username, uuid, device_token, created_at FROM users")
         .fetch_all(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let users = rows.into_iter().map(|row| User {
-        id: row.get("id"),
-        username: row.get("username"),
-        uuid: row.get("uuid"),
-        device_token: row.get("device_token"),
-        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-            .map(|dt| dt.to_rfc3339()),
-    }).collect();
+    let users = rows
+        .into_iter()
+        .map(|row| User {
+            id: row.get("id"),
+            username: row.get("username"),
+            uuid: row.get("uuid"),
+            device_token: row.get("device_token"),
+            created_at: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                .map(|dt| dt.to_rfc3339()),
+        })
+        .collect();
 
     Ok(Json(users))
 }
@@ -143,12 +154,14 @@ pub async fn register_event_view(
     Path(event_id): Path<i32>,
     Json(payload): Json<RegisterViewRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    sqlx::query("INSERT INTO event_views (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
-        .bind(event_id)
-        .bind(payload.user_id)
-        .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    sqlx::query(
+        "INSERT INTO event_views (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    )
+    .bind(event_id)
+    .bind(payload.user_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(StatusCode::OK)
 }
@@ -184,22 +197,26 @@ pub async fn list_events(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let events = rows.into_iter().map(|row| {
-        let active_participants: i64 = row.get("active_participants");
-        let unique_views: Option<i32> = row.get("unique_views");
-        let is_favorite: bool = row.get("is_favorite");
-        
-        Event {
-            id: row.get("id"),
-            name: row.get("name"),
-            creator_id: row.get("creator_id"),
-            created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-                .map(|dt| dt.to_rfc3339()),
-            unique_views,
-            active_participants: Some(active_participants as i32),
-            is_favorite: Some(is_favorite),
-        }
-    }).collect();
+    let events = rows
+        .into_iter()
+        .map(|row| {
+            let active_participants: i64 = row.get("active_participants");
+            let unique_views: Option<i32> = row.get("unique_views");
+            let is_favorite: bool = row.get("is_favorite");
+
+            Event {
+                id: row.get("id"),
+                name: row.get("name"),
+                creator_id: row.get("creator_id"),
+                created_at: row
+                    .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                    .map(|dt| dt.to_rfc3339()),
+                unique_views,
+                active_participants: Some(active_participants as i32),
+                is_favorite: Some(is_favorite),
+            }
+        })
+        .collect();
 
     Ok(Json(events))
 }
@@ -250,7 +267,8 @@ pub async fn create_event(
         id: row.get("id"),
         name: row.get("name"),
         creator_id: row.get("creator_id"),
-        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+        created_at: row
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
             .map(|dt| dt.to_rfc3339()),
         unique_views: Some(0),
         active_participants: Some(0),
@@ -269,14 +287,17 @@ pub async fn list_merch(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let merch = rows.into_iter().map(|row| Merchandise {
-        id: row.get("id"),
-        event_id: row.get("event_id"),
-        name: row.get("name"),
-        photo_url: row.get("photo_url"),
-        group_name: row.get("group_name"),
-        sort_order: Some(row.get("sort_order")),
-    }).collect();
+    let merch = rows
+        .into_iter()
+        .map(|row| Merchandise {
+            id: row.get("id"),
+            event_id: row.get("event_id"),
+            name: row.get("name"),
+            photo_url: row.get("photo_url"),
+            group_name: row.get("group_name"),
+            sort_order: Some(row.get("sort_order")),
+        })
+        .collect();
 
     Ok(Json(merch))
 }
@@ -316,8 +337,11 @@ pub async fn update_merch_sort_order(
         return Err((StatusCode::BAD_REQUEST, "Event ID mismatch".to_string()));
     }
 
-    let mut tx = pool.begin().await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     for (merch_id, sort_order) in payload.sort_orders {
         sqlx::query("UPDATE merchandise SET sort_order = $1 WHERE id = $2 AND event_id = $3")
             .bind(sort_order)
@@ -327,8 +351,10 @@ pub async fn update_merch_sort_order(
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
-    
-    tx.commit().await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(StatusCode::OK)
 }
@@ -346,7 +372,7 @@ pub async fn update_inventory(
         ON CONFLICT (user_id, merch_id, status)
         DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW()
         RETURNING id, user_id, merch_id, status, quantity
-        "#
+        "#,
     )
     .bind(payload.user_id)
     .bind(payload.merch_id)
@@ -380,30 +406,36 @@ pub async fn get_user_inventory(
         FROM inventory i
         JOIN merchandise m ON i.merch_id = m.id
         WHERE i.user_id = $1
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_all(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let items = rows.into_iter().map(|row| InventoryItem {
-        id: row.get("id"),
-        user_id: row.get("user_id"),
-        merch_id: row.get("merch_id"),
-        status: row.get("status"),
-        quantity: row.get("quantity"),
-        merch_name: Some(row.get("merch_name")),
-        photo_url: row.get("photo_url"),
-        group_name: row.get("group_name"),
-    }).collect();
+    let items = rows
+        .into_iter()
+        .map(|row| InventoryItem {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            merch_id: row.get("merch_id"),
+            status: row.get("status"),
+            quantity: row.get("quantity"),
+            merch_name: Some(row.get("merch_name")),
+            photo_url: row.get("photo_url"),
+            group_name: row.get("group_name"),
+        })
+        .collect();
 
     Ok(Json(items))
 }
 
 // --- Matches ---
-pub async fn trigger_matching(State(pool): State<PgPool>) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let count = crate::matching::run_matching_algorithm(&pool).await
+pub async fn trigger_matching(
+    State(pool): State<PgPool>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let count = crate::matching::run_matching_algorithm(&pool)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     Ok(Json(serde_json::json!({ "matches_created": count })))
@@ -421,17 +453,21 @@ pub async fn list_matches(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let matches = rows.into_iter().map(|row| TradeMatch {
-        id: row.get("id"),
-        user1_id: row.get("user1_id"),
-        user2_id: row.get("user2_id"),
-        status: row.get("status"),
-        created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-            .map(|dt| dt.to_rfc3339()),
-        other_user: None,
-        user_haves: vec![],
-        user_wants: vec![],
-    }).collect();
+    let matches = rows
+        .into_iter()
+        .map(|row| TradeMatch {
+            id: row.get("id"),
+            user1_id: row.get("user1_id"),
+            user2_id: row.get("user2_id"),
+            status: row.get("status"),
+            created_at: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+                .map(|dt| dt.to_rfc3339()),
+            other_user: None,
+            user_haves: vec![],
+            user_wants: vec![],
+        })
+        .collect();
 
     Ok(Json(matches))
 }
