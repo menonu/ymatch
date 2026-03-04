@@ -1,6 +1,6 @@
+mod generated;
 mod handlers;
 mod matching;
-mod generated;
 
 use axum::{
     routing::{get, post},
@@ -14,7 +14,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::from_default_env().add_directive("debug".parse().unwrap()))
+        .with(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("debug".parse().unwrap()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
@@ -49,14 +52,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/auth/guest", post(handlers::guest_login))
         .route("/api/v1/users", get(handlers::list_users))
         // Events
-        .route("/api/v1/events", get(handlers::list_events).post(handlers::create_event))
-        .route("/api/v1/events/:id/view", post(handlers::register_event_view))
-        .route("/api/v1/events/:id/favorite", post(handlers::toggle_favorite))
-        .route("/api/v1/events/:id/merch", get(handlers::list_merch).post(handlers::create_merch))
-        .route("/api/v1/events/:id/merch/sort", post(handlers::update_merch_sort_order))
+        .route(
+            "/api/v1/events",
+            get(handlers::list_events).post(handlers::create_event),
+        )
+        .route(
+            "/api/v1/events/:id/view",
+            post(handlers::register_event_view),
+        )
+        .route(
+            "/api/v1/events/:id/favorite",
+            post(handlers::toggle_favorite),
+        )
+        .route(
+            "/api/v1/events/:id/merch",
+            get(handlers::list_merch).post(handlers::create_merch),
+        )
+        .route(
+            "/api/v1/events/:id/merch/sort",
+            post(handlers::update_merch_sort_order),
+        )
         // Inventory
         .route("/api/v1/user/inventory", post(handlers::update_inventory))
-        .route("/api/v1/user/:id/inventory", get(handlers::get_user_inventory))
+        .route(
+            "/api/v1/user/:id/inventory",
+            get(handlers::get_user_inventory),
+        )
         // Matches
         .route("/api/v1/matches/trigger", post(handlers::trigger_matching))
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
