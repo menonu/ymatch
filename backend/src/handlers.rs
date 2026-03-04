@@ -293,7 +293,7 @@ pub async fn list_all_merch(
             name: row.get("name"),
             photo_url: row.get("photo_url"),
             group_name: row.get("group_name"),
-            sort_order: Some(row.get("sort_order")),
+            sort_order: row.get::<Option<i32>, _>("sort_order"),
         })
         .collect();
 
@@ -477,7 +477,7 @@ pub async fn list_all_matches(
     let mut matches = Vec::new();
     for row in rows {
         let match_id: i32 = row.get("id");
-        let mut trade_match = TradeMatch {
+        let trade_match = TradeMatch {
             id: match_id,
             user1_id: row.get("user1_id"),
             user2_id: row.get("user2_id"),
