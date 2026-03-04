@@ -15,6 +15,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isRestoring = false;
 
   @override
+  void dispose() {
+    _uuidController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
