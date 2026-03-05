@@ -303,7 +303,14 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
       final newList = currentList.map((item) {
         if (item.merchId == merchId && item.status == status) {
           found = true;
-          return item.copyWith((m) => m.quantity = quantity);
+          // clone is deprecated, instantiate a new one and copy props
+          return InventoryItem()
+            ..id = item.id
+            ..userId = item.userId
+            ..merchId = item.merchId
+            ..status = item.status
+            ..quantity = quantity
+            ..merchName = item.merchName;
         }
         return item;
       }).toList();
@@ -332,7 +339,7 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
       });
       // Do NOT invalidate yet, let the user keep clicking.
       // We can refresh later or on some other event if needed.
-    } catch (e, st) {
+    } catch (e) {
       state = previousState;
     }
   }

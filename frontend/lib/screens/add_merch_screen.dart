@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
-import '../models/models.dart';
 import '../theme/app_theme.dart';
 
 class AddMerchScreen extends ConsumerStatefulWidget {
@@ -205,8 +204,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                             dense: true,
                             leading: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
-                              child: item.photoUrl != null && item.photoUrl!.isNotEmpty
-                                  ? Image.network(item.photoUrl!, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.image_outlined))
+                              child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
+                                  ? Image.network(item.photoUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_outlined))
                                   : Container(width: 40, height: 40, color: Colors.grey[200], child: const Icon(Icons.image_outlined, size: 20, color: Colors.grey)),
                             ),
                             title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),

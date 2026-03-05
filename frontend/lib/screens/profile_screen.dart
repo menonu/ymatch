@@ -29,7 +29,7 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     CircleAvatar(
                       radius: 48,
-                      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                       child: Icon(
                         Icons.person,
                         size: 48,
@@ -70,8 +70,8 @@ class ProfileScreen extends ConsumerWidget {
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                                 onPressed: () {
-                                  if (user.uuid != null) {
-                                    Clipboard.setData(ClipboardData(text: user.uuid!));
+                                  if (user.hasUuid() && user.uuid.isNotEmpty) {
+                                    Clipboard.setData(ClipboardData(text: user.uuid));
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Master Key copied to clipboard')),
                                     );
@@ -82,7 +82,7 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 8),
                           SelectableText(
-                            user.uuid ?? "Unknown",
+                            user.hasUuid() && user.uuid.isNotEmpty ? user.uuid : "Unknown",
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
@@ -238,7 +238,7 @@ class ProfileScreen extends ConsumerWidget {
             height: 24,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -282,7 +282,7 @@ class ProfileScreen extends ConsumerWidget {
           backendVer.when(
             data: (ver) => SelectableText('Backend (Git Hash): $ver', style: TextStyle(color: Colors.amber[900], fontSize: 13, fontFamily: 'monospace')),
             loading: () => const Text('Backend: Loading...'),
-            error: (_, __) => const Text('Backend: Error fetching version'),
+            error: (error, stackTrace) => const Text('Backend: Error fetching version'),
           ),
         ],
       ),

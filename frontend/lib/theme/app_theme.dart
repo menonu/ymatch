@@ -25,8 +25,6 @@ class AppTheme {
         secondary: secondaryColor,
         surface: surfaceColor,
         onSurface: textPrimaryColor,
-        background: backgroundColor,
-        onBackground: textPrimaryColor,
         error: Colors.redAccent,
       ),
       scaffoldBackgroundColor: backgroundColor,
@@ -123,15 +121,15 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
         elevation: 0,
-        indicatorColor: primaryColor.withOpacity(0.1),
-        labelTextStyle: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        indicatorColor: primaryColor.withValues(alpha: 0.1),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.w600);
           }
           return const TextStyle(color: textSecondaryColor, fontSize: 12, fontWeight: FontWeight.w500);
         }),
-        iconTheme: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: primaryColor);
           }
           return const IconThemeData(color: textSecondaryColor);
