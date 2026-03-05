@@ -50,24 +50,38 @@ class HomeScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Shortcuts Bar
-          Container(
-            height: 60,
-            color: Colors.white,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              children: [
-                _buildShortcutChip(context, Icons.history, 'Recent: Badges', 1),
-                const SizedBox(width: 8),
-                _buildShortcutChip(context, Icons.history, 'Recent: Acrylics', 1),
-                const SizedBox(width: 8),
-                _buildShortcutChip(context, Icons.star, 'Fav: Photo Cards', 2),
-                const SizedBox(width: 8),
-                _buildShortcutChip(context, Icons.star, 'Fav: Posters', 3),
-              ],
-            ),
+          eventsAsync.when(
+            data: (events) {
+              // Get up to 4 favorite events for the shortcuts bar
+              final favEvents = events.where((e) => e.hasIsFavorite() && e.isFavorite).take(4).toList();
+              
+              if (favEvents.isEmpty) {
+                return const SizedBox.shrink(); // Hide if no favorites
+              }
+              
+              return Column(
+                children: [
+                  Container(
+                    height: 60,
+                    color: Colors.white,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      children: favEvents.map((event) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _buildShortcutChip(context, Icons.star, 'Fav: ${event.name}', event.id),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                ],
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
           ),
-          const Divider(height: 1, color: Color(0xFFEEEEEE)),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
