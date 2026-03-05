@@ -33,6 +33,9 @@ class ApiClient {
 
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.trim().isEmpty) {
+        return {}; // Return empty map for 200 OK responses with no body
+      }
       return jsonDecode(response.body);
     } else {
       throw Exception('API Error: ${response.statusCode} ${response.body}');
