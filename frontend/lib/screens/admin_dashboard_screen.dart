@@ -9,12 +9,13 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Dashboard'),
           bottom: const TabBar(
             tabs: [
+              Tab(text: 'System'),
               Tab(text: 'Events'),
               Tab(text: 'Items'),
               Tab(text: 'Matches'),
@@ -23,12 +24,86 @@ class AdminDashboardScreen extends ConsumerWidget {
         ),
         body: const TabBarView(
           children: [
+            _AdminSystemTab(),
             _AdminEventsTab(),
             _AdminItemsTab(),
             _AdminMatchesTab(),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AdminSystemTab extends ConsumerWidget {
+  const _AdminSystemTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(backendSystemStatusProvider);
+
+    return statusAsync.when(
+      data: (status) {
+        if (status['resources'] == null) {
+          return const Center(child: Text('Failed to load system resources.'));
+        }
+        
+        final res = status['resources'];
+        final totalMemMB = (res['total_memory_bytes'] / (1024 * 1024)).toStringAsFixed(0);
+        final usedMemMB = (res['used_memory_bytes'] / (1024 * 1024)).toStringAsFixed(0);
+        final cpuUsage = (res['cpu_usage_percent'] as num).toStringAsFixed(1);
+        final uptimeStr = Duration(seconds: res['uptime_seconds']).toString().split('.').first;
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(backendSystemStatusProvider);
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.commit),
+                  title: const Text('Backend Revision'),
+                  subtitle: Text(status['backend_version'], style: const TextStyle(fontFamily: 'monospace')),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.memory),
+                      title: const Text('Memory Usage'),
+                      subtitle: Text('$usedMemMB MB / $totalMemMB MB'),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.speed),
+                      title: const Text('CPU Usage'),
+                      subtitle: Text('$cpuUsage%'),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.timer),
+                      title: const Text('Uptime'),
+                      subtitle: Text(uptimeStr),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.computer),
+                      title: const Text('Operating System'),
+                      subtitle: Text('${res['os_name']} ${res['os_version']}'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
     );
   }
 }

@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/auth/guest", post(handlers::guest_login))
         .route("/api/v1/users", get(handlers::list_users))
         // System
-        .route("/api/v1/version", get(handlers::get_version))
+        .route("/api/v1/system/status", get(handlers::get_system_status))
         // Events
         .route(
             "/api/v1/events",

@@ -263,8 +263,8 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildVersionInfo(BuildContext context, WidgetRef ref) {
-    final backendVer = ref.watch(backendVersionProvider);
-    
+    final backendStatus = ref.watch(backendSystemStatusProvider);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -279,10 +279,10 @@ class ProfileScreen extends ConsumerWidget {
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[900], fontSize: 12),
           ),
           const SizedBox(height: 4),
-          backendVer.when(
-            data: (ver) => SelectableText('Backend (Git Hash): $ver', style: TextStyle(color: Colors.amber[900], fontSize: 13, fontFamily: 'monospace')),
+          backendStatus.when(
+            data: (status) => SelectableText('Backend (Git Hash): ${status['backend_version']}', style: TextStyle(color: Colors.amber[900], fontSize: 13, fontFamily: 'monospace')),
             loading: () => const Text('Backend: Loading...'),
-            error: (error, stackTrace) => const Text('Backend: Error fetching version'),
+            error: (_, __) => const Text('Backend: Error fetching version'),
           ),
         ],
       ),

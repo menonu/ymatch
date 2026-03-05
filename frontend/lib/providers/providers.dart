@@ -5,13 +5,13 @@ import '../services/api_client.dart';
 import '../models/models.dart';
 
 // --- System ---
-final backendVersionProvider = FutureProvider<String>((ref) async {
+final backendSystemStatusProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final client = ref.watch(apiClientProvider);
   try {
-    final response = await client.get('/api/v1/version');
-    return response['backend_version'] as String? ?? 'unknown';
+    final response = await client.get('/api/v1/system/status');
+    return response as Map<String, dynamic>;
   } catch (e) {
-    return 'error';
+    return {'backend_version': 'error', 'resources': null};
   }
 });
 
