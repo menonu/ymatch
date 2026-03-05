@@ -209,7 +209,7 @@ pub async fn list_events(
         .into_iter()
         .map(|row| {
             let active_participants: i64 = row.get("active_participants");
-            let unique_views: Option<i32> = row.get("unique_views");
+            let unique_views: Option<i64> = row.get("unique_views");
             let is_favorite: bool = row.get("is_favorite");
 
             Event {
@@ -219,7 +219,7 @@ pub async fn list_events(
                 created_at: row
                     .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                     .map(|dt| dt.to_rfc3339()),
-                unique_views,
+                unique_views: unique_views.map(|v| v as i32),
                 active_participants: Some(active_participants as i32),
                 is_favorite: Some(is_favorite),
             }
@@ -502,6 +502,42 @@ pub async fn list_all_matches(
     }
 
     Ok(Json(matches))
+}
+
+pub async fn delete_event(
+    State(pool): State<PgPool>,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    sqlx::query("DELETE FROM events WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::OK)
+}
+
+pub async fn delete_merch(
+    State(pool): State<PgPool>,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    sqlx::query("DELETE FROM merchandise WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::OK)
+}
+
+pub async fn delete_match(
+    State(pool): State<PgPool>,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    sqlx::query("DELETE FROM matches WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::OK)
 }
 
 pub async fn list_matches(

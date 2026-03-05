@@ -25,6 +25,12 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  Future<dynamic> delete(String endpoint) async {
+    final uri = Uri.parse('${config.baseUrl}$endpoint');
+    final response = await _client.delete(uri);
+    return _handleResponse(response);
+  }
+
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);

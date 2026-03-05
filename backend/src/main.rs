@@ -3,7 +3,7 @@ mod handlers;
 mod matching;
 
 use axum::{
-    routing::{get, post},
+    routing::{get, post, delete},
     Router,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -83,6 +83,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Admin
         .route("/api/v1/admin/merch", get(handlers::list_all_merch))
         .route("/api/v1/admin/matches", get(handlers::list_all_matches))
+        .route("/api/v1/admin/events/:id", delete(handlers::delete_event))
+        .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))
+        .route("/api/v1/admin/matches/:id", delete(handlers::delete_match))
         // Matches
         .route("/api/v1/matches/trigger", post(handlers::trigger_matching))
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
