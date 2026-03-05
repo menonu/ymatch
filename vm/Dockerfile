@@ -75,14 +75,15 @@ ENV PATH="/home/ubuntu/.cargo/bin:${PATH}"
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/home/ubuntu/.bun/bin:${PATH}"
 
+# Configure npm for user ubuntu
+USER ubuntu
+RUN mkdir /home/ubuntu/.npm-global && \
+    npm config set prefix '/home/ubuntu/.npm-global'
+ENV PATH="/home/ubuntu/.npm-global/bin:${PATH}"
+
 # Install gemini-cli for ubuntu user using npm
-# Since node is installed as root, we might need to fix npm permissions or just use sudo if configured
-# but better to install global packages that don't need root if possible.
-# Actually, nodejs from nodesource installs npm.
-USER root
 RUN npm install -g @google/gemini-cli
 
-USER ubuntu
 # Install uv for ubuntu user
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/ubuntu/.local/bin:${PATH}"
@@ -93,7 +94,7 @@ ENV PATH="/home/ubuntu/flutter/bin:${PATH}"
 RUN flutter config --no-analytics && flutter precache
 
 # Add paths to bashrc
-RUN echo 'export PATH="/home/ubuntu/flutter/bin:/home/ubuntu/.cargo/bin:/home/ubuntu/.bun/bin:/home/ubuntu/.local/bin:${PATH}"' >> /home/ubuntu/.bashrc && \
+RUN echo 'export PATH="/home/ubuntu/.npm-global/bin:/home/ubuntu/flutter/bin:/home/ubuntu/.cargo/bin:/home/ubuntu/.bun/bin:/home/ubuntu/.local/bin:${PATH}"' >> /home/ubuntu/.bashrc && \
     echo "alias gemini='gemini'" >> /home/ubuntu/.bashrc
 
 # Ensure .gemini and .config/gh directories exist with correct permissions

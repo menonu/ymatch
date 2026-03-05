@@ -10,13 +10,13 @@ services:
       - gemini-data:/home/ubuntu/.gemini
       - docker-data:/var/lib/docker
       - gh-config:/home/ubuntu/.config/gh
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, compute, video, utility]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu, compute, video, utility]
     restart: unless-stopped
 
 volumes:
