@@ -96,7 +96,6 @@ class HomeScreen extends ConsumerWidget {
                     case EventSort.alphabetical:
                       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
                     case EventSort.recent:
-                    default:
                       return b.id.compareTo(a.id); // Descending ID (newest)
                   }
                 });
