@@ -2,7 +2,7 @@ use std::process::Command;
 
 fn main() {
     let output = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(["rev-parse", "--short", "HEAD"])
         .output()
         .unwrap_or_else(|e| panic!("Failed to execute git: {}", e));
     
