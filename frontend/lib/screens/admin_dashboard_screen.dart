@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
+import '../services/api_client.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -52,6 +53,32 @@ class _AdminEventsTab extends ConsumerWidget {
               leading: const Icon(Icons.event),
               title: Text(event.name),
               subtitle: Text('ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Event?'),
+                      content: const Text('Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    try {
+                      final client = ref.read(apiClientProvider);
+                      await client.delete('/api/v1/admin/events/${event.id}');
+                      ref.invalidate(eventsProvider);
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event deleted')));
+                    } catch (e) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+                    }
+                  }
+                },
+              ),
             );
           },
         );
@@ -85,6 +112,32 @@ class _AdminItemsTab extends ConsumerWidget {
                   : const Icon(Icons.image),
               title: Text(item.name),
               subtitle: Text('ID: ${item.id} | Event ID: ${item.eventId} | Group: ${item.hasGroupName() ? item.groupName : 'None'}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Merchandise?'),
+                      content: const Text('Are you sure you want to delete this item?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    try {
+                      final client = ref.read(apiClientProvider);
+                      await client.delete('/api/v1/admin/merch/${item.id}');
+                      ref.invalidate(adminMerchProvider);
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item deleted')));
+                    } catch (e) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+                    }
+                  }
+                },
+              ),
             );
           },
         );
@@ -115,7 +168,38 @@ class _AdminMatchesTab extends ConsumerWidget {
               leading: const Icon(Icons.swap_horiz),
               title: Text('Match ID: ${match.id}'),
               subtitle: Text('User 1: ${match.user1Id} | User 2: ${match.user2Id} | Status: ${match.status}'),
-              trailing: Text(match.hasCreatedAt() ? match.createdAt.split('T').first : ''),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(match.hasCreatedAt() ? match.createdAt.split('T').first : ''),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Match?'),
+                          content: const Text('Are you sure you want to delete this match record?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                            ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        try {
+                          final client = ref.read(apiClientProvider);
+                          await client.delete('/api/v1/admin/matches/${match.id}');
+                          ref.invalidate(adminMatchesProvider);
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Match deleted')));
+                        } catch (e) {
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
             );
           },
         );
