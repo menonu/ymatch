@@ -471,12 +471,12 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 children: [
                   Text(item.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _buildStepper(label: 'HAVE', color: AppTheme.haveColor, qty: haveQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
-                      const SizedBox(width: 8),
                       _buildStepper(label: 'WANT', color: AppTheme.wantColor, qty: wantQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'WANT', q)),
-                      const SizedBox(width: 8),
                       _buildStepper(label: 'TRADE', color: AppTheme.tradeColor, qty: tradeQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
                     ],
                   ),
@@ -516,24 +516,23 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   Widget _buildStepper({required String label, required Color color, required int qty, required Function(int) onUpdate}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.2))),
-        child: Column(
-          children: [
-            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: color)),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StepperButton(icon: Icons.remove, color: color, onTap: qty > 0 ? () => onUpdate(qty - 1) : null, label: 'Decrease $label'),
-                Expanded(child: Text('$qty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-                _StepperButton(icon: Icons.add, color: color, onTap: () => onUpdate(qty + 1), label: 'Increase $label'),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      width: 100, // Fixed width to ensure it doesn't squish too much and looks uniform in Wrap
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.2))),
+      child: Column(
+        children: [
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: color)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StepperButton(icon: Icons.remove, color: color, onTap: qty > 0 ? () => onUpdate(qty - 1) : null, label: 'Decrease $label'),
+              Expanded(child: Text('$qty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              _StepperButton(icon: Icons.add, color: color, onTap: () => onUpdate(qty + 1), label: 'Increase $label'),
+            ],
+          ),
+        ],
       ),
     );
   }
