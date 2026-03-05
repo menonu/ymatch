@@ -476,7 +476,7 @@ pub async fn list_all_matches(
     State(pool): State<PgPool>,
 ) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
     let rows = sqlx::query(
-        "SELECT id, user1_id, user2_id, status, created_at FROM matches ORDER BY created_at DESC"
+        "SELECT id, user1_id, user2_id, status, created_at FROM matches ORDER BY created_at DESC",
     )
     .fetch_all(&pool)
     .await
@@ -546,7 +546,10 @@ pub async fn update_match_status(
         return Err((StatusCode::BAD_REQUEST, "Invalid status".to_string()));
     }
 
-    let mut tx = pool.begin().await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Update the status of this match
     sqlx::query("UPDATE matches SET status = $1 WHERE id = $2")
@@ -564,12 +567,12 @@ pub async fn update_match_status(
             .fetch_one(&mut *tx)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            
+
         let u1: i32 = match_row.get("user1_id");
         let u2: i32 = match_row.get("user2_id");
 
         // Delete any PENDING matches that involve either user to clear out competing proposals.
-        // NOTE: A more complex system might only delete matches involving the EXACT SAME items, 
+        // NOTE: A more complex system might only delete matches involving the EXACT SAME items,
         // but since we only have user-level matching right now, we clear other pending matches between them.
         sqlx::query("DELETE FROM matches WHERE status = 'PENDING' AND id != $1 AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))")
             .bind(match_id)
@@ -580,7 +583,9 @@ pub async fn update_match_status(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
 
-    tx.commit().await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(StatusCode::OK)
 }

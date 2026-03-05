@@ -9,11 +9,11 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         JOIN merchandise m ON i.merch_id = m.id
         WHERE i.status = 'WANT' 
         ORDER BY i.updated_at ASC
-        "#
+        "#,
     )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
+    .fetch_all(pool)
+    .await
+    .map_err(|e| e.to_string())?;
 
     let mut matches_created = 0;
 
@@ -41,7 +41,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                 JOIN merchandise m ON i.merch_id = m.id
                 WHERE i.user_id = $1 AND i.status = 'TRADE'
                   AND (m.group_name = $2 OR ($2 IS NULL AND m.group_name IS NULL))
-                "#
+                "#,
             )
             .bind(want_user_id)
             .bind(&want_group_name)
