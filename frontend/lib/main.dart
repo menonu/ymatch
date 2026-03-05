@@ -46,10 +46,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       // If auth is loading, maybe return null or splash?
       // For now assume null value means not logged in.
       final isLoggedIn = authState.value != null;
-      final isLoginRoute = state.uri.toString() == '/login';
+      final isLoginRoute = state.uri.path == '/login';
 
-      if (!isLoggedIn && !isLoginRoute) return '/login';
-      if (isLoggedIn && isLoginRoute) return '/';
+      if (!isLoggedIn && !isLoginRoute) {
+        // Preserve query parameters when redirecting to login
+        final queryParams = state.uri.queryParameters;
+        if (queryParams.isNotEmpty) {
+          return Uri(path: '/login', queryParameters: queryParams).toString();
+        }
+        return '/login';
+      }
+      if (isLoggedIn && isLoginRoute) {
+        // Preserve query parameters when redirecting home
+        final queryParams = state.uri.queryParameters;
+        if (queryParams.isNotEmpty) {
+          return Uri(path: '/', queryParameters: queryParams).toString();
+        }
+        return '/';
+      }
       return null;
     },
     routes: [
