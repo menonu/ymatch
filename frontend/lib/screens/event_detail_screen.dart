@@ -282,8 +282,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: item.photoUrl != null && item.photoUrl!.isNotEmpty
-                ? Image.network(item.photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildGridPlaceholder())
+            child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
+                ? Image.network(item.photoUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _buildGridPlaceholder())
                 : _buildGridPlaceholder(),
           ),
           Padding(
@@ -374,8 +374,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: item.photoUrl != null && item.photoUrl!.isNotEmpty
-              ? Image.network(item.photoUrl!, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildCompactPlaceholder())
+          child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
+              ? Image.network(item.photoUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _buildCompactPlaceholder())
               : _buildCompactPlaceholder(),
         ),
         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -460,8 +460,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: item.photoUrl != null && item.photoUrl!.isNotEmpty
-                  ? Image.network(item.photoUrl!, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildImagePlaceholder())
+              child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
+                  ? Image.network(item.photoUrl, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder())
                   : _buildImagePlaceholder(),
             ),
             const SizedBox(width: 16),
@@ -538,46 +538,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  void _showAddMerchDialog(BuildContext context, WidgetRef ref, int eventId) {
-    final nameController = TextEditingController();
-    final urlController = TextEditingController();
-    final groupController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Merchandise'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Item Name'), autofocus: true),
-            const SizedBox(height: 16),
-            TextField(controller: groupController, decoration: const InputDecoration(labelText: 'Group Name (e.g. Badges) (Optional)')),
-            const SizedBox(height: 16),
-            TextField(controller: urlController, decoration: const InputDecoration(labelText: 'Photo URL (Optional)')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isNotEmpty) {
-                await ref.read(merchControllerProvider.notifier).addMerch(
-                      eventId,
-                      name,
-                      urlController.text.trim(),
-                      groupController.text.trim(),
-                    );
-                ref.invalidate(merchProvider(eventId));
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _StepperButton extends StatelessWidget {

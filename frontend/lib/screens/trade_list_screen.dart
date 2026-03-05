@@ -69,7 +69,6 @@ class TradeListScreen extends ConsumerWidget {
               final match = matches[index];
               final isPending = match.status == 'PENDING';
               final isAccepted = match.status == 'ACCEPTED';
-              final isCompleted = match.status == 'COMPLETED';
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
