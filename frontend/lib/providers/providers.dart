@@ -11,6 +11,7 @@ final backendVersionProvider = FutureProvider<String>((ref) async {
     final response = await client.get('/api/v1/version');
     return response['backend_version'] as String? ?? 'unknown';
   } catch (e) {
+    print('Failed to fetch backend version: $e');
     return 'error';
   }
 });
