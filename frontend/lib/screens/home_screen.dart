@@ -47,7 +47,27 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Shortcuts Bar
+          Container(
+            height: 60,
+            color: Colors.white,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              children: [
+                _buildShortcutChip(context, Icons.history, 'Recent: Badges', 1),
+                const SizedBox(width: 8),
+                _buildShortcutChip(context, Icons.history, 'Recent: Acrylics', 1),
+                const SizedBox(width: 8),
+                _buildShortcutChip(context, Icons.star, 'Fav: Photo Cards', 2),
+                const SizedBox(width: 8),
+                _buildShortcutChip(context, Icons.star, 'Fav: Posters', 3),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -202,6 +222,21 @@ class HomeScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('New Event'),
       ),
+    );
+  }
+
+  Widget _buildShortcutChip(BuildContext context, IconData icon, String label, int eventId) {
+    return ActionChip(
+      avatar: Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
+      label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      onPressed: () {
+        // Navigate to the event. In a real implementation, we would also need to pass the group name 
+        // to automatically switch the tab, or the EventDetailScreen would read the desired group from GoRouter state.
+        context.go('/event/$eventId');
+      },
     );
   }
 
