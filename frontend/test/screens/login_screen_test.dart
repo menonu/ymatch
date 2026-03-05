@@ -19,10 +19,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Welcome to ymatch'), findsOneWidget);
-    expect(find.text('Creating your secure guest account...'), findsOneWidget);
-    expect(find.text('Start'), findsOneWidget);
-    expect(find.text('I have a Master Key (Restore)'), findsOneWidget);
+    expect(find.text('ymatch'), findsOneWidget);
+    expect(find.text('Trade merch seamlessly.'), findsOneWidget);
+    expect(find.text('Start Guest Session'), findsOneWidget);
+    expect(find.text('Restore Existing Account'), findsOneWidget);
   });
 
   testWidgets('LoginScreen tapping Restore reveals TextField and Restore button', (WidgetTester tester) async {
@@ -38,11 +38,11 @@ void main() {
     );
 
     // Tap the restore button
-    await tester.tap(find.text('I have a Master Key (Restore)'));
+    await tester.tap(find.text('Restore Existing Account'));
     await tester.pumpAndSettle();
 
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Restore Account'), findsOneWidget);
+    expect(find.text('Restore Account'), findsWidgets); // Can be title and button
     expect(find.text('Cancel'), findsOneWidget);
   });
 }
