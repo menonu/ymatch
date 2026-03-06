@@ -35,6 +35,8 @@ pub struct Event {
     pub active_participants: ::core::option::Option<i32>,
     #[prost(bool, optional, tag = "7")]
     pub is_favorite: ::core::option::Option<bool>,
+    #[prost(bool, optional, tag = "8")]
+    pub is_joined: ::core::option::Option<bool>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -244,4 +246,26 @@ pub struct SendMessageRequest {
     pub latitude: ::core::option::Option<f64>,
     #[prost(double, optional, tag = "6")]
     pub longitude: ::core::option::Option<f64>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchResult {
+    /// "event", "group", "item"
+    #[prost(string, tag = "1")]
+    pub r#type: ::prost::alloc::string::String,
+    /// event_id or merch_id
+    #[prost(int32, tag = "2")]
+    pub id: i32,
+    #[prost(string, tag = "3")]
+    pub title: ::prost::alloc::string::String,
+    /// event name or group name context
+    #[prost(string, optional, tag = "4")]
+    pub subtitle: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    /// To allow navigation to the parent event
+    #[prost(int32, tag = "6")]
+    pub event_id: i32,
 }

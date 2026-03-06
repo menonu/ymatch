@@ -106,6 +106,15 @@ const Event$json = {
       '10': 'isFavorite',
       '17': true
     },
+    {
+      '1': 'is_joined',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '9': 5,
+      '10': 'isJoined',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_creator_id'},
@@ -113,6 +122,7 @@ const Event$json = {
     {'1': '_unique_views'},
     {'1': '_active_participants'},
     {'1': '_is_favorite'},
+    {'1': '_is_joined'},
   ],
 };
 
@@ -122,9 +132,37 @@ final $typed_data.Uint8List eventDescriptor = $convert.base64Decode(
     'lkGAMgASgFSABSCWNyZWF0b3JJZIgBARIiCgpjcmVhdGVkX2F0GAQgASgJSAFSCWNyZWF0ZWRB'
     'dIgBARImCgx1bmlxdWVfdmlld3MYBSABKAVIAlILdW5pcXVlVmlld3OIAQESNAoTYWN0aXZlX3'
     'BhcnRpY2lwYW50cxgGIAEoBUgDUhJhY3RpdmVQYXJ0aWNpcGFudHOIAQESJAoLaXNfZmF2b3Jp'
-    'dGUYByABKAhIBFIKaXNGYXZvcml0ZYgBAUINCgtfY3JlYXRvcl9pZEINCgtfY3JlYXRlZF9hdE'
-    'IPCg1fdW5pcXVlX3ZpZXdzQhYKFF9hY3RpdmVfcGFydGljaXBhbnRzQg4KDF9pc19mYXZvcml0'
-    'ZQ==');
+    'dGUYByABKAhIBFIKaXNGYXZvcml0ZYgBARIgCglpc19qb2luZWQYCCABKAhIBVIIaXNKb2luZW'
+    'SIAQFCDQoLX2NyZWF0b3JfaWRCDQoLX2NyZWF0ZWRfYXRCDwoNX3VuaXF1ZV92aWV3c0IWChRf'
+    'YWN0aXZlX3BhcnRpY2lwYW50c0IOCgxfaXNfZmF2b3JpdGVCDAoKX2lzX2pvaW5lZA==');
+
+@$core.Deprecated('Use favoriteGroupDescriptor instead')
+const FavoriteGroup$json = {
+  '1': 'FavoriteGroup',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'event_id', '3': 2, '4': 1, '5': 5, '10': 'eventId'},
+    {'1': 'group_name', '3': 3, '4': 1, '5': 9, '10': 'groupName'},
+    {
+      '1': 'event_name',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'eventName',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_event_name'},
+  ],
+};
+
+/// Descriptor for `FavoriteGroup`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List favoriteGroupDescriptor = $convert.base64Decode(
+    'Cg1GYXZvcml0ZUdyb3VwEhcKB3VzZXJfaWQYASABKAVSBnVzZXJJZBIZCghldmVudF9pZBgCIA'
+    'EoBVIHZXZlbnRJZBIdCgpncm91cF9uYW1lGAMgASgJUglncm91cE5hbWUSIgoKZXZlbnRfbmFt'
+    'ZRgEIAEoCUgAUglldmVudE5hbWWIAQFCDQoLX2V2ZW50X25hbWU=');
 
 @$core.Deprecated('Use merchandiseDescriptor instead')
 const Merchandise$json = {
@@ -293,7 +331,15 @@ const GuestLoginRequest$json = {
   '1': 'GuestLoginRequest',
   '2': [
     {'1': 'uuid', '3': 1, '4': 1, '5': 9, '10': 'uuid'},
-    {'1': 'device_token', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'deviceToken', '17': true},
+    {
+      '1': 'device_token',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'deviceToken',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_device_token'},
@@ -301,8 +347,9 @@ const GuestLoginRequest$json = {
 };
 
 /// Descriptor for `GuestLoginRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List guestLoginRequestDescriptor = $convert
-    .base64Decode('ChFHdWVzdExvZ2luUmVxdWVzdBISCgR1dWlkGAEgASgJUgR1dWlkEiYKZGV2aWNlX3Rva2VuGAIgASgJSABSC2RldmljZVRva2VuiAEBQg8KDV9kZXZpY2VfdG9rZW4=');
+final $typed_data.Uint8List guestLoginRequestDescriptor = $convert.base64Decode(
+    'ChFHdWVzdExvZ2luUmVxdWVzdBISCgR1dWlkGAEgASgJUgR1dWlkEiYKDGRldmljZV90b2tlbh'
+    'gCIAEoCUgAUgtkZXZpY2VUb2tlbogBAUIPCg1fZGV2aWNlX3Rva2Vu');
 
 @$core.Deprecated('Use loginRequestDescriptor instead')
 const LoginRequest$json = {
@@ -518,7 +565,7 @@ final $typed_data.Uint8List messageDescriptor = $convert.base64Decode(
     'lzZW5kZXJfaWQYAyABKAVSCHNlbmRlcklkEhgKB2NvbnRlbnQYBCABKAlSB2NvbnRlbnQSIgoK'
     'Y3JlYXRlZF9hdBgFIAEoCUgAUgljcmVhdGVkQXSIAQESJgoMbWVzc2FnZV90eXBlGAYgASgJSA'
     'FSC21lc3NhZ2VUeXBliAEBEh8KCGxhdGl0dWRlGAcgASgBSAJSCGxhdGl0dWRliAEBEiEKCWxv'
-    'bmdpdHVkZRgIIAEoAUgDUglsb25naXR1ZGWIAQFCDQoLX2NyZWF0ZWRfYXRDQAoNX21lc3NhZ2'
+    'bmdpdHVkZRgIIAEoAUgDUglsb25naXR1ZGWIAQFCDQoLX2NyZWF0ZWRfYXRCDwoNX21lc3NhZ2'
     'VfdHlwZUILCglfbGF0aXR1ZGVCDAoKX2xvbmdpdHVkZQ==');
 
 @$core.Deprecated('Use sendMessageRequestDescriptor instead')
@@ -568,5 +615,45 @@ final $typed_data.Uint8List sendMessageRequestDescriptor = $convert.base64Decode
     'ChJTZW5kTWVzc2FnZVJlcXVlc3QSGQoIbWF0Y2hfaWQYASABKAVSB21hdGNoSWQSGwoJc2VuZG'
     'VyX2lkGAIgASgFUghzZW5kZXJJZBIYCgdjb250ZW50GAMgASgJUgdjb250ZW50EiYKDG1lc3Nh'
     'Z2VfdHlwZRgEIAEoCUgAUgttZXNzYWdlVHlwZYgBARIfCghsYXRpdHVkZRgFIAEoAUgBUghsYX'
-    'RpdHVkZYgBARIhCglsb25naXR1ZGUYBiABKAFIAklJbG9uZ2l0dWRliAEBQg8KDV9tZXNzYWdl'
+    'RpdHVkZYgBARIhCglsb25naXR1ZGUYBiABKAFIAlIJbG9uZ2l0dWRliAEBQg8KDV9tZXNzYWdl'
     'X3R5cGVCCwoJX2xhdGl0dWRlQgwKCl9sb25naXR1ZGU=');
+
+@$core.Deprecated('Use searchResultDescriptor instead')
+const SearchResult$json = {
+  '1': 'SearchResult',
+  '2': [
+    {'1': 'type', '3': 1, '4': 1, '5': 9, '10': 'type'},
+    {'1': 'id', '3': 2, '4': 1, '5': 5, '10': 'id'},
+    {'1': 'title', '3': 3, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'subtitle',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'subtitle',
+      '17': true
+    },
+    {
+      '1': 'photo_url',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'photoUrl',
+      '17': true
+    },
+    {'1': 'event_id', '3': 6, '4': 1, '5': 5, '10': 'eventId'},
+  ],
+  '8': [
+    {'1': '_subtitle'},
+    {'1': '_photo_url'},
+  ],
+};
+
+/// Descriptor for `SearchResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List searchResultDescriptor = $convert.base64Decode(
+    'CgxTZWFyY2hSZXN1bHQSEgoEdHlwZRgBIAEoCVIEdHlwZRIOCgJpZBgCIAEoBVICaWQSFAoFdG'
+    'l0bGUYAyABKAlSBXRpdGxlEh8KCHN1YnRpdGxlGAQgASgJSABSCHN1YnRpdGxliAEBEiAKCXBo'
+    'b3RvX3VybBgFIAEoCUgBUghwaG90b1VybIgBARIZCghldmVudF9pZBgGIAEoBVIHZXZlbnRJZE'
+    'ILCglfc3VidGl0bGVCDAoKX3Bob3RvX3VybA==');
