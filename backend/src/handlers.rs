@@ -9,14 +9,15 @@ use sqlx::{PgPool, Row};
 // --- System ---
 pub async fn get_system_status() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let rev = option_env!("GIT_HASH").unwrap_or("unknown");
-    
+
     // Create a new System object to fetch current stats
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
-    
+
     let total_memory = sys.total_memory();
     let used_memory = sys.used_memory();
-    let cpu_usage: f32 = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / (sys.cpus().len() as f32).max(1.0);
+    let cpu_usage: f32 = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>()
+        / (sys.cpus().len() as f32).max(1.0);
     let uptime = sysinfo::System::uptime();
 
     Ok(Json(serde_json::json!({
@@ -623,16 +624,19 @@ pub async fn list_matches(
         .await
         .unwrap_or_default();
 
-        let user_haves = haves_rows.into_iter().map(|r| InventoryItem {
-            id: r.get("id"),
-            user_id: r.get("user_id"),
-            merch_id: r.get("merch_id"),
-            status: r.get("status"),
-            quantity: r.get("quantity"),
-            merch_name: Some(r.get("merch_name")),
-            photo_url: r.get("photo_url"),
-            group_name: None,
-        }).collect();
+        let user_haves = haves_rows
+            .into_iter()
+            .map(|r| InventoryItem {
+                id: r.get("id"),
+                user_id: r.get("user_id"),
+                merch_id: r.get("merch_id"),
+                status: r.get("status"),
+                quantity: r.get("quantity"),
+                merch_name: Some(r.get("merch_name")),
+                photo_url: r.get("photo_url"),
+                group_name: None,
+            })
+            .collect();
 
         // Fetch what the other user is TRADING that the current user WANTS
         let wants_rows = sqlx::query(
@@ -652,16 +656,19 @@ pub async fn list_matches(
         .await
         .unwrap_or_default();
 
-        let user_wants = wants_rows.into_iter().map(|r| InventoryItem {
-            id: r.get("id"),
-            user_id: r.get("user_id"),
-            merch_id: r.get("merch_id"),
-            status: r.get("status"),
-            quantity: r.get("quantity"),
-            merch_name: Some(r.get("merch_name")),
-            photo_url: r.get("photo_url"),
-            group_name: None,
-        }).collect();
+        let user_wants = wants_rows
+            .into_iter()
+            .map(|r| InventoryItem {
+                id: r.get("id"),
+                user_id: r.get("user_id"),
+                merch_id: r.get("merch_id"),
+                status: r.get("status"),
+                quantity: r.get("quantity"),
+                merch_name: Some(r.get("merch_name")),
+                photo_url: r.get("photo_url"),
+                group_name: None,
+            })
+            .collect();
 
         matches.push(TradeMatch {
             id: match_id,

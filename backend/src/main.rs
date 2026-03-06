@@ -4,7 +4,7 @@ mod matching;
 mod notifications;
 
 use axum::{
-    routing::{get, post, delete},
+    routing::{delete, get, post},
     Router,
 };
 use sqlx::postgres::PgPoolOptions;
