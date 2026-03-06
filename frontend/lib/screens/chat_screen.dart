@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_client.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
@@ -103,12 +104,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             bottomLeft: !isMe ? const Radius.circular(0) : null,
                           ),
                         ),
-                        child: Text(
-                          msg.content,
-                          style: TextStyle(
-                            color: isMe ? Colors.white : Colors.black87,
-                          ),
-                        ),
+                        child: _buildMessageContent(msg.content, isMe),
                       ),
                     );
                   },
@@ -151,6 +147,91 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMessageContent(String text, bool isMe) {
+    final urlRegExp = RegExp(r'(https?://[^\s]+)');
+    final matches = urlRegExp.allMatches(text);
+
+    if (matches.isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+      );
+    }
+
+    List<Widget> children = [];
+    int lastMatchEnd = 0;
+
+    for (final match in matches) {
+      final String beforeMatch = text.substring(lastMatchEnd, match.start);
+      if (beforeMatch.isNotEmpty) {
+        children.add(Text(
+          beforeMatch,
+          style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+        ));
+      }
+
+      final String url = match.group(0)!;
+      final bool isMapUrl = url.contains('maps.app.goo.gl') || url.contains('google.com/maps') || url.contains('maps.apple.com');
+
+      children.add(
+        GestureDetector(
+          onTap: () async {
+            final uri = Uri.parse(url);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isMe ? Colors.white.withValues(alpha: 0.2) : AppTheme.primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isMe ? Colors.white54 : AppTheme.primaryColor.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isMapUrl ? Icons.place : Icons.link,
+                  size: 16,
+                  color: isMe ? Colors.white : AppTheme.primaryColor,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    isMapUrl ? 'Open in Maps' : 'Open Link',
+                    style: TextStyle(
+                      color: isMe ? Colors.white : AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      lastMatchEnd = match.end;
+    }
+
+    final String afterLastMatch = text.substring(lastMatchEnd);
+    if (afterLastMatch.isNotEmpty) {
+      children.add(Text(
+        afterLastMatch,
+        style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
     );
   }
 }
