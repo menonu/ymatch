@@ -227,7 +227,12 @@ pub async fn list_events(
                 JOIN merchandise m ON m.id = i.merch_id
                 WHERE m.event_id = e.id AND i.quantity > 0
             ) as active_participants,
-            EXISTS(SELECT 1 FROM event_favorites f WHERE f.event_id = e.id AND f.user_id = $1) as is_favorite
+            EXISTS(SELECT 1 FROM event_favorites f WHERE f.event_id = e.id AND f.user_id = $1) as is_favorite,
+            EXISTS(
+                SELECT 1 FROM inventory i 
+                JOIN merchandise m ON m.id = i.merch_id 
+                WHERE m.event_id = e.id AND i.user_id = $1 AND i.quantity > 0
+            ) as is_joined
         FROM events e 
         ORDER BY e.created_at DESC
         "#
@@ -243,6 +248,7 @@ pub async fn list_events(
             let active_participants: i64 = row.get("active_participants");
             let unique_views: Option<i64> = row.get("unique_views");
             let is_favorite: bool = row.get("is_favorite");
+            let is_joined: bool = row.get("is_joined");
 
             Event {
                 id: row.get("id"),
@@ -254,6 +260,7 @@ pub async fn list_events(
                 unique_views: unique_views.map(|v| v as i32),
                 active_participants: Some(active_participants as i32),
                 is_favorite: Some(is_favorite),
+                is_joined: Some(is_joined),
             }
         })
         .collect();
@@ -373,6 +380,7 @@ pub async fn create_event(
         unique_views: Some(0),
         active_participants: Some(0),
         is_favorite: Some(false),
+        is_joined: Some(false),
     }))
 }
 

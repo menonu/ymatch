@@ -6,7 +6,7 @@ import '../providers/providers.dart';
 enum EventSort { recent, popular, alphabetical }
 final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
 
-enum EventFilter { all, mine }
+enum EventFilter { all, favorite, joined }
 final eventFilterProvider = StateProvider<EventFilter>((ref) => EventFilter.all);
 
 class HomeScreen extends ConsumerWidget {
@@ -100,16 +100,23 @@ class HomeScreen extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.white,
-            child: SegmentedButton<EventFilter>(
-              segments: const [
-                ButtonSegment(value: EventFilter.all, label: Text('All Events')),
-                ButtonSegment(value: EventFilter.mine, label: Text('My Events')),
-              ],
-              selected: {filterMode},
-              onSelectionChanged: (Set<EventFilter> newSelection) {
-                ref.read(eventFilterProvider.notifier).state = newSelection.first;
-              },
-              style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<EventFilter>(
+                segments: const [
+                  ButtonSegment(value: EventFilter.all, label: Text('All Events')),
+                  ButtonSegment(value: EventFilter.favorite, label: Text('Favorites')),
+                  ButtonSegment(value: EventFilter.joined, label: Text('My Items')),
+                ],
+                selected: {filterMode},
+                onSelectionChanged: (Set<EventFilter> newSelection) {
+                  ref.read(eventFilterProvider.notifier).state = newSelection.first;
+                },
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -118,8 +125,11 @@ class HomeScreen extends ConsumerWidget {
                 if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
                 
                 var events = originalEvents.where((e) {
-                  if (filterMode == EventFilter.mine) {
-                    return user != null && e.creatorId == user.id;
+                  if (filterMode == EventFilter.favorite) {
+                    return e.hasIsFavorite() && e.isFavorite;
+                  }
+                  if (filterMode == EventFilter.joined) {
+                    return e.hasIsJoined() && e.isJoined;
                   }
                   return true;
                 }).toList();
