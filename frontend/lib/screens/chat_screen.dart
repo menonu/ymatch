@@ -6,6 +6,8 @@ import '../services/api_client.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import 'map_picker_screen.dart';
+import 'package:latlong2/latlong.dart';
 
 final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((ref, matchId) async {
   final client = ref.watch(apiClientProvider);
@@ -123,6 +125,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: SafeArea(
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.add_location_alt_outlined),
+                    color: Colors.grey[600],
+                    onPressed: () async {
+                      final LatLng? pickedLocation = await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+                      );
+                      if (pickedLocation != null) {
+                        // Create a Google Maps URL for universality when clicking
+                        final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=${pickedLocation.latitude},${pickedLocation.longitude}';
+                        _messageController.text = mapsUrl;
+                        _sendMessage(user);
+                      }
+                    },
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
