@@ -3,7 +3,7 @@ mod handlers;
 mod matching;
 
 use axum::{
-    routing::{get, post, delete},
+    routing::{delete, get, post},
     Router,
 };
 use sqlx::postgres::PgPoolOptions;
