@@ -21,6 +21,7 @@ message Event {
   optional int32 unique_views = 5;
   optional int32 active_participants = 6;
   optional bool is_favorite = 7;
+  optional bool is_joined = 8;
 }
 
 message FavoriteGroup {
