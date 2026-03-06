@@ -130,25 +130,23 @@ final currentUserProvider = Provider<User?>((ref) {
 });
 
 // --- Events ---
+enum EventSort { recent, popular, alphabetical }
+final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
+
 final eventsProvider = FutureProvider<List<Event>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final user = ref.watch(currentUserProvider);
+  final sort = ref.watch(eventSortProvider);
   
-  String url = '/api/v1/events';
+  final params = <String, String>{};
   if (user != null) {
-    url += '?user_id=${user.id}';
+    params['user_id'] = user.id.toString();
   }
+  params['sort'] = sort.name;
   
-  final json = await client.get(url);
+  final uri = Uri.parse('/api/v1/events').replace(queryParameters: params);
+  final json = await client.get(uri.toString());
   final events = (json as List).map((e) => Event()..mergeFromProto3Json(e)).toList();
-  
-  // Sort favorites to the top
-  events.sort((a, b) {
-    if (a.hasIsFavorite() && a.isFavorite && (!b.hasIsFavorite() || !b.isFavorite)) return -1;
-    if ((!a.hasIsFavorite() || !a.isFavorite) && b.hasIsFavorite() && b.isFavorite) return 1;
-    // Otherwise sort by id descending (newest first)
-    return b.id.compareTo(a.id);
-  });
   
   return events;
 });

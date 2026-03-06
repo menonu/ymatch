@@ -3,9 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 
-enum EventSort { recent, popular, alphabetical }
-final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
-
 enum EventFilter { all, mine }
 final eventFilterProvider = StateProvider<EventFilter>((ref) => EventFilter.all);
 
@@ -15,7 +12,6 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(eventsProvider);
-    final sortMode = ref.watch(eventSortProvider);
     final filterMode = ref.watch(eventFilterProvider);
     final user = ref.watch(currentUserProvider);
 
@@ -114,25 +110,7 @@ class HomeScreen extends ConsumerWidget {
                   return const Center(child: Text('No events match this filter.', style: TextStyle(color: Colors.grey)));
                 }
                 
-                events.sort((a, b) {
-                  // Favorites always at the top regardless of sort mode
-                  final aFav = a.hasIsFavorite() && a.isFavorite;
-                  final bFav = b.hasIsFavorite() && b.isFavorite;
-                  if (aFav && !bFav) return -1;
-                  if (!aFav && bFav) return 1;
-
-                  // Apply selected sort mode
-                  switch (sortMode) {
-                    case EventSort.popular:
-                      final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
-                      final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
-                      return bPop.compareTo(aPop); // Descending popularity
-                    case EventSort.alphabetical:
-                      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-                    case EventSort.recent:
-                      return b.id.compareTo(a.id); // Descending ID (newest)
-                  }
-                });
+                // Sorting is now handled by the backend.
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),

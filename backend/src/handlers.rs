@@ -168,6 +168,7 @@ pub async fn list_users(
 #[derive(serde::Deserialize)]
 pub struct ListEventsQuery {
     pub user_id: Option<i32>,
+    pub sort: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -199,7 +200,14 @@ pub async fn list_events(
 ) -> Result<Json<Vec<Event>>, (StatusCode, String)> {
     // We calculate active_participants as the number of distinct users who have inventory (HAVE or WANT) for merchandise in this event.
     // If user_id is provided, we join with event_favorites to set is_favorite.
-    let rows = sqlx::query(
+
+    let sort_clause = match query.sort.as_deref() {
+        Some("popular") => "active_participants DESC, e.created_at DESC",
+        Some("alphabetical") => "e.name ASC, e.created_at DESC",
+        _ => "e.created_at DESC",
+    };
+
+    let sql = format!(
         r#"
         SELECT 
             e.id, 
@@ -215,9 +223,12 @@ pub async fn list_events(
             ) as active_participants,
             EXISTS(SELECT 1 FROM event_favorites f WHERE f.event_id = e.id AND f.user_id = $1) as is_favorite
         FROM events e 
-        ORDER BY e.created_at DESC
-        "#
-    )
+        ORDER BY is_favorite DESC, {}
+        "#,
+        sort_clause
+    );
+
+    let rows = sqlx::query(&sql)
         .bind(query.user_id)
         .fetch_all(&pool)
         .await
