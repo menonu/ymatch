@@ -47,11 +47,23 @@ pub async fn guest_login(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if let Some(row) = row {
+        let mut device_token: Option<String> = row.get("device_token");
+        // Update device_token if provided
+        if let Some(ref token) = payload.device_token {
+            sqlx::query("UPDATE users SET device_token = $1 WHERE id = $2")
+                .bind(token)
+                .bind(row.get::<i32, _>("id"))
+                .execute(&pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            device_token = Some(token.clone());
+        }
+
         return Ok(Json(User {
             id: row.get("id"),
             username: row.get("username"),
             uuid: row.get("uuid"),
-            device_token: row.get("device_token"),
+            device_token,
             created_at: row
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
@@ -66,10 +78,11 @@ pub async fn guest_login(
     let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
     let new_username = format!("Guest_{}_{}", uuid_suffix, unique_id);
     let row = sqlx::query(
-        "INSERT INTO users (username, uuid) VALUES ($1, $2) RETURNING id, username, uuid, device_token, created_at"
+        "INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, $3) RETURNING id, username, uuid, device_token, created_at"
     )
     .bind(new_username)
     .bind(&payload.uuid)
+    .bind(&payload.device_token)
     .fetch_one(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

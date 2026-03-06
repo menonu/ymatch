@@ -58,6 +58,7 @@ message TradeMatch {
 // Request/Response Models
 message GuestLoginRequest {
   string uuid = 1;
+  optional string device_token = 2;
 }
 
 message LoginRequest {

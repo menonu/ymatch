@@ -1,6 +1,7 @@
 mod generated;
 mod handlers;
 mod matching;
+mod notifications;
 
 use axum::{
     routing::{get, post, delete},

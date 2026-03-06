@@ -108,6 +108,8 @@ pub struct TradeMatch {
 pub struct GuestLoginRequest {
     #[prost(string, tag = "1")]
     pub uuid: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "2")]
+    pub device_token: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]

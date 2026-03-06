@@ -83,6 +83,32 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                         .map_err(|e| e.to_string())?;
 
                         matches_created += 1;
+
+                        // Notify both users
+                        let user1_row = sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
+                            .bind(want_user_id)
+                            .fetch_one(pool)
+                            .await
+                            .ok();
+                        let user2_row = sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
+                            .bind(partner_id)
+                            .fetch_one(pool)
+                            .await
+                            .ok();
+
+                        if let (Some(u1), Some(u2)) = (user1_row, user2_row) {
+                            let u1_token: Option<String> = u1.get("device_token");
+                            let u2_token: Option<String> = u2.get("device_token");
+                            let u1_name: String = u1.get("username");
+                            let u2_name: String = u2.get("username");
+
+                            if let Some(token) = u1_token {
+                                crate::notifications::send_match_notification(&token, &u2_name).await;
+                            }
+                            if let Some(token) = u2_token {
+                                crate::notifications::send_match_notification(&token, &u1_name).await;
+                            }
+                        }
                     }
                 }
             }
