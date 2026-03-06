@@ -202,6 +202,12 @@ pub struct Message {
     pub content: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "6")]
+    pub message_type: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(double, optional, tag = "7")]
+    pub latitude: ::core::option::Option<f64>,
+    #[prost(double, optional, tag = "8")]
+    pub longitude: ::core::option::Option<f64>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -214,4 +220,10 @@ pub struct SendMessageRequest {
     pub sender_id: i32,
     #[prost(string, tag = "3")]
     pub content: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "4")]
+    pub message_type: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(double, optional, tag = "5")]
+    pub latitude: ::core::option::Option<f64>,
+    #[prost(double, optional, tag = "6")]
+    pub longitude: ::core::option::Option<f64>,
 }

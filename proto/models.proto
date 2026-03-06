@@ -104,10 +104,16 @@ message Message {
   int32 sender_id = 3;
   string content = 4;
   optional string created_at = 5;
+  optional string message_type = 6; // "TEXT", "LOCATION"
+  optional double latitude = 7;
+  optional double longitude = 8;
 }
 
 message SendMessageRequest {
   int32 match_id = 1;
   int32 sender_id = 2;
   string content = 3;
+  optional string message_type = 4;
+  optional double latitude = 5;
+  optional double longitude = 6;
 }
