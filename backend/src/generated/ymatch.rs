@@ -40,6 +40,21 @@ pub struct Event {
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FavoriteGroup {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(int32, tag = "2")]
+    pub event_id: i32,
+    #[prost(string, tag = "3")]
+    pub group_name: ::prost::alloc::string::String,
+    /// Helpful for rendering the shortcut
+    #[prost(string, optional, tag = "4")]
+    pub event_name: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Merchandise {
     #[prost(int32, tag = "1")]
     pub id: i32,
@@ -204,6 +219,7 @@ pub struct Message {
     pub content: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    /// "TEXT", "LOCATION"
     #[prost(string, optional, tag = "6")]
     pub message_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(double, optional, tag = "7")]

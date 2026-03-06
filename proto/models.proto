@@ -23,6 +23,13 @@ message Event {
   optional bool is_favorite = 7;
 }
 
+message FavoriteGroup {
+  int32 user_id = 1;
+  int32 event_id = 2;
+  string group_name = 3;
+  optional string event_name = 4; // Helpful for rendering the shortcut
+}
+
 message Merchandise {
   int32 id = 1;
   int32 event_id = 2;

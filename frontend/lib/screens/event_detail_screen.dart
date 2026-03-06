@@ -109,19 +109,26 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             appBar: AppBar(
               title: const Text('Event Inventory'),
               actions: [
-                IconButton(
-                  icon: Icon(
-                    viewMode == ViewMode.detailed
-                        ? Icons.view_agenda_outlined
-                        : viewMode == ViewMode.grid
-                            ? Icons.grid_view
-                            : Icons.view_list,
-                  ),
-                  tooltip: 'Switch View Mode',
-                  onPressed: () {
-                    final next = ViewMode.values[(viewMode.index + 1) % ViewMode.values.length];
-                    ref.read(viewModeProvider.notifier).state = next;
+                PopupMenuButton<ViewMode>(
+                  icon: const Icon(Icons.view_agenda),
+                  tooltip: 'Change View Mode',
+                  onSelected: (ViewMode result) {
+                    ref.read(viewModeProvider.notifier).state = result;
                   },
+                  itemBuilder: (BuildContext context) => <PopupMenuEntry<ViewMode>>[
+                    const PopupMenuItem<ViewMode>(
+                      value: ViewMode.detailed,
+                      child: Row(children: [Icon(Icons.view_agenda_outlined, size: 20), SizedBox(width: 12), Text('Detailed View')]),
+                    ),
+                    const PopupMenuItem<ViewMode>(
+                      value: ViewMode.grid,
+                      child: Row(children: [Icon(Icons.grid_view, size: 20), SizedBox(width: 12), Text('Grid View')]),
+                    ),
+                    const PopupMenuItem<ViewMode>(
+                      value: ViewMode.list,
+                      child: Row(children: [Icon(Icons.view_list, size: 20), SizedBox(width: 12), Text('Compact List')]),
+                    ),
+                  ],
                 ),
                 PopupMenuButton<String>(
                   onSelected: (value) async {
@@ -171,38 +178,51 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SegmentedButton<MerchFilter>(
-                          segments: const [
-                            ButtonSegment(value: MerchFilter.all, label: Text('All')),
-                            ButtonSegment(value: MerchFilter.have, label: Text('HAVE')),
-                            ButtonSegment(value: MerchFilter.want, label: Text('WANT')),
-                            ButtonSegment(value: MerchFilter.missing, label: Text('Missing')),
+                        Row(
+                          children: [
+                            const Text('Filter items:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            const SizedBox(width: 8),
+                            SegmentedButton<MerchFilter>(
+                              segments: const [
+                                ButtonSegment(value: MerchFilter.all, label: Text('All')),
+                                ButtonSegment(value: MerchFilter.have, label: Text('HAVE')),
+                                ButtonSegment(value: MerchFilter.want, label: Text('WANT')),
+                                ButtonSegment(value: MerchFilter.missing, label: Text('Missing')),
+                              ],
+                              selected: {filterMode},
+                              onSelectionChanged: (Set<MerchFilter> newSelection) {
+                                ref.read(merchFilterProvider.notifier).state = newSelection.first;
+                              },
+                              style: SegmentedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                textStyle: const TextStyle(fontSize: 12),
+                              ),
+                            ),
                           ],
-                          selected: {filterMode},
-                          onSelectionChanged: (Set<MerchFilter> newSelection) {
-                            ref.read(merchFilterProvider.notifier).state = newSelection.first;
-                          },
-                          style: SegmentedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            textStyle: const TextStyle(fontSize: 12),
-                          ),
                         ),
                         const SizedBox(height: 8),
-                        SegmentedButton<InventoryDisplayMode>(
-                          segments: const [
-                            ButtonSegment(value: InventoryDisplayMode.have, label: Text('Just HAVE')),
-                            ButtonSegment(value: InventoryDisplayMode.wantTrade, label: Text('WANT & TRADE')),
-                            ButtonSegment(value: InventoryDisplayMode.all, label: Text('All')),
+                        Row(
+                          children: [
+                            const Text('Show controls:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            const SizedBox(width: 8),
+                            SegmentedButton<InventoryDisplayMode>(
+                              segments: const [
+                                ButtonSegment(value: InventoryDisplayMode.have, label: Text('Just HAVE')),
+                                ButtonSegment(value: InventoryDisplayMode.wantTrade, label: Text('WANT & TRADE')),
+                                ButtonSegment(value: InventoryDisplayMode.all, label: Text('All')),
+                              ],
+                              selected: {displayMode},
+                              onSelectionChanged: (Set<InventoryDisplayMode> newSelection) {
+                                ref.read(inventoryDisplayModeProvider.notifier).state = newSelection.first;
+                              },
+                              style: SegmentedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                textStyle: const TextStyle(fontSize: 12),
+                              ),
+                            ),
                           ],
-                          selected: {displayMode},
-                          onSelectionChanged: (Set<InventoryDisplayMode> newSelection) {
-                            ref.read(inventoryDisplayModeProvider.notifier).state = newSelection.first;
-                          },
-                          style: SegmentedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            textStyle: const TextStyle(fontSize: 12),
-                          ),
                         ),
                       ],
                     ),
@@ -213,55 +233,90 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     children: groupKeys.map((groupName) {
                       final items = groupedMerch[groupName]!;
                       
-                      if (items.isEmpty) {
-                        return const Center(child: Text('No items match this filter.', style: TextStyle(color: Colors.grey)));
-                      }
-                      
-                      if (viewMode == ViewMode.grid) {
-                        return GridView.builder(
-                          padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                            childAspectRatio: 0.55,
+                      return Column(
+                        children: [
+                          Container(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Group: $groupName',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
+                                ),
+                                Consumer(
+                                  builder: (context, ref, _) {
+                                    final favGroups = ref.watch(favoriteGroupsProvider).valueOrNull ?? [];
+                                    final isFav = favGroups.any((g) => g.eventId == widget.eventId && g.groupName == groupName);
+                                    
+                                    return IconButton(
+                                      icon: Icon(isFav ? Icons.star : Icons.star_border, color: Colors.amber),
+                                      onPressed: () async {
+                                        if (user != null) {
+                                          await ref.read(eventsControllerProvider.notifier).toggleFavoriteGroup(widget.eventId, user.id, groupName, !isFav);
+                                          ref.invalidate(favoriteGroupsProvider);
+                                        }
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
-                          itemCount: items.length,
-                          itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup, displayMode),
-                        );
-                      } else if (viewMode == ViewMode.list) {
-                        return ListView.builder(
-                          padding: const EdgeInsets.only(top: 8, bottom: 80),
-                          itemCount: items.length,
-                          itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup, displayMode),
-                        );
-                      } else {
-                        return ReorderableListView.builder(
-                          padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
-                          itemCount: items.length,
-                          onReorder: (oldIndex, newIndex) {
-                            if (oldIndex < newIndex) newIndex -= 1;
-                            final item = items.removeAt(oldIndex);
-                            items.insert(newIndex, item);
-                            
-                            // Calculate new sort orders
-                            final Map<int, int> newSortOrders = {};
-                            for (int i = 0; i < items.length; i++) {
-                              newSortOrders[items[i].id] = i;
-                            }
-                            
-                            // Optimistically update DB
-                            ref.read(merchControllerProvider.notifier).updateSortOrder(widget.eventId, newSortOrders);
-                          },
-                          itemBuilder: (context, index) {
-                            final item = items[index];
-                            return Container(
-                              key: ValueKey(item.id),
-                              child: _buildDetailedListItem(context, ref, user, item, inventoryLookup, displayMode),
-                            );
-                          },
-                        );
-                      }
+                          Expanded(
+                            child: Builder(builder: (context) {
+                              if (items.isEmpty) {
+                                return const Center(child: Text('No items match this filter.', style: TextStyle(color: Colors.grey)));
+                              }
+                              
+                              if (viewMode == ViewMode.grid) {
+                                return GridView.builder(
+                                  padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 8,
+                                    childAspectRatio: 0.55,
+                                  ),
+                                  itemCount: items.length,
+                                  itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup, displayMode),
+                                );
+                              } else if (viewMode == ViewMode.list) {
+                                return ListView.builder(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 80),
+                                  itemCount: items.length,
+                                  itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup, displayMode),
+                                );
+                              } else {
+                                return ReorderableListView.builder(
+                                  padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                                  itemCount: items.length,
+                                  onReorder: (oldIndex, newIndex) {
+                                    if (oldIndex < newIndex) newIndex -= 1;
+                                    final item = items.removeAt(oldIndex);
+                                    items.insert(newIndex, item);
+                                    
+                                    final Map<int, int> newSortOrders = {};
+                                    for (int i = 0; i < items.length; i++) {
+                                      newSortOrders[items[i].id] = i;
+                                    }
+                                    
+                                    ref.read(merchControllerProvider.notifier).updateSortOrder(widget.eventId, newSortOrders);
+                                  },
+                                  itemBuilder: (context, index) {
+                                    final item = items[index];
+                                    return Container(
+                                      key: ValueKey(item.id),
+                                      child: _buildDetailedListItem(context, ref, user, item, inventoryLookup, displayMode),
+                                    );
+                                  },
+                                );
+                              }
+                            }),
+                          ),
+                        ],
+                      );
                     }).toList(),
                   ),
                 ),
