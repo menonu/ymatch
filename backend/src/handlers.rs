@@ -267,6 +267,66 @@ pub struct ToggleFavoriteRequest {
     pub is_favorite: bool,
 }
 
+#[derive(serde::Deserialize)]
+pub struct ToggleFavoriteGroupRequest {
+    pub user_id: i32,
+    pub group_name: String,
+    pub is_favorite: bool,
+}
+
+pub async fn toggle_favorite_group(
+    State(pool): State<PgPool>,
+    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    Json(payload): Json<ToggleFavoriteGroupRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    if payload.is_favorite {
+        sqlx::query("INSERT INTO group_favorites (user_id, event_id, group_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING")
+            .bind(payload.user_id)
+            .bind(event_id)
+            .bind(&payload.group_name)
+            .execute(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    } else {
+        sqlx::query("DELETE FROM group_favorites WHERE user_id = $1 AND event_id = $2 AND group_name = $3")
+            .bind(payload.user_id)
+            .bind(event_id)
+            .bind(&payload.group_name)
+            .execute(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    Ok(StatusCode::OK)
+}
+
+pub async fn list_favorite_groups(
+    State(pool): State<PgPool>,
+    axum::extract::Path(user_id): axum::extract::Path<i32>,
+) -> Result<Json<Vec<FavoriteGroup>>, (StatusCode, String)> {
+    let rows = sqlx::query(
+        r#"
+        SELECT gf.user_id, gf.event_id, gf.group_name, e.name as event_name
+        FROM group_favorites gf
+        JOIN events e ON gf.event_id = e.id
+        WHERE gf.user_id = $1
+        ORDER BY gf.created_at DESC
+        "#
+    )
+    .bind(user_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let groups = rows.into_iter().map(|row| FavoriteGroup {
+        user_id: row.get("user_id"),
+        event_id: row.get("event_id"),
+        group_name: row.get("group_name"),
+        event_name: Some(row.get("event_name")),
+    }).collect();
+
+    Ok(Json(groups))
+}
+
 pub async fn toggle_favorite(
     State(pool): State<PgPool>,
     axum::extract::Path(event_id): axum::extract::Path<i32>,

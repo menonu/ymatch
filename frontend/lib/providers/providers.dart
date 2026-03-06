@@ -158,6 +158,15 @@ final eventsProvider = FutureProvider<List<Event>>((ref) async {
   return events;
 });
 
+final favoriteGroupsProvider = FutureProvider<List<FavoriteGroup>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/user/${user.id}/favorite_groups');
+  return (json as List).map((e) => FavoriteGroup()..mergeFromProto3Json(e)).toList();
+});
+
 class EventsController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
   EventsController(this.client) : super(const AsyncValue.data(null));
@@ -181,6 +190,18 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     try {
       await client.post('/api/v1/events/$eventId/favorite', {
         'user_id': userId,
+        'is_favorite': isFavorite,
+      });
+    } catch (e) {
+      // Handle error if needed
+    }
+  }
+
+  Future<void> toggleFavoriteGroup(int eventId, int userId, String groupName, bool isFavorite) async {
+    try {
+      await client.post('/api/v1/events/$eventId/favorite_group', {
+        'user_id': userId,
+        'group_name': groupName,
         'is_favorite': isFavorite,
       });
     } catch (e) {

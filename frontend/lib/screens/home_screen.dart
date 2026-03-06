@@ -50,13 +50,16 @@ class HomeScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Shortcuts Bar
-          eventsAsync.when(
-            data: (events) {
-              // Get up to 4 favorite events for the shortcuts bar
-              final favEvents = events.where((e) => e.hasIsFavorite() && e.isFavorite).take(4).toList();
+          Consumer(
+            builder: (context, ref, _) {
+              final eventsAsync = ref.watch(eventsProvider);
+              final groupsAsync = ref.watch(favoriteGroupsProvider);
               
-              if (favEvents.isEmpty) {
-                return const SizedBox.shrink(); // Hide if no favorites
+              final favEvents = eventsAsync.valueOrNull?.where((e) => e.hasIsFavorite() && e.isFavorite).take(2).toList() ?? [];
+              final favGroups = groupsAsync.valueOrNull?.take(4).toList() ?? [];
+              
+              if (favEvents.isEmpty && favGroups.isEmpty) {
+                return const SizedBox.shrink();
               }
               
               return Column(
@@ -67,20 +70,31 @@ class HomeScreen extends ConsumerWidget {
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      children: favEvents.map((event) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _buildShortcutChip(context, Icons.star, 'Fav: ${event.name}', event.id),
-                        );
-                      }).toList(),
+                      children: [
+                        ...favEvents.map((event) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildShortcutChip(context, Icons.event, 'Fav: ${event.name}', event.id),
+                          );
+                        }),
+                        ...favGroups.map((group) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildShortcutChip(
+                              context, 
+                              Icons.star, 
+                              '${group.hasEventName() ? group.eventName : 'Group'}: ${group.groupName}', 
+                              group.eventId
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                   ),
                   const Divider(height: 1, color: Color(0xFFEEEEEE)),
                 ],
               );
             },
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
           ),
           Container(
             width: double.infinity,

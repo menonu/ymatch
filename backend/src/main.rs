@@ -52,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/auth/login", post(handlers::login))
         .route("/api/v1/auth/guest", post(handlers::guest_login))
         .route("/api/v1/users", get(handlers::list_users))
+        .route("/api/v1/user/:id/favorite_groups", get(handlers::list_favorite_groups))
         // System
         .route("/api/v1/system/status", get(handlers::get_system_status))
         // Events
@@ -66,6 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/events/:id/favorite",
             post(handlers::toggle_favorite),
+        )
+        .route(
+            "/api/v1/events/:id/favorite_group",
+            post(handlers::toggle_favorite_group),
         )
         .route(
             "/api/v1/events/:id/merch",
