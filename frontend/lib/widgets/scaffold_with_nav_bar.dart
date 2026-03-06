@@ -24,7 +24,7 @@ class ScaffoldWithNavBar extends ConsumerWidget {
       const NavigationDestination(
         icon: Icon(Icons.event_outlined),
         selectedIcon: Icon(Icons.event),
-        label: 'Events',
+        label: 'Items',
       ),
       const NavigationDestination(
         icon: Icon(Icons.swap_horiz_outlined),

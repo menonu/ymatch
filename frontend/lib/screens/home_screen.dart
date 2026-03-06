@@ -21,7 +21,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Events'),
+        title: const Text('Items'),
         actions: [
           PopupMenuButton<EventSort>(
             icon: const Icon(Icons.sort),
