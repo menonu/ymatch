@@ -476,9 +476,39 @@ const Message$json = {
       '10': 'createdAt',
       '17': true
     },
+    {
+      '1': 'message_type',
+      '3': 6,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'messageType',
+      '17': true
+    },
+    {
+      '1': 'latitude',
+      '3': 7,
+      '4': 1,
+      '5': 1,
+      '9': 2,
+      '10': 'latitude',
+      '17': true
+    },
+    {
+      '1': 'longitude',
+      '3': 8,
+      '4': 1,
+      '5': 1,
+      '9': 3,
+      '10': 'longitude',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_created_at'},
+    {'1': '_message_type'},
+    {'1': '_latitude'},
+    {'1': '_longitude'},
   ],
 };
 
@@ -486,7 +516,10 @@ const Message$json = {
 final $typed_data.Uint8List messageDescriptor = $convert.base64Decode(
     'CgdNZXNzYWdlEg4KAmlkGAEgASgFUgJpZBIZCghtYXRjaF9pZBgCIAEoBVIHbWF0Y2hJZBIbCg'
     'lzZW5kZXJfaWQYAyABKAVSCHNlbmRlcklkEhgKB2NvbnRlbnQYBCABKAlSB2NvbnRlbnQSIgoK'
-    'Y3JlYXRlZF9hdBgFIAEoCUgAUgljcmVhdGVkQXSIAQFCDQoLX2NyZWF0ZWRfYXQ=');
+    'Y3JlYXRlZF9hdBgFIAEoCUgAUgljcmVhdGVkQXSIAQESJgoMbWVzc2FnZV90eXBlGAYgASgJSA'
+    'FSC21lc3NhZ2VUeXBliAEBEh8KCGxhdGl0dWRlGAcgASgBSAJSCGxhdGl0dWRliAEBEiEKCWxv'
+    'bmdpdHVkZRgIIAEoAUgDUglsb25naXR1ZGWIAQFCDQoLX2NyZWF0ZWRfYXRDQAoNX21lc3NhZ2'
+    'VfdHlwZUILCglfbGF0aXR1ZGVCDAoKX2xvbmdpdHVkZQ==');
 
 @$core.Deprecated('Use sendMessageRequestDescriptor instead')
 const SendMessageRequest$json = {
@@ -495,10 +528,45 @@ const SendMessageRequest$json = {
     {'1': 'match_id', '3': 1, '4': 1, '5': 5, '10': 'matchId'},
     {'1': 'sender_id', '3': 2, '4': 1, '5': 5, '10': 'senderId'},
     {'1': 'content', '3': 3, '4': 1, '5': 9, '10': 'content'},
+    {
+      '1': 'message_type',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'messageType',
+      '17': true
+    },
+    {
+      '1': 'latitude',
+      '3': 5,
+      '4': 1,
+      '5': 1,
+      '9': 1,
+      '10': 'latitude',
+      '17': true
+    },
+    {
+      '1': 'longitude',
+      '3': 6,
+      '4': 1,
+      '5': 1,
+      '9': 2,
+      '10': 'longitude',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_message_type'},
+    {'1': '_latitude'},
+    {'1': '_longitude'},
   ],
 };
 
 /// Descriptor for `SendMessageRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sendMessageRequestDescriptor = $convert.base64Decode(
     'ChJTZW5kTWVzc2FnZVJlcXVlc3QSGQoIbWF0Y2hfaWQYASABKAVSB21hdGNoSWQSGwoJc2VuZG'
-    'VyX2lkGAIgASgFUghzZW5kZXJJZBIYCgdjb250ZW50GAMgASgJUgdjb250ZW50');
+    'VyX2lkGAIgASgFUghzZW5kZXJJZBIYCgdjb250ZW50GAMgASgJUgdjb250ZW50EiYKDG1lc3Nh'
+    'Z2VfdHlwZRgEIAEoCUgAUgttZXNzYWdlVHlwZYgBARIfCghsYXRpdHVkZRgFIAEoAUgBUghsYX'
+    'RpdHVkZYgBARIhCglsb25naXR1ZGUYBiABKAFIAklJbG9uZ2l0dWRliAEBQg8KDV9tZXNzYWdl'
+    'X3R5cGVCCwoJX2xhdGl0dWRlQgwKCl9sb25naXR1ZGU=');

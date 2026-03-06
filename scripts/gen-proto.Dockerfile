@@ -1,4 +1,4 @@
-FROM rust:latest
+FROM public.ecr.aws/docker/library/rust:latest
 
 # Install Dart
 RUN apt-get update && apt-get install -y apt-transport-https wget gnupg
