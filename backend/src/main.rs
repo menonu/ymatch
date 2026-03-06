@@ -93,7 +93,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))
         .route("/api/v1/admin/matches/:id", delete(handlers::delete_match))
         // Matches
-        .route("/api/v1/matches/trigger", post(handlers::trigger_matching))
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(
             "/api/v1/matches/:id/status",
@@ -104,13 +103,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/api/v1/matches/:id/messages",
             get(handlers::list_messages).post(handlers::send_message),
         )
-        .with_state(pool)
+        .with_state(pool.clone())
         .layer(cors);
 
     // Start Server
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     tracing::info!("listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
+
+    let matching_pool = pool.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            tracing::info!("Running periodic matching algorithm...");
+            match matching::run_matching_algorithm(&matching_pool).await {
+                Ok(count) => {
+                    if count > 0 {
+                        tracing::info!("Created {} new matches automatically.", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error during automatic matching: {}", e);
+                }
+            }
+        }
+    });
+
     axum::serve(listener, app).await?;
 
     Ok(())

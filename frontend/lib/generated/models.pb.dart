@@ -127,6 +127,7 @@ class Event extends $pb.GeneratedMessage {
     $core.int? uniqueViews,
     $core.int? activeParticipants,
     $core.bool? isFavorite,
+    $core.bool? isJoined,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -137,6 +138,7 @@ class Event extends $pb.GeneratedMessage {
     if (activeParticipants != null)
       result.activeParticipants = activeParticipants;
     if (isFavorite != null) result.isFavorite = isFavorite;
+    if (isJoined != null) result.isJoined = isJoined;
     return result;
   }
 
@@ -160,6 +162,7 @@ class Event extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'uniqueViews')
     ..aI(6, _omitFieldNames ? '' : 'activeParticipants')
     ..aOB(7, _omitFieldNames ? '' : 'isFavorite')
+    ..aOB(8, _omitFieldNames ? '' : 'isJoined')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -242,6 +245,105 @@ class Event extends $pb.GeneratedMessage {
   $core.bool hasIsFavorite() => $_has(6);
   @$pb.TagNumber(7)
   void clearIsFavorite() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get isJoined => $_getBF(7);
+  @$pb.TagNumber(8)
+  set isJoined($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIsJoined() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIsJoined() => $_clearField(8);
+}
+
+class FavoriteGroup extends $pb.GeneratedMessage {
+  factory FavoriteGroup({
+    $core.int? userId,
+    $core.int? eventId,
+    $core.String? groupName,
+    $core.String? eventName,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (eventId != null) result.eventId = eventId;
+    if (groupName != null) result.groupName = groupName;
+    if (eventName != null) result.eventName = eventName;
+    return result;
+  }
+
+  FavoriteGroup._();
+
+  factory FavoriteGroup.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FavoriteGroup.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FavoriteGroup',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aI(2, _omitFieldNames ? '' : 'eventId')
+    ..aOS(3, _omitFieldNames ? '' : 'groupName')
+    ..aOS(4, _omitFieldNames ? '' : 'eventName')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FavoriteGroup clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FavoriteGroup copyWith(void Function(FavoriteGroup) updates) =>
+      super.copyWith((message) => updates(message as FavoriteGroup))
+          as FavoriteGroup;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FavoriteGroup create() => FavoriteGroup._();
+  @$core.override
+  FavoriteGroup createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FavoriteGroup getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FavoriteGroup>(create);
+  static FavoriteGroup? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get eventId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set eventId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEventId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEventId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get groupName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set groupName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGroupName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGroupName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get eventName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set eventName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasEventName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEventName() => $_clearField(4);
 }
 
 class Merchandise extends $pb.GeneratedMessage {
@@ -1235,8 +1337,8 @@ class Message extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'content')
     ..aOS(5, _omitFieldNames ? '' : 'createdAt')
     ..aOS(6, _omitFieldNames ? '' : 'messageType')
-    ..a< $core.double>(7, _omitFieldNames ? '' : 'latitude', $pb.PbFieldType.OD)
-    ..a< $core.double>(8, _omitFieldNames ? '' : 'longitude', $pb.PbFieldType.OD)
+    ..aD(7, _omitFieldNames ? '' : 'latitude')
+    ..aD(8, _omitFieldNames ? '' : 'longitude')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1366,8 +1468,8 @@ class SendMessageRequest extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'senderId')
     ..aOS(3, _omitFieldNames ? '' : 'content')
     ..aOS(4, _omitFieldNames ? '' : 'messageType')
-    ..a<$core.double>(5, _omitFieldNames ? '' : 'latitude', $pb.PbFieldType.OD)
-    ..a<$core.double>(6, _omitFieldNames ? '' : 'longitude', $pb.PbFieldType.OD)
+    ..aD(5, _omitFieldNames ? '' : 'latitude')
+    ..aD(6, _omitFieldNames ? '' : 'longitude')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1442,6 +1544,120 @@ class SendMessageRequest extends $pb.GeneratedMessage {
   $core.bool hasLongitude() => $_has(5);
   @$pb.TagNumber(6)
   void clearLongitude() => $_clearField(6);
+}
+
+class SearchResult extends $pb.GeneratedMessage {
+  factory SearchResult({
+    $core.String? type,
+    $core.int? id,
+    $core.String? title,
+    $core.String? subtitle,
+    $core.String? photoUrl,
+    $core.int? eventId,
+  }) {
+    final result = create();
+    if (type != null) result.type = type;
+    if (id != null) result.id = id;
+    if (title != null) result.title = title;
+    if (subtitle != null) result.subtitle = subtitle;
+    if (photoUrl != null) result.photoUrl = photoUrl;
+    if (eventId != null) result.eventId = eventId;
+    return result;
+  }
+
+  SearchResult._();
+
+  factory SearchResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SearchResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SearchResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'type')
+    ..aI(2, _omitFieldNames ? '' : 'id')
+    ..aOS(3, _omitFieldNames ? '' : 'title')
+    ..aOS(4, _omitFieldNames ? '' : 'subtitle')
+    ..aOS(5, _omitFieldNames ? '' : 'photoUrl')
+    ..aI(6, _omitFieldNames ? '' : 'eventId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SearchResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SearchResult copyWith(void Function(SearchResult) updates) =>
+      super.copyWith((message) => updates(message as SearchResult))
+          as SearchResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SearchResult create() => SearchResult._();
+  @$core.override
+  SearchResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SearchResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SearchResult>(create);
+  static SearchResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get type => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set type($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasType() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearType() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get id => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set id($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get title => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set title($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTitle() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTitle() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get subtitle => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set subtitle($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSubtitle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSubtitle() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get photoUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set photoUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPhotoUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPhotoUrl() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get eventId => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set eventId($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasEventId() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEventId() => $_clearField(6);
 }
 
 const $core.bool _omitFieldNames =

@@ -126,3 +126,12 @@ message SendMessageRequest {
   optional double latitude = 5;
   optional double longitude = 6;
 }
+
+message SearchResult {
+  string type = 1; // "event", "group", "item"
+  int32 id = 2; // event_id or merch_id
+  string title = 3;
+  optional string subtitle = 4; // event name or group name context
+  optional string photo_url = 5;
+  int32 event_id = 6; // To allow navigation to the parent event
+}
