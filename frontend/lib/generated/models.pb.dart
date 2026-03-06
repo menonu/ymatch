@@ -1200,6 +1200,9 @@ class Message extends $pb.GeneratedMessage {
     $core.int? senderId,
     $core.String? content,
     $core.String? createdAt,
+    $core.String? messageType,
+    $core.double? latitude,
+    $core.double? longitude,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -1207,6 +1210,9 @@ class Message extends $pb.GeneratedMessage {
     if (senderId != null) result.senderId = senderId;
     if (content != null) result.content = content;
     if (createdAt != null) result.createdAt = createdAt;
+    if (messageType != null) result.messageType = messageType;
+    if (latitude != null) result.latitude = latitude;
+    if (longitude != null) result.longitude = longitude;
     return result;
   }
 
@@ -1228,6 +1234,9 @@ class Message extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'senderId')
     ..aOS(4, _omitFieldNames ? '' : 'content')
     ..aOS(5, _omitFieldNames ? '' : 'createdAt')
+    ..aOS(6, _omitFieldNames ? '' : 'messageType')
+    ..a< $core.double>(7, _omitFieldNames ? '' : 'latitude', $pb.PbFieldType.OD)
+    ..a< $core.double>(8, _omitFieldNames ? '' : 'longitude', $pb.PbFieldType.OD)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1292,6 +1301,33 @@ class Message extends $pb.GeneratedMessage {
   $core.bool hasCreatedAt() => $_has(4);
   @$pb.TagNumber(5)
   void clearCreatedAt() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get messageType => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set messageType($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasMessageType() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearMessageType() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.double get latitude => $_getN(6);
+  @$pb.TagNumber(7)
+  set latitude($core.double value) => $_setDouble(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasLatitude() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearLatitude() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get longitude => $_getN(7);
+  @$pb.TagNumber(8)
+  set longitude($core.double value) => $_setDouble(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasLongitude() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLongitude() => $_clearField(8);
 }
 
 class SendMessageRequest extends $pb.GeneratedMessage {
@@ -1299,11 +1335,17 @@ class SendMessageRequest extends $pb.GeneratedMessage {
     $core.int? matchId,
     $core.int? senderId,
     $core.String? content,
+    $core.String? messageType,
+    $core.double? latitude,
+    $core.double? longitude,
   }) {
     final result = create();
     if (matchId != null) result.matchId = matchId;
     if (senderId != null) result.senderId = senderId;
     if (content != null) result.content = content;
+    if (messageType != null) result.messageType = messageType;
+    if (latitude != null) result.latitude = latitude;
+    if (longitude != null) result.longitude = longitude;
     return result;
   }
 
@@ -1323,6 +1365,9 @@ class SendMessageRequest extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'matchId')
     ..aI(2, _omitFieldNames ? '' : 'senderId')
     ..aOS(3, _omitFieldNames ? '' : 'content')
+    ..aOS(4, _omitFieldNames ? '' : 'messageType')
+    ..a<$core.double>(5, _omitFieldNames ? '' : 'latitude', $pb.PbFieldType.OD)
+    ..a<$core.double>(6, _omitFieldNames ? '' : 'longitude', $pb.PbFieldType.OD)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1370,6 +1415,33 @@ class SendMessageRequest extends $pb.GeneratedMessage {
   $core.bool hasContent() => $_has(2);
   @$pb.TagNumber(3)
   void clearContent() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get messageType => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set messageType($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMessageType() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMessageType() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.double get latitude => $_getN(4);
+  @$pb.TagNumber(5)
+  set latitude($core.double value) => $_setDouble(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasLatitude() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLatitude() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get longitude => $_getN(5);
+  @$pb.TagNumber(6)
+  set longitude($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLongitude() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLongitude() => $_clearField(6);
 }
 
 const $core.bool _omitFieldNames =
