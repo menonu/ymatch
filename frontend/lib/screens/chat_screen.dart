@@ -6,7 +6,10 @@ import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 
-final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((ref, matchId) async {
+final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((
+  ref,
+  matchId,
+) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/matches/$matchId/messages');
   return (json as List).map((e) => Message()..mergeFromProto3Json(e)).toList();
@@ -46,7 +49,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (text.isEmpty) return;
 
     _messageController.clear();
-    
+
     try {
       final client = ref.read(apiClientProvider);
       await client.post('/api/v1/matches/${widget.matchId}/messages', {
@@ -57,7 +60,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.invalidate(messagesProvider(widget.matchId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
       }
     }
   }
@@ -65,7 +70,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final messagesAsync = ref.watch(messagesProvider(widget.matchId));
 
@@ -81,23 +87,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               data: (messages) {
                 if (messages.isEmpty) {
                   return const Center(
-                    child: Text('No messages yet. Say hello!', style: TextStyle(color: Colors.grey)),
+                    child: Text(
+                      'No messages yet. Say hello!',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   );
                 }
                 return ListView.builder(
-                  reverse: false, // In a real app we'd likely want a true bottom-up list, but standard top-down for now.
+                  reverse:
+                      false, // In a real app we'd likely want a true bottom-up list, but standard top-down for now.
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg.senderId == user.id;
 
                     return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isMe
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: isMe ? AppTheme.primaryColor : Colors.grey[200],
+                          color: isMe
+                              ? AppTheme.primaryColor
+                              : Colors.grey[200],
                           borderRadius: BorderRadius.circular(16).copyWith(
                             bottomRight: isMe ? const Radius.circular(0) : null,
                             bottomLeft: !isMe ? const Radius.circular(0) : null,

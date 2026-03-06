@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 
 enum EventSort { recent, popular, alphabetical }
+
 final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
 
 enum EventFilter { all, mine }
-final eventFilterProvider = StateProvider<EventFilter>((ref) => EventFilter.all);
+
+final eventFilterProvider = StateProvider<EventFilter>(
+  (ref) => EventFilter.all,
+);
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -53,12 +57,15 @@ class HomeScreen extends ConsumerWidget {
           eventsAsync.when(
             data: (events) {
               // Get up to 4 favorite events for the shortcuts bar
-              final favEvents = events.where((e) => e.hasIsFavorite() && e.isFavorite).take(4).toList();
-              
+              final favEvents = events
+                  .where((e) => e.hasIsFavorite() && e.isFavorite)
+                  .take(4)
+                  .toList();
+
               if (favEvents.isEmpty) {
                 return const SizedBox.shrink(); // Hide if no favorites
               }
-              
+
               return Column(
                 children: [
                   Container(
@@ -66,11 +73,19 @@ class HomeScreen extends ConsumerWidget {
                     color: Colors.white,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       children: favEvents.map((event) {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: _buildShortcutChip(context, Icons.star, 'Fav: ${event.name}', event.id),
+                          child: _buildShortcutChip(
+                            context,
+                            Icons.star,
+                            'Fav: ${event.name}',
+                            event.id,
+                          ),
                         );
                       }).toList(),
                     ),
@@ -88,21 +103,31 @@ class HomeScreen extends ConsumerWidget {
             color: Colors.white,
             child: SegmentedButton<EventFilter>(
               segments: const [
-                ButtonSegment(value: EventFilter.all, label: Text('All Events')),
-                ButtonSegment(value: EventFilter.mine, label: Text('My Events')),
+                ButtonSegment(
+                  value: EventFilter.all,
+                  label: Text('All Events'),
+                ),
+                ButtonSegment(
+                  value: EventFilter.mine,
+                  label: Text('My Events'),
+                ),
               ],
               selected: {filterMode},
               onSelectionChanged: (Set<EventFilter> newSelection) {
-                ref.read(eventFilterProvider.notifier).state = newSelection.first;
+                ref.read(eventFilterProvider.notifier).state =
+                    newSelection.first;
               },
-              style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
+              style: SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
             ),
           ),
           Expanded(
             child: eventsAsync.when(
               data: (originalEvents) {
-                if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
-                
+                if (originalEvents.isEmpty)
+                  return _buildEmptyState(context, ref);
+
                 var events = originalEvents.where((e) {
                   if (filterMode == EventFilter.mine) {
                     return user != null && e.creatorId == user.id;
@@ -111,9 +136,14 @@ class HomeScreen extends ConsumerWidget {
                 }).toList();
 
                 if (events.isEmpty) {
-                  return const Center(child: Text('No events match this filter.', style: TextStyle(color: Colors.grey)));
+                  return const Center(
+                    child: Text(
+                      'No events match this filter.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  );
                 }
-                
+
                 events.sort((a, b) {
                   // Favorites always at the top regardless of sort mode
                   final aFav = a.hasIsFavorite() && a.isFavorite;
@@ -124,11 +154,17 @@ class HomeScreen extends ConsumerWidget {
                   // Apply selected sort mode
                   switch (sortMode) {
                     case EventSort.popular:
-                      final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
-                      final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
+                      final aPop = a.hasActiveParticipants()
+                          ? a.activeParticipants
+                          : 0;
+                      final bPop = b.hasActiveParticipants()
+                          ? b.activeParticipants
+                          : 0;
                       return bPop.compareTo(aPop); // Descending popularity
                     case EventSort.alphabetical:
-                      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                      return a.name.toLowerCase().compareTo(
+                        b.name.toLowerCase(),
+                      );
                     case EventSort.recent:
                       return b.id.compareTo(a.id); // Descending ID (newest)
                   }
@@ -152,7 +188,9 @@ class HomeScreen extends ConsumerWidget {
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -168,36 +206,60 @@ class HomeScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       event.name,
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
-                                        Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
+                                        Icon(
+                                          Icons.people_outline,
+                                          size: 14,
+                                          color: Colors.grey[600],
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${event.hasActiveParticipants() ? event.activeParticipants : 0} traders',
-                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 12,
+                                          ),
                                         ),
                                         const SizedBox(width: 12),
-                                        Icon(Icons.visibility_outlined, size: 14, color: Colors.grey[600]),
+                                        Icon(
+                                          Icons.visibility_outlined,
+                                          size: 14,
+                                          color: Colors.grey[600],
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${event.hasUniqueViews() ? event.uniqueViews : 0} views',
-                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey[600]),
+                                        Icon(
+                                          Icons.calendar_today_outlined,
+                                          size: 14,
+                                          color: Colors.grey[600],
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           _formatDate(event.createdAt),
-                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -206,13 +268,26 @@ class HomeScreen extends ConsumerWidget {
                               ),
                               IconButton(
                                 icon: Icon(
-                                  event.hasIsFavorite() && event.isFavorite ? Icons.star : Icons.star_border,
-                                  color: event.hasIsFavorite() && event.isFavorite ? Colors.amber : Colors.grey,
+                                  event.hasIsFavorite() && event.isFavorite
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                  color:
+                                      event.hasIsFavorite() && event.isFavorite
+                                      ? Colors.amber
+                                      : Colors.grey,
                                 ),
                                 onPressed: () async {
                                   if (user != null) {
-                                    final newStatus = !(event.hasIsFavorite() && event.isFavorite);
-                                    await ref.read(eventsControllerProvider.notifier).toggleFavorite(event.id, user.id, newStatus);
+                                    final newStatus =
+                                        !(event.hasIsFavorite() &&
+                                            event.isFavorite);
+                                    await ref
+                                        .read(eventsControllerProvider.notifier)
+                                        .toggleFavorite(
+                                          event.id,
+                                          user.id,
+                                          newStatus,
+                                        );
                                     ref.invalidate(eventsProvider);
                                   }
                                 },
@@ -239,15 +314,29 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildShortcutChip(BuildContext context, IconData icon, String label, int eventId) {
+  Widget _buildShortcutChip(
+    BuildContext context,
+    IconData icon,
+    String label,
+    int eventId,
+  ) {
     return ActionChip(
-      avatar: Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
-      label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      backgroundColor: Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.05),
       side: BorderSide.none,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onPressed: () {
-        // Navigate to the event. In a real implementation, we would also need to pass the group name 
+        // Navigate to the event. In a real implementation, we would also need to pass the group name
         // to automatically switch the tab, or the EventDetailScreen would read the desired group from GoRouter state.
         context.go('/event/$eventId');
       },
@@ -269,20 +358,20 @@ class HomeScreen extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.event_busy,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.event_busy, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No events found',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
             'Create an event to start trading.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
@@ -319,7 +408,9 @@ class HomeScreen extends ConsumerWidget {
               final name = nameController.text.trim();
               final user = ref.read(currentUserProvider);
               if (name.isNotEmpty && user != null) {
-                await ref.read(eventsControllerProvider.notifier).addEvent(name, user.id);
+                await ref
+                    .read(eventsControllerProvider.notifier)
+                    .addEvent(name, user.id);
                 ref.invalidate(eventsProvider); // Refresh list
                 if (context.mounted) Navigator.pop(context);
               }

@@ -6,23 +6,38 @@ import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 
-final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((ref, userId) async {
+final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((
+  ref,
+  userId,
+) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/matches/user/$userId');
-  return (json as List).map((e) => TradeMatch()..mergeFromProto3Json(e)).toList();
+  return (json as List)
+      .map((e) => TradeMatch()..mergeFromProto3Json(e))
+      .toList();
 });
 
 class TradeListScreen extends ConsumerWidget {
   const TradeListScreen({super.key});
 
-  Future<void> _updateStatus(BuildContext context, WidgetRef ref, int userId, int matchId, String newStatus) async {
+  Future<void> _updateStatus(
+    BuildContext context,
+    WidgetRef ref,
+    int userId,
+    int matchId,
+    String newStatus,
+  ) async {
     try {
       final client = ref.read(apiClientProvider);
-      await client.post('/api/v1/matches/$matchId/status', {'status': newStatus});
+      await client.post('/api/v1/matches/$matchId/status', {
+        'status': newStatus,
+      });
       ref.invalidate(matchesProvider(userId));
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -30,7 +45,8 @@ class TradeListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final matchesAsync = ref.watch(matchesProvider(user.id));
 
@@ -47,15 +63,24 @@ class TradeListScreen extends ConsumerWidget {
                 await client.post('/api/v1/matches/trigger', {});
                 ref.invalidate(matchesProvider(user.id));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Matching algorithm completed!')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Matching algorithm completed!'),
+                    ),
+                  );
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               }
             },
-          )
+          ),
         ],
       ),
       body: matchesAsync.when(
@@ -91,10 +116,15 @@ class TradeListScreen extends ConsumerWidget {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: AppTheme.secondaryColor.withValues(alpha: 0.1),
+                                color: AppTheme.secondaryColor.withValues(
+                                  alpha: 0.1,
+                                ),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.handshake_outlined, color: AppTheme.secondaryColor),
+                              child: const Icon(
+                                Icons.handshake_outlined,
+                                color: AppTheme.secondaryColor,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -103,15 +133,21 @@ class TradeListScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     'Trade Match #${match.id}',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 4),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: _getStatusColor(match.status).withValues(alpha: 0.1),
+                                      color: _getStatusColor(
+                                        match.status,
+                                      ).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -127,17 +163,45 @@ class TradeListScreen extends ConsumerWidget {
                               ),
                             ),
                             if (isPending || isAccepted)
-                              const Icon(Icons.chat_bubble_outline, color: Colors.grey),
+                              const Icon(
+                                Icons.chat_bubble_outline,
+                                color: Colors.grey,
+                              ),
                           ],
                         ),
                         // Show what is being traded
-                        if (match.userHaves.isNotEmpty || match.userWants.isNotEmpty) ...[
+                        if (match.userHaves.isNotEmpty ||
+                            match.userWants.isNotEmpty) ...[
                           const SizedBox(height: 12),
-                          Text('You Give:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700])),
-                          ...match.userHaves.map((item) => Text('• ${item.merchName} (Qty: ${item.quantity})', style: const TextStyle(fontSize: 12))),
+                          Text(
+                            'You Give:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          ...match.userHaves.map(
+                            (item) => Text(
+                              '• ${item.merchName} (Qty: ${item.quantity})',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text('You Receive:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700])),
-                          ...match.userWants.map((item) => Text('• ${item.merchName} (Qty: ${item.quantity})', style: const TextStyle(fontSize: 12))),
+                          Text(
+                            'You Receive:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          ...match.userWants.map(
+                            (item) => Text(
+                              '• ${item.merchName} (Qty: ${item.quantity})',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
                         ],
                         // Action Buttons based on lifecycle
                         if (isPending) ...[
@@ -148,8 +212,16 @@ class TradeListScreen extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               TextButton(
-                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'REJECTED'),
-                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                onPressed: () => _updateStatus(
+                                  context,
+                                  ref,
+                                  user.id,
+                                  match.id,
+                                  'REJECTED',
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
                                 child: const Text('Reject'),
                               ),
                               const SizedBox(width: 8),
@@ -162,31 +234,56 @@ class TradeListScreen extends ConsumerWidget {
                                       title: const Text('Confirm Trade Offer'),
                                       content: Column(
                                         mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           const Text('You will give:'),
-                                          ...match.userHaves.map((i) => Text('• ${i.merchName}')),
+                                          ...match.userHaves.map(
+                                            (i) => Text('• ${i.merchName}'),
+                                          ),
                                           const SizedBox(height: 16),
                                           const Text('You will receive:'),
-                                          ...match.userWants.map((i) => Text('• ${i.merchName}')),
+                                          ...match.userWants.map(
+                                            (i) => Text('• ${i.merchName}'),
+                                          ),
                                           const SizedBox(height: 16),
-                                          const Text('Are you sure you want to accept this match?', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                          const Text(
+                                            'Are you sure you want to accept this match?',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                                        ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Confirm'),
+                                        ),
                                       ],
                                     ),
                                   );
                                   if (confirm == true && context.mounted) {
-                                    _updateStatus(context, ref, user.id, match.id, 'ACCEPTED');
+                                    _updateStatus(
+                                      context,
+                                      ref,
+                                      user.id,
+                                      match.id,
+                                      'ACCEPTED',
+                                    );
                                   }
                                 },
                                 child: const Text('Accept Match'),
                               ),
                             ],
-                          )
+                          ),
                         ] else if (isAccepted) ...[
                           const SizedBox(height: 16),
                           const Divider(height: 1),
@@ -195,19 +292,35 @@ class TradeListScreen extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               TextButton(
-                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'REJECTED'),
-                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                onPressed: () => _updateStatus(
+                                  context,
+                                  ref,
+                                  user.id,
+                                  match.id,
+                                  'REJECTED',
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
                                 child: const Text('Cancel Trade'),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
-                                onPressed: () => _updateStatus(context, ref, user.id, match.id, 'COMPLETED'),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                onPressed: () => _updateStatus(
+                                  context,
+                                  ref,
+                                  user.id,
+                                  match.id,
+                                  'COMPLETED',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                ),
                                 child: const Text('Mark as Completed'),
                               ),
                             ],
-                          )
-                        ]
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -246,12 +359,16 @@ class TradeListScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Text(
             'No matches found',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
             'Keep adding items to your inventory.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
           ),
         ],
       ),

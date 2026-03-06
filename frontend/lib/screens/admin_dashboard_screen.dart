@@ -47,12 +47,16 @@ class _AdminSystemTab extends ConsumerWidget {
         if (status['resources'] == null) {
           return const Center(child: Text('Failed to load system resources.'));
         }
-        
+
         final res = status['resources'];
-        final totalMemMB = (res['total_memory_bytes'] / (1024 * 1024)).toStringAsFixed(0);
-        final usedMemMB = (res['used_memory_bytes'] / (1024 * 1024)).toStringAsFixed(0);
+        final totalMemMB = (res['total_memory_bytes'] / (1024 * 1024))
+            .toStringAsFixed(0);
+        final usedMemMB = (res['used_memory_bytes'] / (1024 * 1024))
+            .toStringAsFixed(0);
         final cpuUsage = (res['cpu_usage_percent'] as num).toStringAsFixed(1);
-        final uptimeStr = Duration(seconds: res['uptime_seconds']).toString().split('.').first;
+        final uptimeStr = Duration(
+          seconds: res['uptime_seconds'],
+        ).toString().split('.').first;
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -65,7 +69,10 @@ class _AdminSystemTab extends ConsumerWidget {
                 child: ListTile(
                   leading: const Icon(Icons.commit),
                   title: const Text('Backend Revision'),
-                  subtitle: Text(status['backend_version'], style: const TextStyle(fontFamily: 'monospace')),
+                  subtitle: Text(
+                    status['backend_version'],
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -127,7 +134,9 @@ class _AdminEventsTab extends ConsumerWidget {
             return ListTile(
               leading: const Icon(Icons.event),
               title: Text(event.name),
-              subtitle: Text('ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}'),
+              subtitle: Text(
+                'ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}',
+              ),
               trailing: IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () async {
@@ -135,10 +144,21 @@ class _AdminEventsTab extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Delete Event?'),
-                      content: const Text('Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.'),
+                      content: const Text(
+                        'Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.',
+                      ),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text('Delete'),
+                        ),
                       ],
                     ),
                   );
@@ -147,9 +167,15 @@ class _AdminEventsTab extends ConsumerWidget {
                       final client = ref.read(apiClientProvider);
                       await client.delete('/api/v1/admin/events/${event.id}');
                       ref.invalidate(eventsProvider);
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event deleted')));
+                      if (context.mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Event deleted')),
+                        );
                     } catch (e) {
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+                      if (context.mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to delete: $e')),
+                        );
                     }
                   }
                 },
@@ -182,11 +208,19 @@ class _AdminItemsTab extends ConsumerWidget {
             final item = items[index];
             return ListTile(
               leading: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                  ? Image.network(item.photoUrl, width: 50, height: 50, fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported))
+                  ? Image.network(
+                      item.photoUrl,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.image_not_supported),
+                    )
                   : const Icon(Icons.image),
               title: Text(item.name),
-              subtitle: Text('ID: ${item.id} | Event ID: ${item.eventId} | Group: ${item.hasGroupName() ? item.groupName : 'None'}'),
+              subtitle: Text(
+                'ID: ${item.id} | Event ID: ${item.eventId} | Group: ${item.hasGroupName() ? item.groupName : 'None'}',
+              ),
               trailing: IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () async {
@@ -194,10 +228,21 @@ class _AdminItemsTab extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Delete Merchandise?'),
-                      content: const Text('Are you sure you want to delete this item?'),
+                      content: const Text(
+                        'Are you sure you want to delete this item?',
+                      ),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text('Delete'),
+                        ),
                       ],
                     ),
                   );
@@ -206,9 +251,15 @@ class _AdminItemsTab extends ConsumerWidget {
                       final client = ref.read(apiClientProvider);
                       await client.delete('/api/v1/admin/merch/${item.id}');
                       ref.invalidate(adminMerchProvider);
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item deleted')));
+                      if (context.mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Item deleted')),
+                        );
                     } catch (e) {
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+                      if (context.mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to delete: $e')),
+                        );
                     }
                   }
                 },
@@ -242,11 +293,17 @@ class _AdminMatchesTab extends ConsumerWidget {
             return ListTile(
               leading: const Icon(Icons.swap_horiz),
               title: Text('Match ID: ${match.id}'),
-              subtitle: Text('User 1: ${match.user1Id} | User 2: ${match.user2Id} | Status: ${match.status}'),
+              subtitle: Text(
+                'User 1: ${match.user1Id} | User 2: ${match.user2Id} | Status: ${match.status}',
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(match.hasCreatedAt() ? match.createdAt.split('T').first : ''),
+                  Text(
+                    match.hasCreatedAt()
+                        ? match.createdAt.split('T').first
+                        : '',
+                  ),
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
                     onPressed: () async {
@@ -254,21 +311,40 @@ class _AdminMatchesTab extends ConsumerWidget {
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Delete Match?'),
-                          content: const Text('Are you sure you want to delete this match record?'),
+                          content: const Text(
+                            'Are you sure you want to delete this match record?',
+                          ),
                           actions: [
-                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                            ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              child: const Text('Delete'),
+                            ),
                           ],
                         ),
                       );
                       if (confirm == true) {
                         try {
                           final client = ref.read(apiClientProvider);
-                          await client.delete('/api/v1/admin/matches/${match.id}');
+                          await client.delete(
+                            '/api/v1/admin/matches/${match.id}',
+                          );
                           ref.invalidate(adminMatchesProvider);
-                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Match deleted')));
+                          if (context.mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Match deleted')),
+                            );
                         } catch (e) {
-                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+                          if (context.mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to delete: $e')),
+                            );
                         }
                       }
                     },

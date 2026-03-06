@@ -35,6 +35,7 @@ flutter run -d web-server --web-port 8081
 ```
 
 ### Development Guidelines
+- **Run Formatters After Editing**: After editing code, you must run the formatter. For the backend, run `cargo fmt` inside the `backend/` directory. For the frontend, run `dart format .` inside the `frontend/` directory.
 - **Always Rebuild and Restart**: Before testing any changes, ensure the application (Backend/Frontend) is rebuilt and restarted to apply the latest code.
 - **Verify Version**: Confirm that the version/build being tested reflects the most recent changes before proceeding with verification.
 - **Verify Process and Port Status**: Before test, confirm that backend and frontend is working by checking process alive and port is opened (e.g., using `netstat`). Do NOT use `lsof` to kill processes as it may accidentally terminate SSH connections or workspace extensions in this environment. Manage background processes manually using PID files (`backend.pid`, `flutter.pid`).
