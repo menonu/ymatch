@@ -483,7 +483,8 @@ pub async fn get_user_inventory(
 pub async fn trigger_matching(
     State(pool): State<PgPool>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let count = crate::matching::run_matching_algorithm(&pool)
+    let engine = crate::matching::MatchingEngine::new(std::sync::Arc::new(crate::matching::BasicMatchingAlgorithm));
+    let count = engine.run_matching(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
