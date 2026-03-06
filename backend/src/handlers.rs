@@ -9,14 +9,15 @@ use sqlx::{PgPool, Row};
 // --- System ---
 pub async fn get_system_status() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let rev = option_env!("GIT_HASH").unwrap_or("unknown");
-    
+
     // Create a new System object to fetch current stats
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
-    
+
     let total_memory = sys.total_memory();
     let used_memory = sys.used_memory();
-    let cpu_usage: f32 = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / (sys.cpus().len() as f32).max(1.0);
+    let cpu_usage: f32 = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>()
+        / (sys.cpus().len() as f32).max(1.0);
     let uptime = sysinfo::System::uptime();
 
     Ok(Json(serde_json::json!({
@@ -47,11 +48,23 @@ pub async fn guest_login(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if let Some(row) = row {
+        let mut device_token: Option<String> = row.get("device_token");
+        // Update device_token if provided
+        if let Some(ref token) = payload.device_token {
+            sqlx::query("UPDATE users SET device_token = $1 WHERE id = $2")
+                .bind(token)
+                .bind(row.get::<i32, _>("id"))
+                .execute(&pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            device_token = Some(token.clone());
+        }
+
         return Ok(Json(User {
             id: row.get("id"),
             username: row.get("username"),
             uuid: row.get("uuid"),
-            device_token: row.get("device_token"),
+            device_token,
             created_at: row
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
@@ -66,10 +79,11 @@ pub async fn guest_login(
     let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
     let new_username = format!("Guest_{}_{}", uuid_suffix, unique_id);
     let row = sqlx::query(
-        "INSERT INTO users (username, uuid) VALUES ($1, $2) RETURNING id, username, uuid, device_token, created_at"
+        "INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, $3) RETURNING id, username, uuid, device_token, created_at"
     )
     .bind(new_username)
     .bind(&payload.uuid)
+    .bind(&payload.device_token)
     .fetch_one(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -610,16 +624,19 @@ pub async fn list_matches(
         .await
         .unwrap_or_default();
 
-        let user_haves = haves_rows.into_iter().map(|r| InventoryItem {
-            id: r.get("id"),
-            user_id: r.get("user_id"),
-            merch_id: r.get("merch_id"),
-            status: r.get("status"),
-            quantity: r.get("quantity"),
-            merch_name: Some(r.get("merch_name")),
-            photo_url: r.get("photo_url"),
-            group_name: None,
-        }).collect();
+        let user_haves = haves_rows
+            .into_iter()
+            .map(|r| InventoryItem {
+                id: r.get("id"),
+                user_id: r.get("user_id"),
+                merch_id: r.get("merch_id"),
+                status: r.get("status"),
+                quantity: r.get("quantity"),
+                merch_name: Some(r.get("merch_name")),
+                photo_url: r.get("photo_url"),
+                group_name: None,
+            })
+            .collect();
 
         // Fetch what the other user is TRADING that the current user WANTS
         let wants_rows = sqlx::query(
@@ -639,16 +656,19 @@ pub async fn list_matches(
         .await
         .unwrap_or_default();
 
-        let user_wants = wants_rows.into_iter().map(|r| InventoryItem {
-            id: r.get("id"),
-            user_id: r.get("user_id"),
-            merch_id: r.get("merch_id"),
-            status: r.get("status"),
-            quantity: r.get("quantity"),
-            merch_name: Some(r.get("merch_name")),
-            photo_url: r.get("photo_url"),
-            group_name: None,
-        }).collect();
+        let user_wants = wants_rows
+            .into_iter()
+            .map(|r| InventoryItem {
+                id: r.get("id"),
+                user_id: r.get("user_id"),
+                merch_id: r.get("merch_id"),
+                status: r.get("status"),
+                quantity: r.get("quantity"),
+                merch_name: Some(r.get("merch_name")),
+                photo_url: r.get("photo_url"),
+                group_name: None,
+            })
+            .collect();
 
         matches.push(TradeMatch {
             id: match_id,

@@ -629,9 +629,11 @@ class TradeMatch extends $pb.GeneratedMessage {
 class GuestLoginRequest extends $pb.GeneratedMessage {
   factory GuestLoginRequest({
     $core.String? uuid,
+    $core.String? deviceToken,
   }) {
     final result = create();
     if (uuid != null) result.uuid = uuid;
+    if (deviceToken != null) result.deviceToken = deviceToken;
     return result;
   }
 
@@ -649,6 +651,7 @@ class GuestLoginRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'uuid')
+    ..aOS(2, _omitFieldNames ? '' : 'deviceToken')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -678,6 +681,15 @@ class GuestLoginRequest extends $pb.GeneratedMessage {
   $core.bool hasUuid() => $_has(0);
   @$pb.TagNumber(1)
   void clearUuid() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get deviceToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set deviceToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDeviceToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDeviceToken() => $_clearField(2);
 }
 
 class LoginRequest extends $pb.GeneratedMessage {

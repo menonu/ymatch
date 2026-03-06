@@ -63,8 +63,13 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   Future<void> guestLogin(String uuid) async {
     state = const AsyncValue.loading();
     try {
+      // Use a mock device token for the guest session.
+      // In a real app, this would come from a push notification plugin.
+      final mockDeviceToken = 'mock-token-${uuid.substring(0, 8)}';
+
       final json = await client.post('/api/v1/auth/guest', {
         'uuid': uuid,
+        'device_token': mockDeviceToken,
       });
       final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
