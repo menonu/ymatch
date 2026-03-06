@@ -37,26 +37,6 @@ class TradeListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Matches'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_awesome),
-            tooltip: 'Run Matching Algorithm',
-            onPressed: () async {
-              try {
-                final client = ref.read(apiClientProvider);
-                await client.post('/api/v1/matches/trigger', {});
-                ref.invalidate(matchesProvider(user.id));
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Matching algorithm completed!')));
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                }
-              }
-            },
-          )
-        ],
       ),
       body: matchesAsync.when(
         data: (matches) {
