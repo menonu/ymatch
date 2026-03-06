@@ -11,6 +11,9 @@ final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
 enum MerchFilter { all, have, want, missing }
 final merchFilterProvider = StateProvider<MerchFilter>((ref) => MerchFilter.all);
 
+enum InventoryDisplayMode { have, wantTrade, all }
+final inventoryDisplayModeProvider = StateProvider<InventoryDisplayMode>((ref) => InventoryDisplayMode.all);
+
 class EventDetailScreen extends ConsumerStatefulWidget {
   final int eventId;
 
@@ -42,6 +45,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final inventoryAsync = user != null ? ref.watch(inventoryProvider(user.id)) : null;
     final viewMode = ref.watch(viewModeProvider);
     final filterMode = ref.watch(merchFilterProvider);
+    final displayMode = ref.watch(inventoryDisplayModeProvider);
 
     return merchAsync.when(
       data: (merch) {
@@ -166,21 +170,41 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: SegmentedButton<MerchFilter>(
-                      segments: const [
-                        ButtonSegment(value: MerchFilter.all, label: Text('All')),
-                        ButtonSegment(value: MerchFilter.have, label: Text('HAVE')),
-                        ButtonSegment(value: MerchFilter.want, label: Text('WANT')),
-                        ButtonSegment(value: MerchFilter.missing, label: Text('Missing')),
+                    child: Column(
+                      children: [
+                        SegmentedButton<MerchFilter>(
+                          segments: const [
+                            ButtonSegment(value: MerchFilter.all, label: Text('All')),
+                            ButtonSegment(value: MerchFilter.have, label: Text('HAVE')),
+                            ButtonSegment(value: MerchFilter.want, label: Text('WANT')),
+                            ButtonSegment(value: MerchFilter.missing, label: Text('Missing')),
+                          ],
+                          selected: {filterMode},
+                          onSelectionChanged: (Set<MerchFilter> newSelection) {
+                            ref.read(merchFilterProvider.notifier).state = newSelection.first;
+                          },
+                          style: SegmentedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SegmentedButton<InventoryDisplayMode>(
+                          segments: const [
+                            ButtonSegment(value: InventoryDisplayMode.have, label: Text('Just HAVE')),
+                            ButtonSegment(value: InventoryDisplayMode.wantTrade, label: Text('WANT & TRADE')),
+                            ButtonSegment(value: InventoryDisplayMode.all, label: Text('All')),
+                          ],
+                          selected: {displayMode},
+                          onSelectionChanged: (Set<InventoryDisplayMode> newSelection) {
+                            ref.read(inventoryDisplayModeProvider.notifier).state = newSelection.first;
+                          },
+                          style: SegmentedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
                       ],
-                      selected: {filterMode},
-                      onSelectionChanged: (Set<MerchFilter> newSelection) {
-                        ref.read(merchFilterProvider.notifier).state = newSelection.first;
-                      },
-                      style: SegmentedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
                     ),
                   ),
                 ),
@@ -203,13 +227,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             childAspectRatio: 0.55,
                           ),
                           itemCount: items.length,
-                          itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup),
+                          itemBuilder: (context, index) => _buildGridItem(context, ref, user, items[index], inventoryLookup, displayMode),
                         );
                       } else if (viewMode == ViewMode.list) {
                         return ListView.builder(
                           padding: const EdgeInsets.only(top: 8, bottom: 80),
                           itemCount: items.length,
-                          itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup),
+                          itemBuilder: (context, index) => _buildCompactListItem(context, ref, user, items[index], inventoryLookup, displayMode),
                         );
                       } else {
                         return ReorderableListView.builder(
@@ -233,7 +257,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             final item = items[index];
                             return Container(
                               key: ValueKey(item.id),
-                              child: _buildDetailedListItem(context, ref, user, item, inventoryLookup),
+                              child: _buildDetailedListItem(context, ref, user, item, inventoryLookup, displayMode),
                             );
                           },
                         );
@@ -265,11 +289,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   // --- Grid View Item ---
-  Widget _buildGridItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup) {
+  Widget _buildGridItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup, InventoryDisplayMode displayMode) {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
     final tradeQty = merchInv['TRADE'] ?? 0;
+
+    final showHave = displayMode == InventoryDisplayMode.have || displayMode == InventoryDisplayMode.all;
+    final showWantTrade = displayMode == InventoryDisplayMode.wantTrade || displayMode == InventoryDisplayMode.all;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -298,9 +325,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
           Row(
             children: [
-              Expanded(child: _buildGridCounter(context, 'H', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q))),
-              Expanded(child: _buildGridCounter(context, 'W', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q))),
-              Expanded(child: _buildGridCounter(context, 'T', tradeQty, AppTheme.tradeColor, (q) => _updateInv(ref, user, item.id, 'TRADE', q))),
+              if (showHave) Expanded(child: _buildGridCounter(context, 'H', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q))),
+              if (showWantTrade) ...[
+                Expanded(child: _buildGridCounter(context, 'W', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q))),
+                Expanded(child: _buildGridCounter(context, 'T', tradeQty, AppTheme.tradeColor, (q) => _updateInv(ref, user, item.id, 'TRADE', q))),
+              ],
             ],
           )
         ],
@@ -360,11 +389,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   // --- Compact List View Item ---
-  Widget _buildCompactListItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup) {
+  Widget _buildCompactListItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup, InventoryDisplayMode displayMode) {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
     final tradeQty = merchInv['TRADE'] ?? 0;
+
+    final showHave = displayMode == InventoryDisplayMode.have || displayMode == InventoryDisplayMode.all;
+    final showWantTrade = displayMode == InventoryDisplayMode.wantTrade || displayMode == InventoryDisplayMode.all;
 
     return Container(
       decoration: BoxDecoration(
@@ -384,11 +416,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildCompactCounter(context, 'HAVE', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
-              const SizedBox(width: 8),
-              _buildCompactCounter(context, 'WANT', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q)),
-              const SizedBox(width: 8),
-              _buildCompactCounter(context, 'TRADE', tradeQty, AppTheme.tradeColor, (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
+              if (showHave) _buildCompactCounter(context, 'HAVE', haveQty, AppTheme.haveColor, (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
+              if (showHave && showWantTrade) const SizedBox(width: 8),
+              if (showWantTrade) ...[
+                _buildCompactCounter(context, 'WANT', wantQty, AppTheme.wantColor, (q) => _updateInv(ref, user, item.id, 'WANT', q)),
+                const SizedBox(width: 8),
+                _buildCompactCounter(context, 'TRADE', tradeQty, AppTheme.tradeColor, (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
+              ],
             ],
           ),
         ),
@@ -444,11 +478,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   // --- Detailed List View Item (Original) ---
-  Widget _buildDetailedListItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup) {
+  Widget _buildDetailedListItem(BuildContext context, WidgetRef ref, User? user, Merchandise item, Map<int, Map<String, int>> lookup, InventoryDisplayMode displayMode) {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
     final tradeQty = merchInv['TRADE'] ?? 0;
+
+    final showHave = displayMode == InventoryDisplayMode.have || displayMode == InventoryDisplayMode.all;
+    final showWantTrade = displayMode == InventoryDisplayMode.wantTrade || displayMode == InventoryDisplayMode.all;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -475,9 +512,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildStepper(label: 'HAVE', color: AppTheme.haveColor, qty: haveQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
-                      _buildStepper(label: 'WANT', color: AppTheme.wantColor, qty: wantQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'WANT', q)),
-                      _buildStepper(label: 'TRADE', color: AppTheme.tradeColor, qty: tradeQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
+                      if (showHave) _buildStepper(label: 'HAVE', color: AppTheme.haveColor, qty: haveQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'HAVE', q)),
+                      if (showWantTrade) ...[
+                        _buildStepper(label: 'WANT', color: AppTheme.wantColor, qty: wantQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'WANT', q)),
+                        _buildStepper(label: 'TRADE', color: AppTheme.tradeColor, qty: tradeQty, onUpdate: (q) => _updateInv(ref, user, item.id, 'TRADE', q)),
+                      ],
                     ],
                   ),
                 ],
@@ -536,7 +575,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       ),
     );
   }
-
 }
 
 class _StepperButton extends StatelessWidget {
