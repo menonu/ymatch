@@ -1,0 +1,52 @@
+# ---------------------------------------------------
+# Stage 1: Build Environment
+# ---------------------------------------------------
+FROM rust:1.80-slim as builder
+
+# Install system dependencies required for compilation
+RUN apt-get update && apt-get install -y pkg-config libssl-dev protobuf-compiler
+
+WORKDIR /usr/src/ymatch_backend
+
+# Cache dependencies by copying Cargo.toml and Cargo.lock first
+COPY backend/Cargo.toml backend/Cargo.lock ./
+
+# Create dummy source files to build dependencies
+RUN mkdir src && \
+    echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Copy actual source code and proto files
+COPY backend/src ./src
+COPY backend/build.rs ./
+COPY backend/migrations ./migrations
+
+# We need the proto definitions to generate Rust code
+COPY proto /usr/src/proto
+
+# Build the real application
+RUN cargo build --release
+
+# ---------------------------------------------------
+# Stage 2: Runtime Environment
+# ---------------------------------------------------
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/ymatch_backend/target/release/backend /usr/local/bin/ymatch_backend
+
+# Expose the API port
+EXPOSE 3000
+
+# Set environment variables (these should be overridden in production)
+ENV RUST_LOG="info"
+ENV PORT=3000
+
+# Run the binary
+CMD ["ymatch_backend"]
