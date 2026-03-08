@@ -23,7 +23,31 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Items'),
+        titleSpacing: 16,
+        title: SizedBox(
+          height: 40,
+          child: SearchBar(
+            elevation: WidgetStateProperty.all(0),
+            backgroundColor: WidgetStateProperty.all(Colors.grey[200]),
+            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 12)),
+            hintText: 'Search events, groups...',
+            leading: const Icon(Icons.search, size: 20),
+            trailing: [
+              if (searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    ref.read(searchQueryProvider.notifier).state = '';
+                  },
+                ),
+            ],
+            onChanged: (value) {
+              ref.read(searchQueryProvider.notifier).state = value;
+            },
+          ),
+        ),
         actions: [
           if (searchQuery.isEmpty)
             PopupMenuButton<EventSort>(
@@ -47,30 +71,12 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
             ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SearchBar(
-              hintText: 'Search events, groups, items...',
-              leading: const Icon(Icons.search),
-              trailing: [
-                if (searchQuery.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      ref.read(searchQueryProvider.notifier).state = '';
-                    },
-                  ),
-              ],
-              onChanged: (value) {
-                ref.read(searchQueryProvider.notifier).state = value;
-              },
-            ),
-          ),
           Expanded(
             child: searchQuery.isNotEmpty
                 ? _buildSearchResults(context, ref)
