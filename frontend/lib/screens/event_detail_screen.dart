@@ -109,6 +109,31 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             appBar: AppBar(
               title: const Text('Event Inventory'),
               actions: [
+                PopupMenuButton<MerchFilter>(
+                  icon: const Icon(Icons.filter_list),
+                  tooltip: 'Filter Items',
+                  onSelected: (MerchFilter result) {
+                    ref.read(merchFilterProvider.notifier).state = result;
+                  },
+                  itemBuilder: (BuildContext context) => <PopupMenuEntry<MerchFilter>>[
+                    const PopupMenuItem<MerchFilter>(
+                      value: MerchFilter.all,
+                      child: Row(children: [Icon(Icons.inventory_2_outlined, size: 20), SizedBox(width: 12), Text('All Items')]),
+                    ),
+                    const PopupMenuItem<MerchFilter>(
+                      value: MerchFilter.have,
+                      child: Row(children: [Icon(Icons.check_circle_outline, size: 20, color: Colors.green), SizedBox(width: 12), Text('Just HAVE')]),
+                    ),
+                    const PopupMenuItem<MerchFilter>(
+                      value: MerchFilter.want,
+                      child: Row(children: [Icon(Icons.favorite_border, size: 20, color: Colors.red), SizedBox(width: 12), Text('Just WANT')]),
+                    ),
+                    const PopupMenuItem<MerchFilter>(
+                      value: MerchFilter.missing,
+                      child: Row(children: [Icon(Icons.help_outline, size: 20, color: Colors.grey), SizedBox(width: 12), Text('Missing')]),
+                    ),
+                  ],
+                ),
                 PopupMenuButton<ViewMode>(
                   icon: const Icon(Icons.view_agenda),
                   tooltip: 'Change View Mode',
@@ -180,29 +205,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const Text('Filter items:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                            const SizedBox(width: 8),
-                            SegmentedButton<MerchFilter>(
-                              segments: const [
-                                ButtonSegment(value: MerchFilter.all, label: Text('All')),
-                                ButtonSegment(value: MerchFilter.have, label: Text('HAVE')),
-                                ButtonSegment(value: MerchFilter.want, label: Text('WANT')),
-                                ButtonSegment(value: MerchFilter.missing, label: Text('Missing')),
-                              ],
-                              selected: {filterMode},
-                              onSelectionChanged: (Set<MerchFilter> newSelection) {
-                                ref.read(merchFilterProvider.notifier).state = newSelection.first;
-                              },
-                              style: SegmentedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                textStyle: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
+
                         Row(
                           children: [
                             const Text('Show controls:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
