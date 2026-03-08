@@ -17,7 +17,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pick a Meeting Spot'),
         actions: [
           TextButton(
             onPressed: () {

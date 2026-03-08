@@ -51,7 +51,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       data: (merch) {
         if (merch.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Event Inventory')),
+            appBar: AppBar(),
             body: _buildEmptyState(context, ref),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () {
@@ -107,7 +107,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           length: groupKeys.length,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('Event Inventory'),
               actions: [
                 PopupMenuButton<MerchFilter>(
                   icon: const Icon(Icons.filter_list),

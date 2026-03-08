@@ -35,9 +35,7 @@ class TradeListScreen extends ConsumerWidget {
     final matchesAsync = ref.watch(matchesProvider(user.id));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Matches'),
-      ),
+      appBar: AppBar(),
       body: matchesAsync.when(
         data: (matches) {
           if (matches.isEmpty) return _buildEmptyState(context);

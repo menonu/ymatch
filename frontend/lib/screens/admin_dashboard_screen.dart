@@ -12,7 +12,6 @@ class AdminDashboardScreen extends ConsumerWidget {
       length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Admin Dashboard'),
           bottom: const TabBar(
             tabs: [
               Tab(text: 'System'),
