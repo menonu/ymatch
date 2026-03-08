@@ -12,9 +12,7 @@ class ProfileScreen extends ConsumerWidget {
     if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Account'),
-      ),
+      appBar: AppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(

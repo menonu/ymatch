@@ -72,7 +72,6 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Merchandise'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),

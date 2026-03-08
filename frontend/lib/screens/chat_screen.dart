@@ -74,7 +74,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Trade Chat #${widget.matchId}'),
         backgroundColor: Colors.white,
       ),
       body: Column(
