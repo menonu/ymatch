@@ -1,0 +1,59 @@
+# ---------------------------------------------------
+# Stage 1: Build Environment
+# ---------------------------------------------------
+FROM ubuntu:22.04 as builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y curl git unzip xz-utils zip libglu1-mesa clang cmake ninja-build pkg-config libgtk-3-dev
+
+# Set up Flutter
+WORKDIR /opt
+RUN git clone https://github.com/flutter/flutter.git -b stable
+ENV PATH="/opt/flutter/bin:${PATH}"
+
+# Pre-cache Flutter artifacts
+RUN flutter precache --web
+
+WORKDIR /app
+
+# Copy dependency files first
+COPY frontend/pubspec.yaml frontend/pubspec.lock ./
+RUN flutter pub get
+
+# Copy source code and proto files
+COPY frontend ./
+COPY proto /proto
+
+# Generate Protobuf Dart code (Assumes proto-gen.sh or similar mechanism is run, 
+# but for a pure build, we should ideally have pre-generated the dart files 
+# or generate them here. For simplicity, we assume the generated folder is checked in 
+# or generated before docker build.
+# If they need to be generated during build, we need dart protoc plugin.)
+# For now, we will just build what is there.
+
+# Build Flutter Web app
+RUN flutter build web --release --web-renderer canvaskit
+
+# ---------------------------------------------------
+# Stage 2: Runtime Environment (Nginx)
+# ---------------------------------------------------
+FROM nginx:alpine
+
+# Copy the built web assets from the builder stage
+COPY --from=builder /app/build/web /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Configure Nginx to serve single-page application (SPA) correctly
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html index.htm; \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
