@@ -78,9 +78,7 @@ class HomeScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: searchQuery.isNotEmpty
-                ? _buildSearchResults(context, ref)
-                : _buildNormalContent(context, ref, eventsAsync, sortMode, filterMode, user),
+            child: _buildNormalContent(context, ref, eventsAsync, sortMode, filterMode, user, searchQuery),
           ),
         ],
       ),
@@ -92,160 +90,90 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSearchResults(BuildContext context, WidgetRef ref) {
-    final searchAsync = ref.watch(searchProvider);
-
-    return searchAsync.when(
-      data: (results) {
-        if (results.isEmpty) {
-          return Center(
-            child: Text(
-              'No results found',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          itemCount: results.length,
-          itemBuilder: (context, index) {
-            final result = results[index];
-            IconData icon;
-            Color iconColor;
-
-            switch (result.type) {
-              case 'event':
-                icon = Icons.event;
-                iconColor = Colors.blue;
-                break;
-              case 'group':
-                icon = Icons.folder;
-                iconColor = Colors.orange;
-                break;
-              case 'item':
-              default:
-                icon = Icons.inventory_2;
-                iconColor = Colors.green;
-            }
-
-            return ListTile(
-              leading: result.hasPhotoUrl() && result.photoUrl.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.network(
-                        result.photoUrl,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildFallbackIcon(icon, iconColor),
-                      ),
-                    )
-                  : _buildFallbackIcon(icon, iconColor),
-              title: Text(result.title),
-              subtitle: result.hasSubtitle() ? Text(result.subtitle) : null,
-              onTap: () {
-                context.go('/event/${result.eventId}');
-              },
-            );
-          },
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err')),
-    );
-  }
-
-  Widget _buildFallbackIcon(IconData icon, Color color) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Icon(icon, color: color),
-    );
-  }
-
-  Widget _buildNormalContent(BuildContext context, WidgetRef ref, AsyncValue<List<Event>> eventsAsync, EventSort sortMode, EventFilter filterMode, User? user) {
+  Widget _buildNormalContent(BuildContext context, WidgetRef ref, AsyncValue<List<Event>> eventsAsync, EventSort sortMode, EventFilter filterMode, User? user, String searchQuery) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Consumer(
-          builder: (context, ref, _) {
-            final eventsAsync = ref.watch(eventsProvider);
-            final groupsAsync = ref.watch(favoriteGroupsProvider);
-            
-            final favEvents = eventsAsync.valueOrNull?.where((e) => e.hasIsFavorite() && e.isFavorite).take(2).toList() ?? [];
-            final favGroups = groupsAsync.valueOrNull?.take(4).toList() ?? [];
-            
-            if (favEvents.isEmpty && favGroups.isEmpty) {
-              return const SizedBox.shrink();
-            }
-            
-            return Column(
-              children: [
-                Container(
-                  height: 60,
-                  color: Colors.white,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    children: [
-                      ...favEvents.map((event) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _buildShortcutChip(context, Icons.event, 'Fav: ${event.name}', event.id),
-                        );
-                      }),
-                      ...favGroups.map((group) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _buildShortcutChip(
-                            context, 
-                            Icons.star, 
-                            '${group.hasEventName() ? group.eventName : 'Group'}: ${group.groupName}', 
-                            group.eventId
-                          ),
-                        );
-                      }),
-                    ],
+        if (searchQuery.isEmpty)
+          Consumer(
+            builder: (context, ref, _) {
+              final eventsAsync = ref.watch(eventsProvider);
+              final groupsAsync = ref.watch(favoriteGroupsProvider);
+              
+              final favEvents = eventsAsync.valueOrNull?.where((e) => e.hasIsFavorite() && e.isFavorite).take(2).toList() ?? [];
+              final favGroups = groupsAsync.valueOrNull?.take(4).toList() ?? [];
+              
+              if (favEvents.isEmpty && favGroups.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              
+              return Column(
+                children: [
+                  Container(
+                    height: 60,
+                    color: Colors.white,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      children: [
+                        ...favEvents.map((event) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildShortcutChip(context, Icons.event, 'Fav: ${event.name}', event.id),
+                          );
+                        }),
+                        ...favGroups.map((group) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildShortcutChip(
+                              context, 
+                              Icons.star, 
+                              '${group.hasEventName() ? group.eventName : 'Group'}: ${group.groupName}', 
+                              group.eventId
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
                   ),
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                ],
+              );
+            },
+          ),
+        if (searchQuery.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.white,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<EventFilter>(
+                segments: const [
+                  ButtonSegment(value: EventFilter.all, label: Text('All Events')),
+                  ButtonSegment(value: EventFilter.favorite, label: Text('Favorites')),
+                  ButtonSegment(value: EventFilter.joined, label: Text('My Items')),
+                ],
+                selected: {filterMode},
+                onSelectionChanged: (Set<EventFilter> newSelection) {
+                  ref.read(eventFilterProvider.notifier).state = newSelection.first;
+                },
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12),
                 ),
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
-              ],
-            );
-          },
-        ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.white,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<EventFilter>(
-              segments: const [
-                ButtonSegment(value: EventFilter.all, label: Text('All Events')),
-                ButtonSegment(value: EventFilter.favorite, label: Text('Favorites')),
-                ButtonSegment(value: EventFilter.joined, label: Text('My Items')),
-              ],
-              selected: {filterMode},
-              onSelectionChanged: (Set<EventFilter> newSelection) {
-                ref.read(eventFilterProvider.notifier).state = newSelection.first;
-              },
-              style: SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                textStyle: const TextStyle(fontSize: 12),
               ),
             ),
           ),
-        ),
         Expanded(
           child: eventsAsync.when(
             data: (originalEvents) {
               if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
               
               var events = originalEvents.where((e) {
+                if (searchQuery.isNotEmpty && !e.name.toLowerCase().contains(searchQuery.toLowerCase())) {
+                  return false;
+                }
                 if (filterMode == EventFilter.favorite) {
                   return e.hasIsFavorite() && e.isFavorite;
                 }

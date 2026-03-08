@@ -14,6 +14,8 @@ final merchFilterProvider = StateProvider<MerchFilter>((ref) => MerchFilter.all)
 enum InventoryDisplayMode { have, wantTrade, all }
 final inventoryDisplayModeProvider = StateProvider<InventoryDisplayMode>((ref) => InventoryDisplayMode.all);
 
+final itemSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
+
 class EventDetailScreen extends ConsumerStatefulWidget {
   final int eventId;
 
@@ -46,6 +48,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final viewMode = ref.watch(viewModeProvider);
     final filterMode = ref.watch(merchFilterProvider);
     final displayMode = ref.watch(inventoryDisplayModeProvider);
+    final searchQuery = ref.watch(itemSearchQueryProvider);
 
     return merchAsync.when(
       data: (merch) {
@@ -78,6 +81,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
         // Apply Filter
         final filteredMerch = merch.where((item) {
+          if (searchQuery.isNotEmpty && !item.name.toLowerCase().contains(searchQuery.toLowerCase())) {
+            return false;
+          }
+
           if (filterMode == MerchFilter.all) return true;
           final inv = inventoryLookup[item.id] ?? {};
           final have = inv['HAVE'] ?? 0;
@@ -107,6 +114,31 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           length: groupKeys.length,
           child: Scaffold(
             appBar: AppBar(
+              titleSpacing: 16,
+              title: SizedBox(
+                height: 40,
+                child: SearchBar(
+                  elevation: WidgetStateProperty.all(0),
+                  backgroundColor: WidgetStateProperty.all(Colors.grey[200]),
+                  padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 12)),
+                  hintText: 'Search items...',
+                  leading: const Icon(Icons.search, size: 20),
+                  trailing: [
+                    if (searchQuery.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          ref.read(itemSearchQueryProvider.notifier).state = '';
+                        },
+                      ),
+                  ],
+                  onChanged: (value) {
+                    ref.read(itemSearchQueryProvider.notifier).state = value;
+                  },
+                ),
+              ),
               actions: [
                 PopupMenuButton<MerchFilter>(
                   icon: const Icon(Icons.filter_list),
