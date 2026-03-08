@@ -55,6 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/user/:id/favorite_groups", get(handlers::list_favorite_groups))
         // System
         .route("/api/v1/system/status", get(handlers::get_system_status))
+        // Search
+        .route("/api/v1/search", get(handlers::global_search))
         // Events
         .route(
             "/api/v1/events",
