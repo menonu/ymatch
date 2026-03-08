@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
+import '../models/models.dart';
 
 enum EventSort { recent, popular, alphabetical }
 final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
@@ -18,248 +19,354 @@ class HomeScreen extends ConsumerWidget {
     final sortMode = ref.watch(eventSortProvider);
     final filterMode = ref.watch(eventFilterProvider);
     final user = ref.watch(currentUserProvider);
+    final searchQuery = ref.watch(searchQueryProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Items'),
         actions: [
-          PopupMenuButton<EventSort>(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Sort Events',
-            onSelected: (EventSort result) {
-              ref.read(eventSortProvider.notifier).state = result;
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<EventSort>>[
-              const PopupMenuItem<EventSort>(
-                value: EventSort.recent,
-                child: Text('Newest First'),
-              ),
-              const PopupMenuItem<EventSort>(
-                value: EventSort.popular,
-                child: Text('Most Popular'),
-              ),
-              const PopupMenuItem<EventSort>(
-                value: EventSort.alphabetical,
-                child: Text('Alphabetical'),
-              ),
-            ],
-          ),
+          if (searchQuery.isEmpty)
+            PopupMenuButton<EventSort>(
+              icon: const Icon(Icons.sort),
+              tooltip: 'Sort Events',
+              onSelected: (EventSort result) {
+                ref.read(eventSortProvider.notifier).state = result;
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<EventSort>>[
+                const PopupMenuItem<EventSort>(
+                  value: EventSort.recent,
+                  child: Text('Newest First'),
+                ),
+                const PopupMenuItem<EventSort>(
+                  value: EventSort.popular,
+                  child: Text('Most Popular'),
+                ),
+                const PopupMenuItem<EventSort>(
+                  value: EventSort.alphabetical,
+                  child: Text('Alphabetical'),
+                ),
+              ],
+            ),
         ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Shortcuts Bar
-          Consumer(
-            builder: (context, ref, _) {
-              final eventsAsync = ref.watch(eventsProvider);
-              final groupsAsync = ref.watch(favoriteGroupsProvider);
-              
-              final favEvents = eventsAsync.valueOrNull?.where((e) => e.hasIsFavorite() && e.isFavorite).take(2).toList() ?? [];
-              final favGroups = groupsAsync.valueOrNull?.take(4).toList() ?? [];
-              
-              if (favEvents.isEmpty && favGroups.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              
-              return Column(
-                children: [
-                  Container(
-                    height: 60,
-                    color: Colors.white,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      children: [
-                        ...favEvents.map((event) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _buildShortcutChip(context, Icons.event, 'Fav: ${event.name}', event.id),
-                          );
-                        }),
-                        ...favGroups.map((group) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _buildShortcutChip(
-                              context, 
-                              Icons.star, 
-                              '${group.hasEventName() ? group.eventName : 'Group'}: ${group.groupName}', 
-                              group.eventId
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                ],
-              );
-            },
-          ),
-          Container(
-            width: double.infinity,
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.white,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SegmentedButton<EventFilter>(
-                segments: const [
-                  ButtonSegment(value: EventFilter.all, label: Text('All Events')),
-                  ButtonSegment(value: EventFilter.favorite, label: Text('Favorites')),
-                  ButtonSegment(value: EventFilter.joined, label: Text('My Items')),
-                ],
-                selected: {filterMode},
-                onSelectionChanged: (Set<EventFilter> newSelection) {
-                  ref.read(eventFilterProvider.notifier).state = newSelection.first;
-                },
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(fontSize: 12),
-                ),
-              ),
+            child: SearchBar(
+              hintText: 'Search events, groups, items...',
+              leading: const Icon(Icons.search),
+              trailing: [
+                if (searchQuery.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      ref.read(searchQueryProvider.notifier).state = '';
+                    },
+                  ),
+              ],
+              onChanged: (value) {
+                ref.read(searchQueryProvider.notifier).state = value;
+              },
             ),
           ),
           Expanded(
-            child: eventsAsync.when(
-              data: (originalEvents) {
-                if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
-                
-                var events = originalEvents.where((e) {
-                  if (filterMode == EventFilter.favorite) {
-                    return e.hasIsFavorite() && e.isFavorite;
-                  }
-                  if (filterMode == EventFilter.joined) {
-                    return e.hasIsJoined() && e.isJoined;
-                  }
-                  return true;
-                }).toList();
-
-                if (events.isEmpty) {
-                  return const Center(child: Text('No events match this filter.', style: TextStyle(color: Colors.grey)));
-                }
-                
-                events.sort((a, b) {
-                  // Favorites always at the top regardless of sort mode
-                  final aFav = a.hasIsFavorite() && a.isFavorite;
-                  final bFav = b.hasIsFavorite() && b.isFavorite;
-                  if (aFav && !bFav) return -1;
-                  if (!aFav && bFav) return 1;
-
-                  // Apply selected sort mode
-                  switch (sortMode) {
-                    case EventSort.popular:
-                      final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
-                      final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
-                      return bPop.compareTo(aPop); // Descending popularity
-                    case EventSort.alphabetical:
-                      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-                    case EventSort.recent:
-                      return b.id.compareTo(a.id); // Descending ID (newest)
-                  }
-                });
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final event = events[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => context.go('/event/${event.id}'),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.confirmation_number_outlined,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      event.name,
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${event.hasActiveParticipants() ? event.activeParticipants : 0} traders',
-                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Icon(Icons.visibility_outlined, size: 14, color: Colors.grey[600]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${event.hasUniqueViews() ? event.uniqueViews : 0} views',
-                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey[600]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _formatDate(event.createdAt),
-                                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  event.hasIsFavorite() && event.isFavorite ? Icons.star : Icons.star_border,
-                                  color: event.hasIsFavorite() && event.isFavorite ? Colors.amber : Colors.grey,
-                                ),
-                                onPressed: () async {
-                                  if (user != null) {
-                                    final newStatus = !(event.hasIsFavorite() && event.isFavorite);
-                                    await ref.read(eventsControllerProvider.notifier).toggleFavorite(event.id, user.id, newStatus);
-                                    ref.invalidate(eventsProvider);
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => Center(child: Text('Error: $err')),
-            ),
+            child: searchQuery.isNotEmpty
+                ? _buildSearchResults(context, ref)
+                : _buildNormalContent(context, ref, eventsAsync, sortMode, filterMode, user),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: searchQuery.isEmpty ? FloatingActionButton.extended(
         onPressed: () => _showAddEventDialog(context, ref),
         icon: const Icon(Icons.add),
         label: const Text('New Event'),
+      ) : null,
+    );
+  }
+
+  Widget _buildSearchResults(BuildContext context, WidgetRef ref) {
+    final searchAsync = ref.watch(searchProvider);
+
+    return searchAsync.when(
+      data: (results) {
+        if (results.isEmpty) {
+          return Center(
+            child: Text(
+              'No results found',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            final result = results[index];
+            IconData icon;
+            Color iconColor;
+
+            switch (result.type) {
+              case 'event':
+                icon = Icons.event;
+                iconColor = Colors.blue;
+                break;
+              case 'group':
+                icon = Icons.folder;
+                iconColor = Colors.orange;
+                break;
+              case 'item':
+              default:
+                icon = Icons.inventory_2;
+                iconColor = Colors.green;
+            }
+
+            return ListTile(
+              leading: result.hasPhotoUrl() && result.photoUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        result.photoUrl,
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildFallbackIcon(icon, iconColor),
+                      ),
+                    )
+                  : _buildFallbackIcon(icon, iconColor),
+              title: Text(result.title),
+              subtitle: result.hasSubtitle() ? Text(result.subtitle) : null,
+              onTap: () {
+                context.go('/event/${result.eventId}');
+              },
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
+    );
+  }
+
+  Widget _buildFallbackIcon(IconData icon, Color color) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
       ),
+      child: Icon(icon, color: color),
+    );
+  }
+
+  Widget _buildNormalContent(BuildContext context, WidgetRef ref, AsyncValue<List<Event>> eventsAsync, EventSort sortMode, EventFilter filterMode, User? user) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Consumer(
+          builder: (context, ref, _) {
+            final eventsAsync = ref.watch(eventsProvider);
+            final groupsAsync = ref.watch(favoriteGroupsProvider);
+            
+            final favEvents = eventsAsync.valueOrNull?.where((e) => e.hasIsFavorite() && e.isFavorite).take(2).toList() ?? [];
+            final favGroups = groupsAsync.valueOrNull?.take(4).toList() ?? [];
+            
+            if (favEvents.isEmpty && favGroups.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            
+            return Column(
+              children: [
+                Container(
+                  height: 60,
+                  color: Colors.white,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    children: [
+                      ...favEvents.map((event) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _buildShortcutChip(context, Icons.event, 'Fav: ${event.name}', event.id),
+                        );
+                      }),
+                      ...favGroups.map((group) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _buildShortcutChip(
+                            context, 
+                            Icons.star, 
+                            '${group.hasEventName() ? group.eventName : 'Group'}: ${group.groupName}', 
+                            group.eventId
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+              ],
+            );
+          },
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.white,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<EventFilter>(
+              segments: const [
+                ButtonSegment(value: EventFilter.all, label: Text('All Events')),
+                ButtonSegment(value: EventFilter.favorite, label: Text('Favorites')),
+                ButtonSegment(value: EventFilter.joined, label: Text('My Items')),
+              ],
+              selected: {filterMode},
+              onSelectionChanged: (Set<EventFilter> newSelection) {
+                ref.read(eventFilterProvider.notifier).state = newSelection.first;
+              },
+              style: SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                textStyle: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: eventsAsync.when(
+            data: (originalEvents) {
+              if (originalEvents.isEmpty) return _buildEmptyState(context, ref);
+              
+              var events = originalEvents.where((e) {
+                if (filterMode == EventFilter.favorite) {
+                  return e.hasIsFavorite() && e.isFavorite;
+                }
+                if (filterMode == EventFilter.joined) {
+                  return e.hasIsJoined() && e.isJoined;
+                }
+                return true;
+              }).toList();
+
+              if (events.isEmpty) {
+                return const Center(child: Text('No events match this filter.', style: TextStyle(color: Colors.grey)));
+              }
+              
+              events.sort((a, b) {
+                final aFav = a.hasIsFavorite() && a.isFavorite;
+                final bFav = b.hasIsFavorite() && b.isFavorite;
+                if (aFav && !bFav) return -1;
+                if (!aFav && bFav) return 1;
+
+                switch (sortMode) {
+                  case EventSort.popular:
+                    final aPop = a.hasActiveParticipants() ? a.activeParticipants : 0;
+                    final bPop = b.hasActiveParticipants() ? b.activeParticipants : 0;
+                    return bPop.compareTo(aPop);
+                  case EventSort.alphabetical:
+                    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                  case EventSort.recent:
+                    return b.id.compareTo(a.id);
+                }
+              });
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  final event = events[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => context.go('/event/${event.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.confirmation_number_outlined,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    event.name,
+                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${event.hasActiveParticipants() ? event.activeParticipants : 0} traders',
+                                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(Icons.visibility_outlined, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${event.hasUniqueViews() ? event.uniqueViews : 0} views',
+                                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatDate(event.createdAt),
+                                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                event.hasIsFavorite() && event.isFavorite ? Icons.star : Icons.star_border,
+                                color: event.hasIsFavorite() && event.isFavorite ? Colors.amber : Colors.grey,
+                              ),
+                              onPressed: () async {
+                                if (user != null) {
+                                  final newStatus = !(event.hasIsFavorite() && event.isFavorite);
+                                  await ref.read(eventsControllerProvider.notifier).toggleFavorite(event.id, user.id, newStatus);
+                                  ref.invalidate(eventsProvider);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Center(child: Text('Error: $err')),
+          ),
+        ),
+      ],
     );
   }
 

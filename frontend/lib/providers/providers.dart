@@ -387,3 +387,16 @@ final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
   final json = await client.get('/api/v1/admin/matches');
   return (json as List).map((e) => TradeMatch()..mergeFromProto3Json(e)).toList();
 });
+
+// --- Search ---
+final searchQueryProvider = StateProvider<String>((ref) => '');
+
+final searchProvider = FutureProvider<List<SearchResult>>((ref) async {
+  final query = ref.watch(searchQueryProvider);
+  if (query.trim().isEmpty) return [];
+  
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/search?q=${Uri.encodeComponent(query.trim())}');
+  return (json as List).map((e) => SearchResult()..mergeFromProto3Json(e)).toList();
+});
+
