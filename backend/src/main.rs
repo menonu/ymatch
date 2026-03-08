@@ -52,7 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/auth/login", post(handlers::login))
         .route("/api/v1/auth/guest", post(handlers::guest_login))
         .route("/api/v1/users", get(handlers::list_users))
-        .route("/api/v1/user/:id/favorite_groups", get(handlers::list_favorite_groups))
+        .route(
+            "/api/v1/user/:id/favorite_groups",
+            get(handlers::list_favorite_groups),
+        )
         // System
         .route("/api/v1/system/status", get(handlers::get_system_status))
         // Search
@@ -114,12 +117,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
     let matching_pool = pool.clone();
+    let matching_engine =
+        matching::MatchingEngine::new(std::sync::Arc::new(matching::StrictGroupMatcher));
+
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
         loop {
             interval.tick().await;
             tracing::info!("Running periodic matching algorithm...");
-            match matching::run_matching_algorithm(&matching_pool).await {
+            match matching_engine.run(&matching_pool).await {
                 Ok(count) => {
                     if count > 0 {
                         tracing::info!("Created {} new matches automatically.", count);
