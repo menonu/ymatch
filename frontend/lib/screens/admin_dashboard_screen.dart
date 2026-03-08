@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 
@@ -9,15 +11,17 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'System'),
               Tab(text: 'Events'),
               Tab(text: 'Items'),
               Tab(text: 'Matches'),
+              Tab(text: 'Debug'),
             ],
           ),
         ),
@@ -27,6 +31,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             _AdminEventsTab(),
             _AdminItemsTab(),
             _AdminMatchesTab(),
+            _AdminDebugTab(),
           ],
         ),
       ),
@@ -280,6 +285,136 @@ class _AdminMatchesTab extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Center(child: Text('Error: $err')),
+    );
+  }
+}
+
+class _AdminDebugTab extends ConsumerWidget {
+  const _AdminDebugTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            margin: EdgeInsets.zero,
+            color: Colors.amber[50], // Subtle warning/debug color
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.bug_report, color: Colors.amber[900]),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Developer / Debug Tools',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber[900],
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildVersionInfo(context, ref),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.add_to_photos),
+                      label: const Text('Generate Test Event (50 items in 5 tabs)'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber[800],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () async {
+                        if (user == null) return;
+                        
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Generate Data?'),
+                            content: const Text('This will create a dummy event with 50 items spread across 5 group tabs. Proceed?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Generate')),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating data...')));
+                          }
+                          await ref.read(eventsControllerProvider.notifier).generateDebugData(user.id);
+                          ref.invalidate(eventsProvider);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Test data generated successfully!')));
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Open New Guest Session in Browser'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () {
+                        final newUuid = const Uuid().v4();
+                        final currentUrl = Uri.base.origin;
+                        final newUrl = Uri.parse('$currentUrl/#/?dev_user=$newUuid');
+                        launchUrl(newUrl, webOnlyWindowName: '_blank');
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionInfo(BuildContext context, WidgetRef ref) {
+    final backendStatus = ref.watch(backendSystemStatusProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Versions',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[900], fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          backendStatus.when(
+            data: (status) => SelectableText('Backend (Git Hash): ${status['backend_version']}', style: TextStyle(color: Colors.amber[900], fontSize: 13, fontFamily: 'monospace')),
+            loading: () => const Text('Backend: Loading...'),
+            error: (_, __) => const Text('Backend: Error fetching version'),
+          ),
+        ],
+      ),
     );
   }
 }
