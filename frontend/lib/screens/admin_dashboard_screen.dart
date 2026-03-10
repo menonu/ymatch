@@ -365,11 +365,64 @@ class _AdminMatchesTab extends ConsumerWidget {
   }
 }
 
-class _AdminDebugTab extends ConsumerWidget {
+class _AdminDebugTab extends ConsumerStatefulWidget {
   const _AdminDebugTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AdminDebugTab> createState() => _AdminDebugTabState();
+}
+
+class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
+  final _targetEventIdController = TextEditingController();
+
+  @override
+  void dispose() {
+    _targetEventIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _generateMockItems(int count) async {
+    final eventId = int.tryParse(_targetEventIdController.text);
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid Event ID')),
+      );
+      return;
+    }
+    await ref
+        .read(eventsControllerProvider.notifier)
+        .generateMockItems(eventId, count);
+    ref.invalidate(adminMerchProvider);
+    ref.invalidate(merchProvider(eventId));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$count items added to Event $eventId!')),
+      );
+    }
+  }
+
+  Future<void> _generateMockUsers(int count) async {
+    final eventId = int.tryParse(_targetEventIdController.text);
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid Event ID')),
+      );
+      return;
+    }
+    await ref
+        .read(eventsControllerProvider.notifier)
+        .generateMockUsers(eventId, count);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$count mock users created for Event $eventId!'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
 
     return SingleChildScrollView(
@@ -482,6 +535,72 @@ class _AdminDebugTab extends ConsumerWidget {
                         launchUrl(newUrl, webOnlyWindowName: '_blank');
                       },
                     ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Data Generation',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber[900],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.event_available),
+                    label: const Text('Create Empty Event'),
+                    onPressed: () async {
+                      if (user == null) return;
+                      await ref.read(eventsControllerProvider.notifier).createEmptyEvent(user.id);
+                      ref.invalidate(eventsProvider);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Empty event created!')));
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _targetEventIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Target Event ID',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text('Add 5 Items'),
+                        onPressed: () => _generateMockItems(5),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text('Add 10 Items'),
+                        onPressed: () => _generateMockItems(10),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.people),
+                        label: const Text('Generate 5 Mock Users & Inventory'),
+                        onPressed: () => _generateMockUsers(5),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.people),
+                        label: const Text('Generate 10 Mock Users & Inventory'),
+                        onPressed: () => _generateMockUsers(10),
+                      ),
+                    ],
                   ),
                 ],
               ),

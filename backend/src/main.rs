@@ -108,6 +108,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/api/v1/debug/simulate_incoming/:user_id",
             post(handlers::debug_simulate_incoming),
         )
+        .route(
+            "/api/v1/debug/create_empty_event",
+            post(handlers::debug_create_empty_event),
+        )
+        .route(
+            "/api/v1/debug/generate_mock_items",
+            post(handlers::debug_generate_mock_items),
+        )
+        .route(
+            "/api/v1/debug/generate_mock_users",
+            post(handlers::debug_generate_mock_users),
+        )
         // Matches
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(

@@ -236,6 +236,36 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> createEmptyEvent(int creatorId) async {
+    try {
+      await client.post('/api/v1/debug/create_empty_event', {'creator_id': creatorId});
+    } catch (e) {
+      throw Exception('Failed to create empty event: $e');
+    }
+  }
+
+  Future<void> generateMockItems(int eventId, int count) async {
+    try {
+      await client.post('/api/v1/debug/generate_mock_items', {
+        'event_id': eventId,
+        'item_count': count,
+      });
+    } catch (e) {
+      throw Exception('Failed to generate mock items: $e');
+    }
+  }
+
+  Future<void> generateMockUsers(int eventId, int count) async {
+    try {
+      await client.post('/api/v1/debug/generate_mock_users', {
+        'event_id': eventId,
+        'user_count': count,
+      });
+    } catch (e) {
+      throw Exception('Failed to generate mock users: $e');
+    }
+  }
+
   Future<void> generateDebugData(int creatorId) async {
     state = const AsyncValue.loading();
     try {
