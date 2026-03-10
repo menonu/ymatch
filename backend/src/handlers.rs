@@ -1036,3 +1036,147 @@ pub async fn nuke_seed(
 
     Ok(StatusCode::OK)
 }
+
+pub async fn debug_trigger_match(
+    State(pool): State<PgPool>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let matching_engine = crate::matching::MatchingEngine::new(std::sync::Arc::new(crate::matching::StrictGroupMatcher));
+    match matching_engine.run(&pool).await {
+        Ok(count) => Ok(Json(serde_json::json!({
+            "status": "success",
+            "matches_created": count
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to run matching algorithm: {}", e),
+        )),
+    }
+}
+
+pub async fn debug_simulate_incoming(
+    State(pool): State<PgPool>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // 1. Find an item the user WANTs
+    let want_item = sqlx::query(
+        r#"
+        SELECT i.merch_id, m.group_name 
+        FROM inventory i
+        JOIN merchandise m ON i.merch_id = m.id
+        WHERE i.user_id = $1 AND i.status = 'WANT'
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let want_row = match want_item {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "User has no WANT items to simulate a match for.".to_string(),
+            ))
+        }
+    };
+
+    let user_want_merch_id: i32 = want_row.get("merch_id");
+    let group_name: Option<String> = want_row.get("group_name");
+
+    // 2. Find an item the user is TRADING (in the same group if applicable)
+    let trade_query = match group_name.as_ref() {
+        Some(g) => sqlx::query(
+            r#"
+                SELECT i.merch_id 
+                FROM inventory i
+                JOIN merchandise m ON i.merch_id = m.id
+                WHERE i.user_id = $1 AND i.status = 'TRADE' AND m.group_name = $2
+                LIMIT 1
+                "#,
+        )
+        .bind(user_id)
+        .bind(g),
+        None => sqlx::query(
+            r#"
+                SELECT i.merch_id 
+                FROM inventory i
+                JOIN merchandise m ON i.merch_id = m.id
+                WHERE i.user_id = $1 AND i.status = 'TRADE' AND m.group_name IS NULL
+                LIMIT 1
+                "#,
+        )
+        .bind(user_id),
+    };
+
+    let trade_item = trade_query
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let trade_row = match trade_item {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "User has no TRADE items in the same group to simulate a match for.".to_string(),
+            ))
+        }
+    };
+
+    let user_trade_merch_id: i32 = trade_row.get("merch_id");
+
+    // 3. Create a mock user
+    let mock_username = format!(
+        "mock_user_{}",
+        uuid::Uuid::new_v4()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
+    );
+    let mock_user_id: i32 =
+        sqlx::query("INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, 'mock') RETURNING id")
+            .bind(&mock_username)
+            .bind(uuid::Uuid::new_v4().to_string()) // Required uuid
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .get("id");
+
+    // 4. Give the mock user what the real user WANTs (Mock has TRADE)
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'TRADE', 1)",
+    )
+    .bind(mock_user_id)
+    .bind(user_want_merch_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // 5. Make the mock user WANT what the real user has for TRADE
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'WANT', 1)",
+    )
+    .bind(mock_user_id)
+    .bind(user_trade_merch_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // 6. Trigger matching algorithm
+    let matching_engine = crate::matching::MatchingEngine::new(std::sync::Arc::new(crate::matching::StrictGroupMatcher));
+    match matching_engine.run(&pool).await {
+        Ok(count) => Ok(Json(serde_json::json!({
+            "status": "success",
+            "message": format!("Simulated match created. Run matching resulted in {} matches.", count),
+            "mock_user_id": mock_user_id,
+            "mock_username": mock_username
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to run matching algorithm after simulation: {}", e),
+        )),
+    }
+}
