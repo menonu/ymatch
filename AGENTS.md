@@ -23,7 +23,7 @@ This document serves as the main entry point and guide for the `ymatch` merchand
 ### Commands
 ```bash
 # Start Database
-docker-compose up -d
+docker compose up -d
 
 # Run Backend
 cd backend
