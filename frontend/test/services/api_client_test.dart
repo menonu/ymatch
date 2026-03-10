@@ -36,13 +36,11 @@ void main() {
 
       expect(
         () async => await apiClient.get('/api/test'),
-        throwsA(
-          isA<Exception>().having(
-            (e) => e.toString(),
-            'message',
-            contains('API Error: 500'),
-          ),
-        ),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('API Error: 500'),
+        )),
       );
     });
 
@@ -71,13 +69,11 @@ void main() {
 
       expect(
         () async => await apiClient.post('/api/test', {'key': 'value'}),
-        throwsA(
-          isA<Exception>().having(
-            (e) => e.toString(),
-            'message',
-            contains('API Error: 400'),
-          ),
-        ),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('API Error: 400'),
+        )),
       );
     });
 
@@ -90,41 +86,33 @@ void main() {
 
         expect(
           () async => await apiClient.get('/api/test'),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('API Error: 199 Information'),
-            ),
-          ),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('API Error: 199 Information'),
+          )),
         );
       });
 
-      test(
-        'returns json for status code 200 (lower bound of success)',
-        () async {
-          final mockClient = MockClient((request) async {
-            return http.Response(jsonEncode({'message': 'OK'}), 200);
-          });
-          final apiClient = ApiClient(config, client: mockClient);
+      test('returns json for status code 200 (lower bound of success)', () async {
+        final mockClient = MockClient((request) async {
+          return http.Response(jsonEncode({'message': 'OK'}), 200);
+        });
+        final apiClient = ApiClient(config, client: mockClient);
 
-          final response = await apiClient.get('/api/test');
-          expect(response, {'message': 'OK'});
-        },
-      );
+        final response = await apiClient.get('/api/test');
+        expect(response, {'message': 'OK'});
+      });
 
-      test(
-        'returns json for status code 299 (upper bound of success)',
-        () async {
-          final mockClient = MockClient((request) async {
-            return http.Response(jsonEncode({'message': 'OK'}), 299);
-          });
-          final apiClient = ApiClient(config, client: mockClient);
+      test('returns json for status code 299 (upper bound of success)', () async {
+        final mockClient = MockClient((request) async {
+          return http.Response(jsonEncode({'message': 'OK'}), 299);
+        });
+        final apiClient = ApiClient(config, client: mockClient);
 
-          final response = await apiClient.get('/api/test');
-          expect(response, {'message': 'OK'});
-        },
-      );
+        final response = await apiClient.get('/api/test');
+        expect(response, {'message': 'OK'});
+      });
 
       test('throws Exception for status code 300 (above 299)', () async {
         final mockClient = MockClient((request) async {
@@ -134,13 +122,11 @@ void main() {
 
         expect(
           () async => await apiClient.get('/api/test'),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('API Error: 300 Multiple Choices'),
-            ),
-          ),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('API Error: 300 Multiple Choices'),
+          )),
         );
       });
     });

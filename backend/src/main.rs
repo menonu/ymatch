@@ -97,29 +97,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/admin/events/:id", delete(handlers::delete_event))
         .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))
         .route("/api/v1/admin/matches/:id", delete(handlers::delete_match))
-        // Debug
-        .route("/api/v1/debug/reset_me", post(handlers::reset_me))
-        .route("/api/v1/debug/nuke_seed", post(handlers::nuke_seed))
-        .route(
-            "/api/v1/debug/trigger_match",
-            post(handlers::debug_trigger_match),
-        )
-        .route(
-            "/api/v1/debug/simulate_incoming/:user_id",
-            post(handlers::debug_simulate_incoming),
-        )
-        .route(
-            "/api/v1/debug/create_empty_event",
-            post(handlers::debug_create_empty_event),
-        )
-        .route(
-            "/api/v1/debug/generate_mock_items",
-            post(handlers::debug_generate_mock_items),
-        )
-        .route(
-            "/api/v1/debug/generate_mock_users",
-            post(handlers::debug_generate_mock_users),
-        )
         // Matches
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(
@@ -140,15 +117,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
     let matching_pool = pool.clone();
-    let matching_engine =
-        matching::MatchingEngine::new(std::sync::Arc::new(matching::StrictGroupMatcher));
-
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
         loop {
             interval.tick().await;
             tracing::info!("Running periodic matching algorithm...");
-            match matching_engine.run(&matching_pool).await {
+            match matching::run_matching_algorithm(&matching_pool).await {
                 Ok(count) => {
                     if count > 0 {
                         tracing::info!("Created {} new matches automatically.", count);

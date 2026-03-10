@@ -35,9 +35,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     setState(() => _isAdding = true);
 
     try {
-      await ref
-          .read(merchControllerProvider.notifier)
-          .addMerch(
+      await ref.read(merchControllerProvider.notifier).addMerch(
             widget.eventId,
             name,
             _urlController.text.trim(),
@@ -55,13 +53,11 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       ref.invalidate(merchProvider(widget.eventId));
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added "$name" successfully.'),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Added "$name" successfully.'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } finally {
       if (mounted) {
@@ -98,15 +94,11 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
           }
 
           // Filter existing items in the currently selected group to show as preview
-          final itemsInSelectedGroup =
-              merchList.where((item) {
-                final gName = item.hasGroupName() && item.groupName.isNotEmpty
-                    ? item.groupName
-                    : null;
-                return gName == _selectedGroup;
-              }).toList()..sort(
-                (a, b) => b.id.compareTo(a.id),
-              ); // Newest first for the preview
+          final itemsInSelectedGroup = merchList.where((item) {
+             final gName = item.hasGroupName() && item.groupName.isNotEmpty ? item.groupName : null;
+             return gName == _selectedGroup;
+          }).toList()
+          ..sort((a, b) => b.id.compareTo(a.id)); // Newest first for the preview
 
           return Column(
             children: [
@@ -120,33 +112,27 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                     // Group Selection (Chips)
                     Text(
                       'Select Group',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelLarge?.copyWith(color: Colors.grey[700]),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 8),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          ...groups.map(
-                            (g) => Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: FilterChip(
-                                label: Text(g),
-                                selected: _selectedGroup == g,
-                                selectedColor: AppTheme.primaryColor.withValues(
-                                  alpha: 0.1,
-                                ),
-                                checkmarkColor: AppTheme.primaryColor,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    _selectedGroup = selected ? g : null;
-                                  });
-                                },
-                              ),
+                          ...groups.map((g) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(g),
+                              selected: _selectedGroup == g,
+                              selectedColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                              checkmarkColor: AppTheme.primaryColor,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _selectedGroup = selected ? g : null;
+                                });
+                              },
                             ),
-                          ),
+                          )),
                           ActionChip(
                             avatar: const Icon(Icons.add, size: 16),
                             label: const Text('New Group'),
@@ -183,14 +169,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                     // Add Button
                     ElevatedButton.icon(
                       icon: _isAdding
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.add),
                       label: Text(_isAdding ? 'Adding...' : 'Add Item'),
                       style: ElevatedButton.styleFrom(
@@ -205,26 +184,16 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
               // --- PREVIEW SECTION ---
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 color: Colors.grey[100],
                 child: Text(
                   'Existing items in "${_selectedGroup ?? 'Uncategorized'}"',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
                 ),
               ),
               Expanded(
                 child: itemsInSelectedGroup.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No items in this group yet.',
-                          style: TextStyle(color: Colors.grey[500]),
-                        ),
-                      )
+                    ? Center(child: Text('No items in this group yet.', style: TextStyle(color: Colors.grey[500])))
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: itemsInSelectedGroup.length,
@@ -234,34 +203,11 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                             dense: true,
                             leading: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
-                              child:
-                                  item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                                  ? Image.network(
-                                      item.photoUrl,
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Icon(Icons.image_outlined),
-                                    )
-                                  : Container(
-                                      width: 40,
-                                      height: 40,
-                                      color: Colors.grey[200],
-                                      child: const Icon(
-                                        Icons.image_outlined,
-                                        size: 20,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
+                              child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
+                                  ? Image.network(item.photoUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_outlined))
+                                  : Container(width: 40, height: 40, color: Colors.grey[200], child: const Icon(Icons.image_outlined, size: 20, color: Colors.grey)),
                             ),
-                            title: Text(
-                              item.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                           );
                         },
                       ),
@@ -287,10 +233,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
           decoration: const InputDecoration(hintText: 'e.g., Keychains'),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               final val = ctrl.text.trim();
