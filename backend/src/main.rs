@@ -100,6 +100,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Debug
         .route("/api/v1/debug/reset_me", post(handlers::reset_me))
         .route("/api/v1/debug/nuke_seed", post(handlers::nuke_seed))
+        .route(
+            "/api/v1/debug/trigger_match",
+            post(handlers::debug_trigger_match),
+        )
+        .route(
+            "/api/v1/debug/simulate_incoming/:user_id",
+            post(handlers::debug_simulate_incoming),
+        )
         // Matches
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(

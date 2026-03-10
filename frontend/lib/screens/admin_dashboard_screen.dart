@@ -490,6 +490,121 @@ class _AdminDebugTab extends ConsumerWidget {
           const SizedBox(height: 16),
           Card(
             margin: EdgeInsets.zero,
+            color: Colors.teal[50],
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.hub, color: Colors.teal[900]),
+                      const SizedBox(width: 8),
+                      Text(
+                        'State Simulation',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal[900],
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.calculate),
+                      label: const Text('Force Trigger Matching Algorithm'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal[800],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Force Trigger?'),
+                            content: const Text('This will manually run the background matching algorithm. Proceed?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Trigger')),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Triggering algorithm...')));
+                          }
+                          try {
+                            final client = ref.read(apiClientProvider);
+                            final response = await client.post('/api/v1/debug/trigger_match', {});
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Matches created: ${response['matches_created']}')));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Simulate Incoming Match Request'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal[800],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () async {
+                        if (user == null) return;
+                        
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Simulate Match?'),
+                            content: const Text('This will create a mock user who has an item you WANT, and wants an item you are TRADING. Proceed?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Simulate')),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulating match...')));
+                          }
+                          try {
+                            final client = ref.read(apiClientProvider);
+                            final response = await client.post('/api/v1/debug/simulate_incoming/${user.id}', {});
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response['message'] ?? 'Simulated successfully')));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            margin: EdgeInsets.zero,
             color: Colors.red[50], // Danger Zone color
             child: Padding(
               padding: const EdgeInsets.all(24.0),
