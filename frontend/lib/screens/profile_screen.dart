@@ -9,8 +9,7 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    if (user == null)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
       appBar: AppBar(),
@@ -28,9 +27,7 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     CircleAvatar(
                       radius: 48,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.1),
+                      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                       child: Icon(
                         Icons.person,
                         size: 48,
@@ -40,8 +37,9 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     Text(
                       user.username,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 24),
                     Container(
@@ -71,15 +69,9 @@ class ProfileScreen extends ConsumerWidget {
                                 constraints: const BoxConstraints(),
                                 onPressed: () {
                                   if (user.hasUuid() && user.uuid.isNotEmpty) {
-                                    Clipboard.setData(
-                                      ClipboardData(text: user.uuid),
-                                    );
+                                    Clipboard.setData(ClipboardData(text: user.uuid));
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Master Key copied to clipboard',
-                                        ),
-                                      ),
+                                      const SnackBar(content: Text('Master Key copied to clipboard')),
                                     );
                                   }
                                 },
@@ -88,11 +80,8 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 8),
                           SelectableText(
-                            user.hasUuid() && user.uuid.isNotEmpty
-                                ? user.uuid
-                                : "Unknown",
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
+                            user.hasUuid() && user.uuid.isNotEmpty ? user.uuid : "Unknown",
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -100,19 +89,12 @@ class ProfileScreen extends ConsumerWidget {
                           const SizedBox(height: 12),
                           const Row(
                             children: [
-                              Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.orange,
-                                size: 16,
-                              ),
+                              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Save this key to restore your account on another device!',
-                                  style: TextStyle(
-                                    color: Colors.orange,
-                                    fontSize: 12,
-                                  ),
+                                  style: TextStyle(color: Colors.orange, fontSize: 12),
                                 ),
                               ),
                             ],
@@ -137,34 +119,20 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.help_outline,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        Icon(Icons.help_outline, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
                           'How to Trade',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _buildInstructionStep(
-                      context,
-                      '1',
-                      'Go to the Events tab and find your event.',
-                    ),
-                    _buildInstructionStep(
-                      context,
-                      '2',
-                      'Use + and - to set your HAVE and WANT items.',
-                    ),
-                    _buildInstructionStep(
-                      context,
-                      '3',
-                      'Go to Matches to see who wants to trade with you.',
-                    ),
+                    _buildInstructionStep(context, '1', 'Go to the Events tab and find your event.'),
+                    _buildInstructionStep(context, '2', 'Use + and - to set your HAVE and WANT items.'),
+                    _buildInstructionStep(context, '3', 'Go to Matches to see who wants to trade with you.'),
                   ],
                 ),
               ),
@@ -200,9 +168,7 @@ class ProfileScreen extends ConsumerWidget {
             height: 24,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -216,7 +182,10 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
         ],
       ),
