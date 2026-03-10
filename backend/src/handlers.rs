@@ -936,3 +936,394 @@ pub async fn send_message(
         longitude: row.get("longitude"),
     }))
 }
+
+// --- Debug ---
+#[derive(serde::Deserialize)]
+pub struct ResetMeRequest {
+    pub user_id: i32,
+}
+
+pub async fn reset_me(
+    State(pool): State<PgPool>,
+    Json(payload): Json<ResetMeRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Delete Messages associated with User's matches (optional if we just delete matches, but good to be explicit or if we just delete the user's messages)
+    // Actually, it's safer to delete matches, which should cascade or we delete messages manually.
+    // Let's delete inventory
+    sqlx::query("DELETE FROM inventory WHERE user_id = $1")
+        .bind(payload.user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Delete messages sent by user (or we could delete matches entirely)
+    // The issue says: "deletes all Inventory (HAVE/WANT) records, Trade Matches, and Messages associated with the *currently logged-in user*"
+    
+    // Find all match IDs for the user
+    let matches: Vec<(i32,)> = sqlx::query_as("SELECT id FROM trade_matches WHERE user1_id = $1 OR user2_id = $1")
+        .bind(payload.user_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    for (match_id,) in matches {
+        sqlx::query("DELETE FROM messages WHERE match_id = $1")
+            .bind(match_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        sqlx::query("DELETE FROM trade_matches WHERE id = $1")
+            .bind(match_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn nuke_seed(
+    State(pool): State<PgPool>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Nuke all tables
+    sqlx::query("TRUNCATE TABLE messages, trade_matches, inventory, merchandise, events, users, event_views, favorite_events, favorite_groups RESTART IDENTITY CASCADE;")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Seed Demo Event
+    let creator_id: i32 = sqlx::query("INSERT INTO users (username) VALUES ('admin') RETURNING id")
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .get("id");
+
+    let event_id: i32 = sqlx::query("INSERT INTO events (name, creator_id) VALUES ('Demo Event', $1) RETURNING id")
+        .bind(creator_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .get("id");
+
+    // Seed some standard items
+    for i in 1..=5 {
+        sqlx::query("INSERT INTO merchandise (event_id, name, group_name) VALUES ($1, $2, 'Group A')")
+            .bind(event_id)
+            .bind(format!("Item {}", i))
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn debug_trigger_match(
+    State(pool): State<PgPool>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let matching_engine = crate::matching::MatchingEngine::new(std::sync::Arc::new(crate::matching::StrictGroupMatcher));
+    match matching_engine.run(&pool).await {
+        Ok(count) => Ok(Json(serde_json::json!({
+            "status": "success",
+            "matches_created": count
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to run matching algorithm: {}", e),
+        )),
+    }
+}
+
+pub async fn debug_simulate_incoming(
+    State(pool): State<PgPool>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // 1. Find an item the user WANTs
+    let want_item = sqlx::query(
+        r#"
+        SELECT i.merch_id, m.group_name 
+        FROM inventory i
+        JOIN merchandise m ON i.merch_id = m.id
+        WHERE i.user_id = $1 AND i.status = 'WANT'
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let want_row = match want_item {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "User has no WANT items to simulate a match for.".to_string(),
+            ))
+        }
+    };
+
+    let user_want_merch_id: i32 = want_row.get("merch_id");
+    let group_name: Option<String> = want_row.get("group_name");
+
+    // 2. Find an item the user is TRADING (in the same group if applicable)
+    let trade_query = match group_name.as_ref() {
+        Some(g) => sqlx::query(
+            r#"
+                SELECT i.merch_id 
+                FROM inventory i
+                JOIN merchandise m ON i.merch_id = m.id
+                WHERE i.user_id = $1 AND i.status = 'TRADE' AND m.group_name = $2
+                LIMIT 1
+                "#,
+        )
+        .bind(user_id)
+        .bind(g),
+        None => sqlx::query(
+            r#"
+                SELECT i.merch_id 
+                FROM inventory i
+                JOIN merchandise m ON i.merch_id = m.id
+                WHERE i.user_id = $1 AND i.status = 'TRADE' AND m.group_name IS NULL
+                LIMIT 1
+                "#,
+        )
+        .bind(user_id),
+    };
+
+    let trade_item = trade_query
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let trade_row = match trade_item {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "User has no TRADE items in the same group to simulate a match for.".to_string(),
+            ))
+        }
+    };
+
+    let user_trade_merch_id: i32 = trade_row.get("merch_id");
+
+    // 3. Create a mock user
+    let mock_username = format!(
+        "mock_user_{}",
+        uuid::Uuid::new_v4()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
+    );
+    let mock_user_id: i32 =
+        sqlx::query("INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, 'mock') RETURNING id")
+            .bind(&mock_username)
+            .bind(uuid::Uuid::new_v4().to_string()) // Required uuid
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .get("id");
+
+    // 4. Give the mock user what the real user WANTs (Mock has TRADE)
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'TRADE', 1)",
+    )
+    .bind(mock_user_id)
+    .bind(user_want_merch_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // 5. Make the mock user WANT what the real user has for TRADE
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'WANT', 1)",
+    )
+    .bind(mock_user_id)
+    .bind(user_trade_merch_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // 6. Trigger matching algorithm
+    let matching_engine = crate::matching::MatchingEngine::new(std::sync::Arc::new(crate::matching::StrictGroupMatcher));
+    match matching_engine.run(&pool).await {
+        Ok(count) => Ok(Json(serde_json::json!({
+            "status": "success",
+            "message": format!("Simulated match created. Run matching resulted in {} matches.", count),
+            "mock_user_id": mock_user_id,
+            "mock_username": mock_username
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to run matching algorithm after simulation: {}", e),
+        )),
+    }
+}
+
+pub async fn debug_create_empty_event(
+    State(pool): State<PgPool>,
+    Json(payload): Json<DebugCreateEmptyEventRequest>,
+) -> Result<Json<Event>, (StatusCode, String)> {
+    let random_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let name = format!("Empty Event {}", random_id);
+
+    let row = sqlx::query(
+        "INSERT INTO events (name, creator_id) VALUES ($1, $2) RETURNING id, name, creator_id, created_at"
+    )
+    .bind(name)
+    .bind(payload.creator_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(Event {
+        id: row.get("id"),
+        name: row.get("name"),
+        creator_id: row.get("creator_id"),
+        created_at: row
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+            .map(|dt| dt.to_rfc3339()),
+        unique_views: Some(0),
+        active_participants: Some(0),
+        is_favorite: Some(false),
+        is_joined: Some(false),
+    }))
+}
+
+pub async fn debug_generate_mock_items(
+    State(pool): State<PgPool>,
+    Json(payload): Json<DebugGenerateMockItemsRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let event_exists: bool = sqlx::query("SELECT EXISTS(SELECT 1 FROM events WHERE id = $1)")
+        .bind(payload.event_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .get(0);
+
+    if !event_exists {
+        return Err((StatusCode::NOT_FOUND, "Event not found".to_string()));
+    }
+
+    let groups = ["Mock Series A", "Mock Series B", "Random Items"];
+    for i in 0..payload.item_count {
+        use rand::Rng;
+        let group_name = groups[rand::thread_rng().gen_range(0..groups.len())];
+        let item_name = format!("Item {}-{}", group_name, i + 1);
+
+        sqlx::query("INSERT INTO merchandise (event_id, name, group_name) VALUES ($1, $2, $3)")
+            .bind(payload.event_id)
+            .bind(item_name)
+            .bind(group_name)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn debug_generate_mock_users(
+    State(pool): State<PgPool>,
+    Json(payload): Json<DebugGenerateMockUsersRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Get all merchandise for this event
+    let merch_rows = sqlx::query("SELECT id FROM merchandise WHERE event_id = $1")
+        .bind(payload.event_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if merch_rows.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Event has no merchandise to assign inventory".to_string(),
+        ));
+    }
+
+    let merch_ids: Vec<i32> = merch_rows.into_iter().map(|r| r.get("id")).collect();
+
+    for i in 0..payload.user_count {
+        // Create mock user
+        let uuid = uuid::Uuid::new_v4().to_string();
+        let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
+        let username = format!("MockUser_{}_{}", i + 1, unique_id);
+
+        let user_row = sqlx::query(
+            "INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, 'mock_token') RETURNING id"
+        )
+        .bind(username)
+        .bind(&uuid)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        let user_id: i32 = user_row.get("id");
+
+        // Assign some random inventory
+        use rand::Rng;
+        let num_items = rand::thread_rng().gen_range(1..std::cmp::min(10, merch_ids.len() + 1));
+
+        // Collect inventory choices ahead of time so `rng` isn't held across `await`
+        let mut inventory_to_add = Vec::new();
+        for _ in 0..num_items {
+            let merch_id = merch_ids[rand::thread_rng().gen_range(0..merch_ids.len())];
+            let statuses = ["HAVE", "WANT"];
+            let status = statuses[rand::thread_rng().gen_range(0..statuses.len())];
+            inventory_to_add.push((merch_id, status));
+        }
+
+        for (merch_id, status) in inventory_to_add {
+            sqlx::query(
+                "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, $3, 1) ON CONFLICT DO NOTHING"
+            )
+            .bind(user_id)
+            .bind(merch_id)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        }
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
