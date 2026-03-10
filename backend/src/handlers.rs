@@ -1180,3 +1180,150 @@ pub async fn debug_simulate_incoming(
         )),
     }
 }
+
+pub async fn debug_create_empty_event(
+    State(pool): State<PgPool>,
+    Json(payload): Json<DebugCreateEmptyEventRequest>,
+) -> Result<Json<Event>, (StatusCode, String)> {
+    let random_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let name = format!("Empty Event {}", random_id);
+
+    let row = sqlx::query(
+        "INSERT INTO events (name, creator_id) VALUES ($1, $2) RETURNING id, name, creator_id, created_at"
+    )
+    .bind(name)
+    .bind(payload.creator_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(Event {
+        id: row.get("id"),
+        name: row.get("name"),
+        creator_id: row.get("creator_id"),
+        created_at: row
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+            .map(|dt| dt.to_rfc3339()),
+        unique_views: Some(0),
+        active_participants: Some(0),
+        is_favorite: Some(false),
+        is_joined: Some(false),
+    }))
+}
+
+pub async fn debug_generate_mock_items(
+    State(pool): State<PgPool>,
+    Json(payload): Json<DebugGenerateMockItemsRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let event_exists: bool = sqlx::query("SELECT EXISTS(SELECT 1 FROM events WHERE id = $1)")
+        .bind(payload.event_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .get(0);
+
+    if !event_exists {
+        return Err((StatusCode::NOT_FOUND, "Event not found".to_string()));
+    }
+
+    let groups = ["Mock Series A", "Mock Series B", "Random Items"];
+    for i in 0..payload.item_count {
+        use rand::Rng;
+        let group_name = groups[rand::thread_rng().gen_range(0..groups.len())];
+        let item_name = format!("Item {}-{}", group_name, i + 1);
+
+        sqlx::query("INSERT INTO merchandise (event_id, name, group_name) VALUES ($1, $2, $3)")
+            .bind(payload.event_id)
+            .bind(item_name)
+            .bind(group_name)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn debug_generate_mock_users(
+    State(pool): State<PgPool>,
+    Json(payload): Json<DebugGenerateMockUsersRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Get all merchandise for this event
+    let merch_rows = sqlx::query("SELECT id FROM merchandise WHERE event_id = $1")
+        .bind(payload.event_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if merch_rows.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Event has no merchandise to assign inventory".to_string(),
+        ));
+    }
+
+    let merch_ids: Vec<i32> = merch_rows.into_iter().map(|r| r.get("id")).collect();
+
+    for i in 0..payload.user_count {
+        // Create mock user
+        let uuid = uuid::Uuid::new_v4().to_string();
+        let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
+        let username = format!("MockUser_{}_{}", i + 1, unique_id);
+
+        let user_row = sqlx::query(
+            "INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, 'mock_token') RETURNING id"
+        )
+        .bind(username)
+        .bind(&uuid)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        let user_id: i32 = user_row.get("id");
+
+        // Assign some random inventory
+        use rand::Rng;
+        let num_items = rand::thread_rng().gen_range(1..std::cmp::min(10, merch_ids.len() + 1));
+
+        // Collect inventory choices ahead of time so `rng` isn't held across `await`
+        let mut inventory_to_add = Vec::new();
+        for _ in 0..num_items {
+            let merch_id = merch_ids[rand::thread_rng().gen_range(0..merch_ids.len())];
+            let statuses = ["HAVE", "WANT"];
+            let status = statuses[rand::thread_rng().gen_range(0..statuses.len())];
+            inventory_to_add.push((merch_id, status));
+        }
+
+        for (merch_id, status) in inventory_to_add {
+            sqlx::query(
+                "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, $3, 1) ON CONFLICT DO NOTHING"
+            )
+            .bind(user_id)
+            .bind(merch_id)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        }
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
