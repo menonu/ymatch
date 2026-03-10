@@ -137,7 +137,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // 3. We are on the Home Screen. Create an Event.
-        expect(find.text('Events'), findsWidgets);
+        expect(find.text('New Event'), findsOneWidget);
         await tester.tap(find.text('New Event'));
         await tester.pumpAndSettle();
 

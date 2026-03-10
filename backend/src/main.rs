@@ -97,6 +97,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/admin/events/:id", delete(handlers::delete_event))
         .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))
         .route("/api/v1/admin/matches/:id", delete(handlers::delete_match))
+        // Debug
+        .route("/api/v1/debug/reset_me", post(handlers::reset_me))
+        .route("/api/v1/debug/nuke_seed", post(handlers::nuke_seed))
         // Matches
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(

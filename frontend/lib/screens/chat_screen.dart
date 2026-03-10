@@ -9,7 +9,10 @@ import '../theme/app_theme.dart';
 import 'map_picker_screen.dart';
 import 'package:latlong2/latlong.dart';
 
-final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((ref, matchId) async {
+final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((
+  ref,
+  matchId,
+) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/matches/$matchId/messages');
   return (json as List).map((e) => Message()..mergeFromProto3Json(e)).toList();
@@ -49,7 +52,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (text.isEmpty) return;
 
     _messageController.clear();
-    
+
     try {
       final client = ref.read(apiClientProvider);
       await client.post('/api/v1/matches/${widget.matchId}/messages', {
@@ -60,7 +63,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.invalidate(messagesProvider(widget.matchId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
       }
     }
   }
@@ -68,14 +73,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final messagesAsync = ref.watch(messagesProvider(widget.matchId));
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-      ),
+      appBar: AppBar(backgroundColor: Colors.white),
       body: Column(
         children: [
           Expanded(
@@ -83,23 +87,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               data: (messages) {
                 if (messages.isEmpty) {
                   return const Center(
-                    child: Text('No messages yet. Say hello!', style: TextStyle(color: Colors.grey)),
+                    child: Text(
+                      'No messages yet. Say hello!',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   );
                 }
                 return ListView.builder(
-                  reverse: false, // In a real app we'd likely want a true bottom-up list, but standard top-down for now.
+                  reverse:
+                      false, // In a real app we'd likely want a true bottom-up list, but standard top-down for now.
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg.senderId == user.id;
 
                     return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isMe
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: isMe ? AppTheme.primaryColor : Colors.grey[200],
+                          color: isMe
+                              ? AppTheme.primaryColor
+                              : Colors.grey[200],
                           borderRadius: BorderRadius.circular(16).copyWith(
                             bottomRight: isMe ? const Radius.circular(0) : null,
                             bottomLeft: !isMe ? const Radius.circular(0) : null,
@@ -130,11 +148,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     onPressed: () async {
                       final LatLng? pickedLocation = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const MapPickerScreen(),
+                        ),
                       );
                       if (pickedLocation != null) {
                         // Create a Google Maps URL for universality when clicking
-                        final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=${pickedLocation.latitude},${pickedLocation.longitude}';
+                        final mapsUrl =
+                            'https://www.google.com/maps/search/?api=1&query=${pickedLocation.latitude},${pickedLocation.longitude}';
                         _messageController.text = mapsUrl;
                         _sendMessage(user);
                       }
@@ -184,14 +205,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     for (final match in matches) {
       final String beforeMatch = text.substring(lastMatchEnd, match.start);
       if (beforeMatch.isNotEmpty) {
-        children.add(Text(
-          beforeMatch,
-          style: TextStyle(color: isMe ? Colors.white : Colors.black87),
-        ));
+        children.add(
+          Text(
+            beforeMatch,
+            style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+          ),
+        );
       }
 
       final String url = match.group(0)!;
-      final bool isMapUrl = url.contains('maps.app.goo.gl') || url.contains('google.com/maps') || url.contains('maps.apple.com');
+      final bool isMapUrl =
+          url.contains('maps.app.goo.gl') ||
+          url.contains('google.com/maps') ||
+          url.contains('maps.apple.com');
 
       children.add(
         GestureDetector(
@@ -205,9 +231,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             margin: const EdgeInsets.symmetric(vertical: 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isMe ? Colors.white.withValues(alpha: 0.2) : AppTheme.primaryColor.withValues(alpha: 0.1),
+              color: isMe
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: isMe ? Colors.white54 : AppTheme.primaryColor.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: isMe
+                    ? Colors.white54
+                    : AppTheme.primaryColor.withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -240,10 +272,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final String afterLastMatch = text.substring(lastMatchEnd);
     if (afterLastMatch.isNotEmpty) {
-      children.add(Text(
-        afterLastMatch,
-        style: TextStyle(color: isMe ? Colors.white : Colors.black87),
-      ));
+      children.add(
+        Text(
+          afterLastMatch,
+          style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+        ),
+      );
     }
 
     return Column(

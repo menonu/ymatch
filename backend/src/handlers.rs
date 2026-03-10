@@ -936,3 +936,103 @@ pub async fn send_message(
         longitude: row.get("longitude"),
     }))
 }
+
+// --- Debug ---
+#[derive(serde::Deserialize)]
+pub struct ResetMeRequest {
+    pub user_id: i32,
+}
+
+pub async fn reset_me(
+    State(pool): State<PgPool>,
+    Json(payload): Json<ResetMeRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Delete Messages associated with User's matches (optional if we just delete matches, but good to be explicit or if we just delete the user's messages)
+    // Actually, it's safer to delete matches, which should cascade or we delete messages manually.
+    // Let's delete inventory
+    sqlx::query("DELETE FROM inventory WHERE user_id = $1")
+        .bind(payload.user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Delete messages sent by user (or we could delete matches entirely)
+    // The issue says: "deletes all Inventory (HAVE/WANT) records, Trade Matches, and Messages associated with the *currently logged-in user*"
+    
+    // Find all match IDs for the user
+    let matches: Vec<(i32,)> = sqlx::query_as("SELECT id FROM trade_matches WHERE user1_id = $1 OR user2_id = $1")
+        .bind(payload.user_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    for (match_id,) in matches {
+        sqlx::query("DELETE FROM messages WHERE match_id = $1")
+            .bind(match_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        sqlx::query("DELETE FROM trade_matches WHERE id = $1")
+            .bind(match_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn nuke_seed(
+    State(pool): State<PgPool>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Nuke all tables
+    sqlx::query("TRUNCATE TABLE messages, trade_matches, inventory, merchandise, events, users, event_views, favorite_events, favorite_groups RESTART IDENTITY CASCADE;")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Seed Demo Event
+    let creator_id: i32 = sqlx::query("INSERT INTO users (username) VALUES ('admin') RETURNING id")
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .get("id");
+
+    let event_id: i32 = sqlx::query("INSERT INTO events (name, creator_id) VALUES ('Demo Event', $1) RETURNING id")
+        .bind(creator_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .get("id");
+
+    // Seed some standard items
+    for i in 1..=5 {
+        sqlx::query("INSERT INTO merchandise (event_id, name, group_name) VALUES ($1, $2, 'Group A')")
+            .bind(event_id)
+            .bind(format!("Item {}", i))
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
