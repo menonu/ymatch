@@ -5,7 +5,9 @@ import '../services/api_client.dart';
 import '../models/models.dart';
 
 // --- System ---
-final backendSystemStatusProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final backendSystemStatusProvider = FutureProvider<Map<String, dynamic>>((
+  ref,
+) async {
   final client = ref.watch(apiClientProvider);
   try {
     final response = await client.get('/api/v1/system/status');
@@ -102,12 +104,12 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> signup(String username, String password) async {
     // ... legacy signup ...
-     state = const AsyncValue.loading();
+    state = const AsyncValue.loading();
     try {
       final json = await client.post('/api/v1/auth/signup', {
-         'username': username,
-         'password': password,
-         'device_token': 'web-v1',
+        'username': username,
+        'password': password,
+        'device_token': 'web-v1',
       });
       final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
@@ -126,45 +128,57 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   }
 }
 
-final authProvider = StateNotifierProvider<AuthController, AsyncValue<User?>>((ref) {
+final authProvider = StateNotifierProvider<AuthController, AsyncValue<User?>>((
+  ref,
+) {
   return AuthController(ref.watch(apiClientProvider));
 });
 
 final currentUserProvider = Provider<User?>((ref) {
-   return ref.watch(authProvider).value;
+  return ref.watch(authProvider).value;
 });
 
 // --- Events ---
 final eventsProvider = FutureProvider<List<Event>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final user = ref.watch(currentUserProvider);
-  
+
   String url = '/api/v1/events';
   if (user != null) {
     url += '?user_id=${user.id}';
   }
-  
+
   final json = await client.get(url);
-  final events = (json as List).map((e) => Event()..mergeFromProto3Json(e)).toList();
-  
+  final events = (json as List)
+      .map((e) => Event()..mergeFromProto3Json(e))
+      .toList();
+
   // Sort favorites to the top
   events.sort((a, b) {
-    if (a.hasIsFavorite() && a.isFavorite && (!b.hasIsFavorite() || !b.isFavorite)) return -1;
-    if ((!a.hasIsFavorite() || !a.isFavorite) && b.hasIsFavorite() && b.isFavorite) return 1;
+    if (a.hasIsFavorite() &&
+        a.isFavorite &&
+        (!b.hasIsFavorite() || !b.isFavorite))
+      return -1;
+    if ((!a.hasIsFavorite() || !a.isFavorite) &&
+        b.hasIsFavorite() &&
+        b.isFavorite)
+      return 1;
     // Otherwise sort by id descending (newest first)
     return b.id.compareTo(a.id);
   });
-  
+
   return events;
 });
 
 final favoriteGroupsProvider = FutureProvider<List<FavoriteGroup>>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return [];
-  
+
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/user/${user.id}/favorite_groups');
-  return (json as List).map((e) => FavoriteGroup()..mergeFromProto3Json(e)).toList();
+  return (json as List)
+      .map((e) => FavoriteGroup()..mergeFromProto3Json(e))
+      .toList();
 });
 
 class EventsController extends StateNotifier<AsyncValue<void>> {
@@ -197,7 +211,12 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> toggleFavoriteGroup(int eventId, int userId, String groupName, bool isFavorite) async {
+  Future<void> toggleFavoriteGroup(
+    int eventId,
+    int userId,
+    String groupName,
+    bool isFavorite,
+  ) async {
     try {
       await client.post('/api/v1/events/$eventId/favorite_group', {
         'user_id': userId,
@@ -211,9 +230,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> registerView(int eventId, int userId) async {
     try {
-      await client.post('/api/v1/events/$eventId/view', {
-        'user_id': userId,
-      });
+      await client.post('/api/v1/events/$eventId/view', {'user_id': userId});
     } catch (e) {
       // Ignore errors for analytics
     }
@@ -224,28 +241,37 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     try {
       // 1. Create a debug event
       final eventJson = await client.post('/api/v1/events', {
-        'name': 'Debug Event ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+        'name':
+            'Debug Event ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
         'creator_id': creatorId,
       });
       final event = Event()..mergeFromProto3Json(eventJson);
 
       // 2. Generate 50 items in parallel across 5 groups (10 items each)
       final futures = <Future>[];
-      final groups = ['Photo Cards', 'Badges', 'Acrylic Stands', 'Posters', 'T-Shirts'];
-      
+      final groups = [
+        'Photo Cards',
+        'Badges',
+        'Acrylic Stands',
+        'Posters',
+        'T-Shirts',
+      ];
+
       for (int g = 0; g < groups.length; g++) {
         for (int i = 1; i <= 10; i++) {
           final globalIndex = (g * 10) + i;
           final hasIcon = (globalIndex % 4 != 0); // Every 4th item has no icon
-          final photoUrl = hasIcon ? 'https://picsum.photos/seed/${event.id}_$globalIndex/200' : '';
-          
+          final photoUrl = hasIcon
+              ? 'https://picsum.photos/seed/${event.id}_$globalIndex/200'
+              : '';
+
           futures.add(
             client.post('/api/v1/events/${event.id}/merch', {
               'event_id': event.id,
               'name': '${groups[g]} #$i',
               'photo_url': photoUrl,
               'group_name': groups[g],
-            })
+            }),
           );
         }
       }
@@ -258,22 +284,33 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   }
 }
 
-final eventsControllerProvider = StateNotifierProvider<EventsController, AsyncValue<void>>((ref) {
-  return EventsController(ref.watch(apiClientProvider));
-});
+final eventsControllerProvider =
+    StateNotifierProvider<EventsController, AsyncValue<void>>((ref) {
+      return EventsController(ref.watch(apiClientProvider));
+    });
 
 // --- Merchandise (Family provider by event_id) ---
-final merchProvider = FutureProvider.family<List<Merchandise>, int>((ref, eventId) async {
+final merchProvider = FutureProvider.family<List<Merchandise>, int>((
+  ref,
+  eventId,
+) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/events/$eventId/merch');
-  return (json as List).map((e) => Merchandise()..mergeFromProto3Json(e)).toList();
+  return (json as List)
+      .map((e) => Merchandise()..mergeFromProto3Json(e))
+      .toList();
 });
 
 class MerchController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
   MerchController(this.client) : super(const AsyncValue.data(null));
 
-  Future<void> addMerch(int eventId, String name, String photoUrl, [String? groupName]) async {
+  Future<void> addMerch(
+    int eventId,
+    String name,
+    String photoUrl, [
+    String? groupName,
+  ]) async {
     state = const AsyncValue.loading();
     try {
       final payload = {
@@ -284,7 +321,7 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
       if (groupName != null && groupName.isNotEmpty) {
         payload['group_name'] = groupName;
       }
-      
+
       await client.post('/api/v1/events/$eventId/merch', payload);
       state = const AsyncValue.data(null);
     } catch (e, st) {
@@ -296,7 +333,9 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
     try {
       await client.post('/api/v1/events/$eventId/merch/sort', {
         'event_id': eventId,
-        'sort_orders': sortOrders.map((k, v) => MapEntry(k.toString(), v)), // JSON keys must be strings
+        'sort_orders': sortOrders.map(
+          (k, v) => MapEntry(k.toString(), v),
+        ), // JSON keys must be strings
       });
     } catch (e) {
       // Ignore errors for optimistic UI or show a toast
@@ -304,18 +343,22 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
   }
 }
 
-final merchControllerProvider = StateNotifierProvider<MerchController, AsyncValue<void>>((ref) {
-  return MerchController(ref.watch(apiClientProvider));
-});
+final merchControllerProvider =
+    StateNotifierProvider<MerchController, AsyncValue<void>>((ref) {
+      return MerchController(ref.watch(apiClientProvider));
+    });
 
 // --- Inventory ---
 // --- Inventory Notifier (Optimistic Updates) ---
-class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int> {
+class UserInventoryNotifier
+    extends FamilyAsyncNotifier<List<InventoryItem>, int> {
   @override
   Future<List<InventoryItem>> build(int arg) async {
     final client = ref.watch(apiClientProvider);
     final json = await client.get('/api/v1/user/$arg/inventory');
-    return (json as List).map((e) => InventoryItem()..mergeFromProto3Json(e)).toList();
+    return (json as List)
+        .map((e) => InventoryItem()..mergeFromProto3Json(e))
+        .toList();
   }
 
   Future<void> updateItem(int merchId, String status, int quantity) async {
@@ -342,13 +385,15 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
       }).toList();
 
       if (!found && quantity > 0) {
-        newList.add(InventoryItem()
-          ..id = 0
-          ..userId = userId
-          ..merchId = merchId
-          ..status = status
-          ..quantity = quantity
-          ..merchName = '');
+        newList.add(
+          InventoryItem()
+            ..id = 0
+            ..userId = userId
+            ..merchId = merchId
+            ..status = status
+            ..quantity = quantity
+            ..merchName = '',
+        );
       }
       // filter out 0 quantity if desired, but for now just keep
       state = AsyncValue.data(newList);
@@ -371,21 +416,30 @@ class UserInventoryNotifier extends FamilyAsyncNotifier<List<InventoryItem>, int
   }
 }
 
-final inventoryProvider = AsyncNotifierProviderFamily<UserInventoryNotifier, List<InventoryItem>, int>(() {
-  return UserInventoryNotifier();
-});
+final inventoryProvider =
+    AsyncNotifierProviderFamily<
+      UserInventoryNotifier,
+      List<InventoryItem>,
+      int
+    >(() {
+      return UserInventoryNotifier();
+    });
 
 // --- Admin ---
 final adminMerchProvider = FutureProvider<List<Merchandise>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/admin/merch');
-  return (json as List).map((e) => Merchandise()..mergeFromProto3Json(e)).toList();
+  return (json as List)
+      .map((e) => Merchandise()..mergeFromProto3Json(e))
+      .toList();
 });
 
 final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/admin/matches');
-  return (json as List).map((e) => TradeMatch()..mergeFromProto3Json(e)).toList();
+  return (json as List)
+      .map((e) => TradeMatch()..mergeFromProto3Json(e))
+      .toList();
 });
 
 // --- Search ---
@@ -394,9 +448,12 @@ final searchQueryProvider = StateProvider<String>((ref) => '');
 final searchProvider = FutureProvider<List<SearchResult>>((ref) async {
   final query = ref.watch(searchQueryProvider);
   if (query.trim().isEmpty) return [];
-  
-  final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/search?q=${Uri.encodeComponent(query.trim())}');
-  return (json as List).map((e) => SearchResult()..mergeFromProto3Json(e)).toList();
-});
 
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get(
+    '/api/v1/search?q=${Uri.encodeComponent(query.trim())}',
+  );
+  return (json as List)
+      .map((e) => SearchResult()..mergeFromProto3Json(e))
+      .toList();
+});
