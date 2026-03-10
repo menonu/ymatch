@@ -7,8 +7,7 @@ class ApiClient {
   final ConfigService config;
   final http.Client _client;
 
-  ApiClient(this.config, {http.Client? client})
-    : _client = client ?? http.Client();
+  ApiClient(this.config, {http.Client? client}) : _client = client ?? http.Client();
 
   Future<dynamic> get(String endpoint) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');

@@ -269,32 +269,3 @@ pub struct SearchResult {
     #[prost(int32, tag = "6")]
     pub event_id: i32,
 }
-/// Debug Models
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DebugCreateEmptyEventRequest {
-    #[prost(int32, tag = "1")]
-    pub creator_id: i32,
-}
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DebugGenerateMockItemsRequest {
-    #[prost(int32, tag = "1")]
-    pub event_id: i32,
-    #[prost(int32, tag = "2")]
-    pub item_count: i32,
-}
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DebugGenerateMockUsersRequest {
-    #[prost(int32, tag = "1")]
-    pub event_id: i32,
-    #[prost(int32, tag = "2")]
-    pub user_count: i32,
-}

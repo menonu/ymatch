@@ -16,10 +16,10 @@ import 'theme/app_theme.dart';
 class CustomScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
-    PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.trackpad,
-  };
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+      };
 }
 
 void main() {
@@ -27,15 +27,9 @@ void main() {
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
-final _shellNavigatorEventsKey = GlobalKey<NavigatorState>(
-  debugLabel: 'events',
-);
-final _shellNavigatorMatchesKey = GlobalKey<NavigatorState>(
-  debugLabel: 'matches',
-);
-final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(
-  debugLabel: 'profile',
-);
+final _shellNavigatorEventsKey = GlobalKey<NavigatorState>(debugLabel: 'events');
+final _shellNavigatorMatchesKey = GlobalKey<NavigatorState>(debugLabel: 'matches');
+final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 final _shellNavigatorAdminKey = GlobalKey<NavigatorState>(debugLabel: 'admin');
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -73,7 +67,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return ScaffoldWithNavBar(navigationShell: navigationShell);

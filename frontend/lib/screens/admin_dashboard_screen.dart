@@ -53,14 +53,10 @@ class _AdminSystemTab extends ConsumerWidget {
         }
 
         final res = status['resources'];
-        final totalMemMB = (res['total_memory_bytes'] / (1024 * 1024))
-            .toStringAsFixed(0);
-        final usedMemMB = (res['used_memory_bytes'] / (1024 * 1024))
-            .toStringAsFixed(0);
+        final totalMemMB = (res['total_memory_bytes'] / (1024 * 1024)).toStringAsFixed(0);
+        final usedMemMB = (res['used_memory_bytes'] / (1024 * 1024)).toStringAsFixed(0);
         final cpuUsage = (res['cpu_usage_percent'] as num).toStringAsFixed(1);
-        final uptimeStr = Duration(
-          seconds: res['uptime_seconds'],
-        ).toString().split('.').first;
+        final uptimeStr = Duration(seconds: res['uptime_seconds']).toString().split('.').first;
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -73,10 +69,7 @@ class _AdminSystemTab extends ConsumerWidget {
                 child: ListTile(
                   leading: const Icon(Icons.commit),
                   title: const Text('Backend Revision'),
-                  subtitle: Text(
-                    status['backend_version'],
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
+                  subtitle: Text(status['backend_version'], style: const TextStyle(fontFamily: 'monospace')),
                 ),
               ),
               const SizedBox(height: 16),
@@ -138,9 +131,7 @@ class _AdminEventsTab extends ConsumerWidget {
             return ListTile(
               leading: const Icon(Icons.event),
               title: Text(event.name),
-              subtitle: Text(
-                'ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}',
-              ),
+              subtitle: Text('ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}'),
               trailing: IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () async {
@@ -148,21 +139,10 @@ class _AdminEventsTab extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Delete Event?'),
-                      content: const Text(
-                        'Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.',
-                      ),
+                      content: const Text('Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.'),
                       actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text('Delete'),
-                        ),
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
                       ],
                     ),
                   );
@@ -171,15 +151,9 @@ class _AdminEventsTab extends ConsumerWidget {
                       final client = ref.read(apiClientProvider);
                       await client.delete('/api/v1/admin/events/${event.id}');
                       ref.invalidate(eventsProvider);
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Event deleted')),
-                        );
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event deleted')));
                     } catch (e) {
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to delete: $e')),
-                        );
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
                     }
                   }
                 },
@@ -212,19 +186,11 @@ class _AdminItemsTab extends ConsumerWidget {
             final item = items[index];
             return ListTile(
               leading: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                  ? Image.network(
-                      item.photoUrl,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.image_not_supported),
-                    )
+                  ? Image.network(item.photoUrl, width: 50, height: 50, fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported))
                   : const Icon(Icons.image),
               title: Text(item.name),
-              subtitle: Text(
-                'ID: ${item.id} | Event ID: ${item.eventId} | Group: ${item.hasGroupName() ? item.groupName : 'None'}',
-              ),
+              subtitle: Text('ID: ${item.id} | Event ID: ${item.eventId} | Group: ${item.hasGroupName() ? item.groupName : 'None'}'),
               trailing: IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () async {
@@ -232,21 +198,10 @@ class _AdminItemsTab extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Delete Merchandise?'),
-                      content: const Text(
-                        'Are you sure you want to delete this item?',
-                      ),
+                      content: const Text('Are you sure you want to delete this item?'),
                       actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text('Delete'),
-                        ),
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
                       ],
                     ),
                   );
@@ -255,15 +210,9 @@ class _AdminItemsTab extends ConsumerWidget {
                       final client = ref.read(apiClientProvider);
                       await client.delete('/api/v1/admin/merch/${item.id}');
                       ref.invalidate(adminMerchProvider);
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Item deleted')),
-                        );
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item deleted')));
                     } catch (e) {
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to delete: $e')),
-                        );
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
                     }
                   }
                 },
@@ -297,17 +246,11 @@ class _AdminMatchesTab extends ConsumerWidget {
             return ListTile(
               leading: const Icon(Icons.swap_horiz),
               title: Text('Match ID: ${match.id}'),
-              subtitle: Text(
-                'User 1: ${match.user1Id} | User 2: ${match.user2Id} | Status: ${match.status}',
-              ),
+              subtitle: Text('User 1: ${match.user1Id} | User 2: ${match.user2Id} | Status: ${match.status}'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    match.hasCreatedAt()
-                        ? match.createdAt.split('T').first
-                        : '',
-                  ),
+                  Text(match.hasCreatedAt() ? match.createdAt.split('T').first : ''),
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
                     onPressed: () async {
@@ -315,40 +258,21 @@ class _AdminMatchesTab extends ConsumerWidget {
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Delete Match?'),
-                          content: const Text(
-                            'Are you sure you want to delete this match record?',
-                          ),
+                          content: const Text('Are you sure you want to delete this match record?'),
                           actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                              ),
-                              child: const Text('Delete'),
-                            ),
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                            ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
                           ],
                         ),
                       );
                       if (confirm == true) {
                         try {
                           final client = ref.read(apiClientProvider);
-                          await client.delete(
-                            '/api/v1/admin/matches/${match.id}',
-                          );
+                          await client.delete('/api/v1/admin/matches/${match.id}');
                           ref.invalidate(adminMatchesProvider);
-                          if (context.mounted)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Match deleted')),
-                            );
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Match deleted')));
                         } catch (e) {
-                          if (context.mounted)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to delete: $e')),
-                            );
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
                         }
                       }
                     },
@@ -365,64 +289,11 @@ class _AdminMatchesTab extends ConsumerWidget {
   }
 }
 
-class _AdminDebugTab extends ConsumerStatefulWidget {
+class _AdminDebugTab extends ConsumerWidget {
   const _AdminDebugTab();
 
   @override
-  ConsumerState<_AdminDebugTab> createState() => _AdminDebugTabState();
-}
-
-class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
-  final _targetEventIdController = TextEditingController();
-
-  @override
-  void dispose() {
-    _targetEventIdController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _generateMockItems(int count) async {
-    final eventId = int.tryParse(_targetEventIdController.text);
-    if (eventId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid Event ID')),
-      );
-      return;
-    }
-    await ref
-        .read(eventsControllerProvider.notifier)
-        .generateMockItems(eventId, count);
-    ref.invalidate(adminMerchProvider);
-    ref.invalidate(merchProvider(eventId));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$count items added to Event $eventId!')),
-      );
-    }
-  }
-
-  Future<void> _generateMockUsers(int count) async {
-    final eventId = int.tryParse(_targetEventIdController.text);
-    if (eventId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid Event ID')),
-      );
-      return;
-    }
-    await ref
-        .read(eventsControllerProvider.notifier)
-        .generateMockUsers(eventId, count);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$count mock users created for Event $eventId!'),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
 
     return SingleChildScrollView(
@@ -444,8 +315,7 @@ class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
                       const SizedBox(width: 8),
                       Text(
                         'Developer / Debug Tools',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.amber[900],
                             ),
@@ -459,9 +329,7 @@ class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.add_to_photos),
-                      label: const Text(
-                        'Generate Test Event (50 items in 5 tabs)',
-                      ),
+                      label: const Text('Generate Test Event (50 items in 5 tabs)'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.amber[800],
                         foregroundColor: Colors.white,
@@ -474,42 +342,22 @@ class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Generate Data?'),
-                            content: const Text(
-                              'This will create a dummy event with 50 items spread across 5 group tabs. Proceed?',
-                            ),
+                            content: const Text('This will create a dummy event with 50 items spread across 5 group tabs. Proceed?'),
                             actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Generate'),
-                              ),
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Generate')),
                             ],
                           ),
                         );
 
                         if (confirm == true) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Generating data...'),
-                              ),
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating data...')));
                           }
-                          await ref
-                              .read(eventsControllerProvider.notifier)
-                              .generateDebugData(user.id);
+                          await ref.read(eventsControllerProvider.notifier).generateDebugData(user.id);
                           ref.invalidate(eventsProvider);
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Test data generated successfully!',
-                                ),
-                              ),
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Test data generated successfully!')));
                           }
                         }
                       },
@@ -529,363 +377,8 @@ class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
                       onPressed: () {
                         final newUuid = const Uuid().v4();
                         final currentUrl = Uri.base.origin;
-                        final newUrl = Uri.parse(
-                          '$currentUrl/#/?dev_user=$newUuid',
-                        );
+                        final newUrl = Uri.parse('$currentUrl/#/?dev_user=$newUuid');
                         launchUrl(newUrl, webOnlyWindowName: '_blank');
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Data Generation',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.amber[900],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.event_available),
-                    label: const Text('Create Empty Event'),
-                    onPressed: () async {
-                      if (user == null) return;
-                      await ref.read(eventsControllerProvider.notifier).createEmptyEvent(user.id);
-                      ref.invalidate(eventsProvider);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Empty event created!')));
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _targetEventIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'Target Event ID',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.add_shopping_cart),
-                        label: const Text('Add 5 Items'),
-                        onPressed: () => _generateMockItems(5),
-                      ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.add_shopping_cart),
-                        label: const Text('Add 10 Items'),
-                        onPressed: () => _generateMockItems(10),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.people),
-                        label: const Text('Generate 5 Mock Users & Inventory'),
-                        onPressed: () => _generateMockUsers(5),
-                      ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.people),
-                        label: const Text('Generate 10 Mock Users & Inventory'),
-                        onPressed: () => _generateMockUsers(10),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            margin: EdgeInsets.zero,
-            color: Colors.teal[50],
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.hub, color: Colors.teal[900]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'State Simulation',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.teal[900],
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.calculate),
-                      label: const Text('Force Trigger Matching Algorithm'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal[800],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Force Trigger?'),
-                            content: const Text('This will manually run the background matching algorithm. Proceed?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Trigger')),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Triggering algorithm...')));
-                          }
-                          try {
-                            final client = ref.read(apiClientProvider);
-                            final response = await client.post('/api/v1/debug/trigger_match', {});
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Matches created: ${response['matches_created']}')));
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                            }
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Simulate Incoming Match Request'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal[800],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () async {
-                        if (user == null) return;
-                        
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Simulate Match?'),
-                            content: const Text('This will create a mock user who has an item you WANT, and wants an item you are TRADING. Proceed?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Simulate')),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulating match...')));
-                          }
-                          try {
-                            final client = ref.read(apiClientProvider);
-                            final response = await client.post('/api/v1/debug/simulate_incoming/${user.id}', {});
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response['message'] ?? 'Simulated successfully')));
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                            }
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            margin: EdgeInsets.zero,
-            color: Colors.red[50], // Danger Zone color
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.red[900]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Danger Zone',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red[900],
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.delete_forever),
-                      label: const Text('Reset My Data (Inventory & Matches)'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[600],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () async {
-                        if (user == null) return;
-
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Reset My Data?'),
-                            content: const Text(
-                              'This will permanently delete ALL your Inventory (HAVE/WANT) records, Trade Matches, and Messages. It will NOT delete events or items you created. Proceed?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                ),
-                                child: const Text('Reset Data'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Resetting data...'),
-                              ),
-                            );
-                          }
-                          try {
-                            final client = ref.read(apiClientProvider);
-                            await client.post('/api/v1/debug/reset_me', {
-                              'user_id': user.id,
-                            });
-                            // We need to invalidate things to reflect the UI
-                            ref.invalidate(inventoryProvider);
-                            // We cannot invalidate matchesProvider directly as it is not imported here. It is fine if it reloads when user visits trade list screen.
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Data reset successfully!'),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to reset data: $e'),
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.local_fire_department),
-                      label: const Text('Nuke & Seed DB'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[900],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('NUKE & SEED DATABASE?'),
-                            content: const Text(
-                              'WARNING: This will instantly WIPE OUT ALL Events, Items, Users, and Matches in the database, and then re-seed a Demo Event. This action cannot be undone. Proceed?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red[900],
-                                ),
-                                child: const Text('NUKE IT'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Nuking and Seeding database...'),
-                              ),
-                            );
-                          }
-                          try {
-                            final client = ref.read(apiClientProvider);
-                            await client.post('/api/v1/debug/nuke_seed', {});
-                            ref.invalidate(eventsProvider);
-                            ref.invalidate(adminMerchProvider);
-                            ref.invalidate(adminMatchesProvider);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Database Nuked and Seeded successfully! Reloading...',
-                                  ),
-                                ),
-                              );
-                              // A hard reload or navigation might be necessary, but invalidate covers most
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to Nuke & Seed: $e'),
-                                ),
-                              );
-                            }
-                          }
-                        }
                       },
                     ),
                   ),
@@ -912,22 +405,11 @@ class _AdminDebugTabState extends ConsumerState<_AdminDebugTab> {
         children: [
           Text(
             'Versions',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.amber[900],
-              fontSize: 12,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[900], fontSize: 12),
           ),
           const SizedBox(height: 4),
           backendStatus.when(
-            data: (status) => SelectableText(
-              'Backend (Git Hash): ${status['backend_version']}',
-              style: TextStyle(
-                color: Colors.amber[900],
-                fontSize: 13,
-                fontFamily: 'monospace',
-              ),
-            ),
+            data: (status) => SelectableText('Backend (Git Hash): ${status['backend_version']}', style: TextStyle(color: Colors.amber[900], fontSize: 13, fontFamily: 'monospace')),
             loading: () => const Text('Backend: Loading...'),
             error: (_, __) => const Text('Backend: Error fetching version'),
           ),
