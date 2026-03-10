@@ -242,7 +242,7 @@ pub async fn global_search(
         "SELECT m.id, m.name, m.group_name, m.photo_url, m.event_id, e.name as event_name 
          FROM merchandise m 
          JOIN events e ON m.event_id = e.id 
-         WHERE m.name ILIKE $1 OR m.group_name ILIKE $1 LIMIT 20"
+         WHERE m.name ILIKE $1 OR m.group_name ILIKE $1 LIMIT 20",
     )
     .bind(&search_term)
     .fetch_all(&pool)
@@ -252,7 +252,7 @@ pub async fn global_search(
     for row in merch_rows {
         let group_name: Option<String> = row.get("group_name");
         let event_name: String = row.get("event_name");
-        
+
         // If the match was clearly the group name, we could categorize it as "group",
         // but for now returning it as an item or group is fine. Let's just return items.
         let subtitle = if let Some(gn) = group_name {
@@ -362,13 +362,15 @@ pub async fn toggle_favorite_group(
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     } else {
-        sqlx::query("DELETE FROM group_favorites WHERE user_id = $1 AND event_id = $2 AND group_name = $3")
-            .bind(payload.user_id)
-            .bind(event_id)
-            .bind(&payload.group_name)
-            .execute(&pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        sqlx::query(
+            "DELETE FROM group_favorites WHERE user_id = $1 AND event_id = $2 AND group_name = $3",
+        )
+        .bind(payload.user_id)
+        .bind(event_id)
+        .bind(&payload.group_name)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
     Ok(StatusCode::OK)
 }
@@ -384,19 +386,22 @@ pub async fn list_favorite_groups(
         JOIN events e ON gf.event_id = e.id
         WHERE gf.user_id = $1
         ORDER BY gf.created_at DESC
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_all(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let groups = rows.into_iter().map(|row| FavoriteGroup {
-        user_id: row.get("user_id"),
-        event_id: row.get("event_id"),
-        group_name: row.get("group_name"),
-        event_name: Some(row.get("event_name")),
-    }).collect();
+    let groups = rows
+        .into_iter()
+        .map(|row| FavoriteGroup {
+            user_id: row.get("user_id"),
+            event_id: row.get("event_id"),
+            group_name: row.get("group_name"),
+            event_name: Some(row.get("event_name")),
+        })
+        .collect();
 
     Ok(Json(groups))
 }
