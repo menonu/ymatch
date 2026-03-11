@@ -33,6 +33,7 @@ OCI offers an exceptionally generous "Always Free" tier that we may investigate 
 ### Adaptation Strategy
 
 The Terraform configurations are structured to be modular. While the current focus is GCP, the logic can be adapted to OCI by:
+
 1. Creating OCI-specific Terraform modules.
 2. Mapping the containerized backend to OCI Container Instances or a VM.
 3. Using an OCI Compute VM or Autonomous Database for the PostgreSQL requirement.
