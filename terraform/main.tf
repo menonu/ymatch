@@ -12,22 +12,25 @@ provider "google" {
   region  = var.region
 }
 
-# Variables
-variable "project_id" {
-  description = "The GCP Project ID"
-  type        = string
+# ---------------------------------------------------
+# Networking (VPC & Connector for Cloud Run)
+# ---------------------------------------------------
+resource "google_compute_network" "default" {
+  name = "ymatch-network"
 }
 
-variable "region" {
-  description = "The region to deploy resources to"
-  type        = string
-  default     = "us-central1"
+resource "google_compute_subnetwork" "default" {
+  name          = "ymatch-subnet"
+  ip_cidr_range = "10.0.0.0/24"
+  network       = google_compute_network.default.id
+  region        = var.region
 }
 
-variable "db_password" {
-  description = "The database password"
-  type        = string
-  sensitive   = true
+resource "google_vpc_access_connector" "connector" {
+  name          = "ymatch-vpc-connector"
+  region        = var.region
+  network       = google_compute_network.default.name
+  ip_cidr_range = "10.8.0.0/28"
 }
 
 # ---------------------------------------------------
@@ -40,12 +43,11 @@ resource "google_cloud_run_v2_service" "backend" {
 
   template {
     containers {
-      image = "us-docker.pkg.dev/cloudrun/container/hello" # Placeholder, update with actual image
+      image = var.backend_image
 
       env {
         name  = "DATABASE_URL"
-        # Reference the internal IP of the Compute Engine instance
-        value = "postgres://ymatch_user:$${var.db_password}@$${google_compute_instance.db_vm.network_interface[0].network_ip}:5432/ymatch"
+        value = "postgres://ymatch_user:${var.db_password}@${google_compute_instance.db_vm.network_interface[0].network_ip}:5432/ymatch_db"
       }
       
       env {
@@ -59,6 +61,11 @@ resource "google_cloud_run_v2_service" "backend" {
           memory = "512Mi"
         }
       }
+    }
+
+    vpc_access {
+      connector = google_vpc_access_connector.connector.id
+      egress    = "PRIVATE_RANGES_ONLY"
     }
   }
 }
@@ -77,7 +84,7 @@ resource "google_cloud_run_v2_service_iam_member" "noauth" {
 resource "google_compute_instance" "db_vm" {
   name         = "ymatch-db-vm"
   machine_type = "e2-micro"
-  zone         = "$${var.region}-a"
+  zone         = var.zone
 
   boot_disk {
     initialize_params {
@@ -88,9 +95,10 @@ resource "google_compute_instance" "db_vm" {
   }
 
   network_interface {
-    network = "default"
+    network    = google_compute_network.default.id
+    subnetwork = google_compute_subnetwork.default.id
     access_config {
-      # Ephemeral public IP required for outbound internet access to download Docker/images unless Cloud NAT is configured
+      # Ephemeral public IP
     }
   }
 
@@ -98,32 +106,61 @@ resource "google_compute_instance" "db_vm" {
   metadata_startup_script = <<EOF
 #!/bin/bash
 apt-get update
-apt-get install -y docker.io
+apt-get install -y ca-certificates curl gnupg
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
 docker run -d \
   --name postgres \
   -e POSTGRES_USER=ymatch_user \
   -e POSTGRES_PASSWORD=${var.db_password} \
-  -e POSTGRES_DB=ymatch \
+  -e POSTGRES_DB=ymatch_db \
   -p 5432:5432 \
   -v /var/lib/postgresql/data:/var/lib/postgresql/data \
   --restart unless-stopped \
-  postgres:16-alpine
+  public.ecr.aws/docker/library/postgres:16-alpine
 EOF
 
   tags = ["allow-postgres"]
 }
 
-# Allow internal traffic to the DB from Cloud Run
+# Allow internal traffic to the DB from the VPC and connector range
 resource "google_compute_firewall" "allow_postgres_internal" {
   name    = "allow-postgres-internal"
-  network = "default"
+  network = google_compute_network.default.id
 
   allow {
     protocol = "tcp"
     ports    = ["5432"]
   }
 
-  # Replace with appropriate internal ranges depending on VPC setup
-  source_ranges = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] 
+  # Restricted to VPC and Connector internal ranges
+  source_ranges = ["10.0.0.0/24", "10.8.0.0/28"]
   target_tags   = ["allow-postgres"]
 }
+
+# ---------------------------------------------------
+# Firebase Hosting (Conceptual)
+# ---------------------------------------------------
+# Terraform support for Firebase is available but often managed via firebase-tools CLI.
+# This section serves as a placeholder for the resources.
+
+# resource "google_firebase_project" "default" {
+#   provider = google-beta
+#   project  = var.project_id
+# }
+
+# resource "google_firebase_hosting_site" "default" {
+#   provider = google-beta
+#   project  = var.project_id
+#   site_id  = "ymatch-frontend"
+# }
