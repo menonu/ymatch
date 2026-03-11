@@ -23,7 +23,8 @@ void main() {
           return http.Response(jsonEncode({
             'id': 1,
             'username': 'guest123',
-            'is_guest': true,
+            'device_token': 'mock-token',
+            'created_at': DateTime.now().toIso8601String(),
           }), 200);
         } else if (request.url.path == '/api/v1/events') {
           return http.Response(jsonEncode([]), 200);
@@ -75,19 +76,14 @@ void main() {
 
       // 1. Login
       await tester.tap(find.text('Start Guest Session'));
-      await tester.pump(); // start guest login
-      await tester.pump(); // receive response
-      await tester.pump(); // router redirect
       await tester.pumpAndSettle();
 
       // 2. Navigate to Matches
-      // The icon is Icons.swap_horiz_outlined, but in some themes it might be different or labeled.
-      // Let's try finding the NavigationDestination with label 'Matches'
-      await tester.tap(find.text('Matches'));
+      await tester.tap(find.text('Matches').last);
       await tester.pumpAndSettle();
 
       // 3. Enter Chat
-      await tester.tap(find.textContaining('Match #100'));
+      await tester.tap(find.text('Trade Match #100'));
       await tester.pumpAndSettle();
 
       // 4. Open Map Picker
