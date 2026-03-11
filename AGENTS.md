@@ -3,9 +3,11 @@
 This document serves as the main entry point and guide for the `ymatch` merchandise trading platform project.
 
 ## About the Project
+
 `ymatch` is a merchandise trading platform system designed to help users manage inventory (HAVE/WANT) and execute physical exchanges based on system matches, particularly at events.
 
 ## Source Code Structure
+
 - **`backend/`**: Rust (Axum, SQLx) REST API backend.
 - **`frontend/`**: Flutter (Mobile/Web) frontend application.
 - **`proto/`**: Protobuf definitions for data models shared across boundaries.
@@ -16,11 +18,13 @@ This document serves as the main entry point and guide for the `ymatch` merchand
 ## How to Build and Test
 
 ### Prerequisites
+
 - Docker & Docker Compose
 - Rust (cargo)
 - Flutter SDK
 
 ### Commands
+
 ```bash
 # Start Database
 docker-compose up -d
@@ -35,6 +39,7 @@ flutter run -d web-server --web-port 8081
 ```
 
 ### Development Guidelines
+
 - **Always Rebuild and Restart**: Before testing any changes, ensure the application (Backend/Frontend) is rebuilt and restarted to apply the latest code.
 - **Verify Version**: Confirm that the version/build being tested reflects the most recent changes before proceeding with verification.
 - **Verify Process and Port Status**: Before test, confirm that backend and frontend is working by checking process alive and port is opened (e.g., using `netstat`). Do NOT use `lsof` to kill processes as it may accidentally terminate SSH connections or workspace extensions in this environment. Manage background processes manually using PID files (`backend.pid`, `flutter.pid`).
@@ -53,7 +58,9 @@ flutter run -d web-server --web-port 8081
 - **Git Authentication**: Use the GitHub CLI (`gh`) authentication for `git` operations. Ensure the remote is set to HTTPS and run `gh auth setup-git` to allow `git push` without requiring SSH keys.
 
 ## Docs Structures
+
 For detailed information regarding specific aspects of the system, refer to the documents linked below:
+
 - [Requirements](./docs/requirements.md): Core system requirements.
 - [Use Cases](./docs/use_cases.md): User workflows and use cases.
 - [UI Specs](./docs/ui_specs.md): UI/UX specifications.
