@@ -45,18 +45,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     'ymatch',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo,
-                          letterSpacing: -1,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo,
+                      letterSpacing: -1,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Trade merch seamlessly.',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 48),
 
@@ -98,7 +98,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      onPressed: () => ref.read(authProvider.notifier).startGuestSession(),
+                      onPressed: () =>
+                          ref.read(authProvider.notifier).startGuestSession(),
                     ),
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
