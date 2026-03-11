@@ -20,36 +20,50 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/v1/auth/guest') {
-          return http.Response(jsonEncode({
-            'id': 1,
-            'username': 'guest123',
-            'device_token': 'mock-token',
-            'created_at': DateTime.now().toIso8601String(),
-          }), 200);
+          return http.Response(
+            jsonEncode({
+              'id': 1,
+              'username': 'guest123',
+              'device_token': 'mock-token',
+              'created_at': DateTime.now().toIso8601String(),
+            }),
+            200,
+          );
         } else if (request.url.path == '/api/v1/events') {
           return http.Response(jsonEncode([]), 200);
         } else if (request.url.path == '/api/v1/system/status') {
           return http.Response(jsonEncode({'backend_version': '1.0.0'}), 200);
         } else if (request.url.path == '/api/v1/matches/user/1') {
-          return http.Response(jsonEncode([{
-            'id': 100,
-            'user1_id': 1,
-            'user2_id': 2,
-            'status': 'ACCEPTED',
-            'other_user': {'id': 2, 'username': 'other_user'},
-            'user_haves': [],
-            'user_wants': [],
-          }]), 200);
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 100,
+                'user1_id': 1,
+                'user2_id': 2,
+                'status': 'ACCEPTED',
+                'other_user': {'id': 2, 'username': 'other_user'},
+                'user_haves': [],
+                'user_wants': [],
+              },
+            ]),
+            200,
+          );
         } else if (request.url.path == '/api/v1/matches/100/messages') {
           if (request.method == 'GET') {
             if (messageSent) {
-              return http.Response(jsonEncode([{
-                'id': 1001,
-                'match_id': 100,
-                'sender_id': 1,
-                'content': 'https://www.google.com/maps/search/?api=1&query=35.6895,139.6917',
-                'created_at': '2023-01-01T00:00:00Z',
-              }]), 200);
+              return http.Response(
+                jsonEncode([
+                  {
+                    'id': 1001,
+                    'match_id': 100,
+                    'sender_id': 1,
+                    'content':
+                        'https://www.google.com/maps/search/?api=1&query=35.6895,139.6917',
+                    'created_at': '2023-01-01T00:00:00Z',
+                  },
+                ]),
+                200,
+              );
             }
             return http.Response(jsonEncode([]), 200);
           } else if (request.method == 'POST') {
