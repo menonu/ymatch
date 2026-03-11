@@ -23,11 +23,10 @@ void main() {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/v1/auth/guest') {
           // Fake user response
-          return http.Response(jsonEncode({
-            'id': 1,
-            'username': 'guest123',
-            'is_guest': true,
-          }), 200);
+          return http.Response(
+            jsonEncode({'id': 1, 'username': 'guest123', 'is_guest': true}),
+            200,
+          );
         } else if (request.url.path == '/api/v1/events') {
           // Fake empty events list
           return http.Response(jsonEncode([]), 200);
@@ -57,11 +56,16 @@ void main() {
       await tester.tap(find.text('Start'));
 
       // Wait for network requests, navigation, and rendering to complete
-      await tester.pumpAndSettle(const Duration(seconds: 1)); // Give some time for async flows
+      await tester.pumpAndSettle(
+        const Duration(seconds: 1),
+      ); // Give some time for async flows
 
       // Verify we navigated to the Home screen (Events list)
       expect(find.text('Events'), findsWidgets); // AppBar title
-      expect(find.text('No events found'), findsOneWidget); // Empty events state
+      expect(
+        find.text('No events found'),
+        findsOneWidget,
+      ); // Empty events state
     });
   });
 }
