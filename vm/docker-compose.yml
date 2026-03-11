@@ -4,7 +4,7 @@ services:
     container_name: ubuntu_vm
     privileged: true
     ports:
-      - "2222:22"
+      - '2222:22'
     volumes:
       - /home/menonu/ws:/home/ubuntu/ws
       - gemini-data:/home/ubuntu/.gemini

@@ -142,10 +142,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(AlertDialog), findsOneWidget);
-        await tester.enterText(
-          find.byType(TextField).last,
-          'Comic Market 105',
-        );
+        await tester.enterText(find.byType(TextField).last, 'Comic Market 105');
         await tester.tap(find.text('Create'));
         await tester.pumpAndSettle();
 
