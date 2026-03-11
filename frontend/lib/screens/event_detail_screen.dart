@@ -655,13 +655,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  Widget _buildGridPlaceholder() {
-    return Container(
-      color: Colors.grey[200],
-      child: Icon(Icons.image_outlined, size: 24, color: Colors.grey[400]),
-    );
-  }
-
   Widget _buildGridCounter(
     BuildContext context,
     String label,
@@ -808,15 +801,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCompactPlaceholder() {
-    return Container(
-      width: 40,
-      height: 40,
-      color: Colors.grey[200],
-      child: Icon(Icons.image_outlined, size: 20, color: Colors.grey[400]),
     );
   }
 
@@ -980,18 +964,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   // ... rest of the helpers
-  Widget _buildImagePlaceholder() {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(Icons.image_outlined, size: 32, color: Colors.grey[400]),
-    );
-  }
-
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
     return Center(
       child: Column(
