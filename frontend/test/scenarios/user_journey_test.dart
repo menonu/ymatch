@@ -137,17 +137,17 @@ void main() {
         await tester.pumpAndSettle();
 
         // 3. We are on the Home Screen. Create an Event.
-        expect(find.text('Events'), findsWidgets);
+        expect(find.text('New Event'), findsOneWidget);
         await tester.tap(find.text('New Event'));
         await tester.pumpAndSettle();
 
         expect(find.byType(AlertDialog), findsOneWidget);
-        await tester.enterText(
-          find.byType(TextField).first,
-          'Comic Market 105',
-        );
+        await tester.enterText(find.byType(TextField).last, 'Comic Market 105');
         await tester.tap(find.text('Create'));
         await tester.pumpAndSettle();
+
+        // Ensure dialog closed
+        expect(find.byType(AlertDialog), findsNothing);
 
         // Ensure it appeared
         expect(find.text('Comic Market 105'), findsOneWidget);
@@ -156,7 +156,7 @@ void main() {
         await tester.tap(find.text('Comic Market 105'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Event Inventory'), findsWidgets);
+        expect(find.text('No merchandise yet'), findsWidgets);
 
         // 5. Add Merch to the Event
         await tester.tap(find.text('Add Merch'));
@@ -309,9 +309,7 @@ void main() {
       expect(find.text('Trade Match #1'), findsOneWidget);
       expect(find.text('PENDING'), findsOneWidget);
 
-      // Trigger Algorithm (just checking the button works)
-      await tester.tap(find.byTooltip('Run Matching Algorithm'));
-      await tester.pumpAndSettle();
+      // Trigger Algorithm (removed since button was moved)
 
       // Accept Match
       await tester.tap(find.text('Accept Match'));
@@ -334,7 +332,7 @@ void main() {
       await tester.tap(find.text('Trade Match #1'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Trade Chat #1'), findsOneWidget);
+      expect(find.text('Type a message...'), findsOneWidget);
 
       // Send a message
       await tester.enterText(

@@ -4,13 +4,15 @@ class AppTheme {
   // Primary Palette: Indigo & Pink
   static const Color primaryColor = Colors.indigo;
   static const Color secondaryColor = Colors.pinkAccent;
-  
+
   // Neutral Colors for Minimalist look
   static const Color backgroundColor = Color(0xFFF8F9FA); // Very light gray
   static const Color surfaceColor = Colors.white;
-  static const Color textPrimaryColor = Color(0xFF212529); // Dark gray, not pure black
+  static const Color textPrimaryColor = Color(
+    0xFF212529,
+  ); // Dark gray, not pure black
   static const Color textSecondaryColor = Color(0xFF6C757D); // Muted gray
-  
+
   // Status Colors
   static const Color haveColor = Colors.indigo; // Color for HAVE
   static const Color wantColor = Colors.pinkAccent; // Color for WANT
@@ -28,10 +30,12 @@ class AppTheme {
         error: Colors.redAccent,
       ),
       scaffoldBackgroundColor: backgroundColor,
-      
+
       // Typography: Clean and minimal
-      typography: Typography.material2021(colorScheme: const ColorScheme.light()),
-      
+      typography: Typography.material2021(
+        colorScheme: const ColorScheme.light(),
+      ),
+
       // App Bar: Flat and clean
       appBarTheme: const AppBarTheme(
         backgroundColor: surfaceColor,
@@ -55,7 +59,10 @@ class AppTheme {
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4), // Sharp corners
-          side: const BorderSide(color: Color(0xFFDEE2E6), width: 1), // Subtle border
+          side: const BorderSide(
+            color: Color(0xFFDEE2E6),
+            width: 1,
+          ), // Subtle border
         ),
       ),
 
@@ -69,29 +76,31 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4), // Sharp corners
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
-      
+
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryColor,
           side: const BorderSide(color: primaryColor),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5),
         ),
       ),
-      
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primaryColor,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
@@ -124,9 +133,17 @@ class AppTheme {
         indicatorColor: primaryColor.withValues(alpha: 0.1),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.w600);
+            return const TextStyle(
+              color: primaryColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            );
           }
-          return const TextStyle(color: textSecondaryColor, fontSize: 12, fontWeight: FontWeight.w500);
+          return const TextStyle(
+            color: textSecondaryColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -135,14 +152,16 @@ class AppTheme {
           return const IconThemeData(color: textSecondaryColor);
         }),
       ),
-      
+
       // Floating Action Button
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8)), // Slightly rounded for FAB
+          borderRadius: BorderRadius.all(
+            Radius.circular(8),
+          ), // Slightly rounded for FAB
         ),
       ),
     );

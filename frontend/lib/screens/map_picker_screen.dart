@@ -23,7 +23,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               Navigator.pop(context, _selectedLocation);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.white),
-            child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
