@@ -6,10 +6,7 @@ import '../services/config_service.dart';
 class ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
-  const ScaffoldWithNavBar({
-    required this.navigationShell,
-    super.key,
-  });
+  const ScaffoldWithNavBar({required this.navigationShell, super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -51,7 +48,10 @@ class ScaffoldWithNavBar extends ConsumerWidget {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex.clamp(0, destinations.length - 1),
+        selectedIndex: navigationShell.currentIndex.clamp(
+          0,
+          destinations.length - 1,
+        ),
         onDestinationSelected: (index) {
           navigationShell.goBranch(
             index,
