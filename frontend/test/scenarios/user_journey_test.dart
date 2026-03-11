@@ -1,13 +1,108 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class MockImagePickerPlatform extends ImagePickerPlatform
+    with MockPlatformInterfaceMixin {
+  @override
+  Future<XFile?> getImageFromSource({
+    required ImageSource source,
+    ImagePickerOptions? options,
+  }) async {
+    // Minimal 1x1 transparent PNG
+    final bytes = Uint8List.fromList([
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+      0x00,
+      0x00,
+      0x00,
+      0x0D,
+      0x49,
+      0x48,
+      0x44,
+      0x52,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x08,
+      0x06,
+      0x00,
+      0x00,
+      0x00,
+      0x1F,
+      0x15,
+      0xC4,
+      0x89,
+      0x00,
+      0x00,
+      0x00,
+      0x0A,
+      0x49,
+      0x44,
+      0x41,
+      0x54,
+      0x78,
+      0x9C,
+      0x63,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x05,
+      0x00,
+      0x01,
+      0x0D,
+      0x0A,
+      0x2D,
+      0xB4,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x49,
+      0x45,
+      0x4E,
+      0x44,
+      0xAE,
+      0x42,
+      0x60,
+      0x82,
+    ]);
+    return XFile.fromData(bytes, mimeType: 'image/png', name: 'test_image.png');
+  }
+
+  @override
+  Future<XFile?> getImage({
+    required ImageSource source,
+    double? maxWidth,
+    double? maxHeight,
+    int? imageQuality,
+    CameraDevice preferredCameraDevice = CameraDevice.rear,
+  }) async {
+    return getImageFromSource(source: source);
+  }
+}
 
 void main() {
   setUp(() async {
@@ -142,10 +237,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(AlertDialog), findsOneWidget);
-        await tester.enterText(
-          find.byType(TextField).last,
-          'Comic Market 105',
-        );
+        await tester.enterText(find.byType(TextField).last, 'Comic Market 105');
         await tester.tap(find.text('Create'));
         await tester.pumpAndSettle();
 
@@ -171,12 +263,31 @@ void main() {
         await tester.tap(find.text('Set'));
         await tester.pumpAndSettle();
 
+        // Verify Image Picking
+        ImagePickerPlatform.instance = MockImagePickerPlatform();
+        await tester.tap(find.byIcon(Icons.add_a_photo));
+        await tester.pumpAndSettle();
+
+        final photoUrlField = find.widgetWithText(
+          TextField,
+          'Photo URL (Optional)',
+        );
+        expect(
+          tester.widget<TextField>(photoUrlField).controller?.text,
+          contains('data:image/png;base64,'),
+        );
+
         await tester.enterText(
           find.widgetWithText(TextField, 'Item Name').first,
           'Acrylic Stand A',
         );
         await tester.tap(find.text('Add Item'));
         await tester.pumpAndSettle();
+
+        // Verify it was saved to backend with the image
+        final lastMerch = mockBackendState['merch']!.last;
+        expect(lastMerch['name'], 'Acrylic Stand A');
+        expect(lastMerch['photo_url'], contains('data:image/png;base64,'));
 
         // 6. Navigate back from Add Merch sheet
         await tester.tap(find.byIcon(Icons.close));
