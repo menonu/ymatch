@@ -1,10 +1,10 @@
 # ---------------------------------------------------
 # Stage 1: Build Environment
 # ---------------------------------------------------
-FROM ubuntu:22.04 as builder
+FROM public.ecr.aws/ubuntu/ubuntu:22.04 as builder
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y curl git unzip xz-utils zip libglu1-mesa clang cmake ninja-build pkg-config libgtk-3-dev
+RUN apt-get update && apt-get install -y curl git unzip xz-utils zip libglu1-mesa clang cmake ninja-build pkg-config libgtk-3-dev && rm -rf /var/lib/apt/lists/*
 
 # Set up Flutter
 WORKDIR /opt
@@ -24,20 +24,13 @@ RUN flutter pub get
 COPY frontend ./
 COPY proto /proto
 
-# Generate Protobuf Dart code (Assumes proto-gen.sh or similar mechanism is run, 
-# but for a pure build, we should ideally have pre-generated the dart files 
-# or generate them here. For simplicity, we assume the generated folder is checked in 
-# or generated before docker build.
-# If they need to be generated during build, we need dart protoc plugin.)
-# For now, we will just build what is there.
-
 # Build Flutter Web app
 RUN flutter build web --release --web-renderer canvaskit
 
 # ---------------------------------------------------
 # Stage 2: Runtime Environment (Nginx)
 # ---------------------------------------------------
-FROM nginx:alpine
+FROM public.ecr.aws/nginx/nginx:alpine
 
 # Copy the built web assets from the builder stage
 COPY --from=builder /app/build/web /usr/share/nginx/html

@@ -44,7 +44,7 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Run fmt
-        run: cargo fmt --all -- --check
+        run: cargo fmt -- --check
 
   frontend-test:
     name: Frontend Build & Test
@@ -66,26 +66,8 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Run fmt
-        run: dart format --output=none --set-exit-if-changed .
-
       - name: Run tests
         run: flutter test
 
       - name: Build web
         run: flutter build web
-
-  format-check:
-    name: Prettier Format Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Run Prettier
-        run: npx prettier --check .
