@@ -46,9 +46,8 @@ flutter run -d web-server --web-port 8081
 - **Protobuf First**: Any changes to data structures must be applied to `proto/models.proto` first, then regenerated.
 
 ## How to Manage Tasks
-
-- **Task Tracking**: Always create a GitHub Issue before starting any task. Use GitHub Issues as the primary system to track and manage all project work.
-- **Jules Delegation & Management**: For comprehensive, cross-file tasks (e.g., project-wide refactoring, adding unit tests across multiple files, upgrading dependency versions), delegate the work to Jules by adding the `jules` label to the corresponding GitHub Issue. Jules will start automatically. All communication and status updates should be handled directly within the GitHub Issue. Follow the completion reports posted by Jules in the issue.
+- **Task Tracking**: Use GitHub Issues as the primary task tracker for the project.
+- **Jules Delegation & Management**: For comprehensive, cross-file tasks (e.g., project-wide refactoring, adding unit tests across multiple files, upgrading dependency versions), leverage the `/jules` extension to delegate the work. Use the `/jules status` command to track progress.
 - The GitHub CLI (`gh`) is installed and should be used to manage, fetch, and create issues directly from the workspace.
 - **Git Authentication**: Use the GitHub CLI (`gh`) authentication for `git` operations. Ensure the remote is set to HTTPS and run `gh auth setup-git` to allow `git push` without requiring SSH keys.
 
