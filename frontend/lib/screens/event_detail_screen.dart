@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_helper.dart';
 import 'add_merch_screen.dart';
 
 enum ViewMode { detailed, grid, list }
@@ -600,14 +601,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                ? Image.network(
-                    item.photoUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildGridPlaceholder(),
-                  )
-                : _buildGridPlaceholder(),
+            child: buildImage(
+              item.hasPhotoUrl() ? item.photoUrl : null,
+              fit: BoxFit.cover,
+            ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -655,13 +652,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildGridPlaceholder() {
-    return Container(
-      color: Colors.grey[200],
-      child: Icon(Icons.image_outlined, size: 24, color: Colors.grey[400]),
     );
   }
 
@@ -766,16 +756,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-              ? Image.network(
-                  item.photoUrl,
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildCompactPlaceholder(),
-                )
-              : _buildCompactPlaceholder(),
+          child: buildImage(
+            item.hasPhotoUrl() ? item.photoUrl : null,
+            width: 40,
+            height: 40,
+          ),
         ),
         title: Text(
           item.name,
@@ -816,15 +801,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCompactPlaceholder() {
-    return Container(
-      width: 40,
-      height: 40,
-      color: Colors.grey[200],
-      child: Icon(Icons.image_outlined, size: 20, color: Colors.grey[400]),
     );
   }
 
@@ -916,16 +892,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                  ? Image.network(
-                      item.photoUrl,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildImagePlaceholder(),
-                    )
-                  : _buildImagePlaceholder(),
+              child: buildImage(
+                item.hasPhotoUrl() ? item.photoUrl : null,
+                width: 80,
+                height: 80,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -993,18 +964,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   // ... rest of the helpers
-  Widget _buildImagePlaceholder() {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(Icons.image_outlined, size: 32, color: Colors.grey[400]),
-    );
-  }
-
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
     return Center(
       child: Column(
