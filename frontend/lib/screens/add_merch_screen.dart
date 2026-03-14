@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/providers.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_helper.dart';
 
 class AddMerchScreen extends ConsumerStatefulWidget {
   final int eventId;
@@ -26,6 +29,32 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     _urlController.dispose();
     _nameFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800, // Optimize size
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        final base64String = base64Encode(bytes);
+        // Standard data URI format
+        setState(() {
+          _urlController.text = 'data:image/png;base64,$base64String';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+      }
+    }
   }
 
   void _submit() async {
@@ -172,8 +201,13 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _urlController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Photo URL (Optional)',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add_a_photo),
+                          onPressed: _pickImage,
+                          tooltip: 'Pick from Gallery',
+                        ),
                       ),
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _submit(),
@@ -234,27 +268,11 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                             dense: true,
                             leading: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
-                              child:
-                                  item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                                  ? Image.network(
-                                      item.photoUrl,
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Icon(Icons.image_outlined),
-                                    )
-                                  : Container(
-                                      width: 40,
-                                      height: 40,
-                                      color: Colors.grey[200],
-                                      child: const Icon(
-                                        Icons.image_outlined,
-                                        size: 20,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
+                              child: buildImage(
+                                item.hasPhotoUrl() ? item.photoUrl : null,
+                                width: 40,
+                                height: 40,
+                              ),
                             ),
                             title: Text(
                               item.name,
