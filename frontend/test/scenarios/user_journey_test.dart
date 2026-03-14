@@ -334,14 +334,45 @@ void main() {
             'created_at': DateTime.now().toIso8601String(),
             'other_user': {'id': 2, 'username': 'trader_bob'},
             'user_haves': [
-              {'id': 1, 'merch_name': 'Acrylic Stand A', 'quantity': 1},
+              {
+                'id': 1,
+                'merch_id': 1,
+                'merch_name': 'Acrylic Stand A',
+                'quantity': 1,
+              },
             ],
             'user_wants': [
-              {'id': 2, 'merch_name': 'Badge B', 'quantity': 1},
+              {'id': 2, 'merch_id': 2, 'merch_name': 'Badge B', 'quantity': 1},
             ],
           },
         ],
         'messages': <Map<String, dynamic>>[],
+        'inventory': [
+          {
+            'id': 10,
+            'user_id': 1,
+            'merch_id': 1,
+            'status': 'HAVE',
+            'quantity': 2,
+            'merch_name': 'Acrylic Stand A',
+          },
+          {
+            'id': 11,
+            'user_id': 1,
+            'merch_id': 1,
+            'status': 'TRADE',
+            'quantity': 1,
+            'merch_name': 'Acrylic Stand A',
+          },
+          {
+            'id': 12,
+            'user_id': 1,
+            'merch_id': 2,
+            'status': 'WANT',
+            'quantity': 1,
+            'merch_name': 'Badge B',
+          },
+        ],
       };
 
       final mockClient = MockClient((request) async {
@@ -364,6 +395,10 @@ void main() {
           return http.Response(jsonEncode(mockBackendState['matches']), 200);
         }
 
+        if (path.startsWith('/api/v1/user/1/inventory')) {
+          return http.Response(jsonEncode(mockBackendState['inventory']), 200);
+        }
+
         if (path == '/api/v1/matches/trigger') {
           return http.Response(jsonEncode({'matches_created': 0}), 200);
         }
@@ -371,7 +406,26 @@ void main() {
         if (path == '/api/v1/matches/1/status' && method == 'POST') {
           final body = jsonDecode(request.body);
           if (body['status'] == 'ACCEPTED') {
-            mockBackendState['matches']![0]['status'] = 'ACCEPTED';
+            (mockBackendState['matches'] as List)[0]['status'] = 'ACCEPTED';
+          } else if (body['status'] == 'COMPLETED') {
+            (mockBackendState['matches'] as List)[0]['status'] = 'COMPLETED';
+
+            // UC-04 logic: decrement HAVEs, remove WANTs/TRADEs
+            final inventory =
+                mockBackendState['inventory'] as List<Map<String, dynamic>>;
+
+            // Decrement Acrylic Stand A (merch_id: 1) HAVE
+            for (var item in inventory) {
+              if (item['merch_id'] == 1 && item['status'] == 'HAVE') {
+                item['quantity'] = (item['quantity'] as int) - 1;
+              }
+            }
+            // Remove TRADE for merch_id: 1 and WANT for merch_id: 2
+            inventory.removeWhere(
+              (item) =>
+                  (item['merch_id'] == 1 && item['status'] == 'TRADE') ||
+                  (item['merch_id'] == 2 && item['status'] == 'WANT'),
+            );
           }
           return http.Response('', 200); // Empty response for 200 OK
         }
@@ -458,6 +512,36 @@ void main() {
 
       // Verify message appears
       expect(find.text('Hello! Where should we meet?'), findsOneWidget);
+
+      // --- New: UC-04 Execute Trade ---
+
+      // Navigate back to match list
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Ensure we are back and see the match
+      expect(find.text('Trade Match #1'), findsOneWidget);
+      expect(find.text('ACCEPTED'), findsOneWidget);
+
+      // Mark as Completed
+      expect(find.text('Mark as Completed'), findsOneWidget);
+      await tester.tap(find.text('Mark as Completed'));
+      await tester.pumpAndSettle();
+
+      // Verify status changed in UI
+      expect(find.text('COMPLETED'), findsOneWidget);
+
+      // Verify buttons are gone
+      expect(find.text('Mark as Completed'), findsNothing);
+      expect(find.text('Cancel Trade'), findsNothing);
+
+      // Verify mock backend inventory state
+      final inventory =
+          mockBackendState['inventory'] as List<Map<String, dynamic>>;
+      expect(inventory.length, 1);
+      expect(inventory[0]['status'], 'HAVE');
+      expect(inventory[0]['quantity'], 1);
+      expect(inventory[0]['merch_id'], 1);
     });
   });
 }
