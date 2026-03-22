@@ -24,12 +24,23 @@ void main() {
         if (request.url.path == '/api/v1/auth/guest') {
           // Fake user response
           return http.Response(
-            jsonEncode({'id': 1, 'username': 'guest123', 'is_guest': true}),
+            jsonEncode({
+              'id': 1,
+              'username': 'guest123',
+              'is_guest': true,
+              'role': 'user',
+              'is_banned': false,
+            }),
             200,
           );
         } else if (request.url.path == '/api/v1/events') {
           // Fake empty events list
           return http.Response(jsonEncode([]), 200);
+        } else if (request.url.path == '/api/v1/system/status') {
+          return http.Response(
+            jsonEncode({'backend_version': 'test', 'resources': null}),
+            200,
+          );
         }
         return http.Response('Not Found', 404);
       });
