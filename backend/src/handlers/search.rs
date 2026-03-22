@@ -14,11 +14,13 @@ pub async fn global_search(
     let search_term = format!("%{}%", query.q);
     let mut results = Vec::new();
 
-    let event_rows = sqlx::query("SELECT id, name FROM events WHERE name ILIKE $1 LIMIT 10")
-        .bind(&search_term)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let event_rows = sqlx::query(
+        "SELECT id, name FROM events WHERE name ILIKE $1 AND status = 'published' LIMIT 10",
+    )
+    .bind(&search_term)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     for row in event_rows {
         results.push(SearchResult {
@@ -35,7 +37,10 @@ pub async fn global_search(
         "SELECT m.id, m.name, m.group_name, m.photo_url, m.event_id, e.name as event_name 
          FROM merchandise m 
          JOIN events e ON m.event_id = e.id 
-         WHERE m.name ILIKE $1 OR m.group_name ILIKE $1 LIMIT 20",
+         WHERE (m.name ILIKE $1 OR m.group_name ILIKE $1)
+           AND m.is_deleted = false AND m.status = 'published'
+           AND e.status = 'published'
+         LIMIT 20",
     )
     .bind(&search_term)
     .fetch_all(&pool)

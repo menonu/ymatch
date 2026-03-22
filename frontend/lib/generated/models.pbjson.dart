@@ -40,11 +40,19 @@ const User$json = {
       '10': 'createdAt',
       '17': true
     },
+    {'1': 'role', '3': 6, '4': 1, '5': 9, '9': 3, '10': 'role', '17': true},
+    {'1': 'is_banned', '3': 7, '4': 1, '5': 8, '9': 4, '10': 'isBanned', '17': true},
+    {'1': 'ban_reason', '3': 8, '4': 1, '5': 9, '9': 5, '10': 'banReason', '17': true},
+    {'1': 'banned_until', '3': 9, '4': 1, '5': 9, '9': 6, '10': 'bannedUntil', '17': true},
   ],
   '8': [
     {'1': '_uuid'},
     {'1': '_device_token'},
     {'1': '_created_at'},
+    {'1': '_role'},
+    {'1': '_is_banned'},
+    {'1': '_ban_reason'},
+    {'1': '_banned_until'},
   ],
 };
 
@@ -115,6 +123,7 @@ const Event$json = {
       '10': 'isJoined',
       '17': true
     },
+    {'1': 'status', '3': 9, '4': 1, '5': 9, '9': 6, '10': 'status', '17': true},
   ],
   '8': [
     {'1': '_creator_id'},
@@ -123,6 +132,7 @@ const Event$json = {
     {'1': '_active_participants'},
     {'1': '_is_favorite'},
     {'1': '_is_joined'},
+    {'1': '_status'},
   ],
 };
 
@@ -198,11 +208,19 @@ const Merchandise$json = {
       '10': 'sortOrder',
       '17': true
     },
+    {'1': 'status', '3': 7, '4': 1, '5': 9, '9': 3, '10': 'status', '17': true},
+    {'1': 'is_deleted', '3': 8, '4': 1, '5': 8, '9': 4, '10': 'isDeleted', '17': true},
+    {'1': 'trade_enabled', '3': 9, '4': 1, '5': 8, '9': 5, '10': 'tradeEnabled', '17': true},
+    {'1': 'creator_id', '3': 10, '4': 1, '5': 5, '9': 6, '10': 'creatorId', '17': true},
   ],
   '8': [
     {'1': '_photo_url'},
     {'1': '_group_name'},
     {'1': '_sort_order'},
+    {'1': '_status'},
+    {'1': '_is_deleted'},
+    {'1': '_trade_enabled'},
+    {'1': '_creator_id'},
   ],
 };
 
@@ -398,6 +416,10 @@ const CreateEventRequest$json = {
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'creator_id', '3': 2, '4': 1, '5': 5, '10': 'creatorId'},
+    {'1': 'status', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'status', '17': true},
+  ],
+  '8': [
+    {'1': '_status'},
   ],
 };
 
@@ -480,10 +502,14 @@ const CreateMerchRequest$json = {
       '10': 'groupName',
       '17': true
     },
+    {'1': 'creator_id', '3': 4, '4': 1, '5': 5, '9': 2, '10': 'creatorId', '17': true},
+    {'1': 'status', '3': 5, '4': 1, '5': 9, '9': 3, '10': 'status', '17': true},
   ],
   '8': [
     {'1': '_photo_url'},
     {'1': '_group_name'},
+    {'1': '_creator_id'},
+    {'1': '_status'},
   ],
 };
 
@@ -657,3 +683,44 @@ final $typed_data.Uint8List searchResultDescriptor = $convert.base64Decode(
     'l0bGUYAyABKAlSBXRpdGxlEh8KCHN1YnRpdGxlGAQgASgJSABSCHN1YnRpdGxliAEBEiAKCXBo'
     'b3RvX3VybBgFIAEoCUgBUghwaG90b1VybIgBARIZCghldmVudF9pZBgGIAEoBVIHZXZlbnRJZE'
     'ILCglfc3VidGl0bGVCDAoKX3Bob3RvX3VybA==');
+
+@$core.Deprecated('Use banUserRequestDescriptor instead')
+const BanUserRequest$json = {
+  '1': 'BanUserRequest',
+  '2': [
+    {'1': 'reason', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'reason', '17': true},
+    {'1': 'banned_until', '3': 2, '4': 1, '5': 9, '9': 1, '10': 'bannedUntil', '17': true},
+  ],
+  '8': [
+    {'1': '_reason'},
+    {'1': '_banned_until'},
+  ],
+};
+
+/// Descriptor for `BanUserRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List banUserRequestDescriptor = $convert.base64Decode(
+    'Cg5CYW5Vc2VyUmVxdWVzdA==');
+
+@$core.Deprecated('Use updateUserRoleRequestDescriptor instead')
+const UpdateUserRoleRequest$json = {
+  '1': 'UpdateUserRoleRequest',
+  '2': [
+    {'1': 'role', '3': 1, '4': 1, '5': 9, '10': 'role'},
+  ],
+};
+
+/// Descriptor for `UpdateUserRoleRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateUserRoleRequestDescriptor = $convert.base64Decode(
+    'ChVVcGRhdGVVc2VyUm9sZVJlcXVlc3Q=');
+
+@$core.Deprecated('Use userActionRequestDescriptor instead')
+const UserActionRequest$json = {
+  '1': 'UserActionRequest',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+  ],
+};
+
+/// Descriptor for `UserActionRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List userActionRequestDescriptor = $convert.base64Decode(
+    'ChFVc2VyQWN0aW9uUmVxdWVzdA==');

@@ -2,118 +2,513 @@
 
 Base URL: `/api/v1`
 
-## 1. Authentication
+All request and response bodies use JSON (`Content-Type: application/json`).
 
-### POST /auth/signup
-Create a new user.
-- **Request**:
+---
+
+## 1. Authentication & Users
+
+### POST /api/v1/auth/signup
+
+Create a new user account.
+
+- **Request Body**:
   ```json
   {
     "username": "user123",
     "password": "securepassword",
-    "device_token": "fcm_token_..." // Optional, for notifications
+    "device_token": "fcm_token_..."   // optional
   }
   ```
 - **Response**: `201 Created`
   ```json
-  { "token": "jwt_token", "user_id": 1 }
+  { "user_id": 1, "username": "user123" }
   ```
 
-### POST /auth/login
-- **Request**: `{ "username": "...", "password": "..." }`
-- **Response**: `200 OK` `{ "token": "..." }`
+### POST /api/v1/auth/login
 
----
+Login with username and password.
 
-## 2. Events & Merchandise
-
-### GET /events
-List all event groups.
+- **Request Body**:
+  ```json
+  { "username": "user123", "password": "securepassword" }
+  ```
 - **Response**: `200 OK`
   ```json
-  [
-    { "id": 1, "name": "Yukari Live 2025", "created_at": "2025-12-01T..." }
-  ]
+  { "user_id": 1, "username": "user123", "role": "user" }
   ```
+- **Error**: `403 Forbidden` if the user is banned (response includes `ban_reason` and `banned_until`).
 
-### POST /events
-Create a new event.
-- **Request**: `{ "name": "..." }`
+### POST /api/v1/auth/guest
 
-### GET /events/:id/merch
-List merchandise for an event.
-- **Response**: `200 OK`
-  ```json
-  [
-    { "id": 101, "name": "Photo 01", "photo_url": "..." },
-    { "id": 102, "name": "Photo 02", "photo_url": "..." }
-  ]
-  ```
+Guest login by device UUID. Creates the guest account on first use.
 
-### POST /events/:id/merch
-Add merchandise to an event.
-- **Request**: `{ "name": "Photo 03", "photo_url": "..." }`
-
----
-
-## 3. User Inventory
-
-### GET /user/inventory
-Get current user's inventory status.
-- **Response**: `200 OK`
-  ```json
-  [
-    { "merch_id": 101, "status": "HAVE" },
-    { "merch_id": 102, "status": "WANT" }
-  ]
-  ```
-
-### POST /user/inventory
-Update inventory status.
-- **Request**:
+- **Request Body**:
   ```json
   {
+    "uuid": "device-uuid-string",
+    "device_token": "fcm_token_..."   // optional
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  { "user_id": 2, "username": "guest_abc123", "role": "user" }
+  ```
+- **Error**: `403 Forbidden` if the guest account is banned.
+
+### GET /api/v1/users
+
+List all users.
+
+- **Response**: `200 OK`
+  ```json
+  [
+    { "id": 1, "username": "user123", "role": "user", "is_banned": false }
+  ]
+  ```
+
+---
+
+## 2. Events
+
+### GET /api/v1/events
+
+List events. Returns all published events plus the requesting user's own drafts.
+
+- **Query Parameters**:
+  | Param     | Type | Description                           |
+  |-----------|------|---------------------------------------|
+  | `user_id` | int  | Optional. Include this user's drafts. |
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Yukari Live 2025",
+      "creator_id": 1,
+      "created_at": "2025-07-01T00:00:00Z",
+      "unique_views": 42,
+      "status": "published",
+      "is_favorited": true
+    }
+  ]
+  ```
+
+### POST /api/v1/events
+
+Create a new event.
+
+- **Request Body**:
+  ```json
+  {
+    "name": "Summer Exchange 2025",
+    "creator_id": 1,
+    "status": "draft"               // optional, defaults to "published"
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  { "id": 2, "name": "Summer Exchange 2025", "status": "draft" }
+  ```
+- **Permissions**: Banned users cannot create events.
+
+### POST /api/v1/events/:id/publish
+
+Publish a draft event.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1 }
+  ```
+- **Response**: `200 OK`
+- **Permissions**: Event owner, admin, or moderator only.
+
+### POST /api/v1/events/:id/view
+
+Register a unique view for an event.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1 }
+  ```
+- **Response**: `200 OK`
+- **Notes**: Increments `unique_views` on the event. Duplicate views by the same user are ignored via the `event_views` table.
+
+### POST /api/v1/events/:id/favorite
+
+Toggle event favorite status.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1, "is_favorite": true }
+  ```
+- **Response**: `200 OK`
+
+### POST /api/v1/events/:id/favorite_group
+
+Toggle a merchandise group favorite within an event.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1, "group_name": "Photos", "is_favorite": true }
+  ```
+- **Response**: `200 OK`
+
+### GET /api/v1/user/:id/favorite_groups
+
+List a user's favorite merchandise groups.
+
+- **Response**: `200 OK`
+  ```json
+  [
+    { "event_id": 1, "group_name": "Photos", "created_at": "2025-07-01T00:00:00Z" }
+  ]
+  ```
+
+---
+
+## 3. Merchandise
+
+### GET /api/v1/events/:id/merch
+
+List merchandise for an event. Returns published items plus the requesting user's own drafts. Excludes soft-deleted items.
+
+- **Query Parameters**:
+  | Param     | Type | Description                                 |
+  |-----------|------|---------------------------------------------|
+  | `user_id` | int  | Optional. Include this user's draft merch.  |
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "id": 101,
+      "event_id": 1,
+      "name": "Photo 01",
+      "photo_url": "https://...",
+      "group_name": "Photos",
+      "sort_order": 0,
+      "status": "published",
+      "is_deleted": false,
+      "trade_enabled": true,
+      "creator_id": 1
+    }
+  ]
+  ```
+
+### POST /api/v1/events/:id/merch
+
+Create merchandise for an event.
+
+- **Request Body**:
+  ```json
+  {
+    "name": "Photo 03",
+    "photo_url": "https://...",       // optional
+    "group_name": "Photos",           // optional
+    "creator_id": 1,                  // optional
+    "status": "draft"                 // optional, defaults to "published"
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  { "id": 103, "name": "Photo 03", "status": "draft" }
+  ```
+
+### POST /api/v1/events/:id/merch/:merch_id/publish
+
+Publish a draft merchandise item.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1 }
+  ```
+- **Response**: `200 OK`
+- **Permissions**: Merch creator, admin, or moderator only.
+
+### DELETE /api/v1/events/:id/merch/:merch_id
+
+Delete a merchandise item. Uses soft-delete (`is_deleted = TRUE`) if the item has existing inventory references; otherwise performs a hard delete.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+
+### POST /api/v1/events/:id/merch/sort
+
+Update the display sort order for merchandise in an event.
+
+- **Request Body**:
+  ```json
+  {
+    "event_id": 1,
+    "sort_orders": { "101": 0, "102": 1, "103": 2 }
+  }
+  ```
+- **Response**: `200 OK`
+
+---
+
+## 4. Inventory
+
+### POST /api/v1/user/inventory
+
+Upsert a user's inventory entry. Creates or updates the record based on the unique `(user_id, merch_id, status)` constraint.
+
+- **Request Body**:
+  ```json
+  {
+    "user_id": 1,
     "merch_id": 101,
-    "status": "HAVE" // Enum: HAVE, WANT, NONE
+    "status": "HAVE",                // "HAVE", "WANT", or "TRADE"
+    "quantity": 2
+  }
+  ```
+- **Response**: `200 OK`
+
+### GET /api/v1/user/:id/inventory
+
+Get a user's full inventory.
+
+- **Response**: `200 OK`
+  ```json
+  [
+    { "id": 1, "user_id": 1, "merch_id": 101, "status": "HAVE", "quantity": 2, "updated_at": "..." }
+  ]
+  ```
+
+---
+
+## 5. Matches
+
+### GET /api/v1/matches/user/:id
+
+List all matches for a user (where the user is `user1_id` or `user2_id`).
+
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "id": 500,
+      "user1_id": 1,
+      "user2_id": 2,
+      "status": "PENDING",
+      "created_at": "2025-07-01T00:00:00Z"
+    }
+  ]
+  ```
+
+### POST /api/v1/matches/:id/status
+
+Update the status of a match.
+
+- **Request Body**:
+  ```json
+  { "status": "ACCEPTED" }
+  ```
+- **Allowed values**: `ACCEPTED`, `REJECTED`, `COMPLETED`
+- **Response**: `200 OK`
+
+---
+
+## 6. Messages
+
+### GET /api/v1/matches/:id/messages
+
+List all messages in a match conversation.
+
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "id": 1,
+      "match_id": 500,
+      "sender_id": 1,
+      "content": "Hello!",
+      "created_at": "2025-07-01T00:00:00Z",
+      "message_type": "TEXT",
+      "latitude": null,
+      "longitude": null
+    }
+  ]
+  ```
+
+### POST /api/v1/matches/:id/messages
+
+Send a message in a match conversation.
+
+- **Request Body**:
+  ```json
+  {
+    "match_id": 500,
+    "sender_id": 1,
+    "content": "Let's meet at the north gate.",
+    "message_type": "LOCATION",       // optional, defaults to "TEXT"
+    "latitude": 35.6762,              // optional
+    "longitude": 139.6503             // optional
+  }
+  ```
+- **Response**: `201 Created`
+
+---
+
+## 7. Admin
+
+All admin endpoints require the `user_id` query parameter, and the requesting user must have the `admin` or `moderator` role (unless otherwise noted).
+
+### GET /api/v1/admin/merch
+
+List all merchandise (including drafts and soft-deleted).
+
+- **Response**: `200 OK` — Array of merchandise objects.
+
+### GET /api/v1/admin/matches
+
+List all matches.
+
+- **Response**: `200 OK` — Array of match objects.
+
+### DELETE /api/v1/admin/events/:id
+
+Delete an event.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator only.
+
+### DELETE /api/v1/admin/merch/:id
+
+Delete merchandise (soft-delete if inventory exists).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator only.
+
+### DELETE /api/v1/admin/matches/:id
+
+Delete a match.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator only.
+
+### GET /api/v1/admin/users/:id
+
+Get detailed user information.
+
+- **Response**: `200 OK`
+  ```json
+  {
+    "id": 1,
+    "username": "user123",
+    "role": "user",
+    "is_banned": false,
+    "ban_reason": null,
+    "banned_until": null,
+    "created_at": "2025-07-01T00:00:00Z"
+  }
+  ```
+
+### POST /api/v1/admin/users/:id/ban
+
+Ban a user.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Request Body**:
+  ```json
+  {
+    "reason": "Spam",                  // optional
+    "banned_until": "2025-12-31T00:00:00Z"  // optional, NULL = permanent
+  }
+  ```
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator only.
+
+### POST /api/v1/admin/users/:id/unban
+
+Unban a user.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator only.
+
+### POST /api/v1/admin/users/:id/role
+
+Update a user's role.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Request Body**:
+  ```json
+  { "role": "moderator" }
+  ```
+- **Allowed values**: `user`, `moderator`, `admin`
+- **Response**: `200 OK`
+- **Permissions**: **Admin only** (moderators cannot change roles).
+
+---
+
+## 8. Search
+
+### GET /api/v1/search
+
+Search across events and merchandise by name. Excludes soft-deleted and draft items.
+
+- **Query Parameters**:
+  | Param | Type   | Description         |
+  |-------|--------|---------------------|
+  | `q`   | string | Required. Search term. |
+- **Response**: `200 OK`
+  ```json
+  {
+    "events": [
+      { "id": 1, "name": "Yukari Live 2025" }
+    ],
+    "merchandise": [
+      { "id": 101, "name": "Photo 01", "event_id": 1 }
+    ]
   }
   ```
 
 ---
 
-## 4. Matching & Trades
+## 9. System
 
-### GET /matches
-Get list of matches found for the user.
+### GET /api/v1/system/status
+
+Backend health check.
+
 - **Response**: `200 OK`
   ```json
-  [
-    {
-      "match_id": 500,
-      "partner_user": { "id": 2, "username": "trader_b" },
-      "give": { "id": 101, "name": "Photo 01" },
-      "get": { "id": 102, "name": "Photo 02" },
-      "status": "PENDING"
-    }
-  ]
+  { "status": "ok" }
   ```
-
-### POST /matches/trigger
-Manually trigger matching algorithm (Dev/Debug).
-- **Response**: `200 OK` `{ "new_matches": 2 }`
 
 ---
 
-## 5. Messaging
+## Permission Summary
 
-### GET /matches/:id/messages
-Get chat history for a match.
-- **Response**: `200 OK`
-  ```json
-  [
-    { "id": 1, "sender_id": 1, "content": "Hello!", "created_at": "..." }
-  ]
-  ```
+| Role        | Capabilities                                                                     |
+|-------------|----------------------------------------------------------------------------------|
+| `user`      | Create events/merch, manage own inventory, trade, message.                       |
+| `moderator` | All user abilities + delete any event/merch/match via admin endpoints.           |
+| `admin`     | All moderator abilities + manage user roles and bans.                            |
 
-### POST /matches/:id/messages
-Send a message.
-- **Request**: `{ "content": "Let's meet at the north gate." }`
+Banned users receive `403 Forbidden` on login and are blocked from creating events.

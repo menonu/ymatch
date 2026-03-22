@@ -24,6 +24,10 @@ class User extends $pb.GeneratedMessage {
     $core.String? uuid,
     $core.String? deviceToken,
     $core.String? createdAt,
+    $core.String? role,
+    $core.bool? isBanned,
+    $core.String? banReason,
+    $core.String? bannedUntil,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -31,6 +35,10 @@ class User extends $pb.GeneratedMessage {
     if (uuid != null) result.uuid = uuid;
     if (deviceToken != null) result.deviceToken = deviceToken;
     if (createdAt != null) result.createdAt = createdAt;
+    if (role != null) result.role = role;
+    if (isBanned != null) result.isBanned = isBanned;
+    if (banReason != null) result.banReason = banReason;
+    if (bannedUntil != null) result.bannedUntil = bannedUntil;
     return result;
   }
 
@@ -52,6 +60,10 @@ class User extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'uuid')
     ..aOS(4, _omitFieldNames ? '' : 'deviceToken')
     ..aOS(5, _omitFieldNames ? '' : 'createdAt')
+    ..aOS(6, _omitFieldNames ? '' : 'role')
+    ..aOB(7, _omitFieldNames ? '' : 'isBanned')
+    ..aOS(8, _omitFieldNames ? '' : 'banReason')
+    ..aOS(9, _omitFieldNames ? '' : 'bannedUntil')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -116,6 +128,42 @@ class User extends $pb.GeneratedMessage {
   $core.bool hasCreatedAt() => $_has(4);
   @$pb.TagNumber(5)
   void clearCreatedAt() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get role => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set role($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRole() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRole() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get isBanned => $_getBF(6);
+  @$pb.TagNumber(7)
+  set isBanned($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasIsBanned() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIsBanned() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get banReason => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set banReason($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBanReason() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBanReason() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get bannedUntil => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set bannedUntil($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasBannedUntil() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearBannedUntil() => $_clearField(9);
 }
 
 class Event extends $pb.GeneratedMessage {
@@ -128,6 +176,7 @@ class Event extends $pb.GeneratedMessage {
     $core.int? activeParticipants,
     $core.bool? isFavorite,
     $core.bool? isJoined,
+    $core.String? status,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -139,6 +188,7 @@ class Event extends $pb.GeneratedMessage {
       result.activeParticipants = activeParticipants;
     if (isFavorite != null) result.isFavorite = isFavorite;
     if (isJoined != null) result.isJoined = isJoined;
+    if (status != null) result.status = status;
     return result;
   }
 
@@ -163,6 +213,7 @@ class Event extends $pb.GeneratedMessage {
     ..aI(6, _omitFieldNames ? '' : 'activeParticipants')
     ..aOB(7, _omitFieldNames ? '' : 'isFavorite')
     ..aOB(8, _omitFieldNames ? '' : 'isJoined')
+    ..aOS(9, _omitFieldNames ? '' : 'status')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -254,6 +305,15 @@ class Event extends $pb.GeneratedMessage {
   $core.bool hasIsJoined() => $_has(7);
   @$pb.TagNumber(8)
   void clearIsJoined() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get status => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set status($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasStatus() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearStatus() => $_clearField(9);
 }
 
 class FavoriteGroup extends $pb.GeneratedMessage {
@@ -354,6 +414,10 @@ class Merchandise extends $pb.GeneratedMessage {
     $core.String? photoUrl,
     $core.String? groupName,
     $core.int? sortOrder,
+    $core.String? status,
+    $core.bool? isDeleted,
+    $core.bool? tradeEnabled,
+    $core.int? creatorId,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -362,6 +426,10 @@ class Merchandise extends $pb.GeneratedMessage {
     if (photoUrl != null) result.photoUrl = photoUrl;
     if (groupName != null) result.groupName = groupName;
     if (sortOrder != null) result.sortOrder = sortOrder;
+    if (status != null) result.status = status;
+    if (isDeleted != null) result.isDeleted = isDeleted;
+    if (tradeEnabled != null) result.tradeEnabled = tradeEnabled;
+    if (creatorId != null) result.creatorId = creatorId;
     return result;
   }
 
@@ -384,6 +452,10 @@ class Merchandise extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'photoUrl')
     ..aOS(5, _omitFieldNames ? '' : 'groupName')
     ..aI(6, _omitFieldNames ? '' : 'sortOrder')
+    ..aOS(7, _omitFieldNames ? '' : 'status')
+    ..aOB(8, _omitFieldNames ? '' : 'isDeleted')
+    ..aOB(9, _omitFieldNames ? '' : 'tradeEnabled')
+    ..aI(10, _omitFieldNames ? '' : 'creatorId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -458,6 +530,42 @@ class Merchandise extends $pb.GeneratedMessage {
   $core.bool hasSortOrder() => $_has(5);
   @$pb.TagNumber(6)
   void clearSortOrder() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get status => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set status($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStatus() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStatus() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get isDeleted => $_getBF(7);
+  @$pb.TagNumber(8)
+  set isDeleted($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIsDeleted() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIsDeleted() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.bool get tradeEnabled => $_getBF(8);
+  @$pb.TagNumber(9)
+  set tradeEnabled($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasTradeEnabled() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearTradeEnabled() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get creatorId => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set creatorId($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasCreatorId() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearCreatorId() => $_clearField(10);
 }
 
 class InventoryItem extends $pb.GeneratedMessage {
@@ -942,10 +1050,12 @@ class CreateEventRequest extends $pb.GeneratedMessage {
   factory CreateEventRequest({
     $core.String? name,
     $core.int? creatorId,
+    $core.String? status,
   }) {
     final result = create();
     if (name != null) result.name = name;
     if (creatorId != null) result.creatorId = creatorId;
+    if (status != null) result.status = status;
     return result;
   }
 
@@ -964,6 +1074,7 @@ class CreateEventRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'name')
     ..aI(2, _omitFieldNames ? '' : 'creatorId')
+    ..aOS(3, _omitFieldNames ? '' : 'status')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1002,6 +1113,15 @@ class CreateEventRequest extends $pb.GeneratedMessage {
   $core.bool hasCreatorId() => $_has(1);
   @$pb.TagNumber(2)
   void clearCreatorId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get status => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set status($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStatus() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStatus() => $_clearField(3);
 }
 
 class UpdateInventoryRequest extends $pb.GeneratedMessage {
@@ -1167,11 +1287,15 @@ class CreateMerchRequest extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? photoUrl,
     $core.String? groupName,
+    $core.int? creatorId,
+    $core.String? status,
   }) {
     final result = create();
     if (name != null) result.name = name;
     if (photoUrl != null) result.photoUrl = photoUrl;
     if (groupName != null) result.groupName = groupName;
+    if (creatorId != null) result.creatorId = creatorId;
+    if (status != null) result.status = status;
     return result;
   }
 
@@ -1191,6 +1315,8 @@ class CreateMerchRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'name')
     ..aOS(2, _omitFieldNames ? '' : 'photoUrl')
     ..aOS(3, _omitFieldNames ? '' : 'groupName')
+    ..aI(4, _omitFieldNames ? '' : 'creatorId')
+    ..aOS(5, _omitFieldNames ? '' : 'status')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1238,6 +1364,24 @@ class CreateMerchRequest extends $pb.GeneratedMessage {
   $core.bool hasGroupName() => $_has(2);
   @$pb.TagNumber(3)
   void clearGroupName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get creatorId => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set creatorId($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCreatorId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCreatorId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get status => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set status($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStatus() => $_clearField(5);
 }
 
 class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
@@ -1658,6 +1802,181 @@ class SearchResult extends $pb.GeneratedMessage {
   $core.bool hasEventId() => $_has(5);
   @$pb.TagNumber(6)
   void clearEventId() => $_clearField(6);
+}
+
+class BanUserRequest extends $pb.GeneratedMessage {
+  factory BanUserRequest({
+    $core.String? reason,
+    $core.String? bannedUntil,
+  }) {
+    final result = create();
+    if (reason != null) result.reason = reason;
+    if (bannedUntil != null) result.bannedUntil = bannedUntil;
+    return result;
+  }
+
+  BanUserRequest._();
+
+  factory BanUserRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BanUserRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BanUserRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'reason')
+    ..aOS(2, _omitFieldNames ? '' : 'bannedUntil')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BanUserRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BanUserRequest copyWith(void Function(BanUserRequest) updates) =>
+      super.copyWith((message) => updates(message as BanUserRequest))
+          as BanUserRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BanUserRequest create() => BanUserRequest._();
+  @$core.override
+  BanUserRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BanUserRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BanUserRequest>(create);
+  static BanUserRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get reason => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set reason($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasReason() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearReason() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get bannedUntil => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set bannedUntil($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBannedUntil() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBannedUntil() => $_clearField(2);
+}
+
+class UpdateUserRoleRequest extends $pb.GeneratedMessage {
+  factory UpdateUserRoleRequest({
+    $core.String? role,
+  }) {
+    final result = create();
+    if (role != null) result.role = role;
+    return result;
+  }
+
+  UpdateUserRoleRequest._();
+
+  factory UpdateUserRoleRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateUserRoleRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateUserRoleRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'role')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateUserRoleRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateUserRoleRequest copyWith(
+          void Function(UpdateUserRoleRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateUserRoleRequest))
+          as UpdateUserRoleRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateUserRoleRequest create() => UpdateUserRoleRequest._();
+  @$core.override
+  UpdateUserRoleRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateUserRoleRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateUserRoleRequest>(create);
+  static UpdateUserRoleRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get role => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set role($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRole() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRole() => $_clearField(1);
+}
+
+class UserActionRequest extends $pb.GeneratedMessage {
+  factory UserActionRequest({
+    $core.int? userId,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    return result;
+  }
+
+  UserActionRequest._();
+
+  factory UserActionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UserActionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UserActionRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UserActionRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UserActionRequest copyWith(void Function(UserActionRequest) updates) =>
+      super.copyWith((message) => updates(message as UserActionRequest))
+          as UserActionRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UserActionRequest create() => UserActionRequest._();
+  @$core.override
+  UserActionRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UserActionRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UserActionRequest>(create);
+  static UserActionRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
 }
 
 const $core.bool _omitFieldNames =
