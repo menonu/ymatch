@@ -24,7 +24,13 @@ void main() {
         final mockClient = MockClient((request) async {
           if (request.url.path == '/api/v1/auth/guest') {
             return http.Response(
-              jsonEncode({'id': 1, 'username': 'testuser', 'is_guest': true}),
+              jsonEncode({
+                'id': 1,
+                'username': 'testuser',
+                'is_guest': true,
+                'role': 'user',
+                'is_banned': false,
+              }),
               200,
             );
           } else if (request.url.path == '/api/v1/events') {
@@ -36,6 +42,7 @@ void main() {
                   'isFavorite': true,
                   'isJoined': false,
                   'createdAt': DateTime.now().toIso8601String(),
+                  'status': 'published',
                 },
                 {
                   'id': 2,
@@ -43,6 +50,7 @@ void main() {
                   'isFavorite': false,
                   'isJoined': true,
                   'createdAt': DateTime.now().toIso8601String(),
+                  'status': 'published',
                 },
               ]),
               200,
@@ -50,8 +58,24 @@ void main() {
           } else if (request.url.path == '/api/v1/events/1/merch') {
             return http.Response(
               jsonEncode([
-                {'id': 1, 'eventId': 1, 'name': 'Sticker', 'groupName': 'Swag'},
-                {'id': 2, 'eventId': 1, 'name': 'T-Shirt', 'groupName': 'Swag'},
+                {
+                  'id': 1,
+                  'eventId': 1,
+                  'name': 'Sticker',
+                  'groupName': 'Swag',
+                  'status': 'published',
+                  'is_deleted': false,
+                  'trade_enabled': true,
+                },
+                {
+                  'id': 2,
+                  'eventId': 1,
+                  'name': 'T-Shirt',
+                  'groupName': 'Swag',
+                  'status': 'published',
+                  'is_deleted': false,
+                  'trade_enabled': true,
+                },
               ]),
               200,
             );
