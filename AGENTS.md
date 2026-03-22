@@ -16,41 +16,51 @@ This document serves as the main entry point and guide for the `ymatch` merchand
 ## How to Build and Test
 
 ### Prerequisites
-- Docker & Docker Compose (for PostgreSQL database)
+- Docker & Docker Compose
 - Rust (cargo)
 - Flutter SDK
 
-### Database Setup
+### Start Infrastructure (Database)
 ```bash
-# Option A: Docker (recommended)
-docker-compose up -d    # Starts PostgreSQL on localhost:5432
+# Start PostgreSQL (port 5432) and pgAdmin (port 5050)
+docker compose up -d
 
-# Option B: Local PostgreSQL (if Docker unavailable)
-sudo apt install postgresql
-sudo pg_ctlcluster 16 main start
-sudo -u postgres createuser ymatch_user -P   # password: secure_dev_password
-sudo -u postgres createdb ymatch -O ymatch_user
-sudo -u postgres createdb ymatch_test -O ymatch_user
+# Create test database (first time only)
+docker exec ymatch_db psql -U ymatch_user -d ymatch -c "CREATE DATABASE ymatch_test OWNER ymatch_user;"
 ```
 
 Database credentials: `ymatch_user:secure_dev_password@localhost:5432/ymatch`
+pgAdmin: `http://localhost:5050` (admin@ymatch.com / admin)
+
+### Service Ports
+| Service      | Port  | Description                     |
+|-------------|-------|---------------------------------|
+| PostgreSQL  | 5432  | Database (via Docker)           |
+| pgAdmin     | 5050  | Database admin UI (via Docker)  |
+| Backend API | 3000  | Rust/Axum REST API              |
+| Frontend    | 8081  | Flutter Web dev server          |
 
 ### Commands
 ```bash
-# Run Backend
+# Run Backend (port 3000)
 cd backend
 DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch cargo run --bin backend
 
-# Run Frontend (Web)
+# Run Frontend (port 8081)
 cd frontend
 flutter run -d web-server --web-port 8081
 
-# Run Tests (from backend/)
+# Run Backend Tests (requires ymatch_test DB)
+cd backend
 DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test cargo test -- --test-threads=1
 
+# Run Frontend Tests
+cd frontend
+flutter test
+
 # Code Quality
-cargo clippy -- -D warnings
-cargo fmt -- --check
+cd backend && cargo clippy -- -D warnings && cargo fmt -- --check
+cd frontend && flutter analyze
 ```
 
 ### Development Guidelines
