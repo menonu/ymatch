@@ -11,6 +11,10 @@ message User {
   optional string uuid = 3;
   optional string device_token = 4;
   optional string created_at = 5;
+  optional string role = 6; // "user", "moderator", "admin"
+  optional bool is_banned = 7;
+  optional string ban_reason = 8;
+  optional string banned_until = 9;
 }
 
 message Event {
@@ -22,6 +26,7 @@ message Event {
   optional int32 active_participants = 6;
   optional bool is_favorite = 7;
   optional bool is_joined = 8;
+  optional string status = 9; // "draft", "published"
 }
 
 message FavoriteGroup {
@@ -38,6 +43,10 @@ message Merchandise {
   optional string photo_url = 4;
   optional string group_name = 5;
   optional int32 sort_order = 6;
+  optional string status = 7; // "draft", "published"
+  optional bool is_deleted = 8;
+  optional bool trade_enabled = 9;
+  optional int32 creator_id = 10;
 }
 
 message InventoryItem {
@@ -83,6 +92,7 @@ message CreateUserRequest {
 message CreateEventRequest {
   string name = 1;
   int32 creator_id = 2;
+  optional string status = 3; // "draft" or "published" (default: "published")
 }
 
 message UpdateInventoryRequest {
@@ -101,6 +111,8 @@ message CreateMerchRequest {
   string name = 1;
   optional string photo_url = 2;
   optional string group_name = 3;
+  optional int32 creator_id = 4;
+  optional string status = 5; // "draft" or "published" (default: "published")
 }
 
 message UpdateMatchStatusRequest {
@@ -134,4 +146,19 @@ message SearchResult {
   optional string subtitle = 4; // event name or group name context
   optional string photo_url = 5;
   int32 event_id = 6; // To allow navigation to the parent event
+}
+
+// Admin request types
+message BanUserRequest {
+  optional string reason = 1;
+  optional string banned_until = 2; // ISO 8601 datetime
+}
+
+message UpdateUserRoleRequest {
+  string role = 1; // "user", "moderator", "admin"
+}
+
+// Generic request with user_id for permission checks
+message UserActionRequest {
+  int32 user_id = 1;
 }

@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: ymatch_user
       POSTGRES_PASSWORD: secure_dev_password
-      POSTGRES_DB: ymatch_db
+      POSTGRES_DB: ymatch
     ports:
       - "5432:5432"
     volumes:
