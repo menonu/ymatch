@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     tmux \
     lsof \
     iproute2 \
+    gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker
@@ -71,6 +72,8 @@ USER ubuntu
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/home/ubuntu/.cargo/bin:${PATH}"
 
+RUN rustup component add rustfmt
+
 # Install Bun for ubuntu user
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/home/ubuntu/.bun/bin:${PATH}"
@@ -92,6 +95,14 @@ ENV PATH="/home/ubuntu/.local/bin:${PATH}"
 RUN git clone https://github.com/flutter/flutter.git /home/ubuntu/flutter -b stable
 ENV PATH="/home/ubuntu/flutter/bin:${PATH}"
 RUN flutter config --no-analytics && flutter precache
+
+RUN curl -fsSL https://gh.io/copilot-install | bash
+RUN printf '%s\n' \
+    'set -g default-terminal "screen-256color"' \
+    'set -gq utf8 on' \
+    'set -gq status-utf8 on' \
+    > /home/ubuntu/.tmux.conf \
+    && mkdir -p /home/ubuntu/.copilot /home/ubuntu/.cache/copilot /home/ubuntu/.config/gh /home/ubuntu/.local
 
 # Add paths to bashrc
 RUN echo 'export PATH="/home/ubuntu/.npm-global/bin:/home/ubuntu/flutter/bin:/home/ubuntu/.cargo/bin:/home/ubuntu/.bun/bin:/home/ubuntu/.local/bin:${PATH}"' >> /home/ubuntu/.bashrc && \
