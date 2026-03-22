@@ -599,6 +599,63 @@ async fn test_search_returns_results() {
         .any(|r| r["title"] == "Searchable Convention"));
 }
 
+#[tokio::test]
+async fn test_search_excludes_draft_events() {
+    let pool = setup_test_pool().await;
+
+    // Create user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "search-draft-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    // Create a draft event
+    let app = backend::routes::create_router(pool.clone());
+    app.oneshot(
+        Request::builder()
+            .method("POST")
+            .uri("/api/v1/events")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"name": "DraftSearchTest Event", "creator_id": {}, "status": "draft"}}"#,
+                user_id
+            )))
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // Search should NOT find the draft event
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/search?q=DraftSearchTest")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let results: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        !results.iter().any(|r| r["title"] == "DraftSearchTest Event"),
+        "Draft events should not appear in search results"
+    );
+}
+
 // --- Admin ---
 
 #[tokio::test]

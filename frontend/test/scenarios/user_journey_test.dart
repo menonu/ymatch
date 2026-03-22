@@ -131,7 +131,24 @@ void main() {
                 'username': 'guest_test',
                 'device_token': 'mock-token',
                 'created_at': DateTime.now().toIso8601String(),
+                'role': 'user',
+                'is_banned': false,
               }),
+              200,
+            );
+          }
+
+          if (path == '/api/v1/users') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 1,
+                  'username': 'guest_test',
+                  'role': 'user',
+                  'is_banned': false,
+                  'created_at': DateTime.now().toIso8601String(),
+                },
+              ]),
               200,
             );
           }
@@ -153,6 +170,7 @@ void main() {
                 'name': body['name'],
                 'creator_id': body['creator_id'],
                 'created_at': DateTime.now().toIso8601String(),
+                'status': 'published',
               };
               mockBackendState['events']!.add(newEvent);
               return http.Response(jsonEncode(newEvent), 200);
@@ -170,6 +188,9 @@ void main() {
                 'name': body['name'],
                 'group_name': body['group_name'] ?? '',
                 'photo_url': body['photo_url'] ?? '',
+                'status': 'published',
+                'is_deleted': false,
+                'trade_enabled': true,
               };
               mockBackendState['merch']!.add(newMerch);
               return http.Response(jsonEncode(newMerch), 200);
@@ -332,7 +353,12 @@ void main() {
             'user2_id': 2,
             'status': 'PENDING',
             'created_at': DateTime.now().toIso8601String(),
-            'other_user': {'id': 2, 'username': 'trader_bob'},
+            'other_user': {
+              'id': 2,
+              'username': 'trader_bob',
+              'role': 'user',
+              'is_banned': false,
+            },
             'user_haves': [
               {'id': 1, 'merch_name': 'Acrylic Stand A', 'quantity': 1},
             ],
@@ -355,6 +381,8 @@ void main() {
               'username': 'guest_test',
               'device_token': 'mock-token',
               'created_at': DateTime.now().toIso8601String(),
+              'role': 'user',
+              'is_banned': false,
             }),
             200,
           );

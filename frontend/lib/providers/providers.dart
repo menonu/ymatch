@@ -185,13 +185,15 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
   EventsController(this.client) : super(const AsyncValue.data(null));
 
-  Future<void> addEvent(String name, int creatorId) async {
+  Future<void> addEvent(String name, int creatorId, {String? status}) async {
     state = const AsyncValue.loading();
     try {
-      await client.post('/api/v1/events', {
+      final body = <String, dynamic>{
         'name': name,
         'creator_id': creatorId,
-      });
+      };
+      if (status != null) body['status'] = status;
+      await client.post('/api/v1/events', body);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -295,7 +297,12 @@ final merchProvider = FutureProvider.family<List<Merchandise>, int>((
   eventId,
 ) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/events/$eventId/merch');
+  final user = ref.watch(currentUserProvider);
+  String url = '/api/v1/events/$eventId/merch';
+  if (user != null) {
+    url += '?user_id=${user.id}';
+  }
+  final json = await client.get(url);
   return (json as List)
       .map((e) => Merchandise()..mergeFromProto3Json(e))
       .toList();
@@ -310,10 +317,12 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
     String name,
     String photoUrl, [
     String? groupName,
+    int? creatorId,
+    String? status,
   ]) async {
     state = const AsyncValue.loading();
     try {
-      final payload = {
+      final payload = <String, dynamic>{
         'event_id': eventId,
         'name': name,
         'photo_url': photoUrl,
@@ -321,6 +330,8 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
       if (groupName != null && groupName.isNotEmpty) {
         payload['group_name'] = groupName;
       }
+      if (creatorId != null) payload['creator_id'] = creatorId;
+      if (status != null) payload['status'] = status;
 
       await client.post('/api/v1/events/$eventId/merch', payload);
       state = const AsyncValue.data(null);
@@ -441,6 +452,120 @@ final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
       .map((e) => TradeMatch()..mergeFromProto3Json(e))
       .toList();
 });
+
+// --- Admin Users ---
+final adminUsersProvider = FutureProvider<List<User>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/users');
+  return (json as List)
+      .map((e) => User()..mergeFromProto3Json(e))
+      .toList();
+});
+
+class AdminController extends StateNotifier<AsyncValue<void>> {
+  final ApiClient client;
+  AdminController(this.client) : super(const AsyncValue.data(null));
+
+  Future<void> banUser(int targetUserId, int adminUserId,
+      {String? reason, String? bannedUntil}) async {
+    state = const AsyncValue.loading();
+    try {
+      final body = <String, dynamic>{};
+      if (reason != null) body['reason'] = reason;
+      if (bannedUntil != null) body['banned_until'] = bannedUntil;
+      await client.post(
+          '/api/v1/admin/users/$targetUserId/ban?user_id=$adminUserId', body);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> unbanUser(int targetUserId, int adminUserId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.post(
+          '/api/v1/admin/users/$targetUserId/unban?user_id=$adminUserId', {});
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateUserRole(
+      int targetUserId, int adminUserId, String role) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.post(
+          '/api/v1/admin/users/$targetUserId/role?user_id=$adminUserId',
+          {'role': role});
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> publishEvent(int eventId, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client
+          .post('/api/v1/events/$eventId/publish', {'user_id': userId});
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> publishMerch(int eventId, int merchId, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.post(
+          '/api/v1/events/$eventId/merch/$merchId/publish',
+          {'user_id': userId});
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteEvent(int eventId, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client
+          .delete('/api/v1/admin/events/$eventId?user_id=$userId');
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteMerch(int merchId, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client
+          .delete('/api/v1/admin/merch/$merchId?user_id=$userId');
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteMatch(int matchId, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client
+          .delete('/api/v1/admin/matches/$matchId?user_id=$userId');
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final adminControllerProvider =
+    StateNotifierProvider<AdminController, AsyncValue<void>>((ref) {
+      return AdminController(ref.watch(apiClientProvider));
+    });
 
 // --- Search ---
 final searchQueryProvider = StateProvider<String>((ref) => '');

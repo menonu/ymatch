@@ -11,13 +11,14 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
               Tab(text: 'System'),
+              Tab(text: 'Users'),
               Tab(text: 'Events'),
               Tab(text: 'Items'),
               Tab(text: 'Matches'),
@@ -28,6 +29,7 @@ class AdminDashboardScreen extends ConsumerWidget {
         body: const TabBarView(
           children: [
             _AdminSystemTab(),
+            _AdminUsersTab(),
             _AdminEventsTab(),
             _AdminItemsTab(),
             _AdminMatchesTab(),
@@ -119,6 +121,140 @@ class _AdminSystemTab extends ConsumerWidget {
   }
 }
 
+class _AdminUsersTab extends ConsumerWidget {
+  const _AdminUsersTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usersAsync = ref.watch(adminUsersProvider);
+    final currentUser = ref.watch(currentUserProvider);
+
+    return usersAsync.when(
+      data: (users) {
+        if (users.isEmpty) {
+          return const Center(child: Text('No users found.'));
+        }
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(adminUsersProvider);
+          },
+          child: ListView.builder(
+            itemCount: users.length,
+            itemBuilder: (context, index) {
+              final user = users[index];
+              final isBanned = user.hasIsBanned() && user.isBanned;
+              final role = user.hasRole() ? user.role : 'user';
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: isBanned
+                      ? Colors.red[100]
+                      : role == 'admin'
+                          ? Colors.purple[100]
+                          : role == 'moderator'
+                              ? Colors.blue[100]
+                              : Colors.grey[200],
+                  child: Icon(
+                    isBanned
+                        ? Icons.block
+                        : role == 'admin'
+                            ? Icons.admin_panel_settings
+                            : role == 'moderator'
+                                ? Icons.shield
+                                : Icons.person,
+                    color: isBanned ? Colors.red : null,
+                  ),
+                ),
+                title: Text(
+                  user.username,
+                  style: TextStyle(
+                    decoration:
+                        isBanned ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                subtitle: Text(
+                  'ID: ${user.id} | Role: $role${isBanned ? ' | BANNED' : ''}',
+                ),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    final adminId = currentUser?.id ?? 0;
+                    final admin = ref.read(adminControllerProvider.notifier);
+                    switch (value) {
+                      case 'ban':
+                        final reason = await _showInputDialog(
+                            context, 'Ban Reason', 'Enter reason (optional)');
+                        await admin.banUser(user.id, adminId, reason: reason);
+                        ref.invalidate(adminUsersProvider);
+                        break;
+                      case 'unban':
+                        await admin.unbanUser(user.id, adminId);
+                        ref.invalidate(adminUsersProvider);
+                        break;
+                      case 'role_admin':
+                        await admin.updateUserRole(user.id, adminId, 'admin');
+                        ref.invalidate(adminUsersProvider);
+                        break;
+                      case 'role_moderator':
+                        await admin.updateUserRole(
+                            user.id, adminId, 'moderator');
+                        ref.invalidate(adminUsersProvider);
+                        break;
+                      case 'role_user':
+                        await admin.updateUserRole(user.id, adminId, 'user');
+                        ref.invalidate(adminUsersProvider);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (!isBanned)
+                      const PopupMenuItem(
+                          value: 'ban', child: Text('🚫 Ban User')),
+                    if (isBanned)
+                      const PopupMenuItem(
+                          value: 'unban', child: Text('✅ Unban User')),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                        value: 'role_admin', child: Text('👑 Set Admin')),
+                    const PopupMenuItem(
+                        value: 'role_moderator',
+                        child: Text('🛡️ Set Moderator')),
+                    const PopupMenuItem(
+                        value: 'role_user', child: Text('👤 Set User')),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
+    );
+  }
+
+  Future<String?> _showInputDialog(
+      BuildContext context, String title, String hint) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: hint),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+}
+
 class _AdminEventsTab extends ConsumerWidget {
   const _AdminEventsTab();
 
@@ -135,9 +271,29 @@ class _AdminEventsTab extends ConsumerWidget {
           itemCount: events.length,
           itemBuilder: (context, index) {
             final event = events[index];
+            final isDraft = event.hasStatus() && event.status == 'draft';
             return ListTile(
-              leading: const Icon(Icons.event),
-              title: Text(event.name),
+              leading: Icon(
+                Icons.event,
+                color: isDraft ? Colors.orange : null,
+              ),
+              title: Row(
+                children: [
+                  Expanded(child: Text(event.name)),
+                  if (isDraft)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[100],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('DRAFT',
+                          style: TextStyle(
+                              fontSize: 10, color: Colors.orange[800])),
+                    ),
+                ],
+              ),
               subtitle: Text(
                 'ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}',
               ),
@@ -169,7 +325,9 @@ class _AdminEventsTab extends ConsumerWidget {
                   if (confirm == true) {
                     try {
                       final client = ref.read(apiClientProvider);
-                      await client.delete('/api/v1/admin/events/${event.id}');
+                      final user = ref.read(currentUserProvider);
+                      final userId = user?.id ?? 0;
+                      await client.delete('/api/v1/admin/events/${event.id}?user_id=$userId');
                       ref.invalidate(eventsProvider);
                       if (context.mounted)
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -253,7 +411,9 @@ class _AdminItemsTab extends ConsumerWidget {
                   if (confirm == true) {
                     try {
                       final client = ref.read(apiClientProvider);
-                      await client.delete('/api/v1/admin/merch/${item.id}');
+                      final user = ref.read(currentUserProvider);
+                      final userId = user?.id ?? 0;
+                      await client.delete('/api/v1/admin/merch/${item.id}?user_id=$userId');
                       ref.invalidate(adminMerchProvider);
                       if (context.mounted)
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -336,8 +496,10 @@ class _AdminMatchesTab extends ConsumerWidget {
                       if (confirm == true) {
                         try {
                           final client = ref.read(apiClientProvider);
+                          final user = ref.read(currentUserProvider);
+                          final userId = user?.id ?? 0;
                           await client.delete(
-                            '/api/v1/admin/matches/${match.id}',
+                            '/api/v1/admin/matches/${match.id}?user_id=$userId',
                           );
                           ref.invalidate(adminMatchesProvider);
                           if (context.mounted)

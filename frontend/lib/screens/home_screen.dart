@@ -304,6 +304,22 @@ class HomeScreen extends ConsumerWidget {
                                         .titleLarge
                                         ?.copyWith(fontWeight: FontWeight.w600),
                                   ),
+                                  if (event.hasStatus() &&
+                                      event.status == 'draft')
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange[100],
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text('DRAFT',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.orange[800])),
+                                    ),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
