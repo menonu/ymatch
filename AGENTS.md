@@ -47,7 +47,6 @@ flutter run -d web-server --web-port 8081
 
 ## How to Manage Tasks
 - **Task Tracking**: Use GitHub Issues as the primary task tracker for the project.
-- **Jules Delegation & Management**: For comprehensive, cross-file tasks (e.g., project-wide refactoring, adding unit tests across multiple files, upgrading dependency versions), leverage the `/jules` extension to delegate the work. Use the `/jules status` command to track progress.
 - The GitHub CLI (`gh`) is installed and should be used to manage, fetch, and create issues directly from the workspace.
 - **Git Authentication**: Use the GitHub CLI (`gh`) authentication for `git` operations. Ensure the remote is set to HTTPS and run `gh auth setup-git` to allow `git push` without requiring SSH keys.
 
@@ -59,6 +58,5 @@ For detailed information regarding specific aspects of the system, refer to the 
 - [Architecture & Actors](./docs/architecture.md): System architecture, technical stack, and actors.
 - [API Specification](./docs/api_spec.md): Available REST API endpoints and data payloads.
 - [Database Schema](./docs/db_schema.md): Database entity-relationship mapping and SQL schema.
-- [Project Progress](./docs/progress.md): Completed and pending features.
+- [Cloud Deployment](./docs/cloud_deployment.md): GCP cloud deployment strategy.
 - [Initial Idea](./docs/initial.md): The raw initial project idea.
-- [Review Initial](./docs/review_initial.md): Review of initial requirements.
