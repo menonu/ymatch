@@ -44,6 +44,7 @@ pub fn create_router(pool: PgPool) -> Router {
             "/api/v1/events/:id/favorite_group",
             post(handlers::toggle_favorite_group),
         )
+        .route("/api/v1/events/:id/publish", post(handlers::publish_event))
         .route(
             "/api/v1/events/:id/merch",
             get(handlers::list_merch).post(handlers::create_merch),
@@ -51,6 +52,14 @@ pub fn create_router(pool: PgPool) -> Router {
         .route(
             "/api/v1/events/:id/merch/sort",
             post(handlers::update_merch_sort_order),
+        )
+        .route(
+            "/api/v1/events/:id/merch/:merch_id/publish",
+            post(handlers::publish_merch),
+        )
+        .route(
+            "/api/v1/events/:id/merch/:merch_id",
+            delete(handlers::delete_merch_by_creator),
         )
         // Inventory
         .route("/api/v1/user/inventory", post(handlers::update_inventory))
@@ -64,6 +73,13 @@ pub fn create_router(pool: PgPool) -> Router {
         .route("/api/v1/admin/events/:id", delete(handlers::delete_event))
         .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))
         .route("/api/v1/admin/matches/:id", delete(handlers::delete_match))
+        .route("/api/v1/admin/users/:id", get(handlers::get_user_details))
+        .route("/api/v1/admin/users/:id/ban", post(handlers::ban_user))
+        .route("/api/v1/admin/users/:id/unban", post(handlers::unban_user))
+        .route(
+            "/api/v1/admin/users/:id/role",
+            post(handlers::update_user_role),
+        )
         // Matches
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(

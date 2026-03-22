@@ -1,4 +1,5 @@
 use crate::generated::ymatch::*;
+use crate::handlers::permissions;
 use axum::{extract::State, http::StatusCode, Json};
 use sqlx::{PgPool, Row};
 
@@ -46,6 +47,7 @@ pub async fn list_events(
     State(pool): State<PgPool>,
     axum::extract::Query(query): axum::extract::Query<ListEventsQuery>,
 ) -> Result<Json<Vec<Event>>, (StatusCode, String)> {
+    // Show published events + user's own drafts
     let rows = sqlx::query(
         r#"
         SELECT 
@@ -53,6 +55,7 @@ pub async fn list_events(
             e.name, 
             e.creator_id, 
             e.created_at,
+            e.status,
             (SELECT COUNT(*) FROM event_views v WHERE v.event_id = e.id) as unique_views,
             (
                 SELECT COUNT(DISTINCT i.user_id)
@@ -67,13 +70,14 @@ pub async fn list_events(
                 WHERE m.event_id = e.id AND i.user_id = $1 AND i.quantity > 0
             ) as is_joined
         FROM events e 
+        WHERE e.status = 'published' OR e.creator_id = $1
         ORDER BY e.created_at DESC
-        "#
+        "#,
     )
-        .bind(query.user_id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .bind(query.user_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let events = rows
         .into_iter()
@@ -94,6 +98,7 @@ pub async fn list_events(
                 active_participants: Some(active_participants as i32),
                 is_favorite: Some(is_favorite),
                 is_joined: Some(is_joined),
+                status: Some(row.get("status")),
             }
         })
         .collect();
@@ -186,11 +191,17 @@ pub async fn create_event(
     State(pool): State<PgPool>,
     Json(payload): Json<CreateEventRequest>,
 ) -> Result<Json<Event>, (StatusCode, String)> {
+    let user = permissions::get_verified_user(&pool, payload.creator_id).await?;
+    permissions::require_not_banned(&user)?;
+
+    let status = payload.status.as_deref().unwrap_or("published");
+
     let row = sqlx::query(
-        "INSERT INTO events (name, creator_id) VALUES ($1, $2) RETURNING id, name, creator_id, created_at"
+        "INSERT INTO events (name, creator_id, status) VALUES ($1, $2, $3) RETURNING id, name, creator_id, created_at, status",
     )
-    .bind(payload.name)
+    .bind(&payload.name)
     .bind(payload.creator_id)
+    .bind(status)
     .fetch_one(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -206,5 +217,34 @@ pub async fn create_event(
         active_participants: Some(0),
         is_favorite: Some(false),
         is_joined: Some(false),
+        status: Some(row.get("status")),
     }))
+}
+
+pub async fn publish_event(
+    State(pool): State<PgPool>,
+    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    Json(payload): Json<UserActionRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
+    permissions::require_not_banned(&user)?;
+
+    let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let row = row.ok_or((StatusCode::NOT_FOUND, "Event not found".to_string()))?;
+    let creator_id: Option<i32> = row.get("creator_id");
+
+    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+
+    sqlx::query("UPDATE events SET status = 'published' WHERE id = $1")
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
 }

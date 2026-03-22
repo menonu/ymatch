@@ -5,6 +5,7 @@ mod inventory;
 mod matches;
 mod merch;
 mod messages;
+pub mod permissions;
 mod search;
 mod system;
 

@@ -622,6 +622,13 @@ async fn test_admin_delete_event() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // Promote user to admin
+    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
+        .bind(user_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
     let app = backend::routes::create_router(pool.clone());
     let resp = app
         .oneshot(
@@ -641,13 +648,16 @@ async fn test_admin_delete_event() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let event_id = event["id"].as_i64().unwrap();
 
-    // Delete event
+    // Delete event (with admin user_id)
     let app = backend::routes::create_router(pool);
     let resp = app
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(&format!("/api/v1/admin/events/{}", event_id))
+                .uri(&format!(
+                    "/api/v1/admin/events/{}?user_id={}",
+                    event_id, user_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -740,4 +750,754 @@ async fn test_messages_empty_list() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0]["content"].as_str().unwrap(), "Hello!");
+}
+
+// --- Permission System Tests ---
+
+#[tokio::test]
+async fn test_banned_user_cannot_login() {
+    let pool = setup_test_pool().await;
+
+    // Create user via guest login
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "ban-test-uuid"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    // Ban the user
+    sqlx::query("UPDATE users SET is_banned = true, ban_reason = 'test ban' WHERE id = $1")
+        .bind(user_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Try guest login again - should be forbidden
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "ban-test-uuid"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_admin_ban_unban_user() {
+    let pool = setup_test_pool().await;
+
+    // Create admin user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "admin-ban-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let admin: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let admin_id = admin["id"].as_i64().unwrap();
+    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
+        .bind(admin_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create target user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "target-ban-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let target: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let target_id = target["id"].as_i64().unwrap();
+
+    // Ban the target
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!(
+                    "/api/v1/admin/users/{}/ban?user_id={}",
+                    target_id, admin_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"reason": "Bad behavior"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify user is banned
+    let row = sqlx::query("SELECT is_banned, ban_reason FROM users WHERE id = $1")
+        .bind(target_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(sqlx::Row::get::<bool, _>(&row, "is_banned"));
+    assert_eq!(
+        sqlx::Row::get::<Option<String>, _>(&row, "ban_reason"),
+        Some("Bad behavior".to_string())
+    );
+
+    // Unban the target
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!(
+                    "/api/v1/admin/users/{}/unban?user_id={}",
+                    target_id, admin_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify user is unbanned
+    let row = sqlx::query("SELECT is_banned FROM users WHERE id = $1")
+        .bind(target_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!sqlx::Row::get::<bool, _>(&row, "is_banned"));
+}
+
+#[tokio::test]
+async fn test_non_admin_cannot_ban() {
+    let pool = setup_test_pool().await;
+
+    // Create regular user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "nonadmin-ban-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    // Try to ban someone (should fail - not admin)
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/admin/users/999/ban?user_id={}", user_id))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"reason": "test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_update_user_role() {
+    let pool = setup_test_pool().await;
+
+    // Create admin
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "role-admin-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let admin: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let admin_id = admin["id"].as_i64().unwrap();
+    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
+        .bind(admin_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create target
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "role-target-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let target: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let target_id = target["id"].as_i64().unwrap();
+
+    // Promote to moderator
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target_id, admin_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "moderator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row = sqlx::query("SELECT role FROM users WHERE id = $1")
+        .bind(target_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(sqlx::Row::get::<String, _>(&row, "role"), "moderator");
+}
+
+// --- Draft/Publish Tests ---
+
+#[tokio::test]
+async fn test_draft_event_visibility() {
+    let pool = setup_test_pool().await;
+
+    // Create two users
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "draft-creator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let creator: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let creator_id = creator["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "draft-viewer"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let viewer: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let viewer_id = viewer["id"].as_i64().unwrap();
+
+    // Create draft event
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Draft Event", "creator_id": {}, "status": "draft"}}"#,
+                    creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(event["status"].as_str().unwrap(), "draft");
+    let event_id = event["id"].as_i64().unwrap();
+
+    // Creator can see draft
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/events?user_id={}", creator_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let events: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(events.iter().any(|e| e["name"] == "Draft Event"));
+
+    // Other user cannot see draft
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/events?user_id={}", viewer_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let events: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!events.iter().any(|e| e["name"] == "Draft Event"));
+
+    // Publish event
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/publish", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, creator_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Now other user can see it
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/events?user_id={}", viewer_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let events: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(events.iter().any(|e| e["name"] == "Draft Event"));
+}
+
+#[tokio::test]
+async fn test_draft_merch_visibility() {
+    let pool = setup_test_pool().await;
+
+    // Create user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "draft-merch-user"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    // Create event
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Merch Draft Event", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+
+    // Create draft merch
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Draft Item", "creator_id": {}, "status": "draft"}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(merch["status"].as_str().unwrap(), "draft");
+    let merch_id = merch["id"].as_i64().unwrap();
+
+    // Creator can see draft merch
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/events/{}/merch?user_id={}",
+                    event_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(items.iter().any(|i| i["name"] == "Draft Item"));
+
+    // Publish merch
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!(
+                    "/api/v1/events/{}/merch/{}/publish",
+                    event_id, merch_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+// --- Soft Delete Tests ---
+
+#[tokio::test]
+async fn test_soft_delete_merch_with_inventory() {
+    let pool = setup_test_pool().await;
+
+    // Create user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "softdel-user"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    // Create event + merch
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "SoftDel Event", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "SoftDel Item", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let merch_id = merch["id"].as_i64().unwrap();
+
+    // Add inventory for this merch
+    let app = backend::routes::create_router(pool.clone());
+    app.oneshot(
+        Request::builder()
+            .method("POST")
+            .uri("/api/v1/user/inventory")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"user_id": {}, "merch_id": {}, "status": "HAVE", "quantity": 3}}"#,
+                user_id, merch_id
+            )))
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // Delete merch (should soft-delete since inventory exists)
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(&format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify merch is soft-deleted
+    let row = sqlx::query("SELECT is_deleted, trade_enabled FROM merchandise WHERE id = $1")
+        .bind(merch_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(sqlx::Row::get::<bool, _>(&row, "is_deleted"));
+    assert!(!sqlx::Row::get::<bool, _>(&row, "trade_enabled"));
+
+    // Inventory still accessible
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/user/{}/inventory", user_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!items.is_empty());
+}
+
+#[tokio::test]
+async fn test_hard_delete_merch_without_inventory() {
+    let pool = setup_test_pool().await;
+
+    // Create user + event + merch
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "harddel-user"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "HardDel Event", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "HardDel Item", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let merch_id = merch["id"].as_i64().unwrap();
+
+    // Delete merch (no inventory → hard delete)
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(&format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify merch is completely gone
+    let row = sqlx::query("SELECT id FROM merchandise WHERE id = $1")
+        .bind(merch_id as i32)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert!(row.is_none());
+}
+
+#[tokio::test]
+async fn test_user_response_includes_role() {
+    let pool = setup_test_pool().await;
+
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "role-check-uuid"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(user["role"].as_str().unwrap(), "user");
+    assert_eq!(user["is_banned"].as_bool().unwrap(), false);
+}
+
+#[tokio::test]
+async fn test_banned_user_cannot_create_event() {
+    let pool = setup_test_pool().await;
+
+    // Create user
+    let app = backend::routes::create_router(pool.clone());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "ban-create-test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    // Ban the user
+    sqlx::query("UPDATE users SET is_banned = true WHERE id = $1")
+        .bind(user_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Try to create event
+    let app = backend::routes::create_router(pool);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Banned Event", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }

@@ -15,6 +15,14 @@ pub struct User {
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "6")]
+    pub role: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, optional, tag = "7")]
+    pub is_banned: ::core::option::Option<bool>,
+    #[prost(string, optional, tag = "8")]
+    pub ban_reason: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "9")]
+    pub banned_until: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -37,6 +45,8 @@ pub struct Event {
     pub is_favorite: ::core::option::Option<bool>,
     #[prost(bool, optional, tag = "8")]
     pub is_joined: ::core::option::Option<bool>,
+    #[prost(string, optional, tag = "9")]
+    pub status: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -70,6 +80,14 @@ pub struct Merchandise {
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, optional, tag = "6")]
     pub sort_order: ::core::option::Option<i32>,
+    #[prost(string, optional, tag = "7")]
+    pub status: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, optional, tag = "8")]
+    pub is_deleted: ::core::option::Option<bool>,
+    #[prost(bool, optional, tag = "9")]
+    pub trade_enabled: ::core::option::Option<bool>,
+    #[prost(int32, optional, tag = "10")]
+    pub creator_id: ::core::option::Option<i32>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -159,6 +177,8 @@ pub struct CreateEventRequest {
     pub name: ::prost::alloc::string::String,
     #[prost(int32, tag = "2")]
     pub creator_id: i32,
+    #[prost(string, optional, tag = "3")]
+    pub status: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -196,6 +216,10 @@ pub struct CreateMerchRequest {
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "3")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, optional, tag = "4")]
+    pub creator_id: ::core::option::Option<i32>,
+    #[prost(string, optional, tag = "5")]
+    pub status: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -268,4 +292,32 @@ pub struct SearchResult {
     /// To allow navigation to the parent event
     #[prost(int32, tag = "6")]
     pub event_id: i32,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct BanUserRequest {
+    #[prost(string, optional, tag = "1")]
+    pub reason: ::core::option::Option<::prost::alloc::string::String>,
+    /// ISO 8601 datetime
+    #[prost(string, optional, tag = "2")]
+    pub banned_until: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateUserRoleRequest {
+    /// "user", "moderator", "admin"
+    #[prost(string, tag = "1")]
+    pub role: ::prost::alloc::string::String,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserActionRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
 }

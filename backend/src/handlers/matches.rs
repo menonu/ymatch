@@ -65,6 +65,10 @@ pub async fn list_matches(
             uuid: None,
             device_token: None,
             created_at: None,
+            role: None,
+            is_banned: None,
+            ban_reason: None,
+            banned_until: None,
         });
 
         let haves_rows = sqlx::query(

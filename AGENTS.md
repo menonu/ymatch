@@ -10,21 +10,33 @@ This document serves as the main entry point and guide for the `ymatch` merchand
 - **`frontend/`**: Flutter (Mobile/Web) frontend application.
 - **`proto/`**: Protobuf definitions for data models shared across boundaries.
 - **`docs/`**: Project documentation, specifications, and architecture.
-- **`scripts/`**: Utility scripts (e.g., protobuf generation).
+- **`scripts/`**: Utility scripts (e.g., protobuf generation, deployment).
 - **`vm/`**: Development container (devcontainer) environment setup and configurations.
 
 ## How to Build and Test
 
 ### Prerequisites
-- Docker & Docker Compose
+- Docker & Docker Compose (for PostgreSQL database)
 - Rust (cargo)
 - Flutter SDK
 
+### Database Setup
+```bash
+# Option A: Docker (recommended)
+docker-compose up -d    # Starts PostgreSQL on localhost:5432
+
+# Option B: Local PostgreSQL (if Docker unavailable)
+sudo apt install postgresql
+sudo pg_ctlcluster 16 main start
+sudo -u postgres createuser ymatch_user -P   # password: secure_dev_password
+sudo -u postgres createdb ymatch -O ymatch_user
+sudo -u postgres createdb ymatch_test -O ymatch_user
+```
+
+Database credentials: `ymatch_user:secure_dev_password@localhost:5432/ymatch`
+
 ### Commands
 ```bash
-# Start Database
-docker-compose up -d
-
 # Run Backend
 cd backend
 DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch cargo run --bin backend
@@ -32,6 +44,13 @@ DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch ca
 # Run Frontend (Web)
 cd frontend
 flutter run -d web-server --web-port 8081
+
+# Run Tests (from backend/)
+DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test cargo test -- --test-threads=1
+
+# Code Quality
+cargo clippy -- -D warnings
+cargo fmt -- --check
 ```
 
 ### Development Guidelines
@@ -43,7 +62,14 @@ flutter run -d web-server --web-port 8081
     - For Frontend: Run `./scripts/redeploy_frontend.sh`
     - For Backend: Run `./scripts/redeploy_backend.sh`
 - **Smoke Tests Mandatory**: After re-deploying the backend, you must run the API smoke tests to verify the core endpoints are not broken. Run `./scripts/smoke_test.sh` from the project root.
-- **Protobuf First**: Any changes to data structures must be applied to `proto/models.proto` first, then regenerated.
+- **Protobuf First**: Any changes to data structures must be applied to `proto/models.proto` first, then manually update `backend/src/generated/ymatch.rs` to match.
+
+## Permission System
+- **Roles**: `user` (default), `moderator`, `admin`
+- **Banned users** are blocked from write operations and login
+- **Moderators** can ban/unban users and perform admin delete operations
+- **Admins** can do everything moderators can, plus change user roles
+- Ownership checks: event creators can manage their events; merch creators can manage their items
 
 ## How to Manage Tasks
 - **Task Tracking**: Use GitHub Issues as the primary task tracker for the project.
