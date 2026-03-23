@@ -5,13 +5,15 @@ services:
     privileged: true
     ports:
       - "2222:22"
+      - "8081:8081"
+      - "3000:3000"
     volumes:
       - /home/menonu/ws:/home/ubuntu/ws
       - gemini-data:/home/ubuntu/.gemini
       - docker-data:/var/lib/docker
       - gh-config:/home/ubuntu/.config/gh
-      - copilot-home:/home/user/.copilot
-      - copilot-cache:/home/user/.cache/copilot
+      - copilot-home:/home/ubuntu/.copilot
+      - copilot-cache:/home/ubuntu/.cache/copilot
     # deploy:
     #   resources:
     #     reservations:

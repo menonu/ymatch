@@ -94,7 +94,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ] else ...[
                     ElevatedButton.icon(
                       icon: const Icon(Icons.bolt),
-                      label: const Text('Start Guest Session'),
+                      label: const Text('Start as New User'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
