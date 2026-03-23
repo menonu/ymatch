@@ -2300,3 +2300,9 @@ backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b
 *.pid
 .gemini/
 *.log
+terraform/terraform.tfvars
+.firebase/
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/tfplan

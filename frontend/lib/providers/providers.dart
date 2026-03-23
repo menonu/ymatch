@@ -126,6 +126,15 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     await prefs.remove('user_uuid');
     state = const AsyncValue.data(null);
   }
+
+  Future<void> updateUsername(int userId, String newUsername) async {
+    final data = await client.put('/api/v1/users/$userId', {
+      'user_id': userId,
+      'username': newUsername,
+    });
+    final user = User()..mergeFromProto3Json(data);
+    state = AsyncValue.data(user);
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthController, AsyncValue<User?>>((

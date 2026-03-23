@@ -158,8 +158,41 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
               ),
               actions: [
+                // Refresh button
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                  onPressed: () {
+                    ref.invalidate(merchProvider(widget.eventId));
+                    if (user != null) ref.invalidate(inventoryProvider(user.id));
+                  },
+                ),
                 PopupMenuButton<MerchFilter>(
-                  icon: const Icon(Icons.filter_list),
+                  // Show active filter as a small icon badge over the filter button
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.filter_list),
+                      if (filterMode != MerchFilter.all)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Icon(
+                            filterMode == MerchFilter.have
+                                ? Icons.check_circle
+                                : filterMode == MerchFilter.want
+                                ? Icons.favorite
+                                : Icons.help,
+                            size: 12,
+                            color: filterMode == MerchFilter.have
+                                ? Colors.green
+                                : filterMode == MerchFilter.want
+                                ? Colors.red
+                                : Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
                   tooltip: 'Filter Items',
                   onSelected: (MerchFilter result) {
                     ref.read(merchFilterProvider.notifier).state = result;
@@ -306,9 +339,81 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ],
                 ),
               ],
-              bottom: TabBar(
-                isScrollable: true,
-                tabs: groupKeys.map((name) => Tab(text: name)).toList(),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(kTextTabBarHeight),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TabBar(
+                        isScrollable: true,
+                        tabs: groupKeys
+                            .map((name) => Tab(text: name))
+                            .toList(),
+                      ),
+                    ),
+                    // Favorite star for the active group tab
+                    Builder(
+                      builder: (context) {
+                        final tabCtrl = DefaultTabController.of(context);
+                        return AnimatedBuilder(
+                          animation: tabCtrl,
+                          builder: (context, _) {
+                            final idx = tabCtrl.index;
+                            final groupName = idx < groupKeys.length
+                                ? groupKeys[idx]
+                                : null;
+                            if (groupName == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return Consumer(
+                              builder: (context, ref, _) {
+                                final favGroups =
+                                    ref
+                                        .watch(favoriteGroupsProvider)
+                                        .valueOrNull ??
+                                    [];
+                                final isFav = favGroups.any(
+                                  (g) =>
+                                      g.eventId == widget.eventId &&
+                                      g.groupName == groupName,
+                                );
+                                return IconButton(
+                                  icon: Icon(
+                                    isFav
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: Colors.amber,
+                                  ),
+                                  tooltip: isFav
+                                      ? 'Remove from favorites'
+                                      : 'Add to favorites',
+                                  onPressed: user == null
+                                      ? null
+                                      : () async {
+                                          await ref
+                                              .read(
+                                                eventsControllerProvider
+                                                    .notifier,
+                                              )
+                                              .toggleFavoriteGroup(
+                                                widget.eventId,
+                                                user.id,
+                                                groupName,
+                                                !isFav,
+                                              );
+                                          ref.invalidate(
+                                            favoriteGroupsProvider,
+                                          );
+                                        },
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             body: Column(
@@ -379,64 +484,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
                       return Column(
                         children: [
-                          Container(
-                            color: Colors.amber.withValues(alpha: 0.1),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Group: $groupName',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber,
-                                  ),
-                                ),
-                                Consumer(
-                                  builder: (context, ref, _) {
-                                    final favGroups =
-                                        ref
-                                            .watch(favoriteGroupsProvider)
-                                            .valueOrNull ??
-                                        [];
-                                    final isFav = favGroups.any(
-                                      (g) =>
-                                          g.eventId == widget.eventId &&
-                                          g.groupName == groupName,
-                                    );
-
-                                    return IconButton(
-                                      icon: Icon(
-                                        isFav ? Icons.star : Icons.star_border,
-                                        color: Colors.amber,
-                                      ),
-                                      onPressed: () async {
-                                        if (user != null) {
-                                          await ref
-                                              .read(
-                                                eventsControllerProvider
-                                                    .notifier,
-                                              )
-                                              .toggleFavoriteGroup(
-                                                widget.eventId,
-                                                user.id,
-                                                groupName,
-                                                !isFav,
-                                              );
-                                          ref.invalidate(
-                                            favoriteGroupsProvider,
-                                          );
-                                        }
-                                      },
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
                           Expanded(
                             child: Builder(
                               builder: (context) {

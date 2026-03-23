@@ -55,7 +55,12 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         actions: [
-          if (searchQuery.isEmpty)
+          if (searchQuery.isEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: () => ref.invalidate(eventsProvider),
+            ),
             PopupMenuButton<EventSort>(
               icon: const Icon(Icons.sort),
               tooltip: 'Sort Events',
@@ -78,6 +83,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ],
             ),
+          ],
           const SizedBox(width: 8),
         ],
       ),

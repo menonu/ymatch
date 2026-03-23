@@ -3,11 +3,51 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _editingUsername = false;
+  late TextEditingController _usernameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveUsername(int userId) async {
+    final newName = _usernameController.text.trim();
+    if (newName.isEmpty) return;
+    try {
+      await ref.read(authProvider.notifier).updateUsername(userId, newName);
+      if (mounted) {
+        setState(() => _editingUsername = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Username updated')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update username: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     if (user == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -38,11 +78,54 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      user.username,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                    // Username row with edit support
+                    if (_editingUsername)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _usernameController,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Username',
+                                isDense: true,
+                              ),
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _saveUsername(user.id),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.check),
+                            color: Colors.green,
+                            onPressed: () => _saveUsername(user.id),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () =>
+                                setState(() => _editingUsername = false),
+                          ),
+                        ],
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            user.username,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 18),
+                            color: Colors.grey,
+                            tooltip: 'Edit username',
+                            onPressed: () {
+                              _usernameController.text = user.username;
+                              setState(() => _editingUsername = true);
+                            },
+                          ),
+                        ],
+                      ),
                     const SizedBox(height: 24),
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -69,18 +152,22 @@ class ProfileScreen extends ConsumerWidget {
                                 color: Theme.of(context).colorScheme.primary,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
-                                onPressed: () {
+                                onPressed: () async {
                                   if (user.hasUuid() && user.uuid.isNotEmpty) {
-                                    Clipboard.setData(
+                                    await Clipboard.setData(
                                       ClipboardData(text: user.uuid),
                                     );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Master Key copied to clipboard',
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Master Key copied to clipboard',
+                                          ),
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    }
                                   }
                                 },
                               ),
