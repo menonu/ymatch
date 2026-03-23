@@ -17,6 +17,20 @@ final backendSystemStatusProvider = FutureProvider<Map<String, dynamic>>((
   }
 });
 
+// Checks if backend is reachable. Can be invalidated to recheck.
+final backendHealthProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  try {
+    await client.get('/api/v1/events');
+    return true;
+  } on BackendUnavailableException {
+    return false;
+  } catch (_) {
+    // Other errors (e.g. 401) still mean backend is reachable
+    return true;
+  }
+});
+
 // --- Auth / Current User ---
 class AuthController extends StateNotifier<AsyncValue<User?>> {
   final ApiClient client;
