@@ -74,6 +74,14 @@ pub async fn create_merch(
         permissions::require_not_banned(&user)?;
     }
 
+    let group = payload.group_name.as_deref().unwrap_or("").trim();
+    if group.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "group_name is required".to_string(),
+        ));
+    }
+
     let status = payload.status.as_deref().unwrap_or("published");
 
     let row = sqlx::query(&format!(
@@ -91,6 +99,55 @@ pub async fn create_merch(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(merch_from_row(&row)))
+}
+
+pub async fn update_merch(
+    State(pool): State<PgPool>,
+    Path((event_id, merch_id)): Path<(i32, i32)>,
+    Json(payload): Json<UpdateMerchRequest>,
+) -> Result<Json<Merchandise>, (StatusCode, String)> {
+    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
+    permissions::require_not_banned(&user)?;
+
+    let row = sqlx::query("SELECT creator_id FROM merchandise WHERE id = $1 AND event_id = $2")
+        .bind(merch_id)
+        .bind(event_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let row = row.ok_or((StatusCode::NOT_FOUND, "Merchandise not found".to_string()))?;
+    let creator_id: Option<i32> = row.get("creator_id");
+
+    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+
+    let mut sets = Vec::new();
+    let mut idx = 3; // $1=merch_id, $2=event_id
+    if payload.name.is_some() { idx += 1; sets.push(format!("name = ${}", idx)); }
+    if payload.photo_url.is_some() { idx += 1; sets.push(format!("photo_url = ${}", idx)); }
+    if payload.group_name.is_some() { idx += 1; sets.push(format!("group_name = ${}", idx)); }
+
+    if sets.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "No fields to update".to_string()));
+    }
+
+    let sql = format!(
+        "UPDATE merchandise SET {} WHERE id = $1 AND event_id = $2 RETURNING {}",
+        sets.join(", "),
+        MERCH_COLUMNS
+    );
+
+    let mut q = sqlx::query(&sql).bind(merch_id).bind(event_id);
+    if let Some(ref name) = payload.name { q = q.bind(name); }
+    if let Some(ref photo_url) = payload.photo_url { q = q.bind(photo_url); }
+    if let Some(ref group_name) = payload.group_name { q = q.bind(group_name); }
+
+    let updated = q
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(merch_from_row(&updated)))
 }
 
 pub async fn publish_merch(
