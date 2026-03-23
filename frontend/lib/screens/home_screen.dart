@@ -597,15 +597,17 @@ class HomeScreen extends ConsumerWidget {
 
   void _showAddEventDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
+    final eventsAsync = ref.read(eventsProvider);
+    final eventCount = eventsAsync.valueOrNull?.length ?? 0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('New Event'),
         content: TextField(
           controller: nameController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Event Name',
-            hintText: 'e.g., Summer Comic Market 2025',
+            hintText: 'Event ${eventCount + 1}',
           ),
           autofocus: true,
         ),
