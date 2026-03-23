@@ -11,8 +11,9 @@ class ScaffoldWithNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final isAdminOrMod = user != null &&
-        (user.role == 'admin' || user.role == 'moderator');
+    final isAdminOrMod =
+        user != null && (user.role == 'admin' || user.role == 'moderator');
+    final backendHealth = ref.watch(backendHealthProvider);
 
     final destinations = <NavigationDestination>[
       const NavigationDestination(
@@ -42,8 +43,56 @@ class ScaffoldWithNavBar extends ConsumerWidget {
       );
     }
 
+    // Show banner only when health check definitively returned false
+    final bool isUnreachable = backendHealth.whenOrNull(data: (v) => !v) ?? false;
+
     return Scaffold(
-      body: navigationShell,
+      body: Column(
+        children: [
+          if (isUnreachable)
+            Material(
+              color: Colors.red.shade700,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'バックエンドサービスに接続できません',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => ref.invalidate(backendHealthProvider),
+                        child: const Text(
+                          '再試行',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Expanded(child: navigationShell),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex.clamp(
           0,

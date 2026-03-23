@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
+import '../services/api_client.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -22,6 +23,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final bool isBackendError =
+        authState.hasError && authState.error is BackendUnavailableException;
 
     return Scaffold(
       body: SafeArea(
@@ -60,7 +63,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  if (authState.isLoading)
+                  if (isBackendError) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.cloud_off,
+                            size: 40,
+                            color: Colors.red.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'バックエンドに接続できません',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'サービスが一時停止中の可能性があります。\nしばらく経ってから再試行してください。',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.red.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('再試行'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade600,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () =>
+                                ref.read(authProvider.notifier).checkLogin(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (authState.isLoading)
                     const Column(
                       children: [
                         CircularProgressIndicator(),
