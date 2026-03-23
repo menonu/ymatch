@@ -247,6 +247,29 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> updateEvent(int eventId, int userId, String name) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.put('/api/v1/events/$eventId', {
+        'user_id': userId,
+        'name': name,
+      });
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteEventByCreator(int eventId, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.delete('/api/v1/admin/events/$eventId?user_id=$userId');
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
   Future<void> generateDebugData(int creatorId) async {
     state = const AsyncValue.loading();
     try {
@@ -359,6 +382,43 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
       });
     } catch (e) {
       // Ignore errors for optimistic UI or show a toast
+    }
+  }
+
+  Future<void> updateMerch(
+    int eventId,
+    int merchId,
+    int userId, {
+    String? name,
+    String? photoUrl,
+    String? groupName,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final payload = <String, dynamic>{'user_id': userId};
+      if (name != null) payload['name'] = name;
+      if (photoUrl != null) payload['photo_url'] = photoUrl;
+      if (groupName != null) payload['group_name'] = groupName;
+      await client.put('/api/v1/events/$eventId/merch/$merchId', payload);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteMerchByCreator(
+    int eventId,
+    int merchId,
+    int userId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.delete(
+        '/api/v1/events/$eventId/merch/$merchId?user_id=$userId',
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
     }
   }
 }

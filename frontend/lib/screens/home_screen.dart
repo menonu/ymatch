@@ -274,11 +274,17 @@ class HomeScreen extends ConsumerWidget {
                 itemCount: events.length,
                 itemBuilder: (context, index) {
                   final event = events[index];
+                  final isOwner = user != null &&
+                      event.hasCreatorId() &&
+                      event.creatorId == user.id;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       onTap: () => context.go('/event/${event.id}'),
+                      onLongPress: isOwner
+                          ? () => _showEventActions(context, ref, event)
+                          : null,
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Row(
@@ -310,6 +316,11 @@ class HomeScreen extends ConsumerWidget {
                                         .titleLarge
                                         ?.copyWith(fontWeight: FontWeight.w600),
                                   ),
+                                  if (isOwner)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 6),
+                                      child: Icon(Icons.edit_note, size: 16, color: Colors.blue[400]),
+                                    ),
                                   if (event.hasStatus() &&
                                       event.status == 'draft')
                                     Container(
@@ -457,6 +468,100 @@ class HomeScreen extends ConsumerWidget {
     } catch (_) {
       return 'Invalid date';
     }
+  }
+
+  void _showEventActions(BuildContext context, WidgetRef ref, Event event) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit Name'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _editEventName(context, ref, event);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteEvent(context, ref, event);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editEventName(BuildContext context, WidgetRef ref, Event event) {
+    final ctrl = TextEditingController(text: event.name);
+    final user = ref.read(currentUserProvider);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Event Name'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Event name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isNotEmpty && user != null) {
+                await ref
+                    .read(eventsControllerProvider.notifier)
+                    .updateEvent(event.id, user.id, newName);
+                ref.invalidate(eventsProvider);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteEvent(BuildContext context, WidgetRef ref, Event event) {
+    final user = ref.read(currentUserProvider);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Event'),
+        content: Text('Are you sure you want to delete "${event.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              if (user != null) {
+                await ref
+                    .read(eventsControllerProvider.notifier)
+                    .deleteEventByCreator(event.id, user.id);
+                ref.invalidate(eventsProvider);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {

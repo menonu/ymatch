@@ -74,6 +74,9 @@ class MockAuthController extends StateNotifier<AsyncValue<User?>>
   void logout() {}
 
   @override
+  Future<void> updateUsername(int userId, String newUsername) async {}
+
+  @override
   // TODO: implement client
   get client => throw UnimplementedError();
 }

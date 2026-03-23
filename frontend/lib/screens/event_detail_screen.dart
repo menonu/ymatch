@@ -110,6 +110,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           return true;
         }).toList();
 
+        final hiddenCount = merch.length - filteredMerch.length;
+
         // Group the merchandise
         final groupedMerch = <String, List<Merchandise>>{};
         for (final item in filteredMerch) {
@@ -167,91 +169,45 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     if (user != null) ref.invalidate(inventoryProvider(user.id));
                   },
                 ),
-                PopupMenuButton<MerchFilter>(
-                  // Show active filter as a small icon badge over the filter button
+                // Show controls (display mode) moved to AppBar
+                PopupMenuButton<InventoryDisplayMode>(
                   icon: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      const Icon(Icons.filter_list),
-                      if (filterMode != MerchFilter.all)
+                      const Icon(Icons.visibility),
+                      if (displayMode != InventoryDisplayMode.all)
                         Positioned(
                           right: -4,
                           top: -4,
-                          child: Icon(
-                            filterMode == MerchFilter.have
-                                ? Icons.check_circle
-                                : filterMode == MerchFilter.want
-                                ? Icons.favorite
-                                : Icons.help,
-                            size: 12,
-                            color: filterMode == MerchFilter.have
-                                ? Colors.green
-                                : filterMode == MerchFilter.want
-                                ? Colors.red
-                                : Colors.grey,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
                     ],
                   ),
-                  tooltip: 'Filter Items',
-                  onSelected: (MerchFilter result) {
-                    ref.read(merchFilterProvider.notifier).state = result;
+                  tooltip: 'Show Controls',
+                  onSelected: (InventoryDisplayMode result) {
+                    ref.read(inventoryDisplayModeProvider.notifier).state = result;
                   },
-                  itemBuilder: (BuildContext context) =>
-                      <PopupMenuEntry<MerchFilter>>[
-                        const PopupMenuItem<MerchFilter>(
-                          value: MerchFilter.all,
-                          child: Row(
-                            children: [
-                              Icon(Icons.inventory_2_outlined, size: 20),
-                              SizedBox(width: 12),
-                              Text('All Items'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem<MerchFilter>(
-                          value: MerchFilter.have,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                size: 20,
-                                color: Colors.green,
-                              ),
-                              SizedBox(width: 12),
-                              Text('Just HAVE'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem<MerchFilter>(
-                          value: MerchFilter.want,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.favorite_border,
-                                size: 20,
-                                color: Colors.red,
-                              ),
-                              SizedBox(width: 12),
-                              Text('Just WANT'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem<MerchFilter>(
-                          value: MerchFilter.missing,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.help_outline,
-                                size: 20,
-                                color: Colors.grey,
-                              ),
-                              SizedBox(width: 12),
-                              Text('Missing'),
-                            ],
-                          ),
-                        ),
-                      ],
+                  itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<InventoryDisplayMode>(
+                      value: InventoryDisplayMode.have,
+                      child: Text('Just HAVE'),
+                    ),
+                    const PopupMenuItem<InventoryDisplayMode>(
+                      value: InventoryDisplayMode.wantTrade,
+                      child: Text('WANT & TRADE'),
+                    ),
+                    const PopupMenuItem<InventoryDisplayMode>(
+                      value: InventoryDisplayMode.all,
+                      child: Text('All'),
+                    ),
+                  ],
                 ),
                 PopupMenuButton<ViewMode>(
                   icon: const Icon(Icons.view_agenda),
@@ -341,78 +297,75 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(kTextTabBarHeight),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TabBar(
-                        isScrollable: true,
-                        tabs: groupKeys
-                            .map((name) => Tab(text: name))
-                            .toList(),
-                      ),
-                    ),
-                    // Favorite star for the active group tab
-                    Builder(
-                      builder: (context) {
-                        final tabCtrl = DefaultTabController.of(context);
-                        return AnimatedBuilder(
-                          animation: tabCtrl,
-                          builder: (context, _) {
-                            final idx = tabCtrl.index;
-                            final groupName = idx < groupKeys.length
-                                ? groupKeys[idx]
-                                : null;
-                            if (groupName == null) {
-                              return const SizedBox.shrink();
-                            }
-                            return Consumer(
-                              builder: (context, ref, _) {
-                                final favGroups =
-                                    ref
-                                        .watch(favoriteGroupsProvider)
-                                        .valueOrNull ??
-                                    [];
-                                final isFav = favGroups.any(
-                                  (g) =>
-                                      g.eventId == widget.eventId &&
-                                      g.groupName == groupName,
-                                );
-                                return IconButton(
-                                  icon: Icon(
-                                    isFav
-                                        ? Icons.star
-                                        : Icons.star_border,
-                                    color: Colors.amber,
-                                  ),
-                                  tooltip: isFav
-                                      ? 'Remove from favorites'
-                                      : 'Add to favorites',
-                                  onPressed: user == null
-                                      ? null
-                                      : () async {
-                                          await ref
-                                              .read(
-                                                eventsControllerProvider
-                                                    .notifier,
-                                              )
-                                              .toggleFavoriteGroup(
-                                                widget.eventId,
-                                                user.id,
-                                                groupName,
-                                                !isFav,
-                                              );
-                                          ref.invalidate(
-                                            favoriteGroupsProvider,
-                                          );
-                                        },
-                                );
-                              },
+                child: Builder(
+                  builder: (context) {
+                    final tabCtrl = DefaultTabController.of(context);
+                    return Row(
+                      children: [
+                        // Group jump dropdown
+                        PopupMenuButton<int>(
+                          icon: const Icon(Icons.list, size: 20),
+                          tooltip: 'Jump to group',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36),
+                          onSelected: (idx) => tabCtrl.animateTo(idx),
+                          itemBuilder: (_) => groupKeys.asMap().entries.map((e) {
+                            return PopupMenuItem<int>(
+                              value: e.key,
+                              child: Text(e.value),
                             );
-                          },
-                        );
-                      },
-                    ),
-                  ],
+                          }).toList(),
+                        ),
+                        Expanded(
+                          child: TabBar(
+                            isScrollable: true,
+                            tabs: groupKeys.map((name) {
+                              return Tab(
+                                child: Consumer(
+                                  builder: (context, ref, _) {
+                                    final favGroups =
+                                        ref.watch(favoriteGroupsProvider).valueOrNull ?? [];
+                                    final isFav = favGroups.any(
+                                      (g) =>
+                                          g.eventId == widget.eventId &&
+                                          g.groupName == name,
+                                    );
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(name),
+                                        const SizedBox(width: 4),
+                                        GestureDetector(
+                                          onTap: user == null
+                                              ? null
+                                              : () async {
+                                                  await ref
+                                                      .read(eventsControllerProvider.notifier)
+                                                      .toggleFavoriteGroup(
+                                                        widget.eventId,
+                                                        user.id,
+                                                        name,
+                                                        !isFav,
+                                                      );
+                                                  ref.invalidate(favoriteGroupsProvider);
+                                                },
+                                          child: Icon(
+                                            isFav ? Icons.star : Icons.star_border,
+                                            color: Colors.amber,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -422,59 +375,71 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   width: double.infinity,
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                    vertical: 8,
+                    vertical: 6,
                     horizontal: 16,
                   ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Show controls:',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SegmentedButton<MerchFilter>(
+                            segments: const [
+                              ButtonSegment(
+                                value: MerchFilter.all,
+                                label: Text('All'),
+                                icon: Icon(Icons.inventory_2_outlined, size: 16),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            SegmentedButton<InventoryDisplayMode>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: InventoryDisplayMode.have,
-                                  label: Text('Just HAVE'),
-                                ),
-                                ButtonSegment(
-                                  value: InventoryDisplayMode.wantTrade,
-                                  label: Text('WANT & TRADE'),
-                                ),
-                                ButtonSegment(
-                                  value: InventoryDisplayMode.all,
-                                  label: Text('All'),
-                                ),
-                              ],
-                              selected: {displayMode},
-                              onSelectionChanged:
-                                  (Set<InventoryDisplayMode> newSelection) {
-                                    ref
-                                        .read(
-                                          inventoryDisplayModeProvider.notifier,
-                                        )
-                                        .state = newSelection
-                                        .first;
-                                  },
-                              style: SegmentedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                textStyle: const TextStyle(fontSize: 12),
+                              ButtonSegment(
+                                value: MerchFilter.have,
+                                label: Text('HAVE'),
+                                icon: Icon(Icons.check_circle_outline, size: 16),
                               ),
+                              ButtonSegment(
+                                value: MerchFilter.want,
+                                label: Text('WANT'),
+                                icon: Icon(Icons.favorite_border, size: 16),
+                              ),
+                              ButtonSegment(
+                                value: MerchFilter.missing,
+                                label: Text('Missing'),
+                                icon: Icon(Icons.help_outline, size: 16),
+                              ),
+                            ],
+                            selected: {filterMode},
+                            onSelectionChanged: (Set<MerchFilter> newSelection) {
+                              ref.read(merchFilterProvider.notifier).state =
+                                  newSelection.first;
+                            },
+                            style: SegmentedButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              textStyle: const TextStyle(fontSize: 11),
                             ),
-                          ],
+                          ),
+                        ),
+                      ),
+                      if (hiddenCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$hiddenCount hidden',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.deepOrange,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -637,22 +602,42 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         displayMode == InventoryDisplayMode.wantTrade ||
         displayMode == InventoryDisplayMode.all;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: buildImage(
-              item.hasPhotoUrl() ? item.photoUrl : null,
-              fit: BoxFit.cover,
+    final isOwner = user != null &&
+        item.hasCreatorId() &&
+        item.creatorId == user.id;
+
+    return GestureDetector(
+      onLongPress: isOwner
+          ? () => _showMerchActions(context, ref, item)
+          : null,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: buildImage(
+                      item.hasPhotoUrl() ? item.photoUrl : null,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  if (isOwner)
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
+                    ),
+                ],
+              ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Text(
@@ -698,6 +683,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -793,58 +779,75 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         displayMode == InventoryDisplayMode.wantTrade ||
         displayMode == InventoryDisplayMode.all;
 
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-        ),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: buildImage(
-            item.hasPhotoUrl() ? item.photoUrl : null,
-            width: 40,
-            height: 40,
+    final isOwner = user != null &&
+        item.hasCreatorId() &&
+        item.creatorId == user.id;
+
+    return GestureDetector(
+      onLongPress: isOwner
+          ? () => _showMerchActions(context, ref, item)
+          : null,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
           ),
         ),
-        title: Text(
-          item.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        trailing: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: buildImage(
+              item.hasPhotoUrl() ? item.photoUrl : null,
+              width: 40,
+              height: 40,
+            ),
+          ),
+          title: Row(
             children: [
-              if (showHave)
-                _buildCompactCounter(
-                  context,
-                  'HAVE',
-                  haveQty,
-                  AppTheme.haveColor,
-                  (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+              Expanded(
+                child: Text(
+                  item.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
-              if (showHave && showWantTrade) const SizedBox(width: 8),
-              if (showWantTrade) ...[
-                _buildCompactCounter(
-                  context,
-                  'WANT',
-                  wantQty,
-                  AppTheme.wantColor,
-                  (q) => _updateInv(ref, user, item.id, 'WANT', q),
-                ),
-                const SizedBox(width: 8),
-                _buildCompactCounter(
-                  context,
-                  'TRADE',
-                  tradeQty,
-                  AppTheme.tradeColor,
-                  (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-                ),
-              ],
+              ),
+              if (isOwner)
+                Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
             ],
+          ),
+          trailing: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showHave)
+                  _buildCompactCounter(
+                    context,
+                    'HAVE',
+                    haveQty,
+                    AppTheme.haveColor,
+                    (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                  ),
+                if (showHave && showWantTrade) const SizedBox(width: 8),
+                if (showWantTrade) ...[
+                  _buildCompactCounter(
+                    context,
+                    'WANT',
+                    wantQty,
+                    AppTheme.wantColor,
+                    (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildCompactCounter(
+                    context,
+                    'TRADE',
+                    tradeQty,
+                    AppTheme.tradeColor,
+                    (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -929,68 +932,92 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         displayMode == InventoryDisplayMode.wantTrade ||
         displayMode == InventoryDisplayMode.all;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: buildImage(
-                item.hasPhotoUrl() ? item.photoUrl : null,
-                width: 80,
-                height: 80,
+    final isOwner = user != null &&
+        item.hasCreatorId() &&
+        item.creatorId == user.id;
+
+    return GestureDetector(
+      onLongPress: isOwner
+          ? () => _showMerchActions(context, ref, item)
+          : null,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: buildImage(
+                  item.hasPhotoUrl() ? item.photoUrl : null,
+                  width: 80,
+                  height: 80,
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (showHave)
-                        _buildStepper(
-                          label: 'HAVE',
-                          color: AppTheme.haveColor,
-                          qty: haveQty,
-                          onUpdate: (q) =>
-                              _updateInv(ref, user, item.id, 'HAVE', q),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      if (showWantTrade) ...[
-                        _buildStepper(
-                          label: 'WANT',
-                          color: AppTheme.wantColor,
-                          qty: wantQty,
-                          onUpdate: (q) =>
-                              _updateInv(ref, user, item.id, 'WANT', q),
-                        ),
-                        _buildStepper(
-                          label: 'TRADE',
-                          color: AppTheme.tradeColor,
-                          qty: tradeQty,
-                          onUpdate: (q) =>
-                              _updateInv(ref, user, item.id, 'TRADE', q),
-                        ),
+                        if (isOwner)
+                          Tooltip(
+                            message: 'You created this item',
+                            child: Icon(
+                              Icons.edit_note,
+                              size: 18,
+                              color: Colors.blue[400],
+                            ),
+                          ),
                       ],
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (showHave)
+                          _buildStepper(
+                            label: 'HAVE',
+                            color: AppTheme.haveColor,
+                            qty: haveQty,
+                            onUpdate: (q) =>
+                                _updateInv(ref, user, item.id, 'HAVE', q),
+                          ),
+                        if (showWantTrade) ...[
+                          _buildStepper(
+                            label: 'WANT',
+                            color: AppTheme.wantColor,
+                            qty: wantQty,
+                            onUpdate: (q) =>
+                                _updateInv(ref, user, item.id, 'WANT', q),
+                          ),
+                          _buildStepper(
+                            label: 'TRADE',
+                            color: AppTheme.tradeColor,
+                            qty: tradeQty,
+                            onUpdate: (q) =>
+                                _updateInv(ref, user, item.id, 'TRADE', q),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1008,6 +1035,112 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           .read(inventoryProvider(user.id).notifier)
           .updateItem(merchId, status, qty);
     }
+  }
+
+  void _showMerchActions(
+    BuildContext context,
+    WidgetRef ref,
+    Merchandise item,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit Name'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _editMerchName(context, ref, item);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteMerch(context, ref, item);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editMerchName(
+    BuildContext context,
+    WidgetRef ref,
+    Merchandise item,
+  ) {
+    final ctrl = TextEditingController(text: item.name);
+    final user = ref.read(currentUserProvider);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Item Name'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Item name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isNotEmpty && user != null) {
+                await ref
+                    .read(merchControllerProvider.notifier)
+                    .updateMerch(item.eventId, item.id, user.id, name: newName);
+                ref.invalidate(merchProvider(widget.eventId));
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteMerch(
+    BuildContext context,
+    WidgetRef ref,
+    Merchandise item,
+  ) {
+    final user = ref.read(currentUserProvider);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Item'),
+        content: Text('Are you sure you want to delete "${item.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              if (user != null) {
+                await ref
+                    .read(merchControllerProvider.notifier)
+                    .deleteMerchByCreator(item.eventId, item.id, user.id);
+                ref.invalidate(merchProvider(widget.eventId));
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ... rest of the helpers

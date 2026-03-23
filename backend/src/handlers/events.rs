@@ -221,6 +221,59 @@ pub async fn create_event(
     }))
 }
 
+pub async fn update_event(
+    State(pool): State<PgPool>,
+    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    Json(payload): Json<UpdateEventRequest>,
+) -> Result<Json<Event>, (StatusCode, String)> {
+    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
+    permissions::require_not_banned(&user)?;
+
+    let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let row = row.ok_or((StatusCode::NOT_FOUND, "Event not found".to_string()))?;
+    let creator_id: Option<i32> = row.get("creator_id");
+
+    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+
+    let name = payload.name.ok_or((StatusCode::BAD_REQUEST, "name is required".to_string()))?;
+
+    sqlx::query("UPDATE events SET name = $1 WHERE id = $2")
+        .bind(&name)
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Return the updated event with stats
+    let updated = sqlx::query(
+        r#"SELECT e.id, e.name, e.creator_id, e.created_at, e.status,
+           (SELECT COUNT(*) FROM event_views v WHERE v.event_id = e.id) as unique_views,
+           (SELECT COUNT(DISTINCT i.user_id) FROM inventory i JOIN merchandise m ON m.id = i.merch_id WHERE m.event_id = e.id AND i.quantity > 0) as active_participants
+           FROM events e WHERE e.id = $1"#
+    )
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(Event {
+        id: updated.get("id"),
+        name: updated.get("name"),
+        creator_id: updated.get("creator_id"),
+        created_at: updated.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").map(|dt| dt.to_rfc3339()),
+        unique_views: updated.get::<Option<i64>, _>("unique_views").map(|v| v as i32),
+        active_participants: Some(updated.get::<i64, _>("active_participants") as i32),
+        is_favorite: Some(false),
+        is_joined: Some(false),
+        status: Some(updated.get("status")),
+    }))
+}
+
 pub async fn publish_event(
     State(pool): State<PgPool>,
     axum::extract::Path(event_id): axum::extract::Path<i32>,

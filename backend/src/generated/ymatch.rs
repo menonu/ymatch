@@ -224,6 +224,24 @@ pub struct CreateMerchRequest {
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq)]
+pub struct UpdateMerchRequest {
+    pub user_id: i32,
+    pub name: Option<String>,
+    pub photo_url: Option<String>,
+    pub group_name: Option<String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq)]
+pub struct UpdateEventRequest {
+    pub user_id: i32,
+    pub name: Option<String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateMatchStatusRequest {
     /// "ACCEPTED", "REJECTED", "COMPLETED"

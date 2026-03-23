@@ -60,7 +60,12 @@ pub fn create_router(pool: PgPool) -> Router {
         )
         .route(
             "/api/v1/events/:id/merch/:merch_id",
-            delete(handlers::delete_merch_by_creator),
+            put(handlers::update_merch).delete(handlers::delete_merch_by_creator),
+        )
+        // Events update
+        .route(
+            "/api/v1/events/:id",
+            put(handlers::update_event),
         )
         // Inventory
         .route("/api/v1/user/inventory", post(handlers::update_inventory))

@@ -32,18 +32,47 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   }
 
   Future<void> _pickImage() async {
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Select Image Source'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, ImageSource.gallery),
+            child: const Row(
+              children: [
+                Icon(Icons.photo_library),
+                SizedBox(width: 12),
+                Text('Gallery'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, ImageSource.camera),
+            child: const Row(
+              children: [
+                Icon(Icons.camera_alt),
+                SizedBox(width: 12),
+                Text('Camera'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (source == null) return;
+
     final ImagePicker picker = ImagePicker();
     try {
       final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 800, // Optimize size
+        source: source,
+        maxWidth: 800,
         maxHeight: 800,
         imageQuality: 85,
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
         final base64String = base64Encode(bytes);
-        // Standard data URI format
         setState(() {
           _urlController.text = 'data:image/png;base64,$base64String';
         });
@@ -60,6 +89,16 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   void _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
+
+    if (_selectedGroup == null || _selectedGroup!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select or create an item group first.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isAdding = true);
 
@@ -199,18 +238,86 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                       onSubmitted: (_) => _submit(),
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _urlController,
-                      decoration: InputDecoration(
-                        labelText: 'Photo URL (Optional)',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.add_a_photo),
-                          onPressed: _pickImage,
-                          tooltip: 'Pick from Gallery',
+                    // Image picker (replaces URL text field)
+                    Row(
+                      children: [
+                        // Preview
+                        GestureDetector(
+                          onTap: _pickImage,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.grey.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: _urlController.text.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(7),
+                                    child: buildImage(
+                                      _urlController.text,
+                                      width: 80,
+                                      height: 80,
+                                    ),
+                                  )
+                                : const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_a_photo,
+                                        color: Colors.grey,
+                                        size: 28,
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Photo',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
                         ),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _submit(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: _pickImage,
+                                icon: const Icon(Icons.image, size: 18),
+                                label: Text(
+                                  _urlController.text.isNotEmpty
+                                      ? 'Change Image'
+                                      : 'Choose Image',
+                                ),
+                              ),
+                              if (_urlController.text.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _urlController.clear();
+                                    });
+                                  },
+                                  child: const Text(
+                                    'Remove',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
 
