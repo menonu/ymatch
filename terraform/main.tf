@@ -83,6 +83,10 @@ resource "google_compute_instance" "db_vm" {
   machine_type = "e2-micro"
   zone         = var.zone
 
+  lifecycle {
+    ignore_changes = [metadata_startup_script, network_interface]
+  }
+
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
@@ -94,11 +98,35 @@ resource "google_compute_instance" "db_vm" {
   network_interface {
     network    = google_compute_network.default.id
     subnetwork = google_compute_subnetwork.default.id
-    access_config {}
+    # No access_config — no external IPv4 (saves ~$3.60/month)
+    # SSH via: gcloud compute ssh ymatch-db-vm --zone us-west1-b --tunnel-through-iap
+    # To temporarily add external IP for maintenance:
+    #   gcloud compute instances add-access-config ymatch-db-vm --zone us-west1-b
+    # To remove after:
+    #   gcloud compute instances delete-access-config ymatch-db-vm --zone us-west1-b --access-config-name external-nat
   }
 
+  # Startup script: idempotent — safe to run on reboot without internet
   metadata_startup_script = <<-EOF
     #!/bin/bash
+    # If Docker is already installed, just ensure postgres is running
+    if command -v docker &> /dev/null; then
+      if ! docker ps --format '{{.Names}}' | grep -q '^postgres$'; then
+        docker start postgres 2>/dev/null || \
+        docker run -d \
+          --name postgres \
+          -e POSTGRES_USER=ymatch_user \
+          -e POSTGRES_PASSWORD=${var.db_password} \
+          -e POSTGRES_DB=ymatch_db \
+          -p 5432:5432 \
+          -v /var/lib/postgresql/data:/var/lib/postgresql/data \
+          --restart unless-stopped \
+          postgres:16-alpine
+      fi
+      exit 0
+    fi
+
+    # First-time setup: requires internet (external IP must be temporarily enabled)
     set -e
     apt-get update
     apt-get install -y ca-certificates curl gnupg
@@ -136,9 +164,9 @@ resource "google_compute_firewall" "allow_postgres_internal" {
   target_tags   = ["allow-postgres"]
 }
 
-# Allow SSH for debugging
-resource "google_compute_firewall" "allow_ssh" {
-  name    = "allow-ssh"
+# Allow SSH via IAP tunnel only (no external IP needed)
+resource "google_compute_firewall" "allow_ssh_iap" {
+  name    = "allow-ssh-iap"
   network = google_compute_network.default.id
 
   allow {
@@ -146,5 +174,5 @@ resource "google_compute_firewall" "allow_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = ["35.235.240.0/20"]
 }
