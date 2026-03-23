@@ -239,6 +239,39 @@ docker exec postgres psql -U ymatch_user -d ymatch_db -c \"UPDATE users SET role
 
 Current admin UUID: `625a6a92-9b70-488b-87b2-1bb68641f37e`
 
+## Stop / Start (Cost Saving)
+
+All resources are within free tier, but you can stop the VM when not in use.
+Cloud Run auto-scales to zero (no action needed). Firebase Hosting is always on (static, free).
+
+### Stop
+```bash
+export PATH="/home/ubuntu/google-cloud-sdk/bin:$PATH"
+gcloud compute instances stop ymatch-db-vm --zone us-west1-b --project tangential-map-491113-b4
+```
+
+### Start
+```bash
+export PATH="/home/ubuntu/google-cloud-sdk/bin:$PATH"
+# 1. Start VM (PostgreSQL auto-starts via Docker --restart policy)
+gcloud compute instances start ymatch-db-vm --zone us-west1-b --project tangential-map-491113-b4
+
+# 2. Wait ~30s, then verify PostgreSQL is running
+gcloud compute ssh ymatch-db-vm --zone us-west1-b --tunnel-through-iap --command "docker ps"
+
+# 3. Cloud Run will reconnect automatically on next request
+curl -s https://ymatch-backend-xbtg3vdbmq-uw.a.run.app/api/v1/events
+```
+
+### Status Check
+```bash
+# VM status
+gcloud compute instances describe ymatch-db-vm --zone us-west1-b --format="get(status)" --project tangential-map-491113-b4
+
+# Cloud Run (always "Active", scales to zero when idle)
+gcloud run services describe ymatch-backend --region us-west1 --format="get(status.url)" --project tangential-map-491113-b4
+```
+
 ## Teardown
 
 ```bash
