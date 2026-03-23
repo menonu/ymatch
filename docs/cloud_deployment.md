@@ -7,7 +7,7 @@ This document outlines the strategy for deploying the `ymatch` platform to the c
 | Component | Service | URL / Address |
 |-----------|---------|---------------|
 | Frontend | Firebase Hosting | https://ymatch-app.web.app |
-| Backend API | Cloud Run (us-west1) | https://ymatch-backend-xbtg3vdbmq-uw.a.run.app |
+| Backend API | Cloud Run (us-west1) | https://ymatch-backend-82867116789.us-west1.run.app |
 | Database | e2-micro VM + Docker PostgreSQL | 10.0.0.2 (internal VPC) |
 | Container Registry | Artifact Registry (us-central1) | us-central1-docker.pkg.dev/tangential-map-491113-b4/ymatch-repo |
 
@@ -244,13 +244,24 @@ Current admin UUID: `625a6a92-9b70-488b-87b2-1bb68641f37e`
 All resources are within free tier, but you can stop the VM when not in use.
 Cloud Run auto-scales to zero (no action needed). Firebase Hosting is always on (static, free).
 
-### Stop
+### GCP Console (Web UI)
+
+| 操作 | 手順 |
+|------|------|
+| **VM停止** | [Compute Engine](https://console.cloud.google.com/compute/instances?project=tangential-map-491113-b4) → `ymatch-db-vm` → ⋮メニュー → **停止** |
+| **VM起動** | 同上 → **開始/再開** |
+| **Cloud Run確認** | [Cloud Run](https://console.cloud.google.com/run?project=tangential-map-491113-b4) → `ymatch-backend` → メトリクス・ログ確認 |
+| **Firebase確認** | [Firebase Console](https://console.firebase.google.com/project/tangential-map-491113-b4/hosting) → Hosting → デプロイ履歴 |
+
+> **Note**: VM停止中はCloud RunからDBに接続できずエラーが返ります。VMを再起動すればPostgreSQLがDocker restart policyで自動復旧し、Cloud Runも次のリクエストで再接続します。
+
+### CLI: Stop
 ```bash
 export PATH="/home/ubuntu/google-cloud-sdk/bin:$PATH"
 gcloud compute instances stop ymatch-db-vm --zone us-west1-b --project tangential-map-491113-b4
 ```
 
-### Start
+### CLI: Start
 ```bash
 export PATH="/home/ubuntu/google-cloud-sdk/bin:$PATH"
 # 1. Start VM (PostgreSQL auto-starts via Docker --restart policy)
@@ -260,7 +271,7 @@ gcloud compute instances start ymatch-db-vm --zone us-west1-b --project tangenti
 gcloud compute ssh ymatch-db-vm --zone us-west1-b --tunnel-through-iap --command "docker ps"
 
 # 3. Cloud Run will reconnect automatically on next request
-curl -s https://ymatch-backend-xbtg3vdbmq-uw.a.run.app/api/v1/events
+curl -s https://ymatch-backend-82867116789.us-west1.run.app/api/v1/events
 ```
 
 ### Status Check
