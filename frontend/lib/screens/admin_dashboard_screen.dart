@@ -10,6 +10,18 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final isAdminOrMod = user != null &&
+        (user.role == 'admin' || user.role == 'moderator');
+
+    if (!isAdminOrMod) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Access denied. Admin or moderator role required.'),
+        ),
+      );
+    }
+
     return DefaultTabController(
       length: 6,
       child: Scaffold(
