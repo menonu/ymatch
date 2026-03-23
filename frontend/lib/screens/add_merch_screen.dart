@@ -22,6 +22,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   String? _selectedGroup;
   bool _isAdding = false;
   final FocusNode _nameFocusNode = FocusNode();
+  final Set<String> _customGroups = {};
 
   @override
   void dispose() {
@@ -66,8 +67,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     try {
       final XFile? image = await picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
+        maxWidth: 256,
+        maxHeight: 256,
         imageQuality: 85,
       );
       if (image != null) {
@@ -158,7 +159,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
               uniqueGroups.add(item.groupName);
             }
           }
-          final groups = uniqueGroups.toList()..sort();
+          uniqueGroups.addAll(_customGroups);
+          final groups = uniqueGroups.toList()..sort(_naturalCompare);
 
           // Auto-select the first group if none is selected and groups exist
           if (_selectedGroup == null && groups.isNotEmpty) {
@@ -173,8 +175,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                     : null;
                 return gName == _selectedGroup;
               }).toList()..sort(
-                (a, b) => b.id.compareTo(a.id),
-              ); // Newest first for the preview
+                (a, b) => _naturalCompare(a.name, b.name),
+              );
 
           return Column(
             children: [
@@ -421,6 +423,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
               final val = ctrl.text.trim();
               if (val.isNotEmpty) {
                 setState(() {
+                  _customGroups.add(val);
                   _selectedGroup = val;
                 });
               }
@@ -431,5 +434,25 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
         ],
       ),
     );
+  }
+
+  static int _naturalCompare(String a, String b) {
+    final regExp = RegExp(r'(\d+)|(\D+)');
+    final partsA = regExp.allMatches(a).toList();
+    final partsB = regExp.allMatches(b).toList();
+    for (int i = 0; i < partsA.length && i < partsB.length; i++) {
+      final pa = partsA[i].group(0)!;
+      final pb = partsB[i].group(0)!;
+      final na = int.tryParse(pa);
+      final nb = int.tryParse(pb);
+      int cmp;
+      if (na != null && nb != null) {
+        cmp = na.compareTo(nb);
+      } else {
+        cmp = pa.toLowerCase().compareTo(pb.toLowerCase());
+      }
+      if (cmp != 0) return cmp;
+    }
+    return a.length.compareTo(b.length);
   }
 }

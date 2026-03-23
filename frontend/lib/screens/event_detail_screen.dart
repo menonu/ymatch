@@ -112,8 +112,20 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
         final hiddenCount = merch.length - filteredMerch.length;
 
-        // Group the merchandise
+        // Build group keys from ALL merch (so groups are always visible)
+        final allGroupKeys = <String>{};
+        for (final item in merch) {
+          final gName = item.hasGroupName() && item.groupName.isNotEmpty
+              ? item.groupName
+              : 'Other Items';
+          allGroupKeys.add(gName);
+        }
+
+        // Group the filtered merchandise
         final groupedMerch = <String, List<Merchandise>>{};
+        for (final gName in allGroupKeys) {
+          groupedMerch[gName] = [];
+        }
         for (final item in filteredMerch) {
           final gName = item.hasGroupName() && item.groupName.isNotEmpty
               ? item.groupName
@@ -125,8 +137,12 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         groupKeys.sort((a, b) {
           if (a == 'Other Items') return 1;
           if (b == 'Other Items') return -1;
-          return a.compareTo(b);
+          return _naturalCompare(a, b);
         });
+        // Natural sort items within each group
+        for (final items in groupedMerch.values) {
+          items.sort((a, b) => _naturalCompare(a.name, b.name));
+        }
 
         return DefaultTabController(
           length: groupKeys.length,
@@ -1227,6 +1243,26 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       ),
     );
   }
+}
+
+int _naturalCompare(String a, String b) {
+  final regExp = RegExp(r'(\d+)|(\D+)');
+  final partsA = regExp.allMatches(a).toList();
+  final partsB = regExp.allMatches(b).toList();
+  for (int i = 0; i < partsA.length && i < partsB.length; i++) {
+    final pa = partsA[i].group(0)!;
+    final pb = partsB[i].group(0)!;
+    final na = int.tryParse(pa);
+    final nb = int.tryParse(pb);
+    int cmp;
+    if (na != null && nb != null) {
+      cmp = na.compareTo(nb);
+    } else {
+      cmp = pa.toLowerCase().compareTo(pb.toLowerCase());
+    }
+    if (cmp != 0) return cmp;
+  }
+  return a.length.compareTo(b.length);
 }
 
 class _StepperButton extends StatelessWidget {
