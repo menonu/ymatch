@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../services/config_service.dart';
+import '../providers/providers.dart';
 
 class ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -10,12 +10,9 @@ class ScaffoldWithNavBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final config = ref.watch(configServiceProvider);
-    final showAdmin = config.enableAdminDashboard;
-
-    // GoRouter StatefulShellRoute branches are fixed, but we can hide the destination visually.
-    // If the branch is hidden, navigationShell.currentIndex might point to an index not in the list.
-    // We must handle this carefully.
+    final user = ref.watch(currentUserProvider);
+    final isAdminOrMod = user != null &&
+        (user.role == 'admin' || user.role == 'moderator');
 
     final destinations = <NavigationDestination>[
       const NavigationDestination(
@@ -35,7 +32,7 @@ class ScaffoldWithNavBar extends ConsumerWidget {
       ),
     ];
 
-    if (showAdmin) {
+    if (isAdminOrMod) {
       destinations.add(
         const NavigationDestination(
           icon: Icon(Icons.admin_panel_settings_outlined),

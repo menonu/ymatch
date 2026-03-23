@@ -2,8 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 
 class ConfigService {
-  final bool enableAdminDashboard = true;
-
   // Compile-time API_BASE_URL override (set via --dart-define=API_BASE_URL=...)
   static const String _apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
