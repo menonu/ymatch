@@ -122,7 +122,7 @@ pub async fn update_merch(
     permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
 
     let mut sets = Vec::new();
-    let mut idx = 3; // $1=merch_id, $2=event_id
+    let mut idx = 2; // $1=merch_id, $2=event_id
     if payload.name.is_some() { idx += 1; sets.push(format!("name = ${}", idx)); }
     if payload.photo_url.is_some() { idx += 1; sets.push(format!("photo_url = ${}", idx)); }
     if payload.group_name.is_some() { idx += 1; sets.push(format!("group_name = ${}", idx)); }
