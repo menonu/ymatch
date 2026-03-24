@@ -89,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 1. Login
-      await tester.tap(find.text('Start Guest Session'));
+      await tester.tap(find.text('Start as New User'));
       await tester.pumpAndSettle();
 
       // 2. Navigate to Matches

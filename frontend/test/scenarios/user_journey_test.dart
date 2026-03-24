@@ -248,8 +248,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // 2. Guest Login
-        expect(find.text('Start Guest Session'), findsOneWidget);
-        await tester.tap(find.text('Start Guest Session'));
+        expect(find.text('Start as New User'), findsOneWidget);
+        await tester.tap(find.text('Start as New User'));
         await tester.pumpAndSettle();
 
         // 3. We are on the Home Screen. Create an Event.
@@ -440,7 +440,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Login
-      await tester.tap(find.text('Start Guest Session'));
+      await tester.tap(find.text('Start as New User'));
       await tester.pumpAndSettle();
 
       // Go to Matches Tab

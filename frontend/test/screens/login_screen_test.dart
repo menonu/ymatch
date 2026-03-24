@@ -19,7 +19,7 @@ void main() {
 
       expect(find.text('ymatch'), findsOneWidget);
       expect(find.text('Trade merch seamlessly.'), findsOneWidget);
-      expect(find.text('Start Guest Session'), findsOneWidget);
+      expect(find.text('Start as New User'), findsOneWidget);
       expect(find.text('Restore Existing Account'), findsOneWidget);
     },
   );

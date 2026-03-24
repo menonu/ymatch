@@ -12,6 +12,20 @@ jobs:
   backend-test:
     name: Backend Build & Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ymatch_user
+          POSTGRES_PASSWORD: secure_dev_password
+          POSTGRES_DB: ymatch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ymatch_user -d ymatch"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: ./backend
@@ -29,6 +43,15 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config postgresql-client
 
+      - name: Create test database
+        env:
+          PGPASSWORD: secure_dev_password
+        run: |
+          until pg_isready -h localhost -p 5432 -U ymatch_user -d ymatch; do
+            sleep 1
+          done
+          psql -h localhost -U ymatch_user -d ymatch -c "CREATE DATABASE ymatch_test OWNER ymatch_user;"
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -38,6 +61,8 @@ jobs:
         run: cargo build --verbose
 
       - name: Run tests
+        env:
+          DATABASE_URL: postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test
         run: cargo test --verbose
 
       - name: Run clippy

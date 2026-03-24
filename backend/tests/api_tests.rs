@@ -451,7 +451,7 @@ async fn test_inventory_upsert() {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"name": "Inv Item"}"#))
+                .body(Body::from(r#"{"name": "Inv Item", "group_name": "Inventory"}"#))
                 .unwrap(),
         )
         .await
@@ -1233,7 +1233,7 @@ async fn test_draft_merch_visibility() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Draft Item", "creator_id": {}, "status": "draft"}}"#,
+                    r#"{{"name": "Draft Item", "group_name": "Drafts", "creator_id": {}, "status": "draft"}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1334,7 +1334,7 @@ async fn test_soft_delete_merch_with_inventory() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "SoftDel Item", "creator_id": {}}}"#,
+                    r#"{{"name": "SoftDel Item", "group_name": "Soft Delete", "creator_id": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1452,7 +1452,7 @@ async fn test_hard_delete_merch_without_inventory() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "HardDel Item", "creator_id": {}}}"#,
+                    r#"{{"name": "HardDel Item", "group_name": "Hard Delete", "creator_id": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
