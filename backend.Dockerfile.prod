@@ -31,7 +31,7 @@ RUN cargo build --release
 # ---------------------------------------------------
 # Stage 2: Runtime Environment
 # ---------------------------------------------------
-FROM public.ecr.aws/docker/library/debian:bookworm-slim
+FROM public.ecr.aws/docker/library/debian:trixie-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*

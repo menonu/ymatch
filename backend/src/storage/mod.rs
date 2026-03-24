@@ -31,13 +31,13 @@ impl std::fmt::Display for StorageError {
 }
 
 /// Build an ImageStorage backend based on the IMAGE_STORAGE env var.
-pub fn create_storage(base_url: &str) -> Arc<dyn ImageStorage> {
+pub async fn create_storage(base_url: &str) -> Arc<dyn ImageStorage> {
     let backend = std::env::var("IMAGE_STORAGE").unwrap_or_else(|_| "local".to_string());
     match backend.as_str() {
         "firebase" => {
             let bucket = std::env::var("FIREBASE_STORAGE_BUCKET")
                 .expect("FIREBASE_STORAGE_BUCKET must be set when IMAGE_STORAGE=firebase");
-            Arc::new(FirebaseStorage::new(bucket))
+            Arc::new(FirebaseStorage::new(bucket).await.expect("Failed to initialize Firebase Storage"))
         }
         _ => {
             let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
