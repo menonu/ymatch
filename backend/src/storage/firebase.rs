@@ -1,40 +1,34 @@
 use super::{ImageStorage, StorageError};
+use std::sync::Arc;
 
 /// Firebase Storage (Google Cloud Storage) backend.
-/// Uses the GCS JSON API with default credentials (ADC) or service account.
+/// Uses the GCS JSON API with Application Default Credentials via gcp_auth.
 pub struct FirebaseStorage {
     bucket: String,
     client: reqwest::Client,
+    auth: Arc<dyn gcp_auth::TokenProvider>,
 }
 
 impl FirebaseStorage {
-    pub fn new(bucket: String) -> Self {
-        Self {
+    pub async fn new(bucket: String) -> Result<Self, StorageError> {
+        let auth = gcp_auth::provider()
+            .await
+            .map_err(|e| StorageError::Remote(format!("Failed to init GCP auth: {}", e)))?;
+        Ok(Self {
             bucket,
             client: reqwest::Client::new(),
-        }
+            auth,
+        })
     }
 
-    /// Get access token from the GCE metadata server (works on Cloud Run).
     async fn get_access_token(&self) -> Result<String, StorageError> {
-        let url = "http://metadata.google.internal/computeMetadata/v1/instance/service-account/default/token";
-        let resp = self
-            .client
-            .get(url)
-            .header("Metadata-Flavor", "Google")
-            .send()
+        let scopes = &["https://www.googleapis.com/auth/devstorage.read_write"];
+        let token = self
+            .auth
+            .token(scopes)
             .await
             .map_err(|e| StorageError::Remote(format!("Failed to get token: {}", e)))?;
-
-        let body: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| StorageError::Remote(format!("Failed to parse token: {}", e)))?;
-
-        body.get("access_token")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .ok_or_else(|| StorageError::Remote("No access_token in response".to_string()))
+        Ok(token.as_str().to_string())
     }
 }
 
@@ -67,18 +61,16 @@ impl ImageStorage for FirebaseStorage {
             )));
         }
 
-        // Public URL for the uploaded object
+        // Public URL via Google Cloud Storage
         let public_url = format!(
-            "https://firebasestorage.googleapis.com/v0/b/{}/o/images%2F{}?alt=media",
+            "https://storage.googleapis.com/{}/images/{}",
             self.bucket, filename
         );
         Ok(public_url)
     }
 
     async fn delete(&self, url: &str) -> Result<(), StorageError> {
-        // Extract the object path from the Firebase Storage URL
         let object_name = if url.contains("/o/") {
-            // URL like: .../o/images%2Ffilename.jpg?alt=media
             let after_o = url.split("/o/").nth(1).unwrap_or("");
             let name = after_o.split('?').next().unwrap_or(after_o);
             urlencoding::decode(name)

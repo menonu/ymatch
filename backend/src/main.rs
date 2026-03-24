@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build base URL for local storage (used for generating image URLs)
     let base_url = format!("http://0.0.0.0:{}", port);
-    let image_storage = storage::create_storage(&base_url);
+    let image_storage = storage::create_storage(&base_url).await;
     let storage_type = std::env::var("IMAGE_STORAGE").unwrap_or_else(|_| "local".to_string());
     tracing::info!("Image storage backend: {}", storage_type);
 
