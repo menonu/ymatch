@@ -479,6 +479,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
                                 if (viewMode == ViewMode.grid) {
                                   return GridView.builder(
+                                    cacheExtent: 600,
                                     padding: const EdgeInsets.only(
                                       top: 16,
                                       bottom: 80,
@@ -505,6 +506,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                   );
                                 } else if (viewMode == ViewMode.list) {
                                   return ListView.builder(
+                                    cacheExtent: 400,
                                     padding: const EdgeInsets.only(
                                       top: 8,
                                       bottom: 80,
@@ -522,6 +524,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                   );
                                 } else {
                                   return ReorderableListView.builder(
+                                    cacheExtent: 600,
                                     padding: const EdgeInsets.only(
                                       top: 16,
                                       bottom: 80,

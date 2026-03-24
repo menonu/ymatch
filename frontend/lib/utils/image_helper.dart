@@ -47,12 +47,15 @@ Widget buildImage(
     try {
       final base64String = url.split(',').last;
       final Uint8List bytes = base64Decode(base64String);
-      return Image.memory(
-        bytes,
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (context, error, stackTrace) => defaultError,
+      return RepaintBoundary(
+        child: Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: fit,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) => defaultError,
+        ),
       );
     } catch (e) {
       return defaultError;
@@ -60,15 +63,23 @@ Widget buildImage(
   }
 
   // Handle standard HTTP URL
-  return Image.network(
-    url,
-    width: width,
-    height: height,
-    fit: fit,
-    loadingBuilder: (context, child, loadingProgress) {
-      if (loadingProgress == null) return child;
-      return defaultPlaceholder;
-    },
-    errorBuilder: (context, error, stackTrace) => defaultError,
+  return RepaintBoundary(
+    child: Image.network(
+      url,
+      width: width,
+      height: height,
+      fit: fit,
+      gaplessPlayback: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) {
+          return child;
+        }
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [defaultPlaceholder, child],
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => defaultError,
+    ),
   );
 }
