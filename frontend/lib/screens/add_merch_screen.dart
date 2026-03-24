@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/providers.dart';
+import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import '../utils/image_helper.dart';
 
@@ -23,6 +24,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   bool _isAdding = false;
   final FocusNode _nameFocusNode = FocusNode();
   final Set<String> _customGroups = {};
+  List<int>? _pickedImageBytes;
+  String? _pickedImageName;
 
   @override
   void dispose() {
@@ -73,9 +76,11 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
-        final base64String = base64Encode(bytes);
         setState(() {
-          _urlController.text = 'data:image/png;base64,$base64String';
+          _pickedImageBytes = bytes;
+          _pickedImageName = image.name;
+          // Store base64 for preview only
+          _urlController.text = 'data:image/png;base64,${base64Encode(bytes)}';
         });
       }
     } catch (e) {
@@ -104,18 +109,31 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     setState(() => _isAdding = true);
 
     try {
+      // Upload image first if one was picked
+      String photoUrl = _urlController.text.trim();
+      if (_pickedImageBytes != null) {
+        final apiClient = ref.read(apiClientProvider);
+        final uploadedUrl = await apiClient.uploadImage(
+          _pickedImageBytes!,
+          _pickedImageName ?? 'image.png',
+        );
+        photoUrl = uploadedUrl;
+      }
+
       await ref
           .read(merchControllerProvider.notifier)
           .addMerch(
             widget.eventId,
             name,
-            _urlController.text.trim(),
+            photoUrl,
             _selectedGroup,
           );
 
       // Clear inputs for continuous adding, but KEEP the selected group!
       _nameController.clear();
       _urlController.clear();
+      _pickedImageBytes = null;
+      _pickedImageName = null;
 
       // Request focus back to the name field to type the next item immediately
       _nameFocusNode.requestFocus();

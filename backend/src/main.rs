@@ -1,5 +1,6 @@
 use backend::matching;
 use backend::routes;
+use backend::storage;
 
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
@@ -29,12 +30,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Migrations applied successfully!");
 
-    let app = routes::create_router(pool.clone());
-
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
+
+    // Build base URL for local storage (used for generating image URLs)
+    let base_url = format!("http://0.0.0.0:{}", port);
+    let image_storage = storage::create_storage(&base_url);
+    let storage_type = std::env::var("IMAGE_STORAGE").unwrap_or_else(|_| "local".to_string());
+    tracing::info!("Image storage backend: {}", storage_type);
+
+    let app = routes::create_router(pool.clone(), image_storage);
+
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;

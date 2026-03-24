@@ -12,6 +12,7 @@ use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter};
 use sqlx::PgPool;
 
 use crate::handlers;
+use crate::storage::ImageStorage;
 
 type IpLimiter = DefaultKeyedRateLimiter<IpAddr>;
 
@@ -43,7 +44,7 @@ async fn rate_limit(
     next.run(req).await
 }
 
-pub fn create_router(pool: PgPool) -> Router {
+pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let cors = tower_http::cors::CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any)
@@ -160,9 +161,20 @@ pub fn create_router(pool: PgPool) -> Router {
              next: Next| async move { rate_limit(req, next, lim).await },
         ));
 
+    // Image upload/delete routes (separate state: Arc<dyn ImageStorage>)
+    let image_routes = Router::new()
+        .route("/api/v1/images/upload", post(handlers::upload_image))
+        .route("/api/v1/images/:filename", delete(handlers::delete_image))
+        .with_state(storage);
+
+    // Serve local uploads directory as static files
+    let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    let static_service = tower_http::services::ServeDir::new(upload_dir);
+
     Router::new()
-        .merge(auth_routes)
-        .merge(api_routes)
-        .with_state(pool)
+        .merge(auth_routes.with_state(pool.clone()))
+        .merge(api_routes.with_state(pool))
+        .merge(image_routes)
+        .nest_service("/uploads", static_service)
         .layer(cors)
 }

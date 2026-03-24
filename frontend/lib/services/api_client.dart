@@ -111,6 +111,34 @@ class ApiClient {
         msg.contains('XMLHttpRequest error');
   }
 
+  /// Upload an image file via multipart POST. Returns the image URL.
+  Future<String> uploadImage(List<int> bytes, String filename) async {
+    final uri = Uri.parse('${config.baseUrl}/api/v1/images/upload');
+    try {
+      final request = http.MultipartRequest('POST', uri);
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+      ));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamedResponse);
+      final data = _handleResponse(response);
+      return data['url'] as String;
+    } on BackendUnavailableException {
+      rethrow;
+    } on SocketException {
+      throw BackendUnavailableException();
+    } on HttpException {
+      throw BackendUnavailableException();
+    } on http.ClientException {
+      throw BackendUnavailableException();
+    } catch (e) {
+      if (_isConnectionError(e)) throw BackendUnavailableException();
+      rethrow;
+    }
+  }
+
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.trim().isEmpty) {
