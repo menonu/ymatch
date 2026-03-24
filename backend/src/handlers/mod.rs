@@ -1,6 +1,7 @@
 mod admin;
 mod auth;
 mod events;
+mod images;
 mod inventory;
 mod matches;
 mod merch;
@@ -12,6 +13,7 @@ mod system;
 pub use admin::*;
 pub use auth::*;
 pub use events::*;
+pub use images::*;
 pub use inventory::*;
 pub use matches::*;
 pub use merch::*;
