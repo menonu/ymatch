@@ -288,15 +288,11 @@ void main() {
         ImagePickerPlatform.instance = MockImagePickerPlatform();
         await tester.tap(find.byIcon(Icons.add_a_photo));
         await tester.pumpAndSettle();
+        await tester.tap(find.text('Gallery'));
+        await tester.pumpAndSettle();
 
-        final photoUrlField = find.widgetWithText(
-          TextField,
-          'Photo URL (Optional)',
-        );
-        expect(
-          tester.widget<TextField>(photoUrlField).controller?.text,
-          contains('data:image/png;base64,'),
-        );
+        expect(find.text('Change Image'), findsOneWidget);
+        expect(find.text('Remove'), findsOneWidget);
 
         await tester.enterText(
           find.widgetWithText(TextField, 'Item Name').first,

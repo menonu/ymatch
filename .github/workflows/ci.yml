@@ -63,7 +63,7 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test
-        run: cargo test --verbose
+        run: cargo test --verbose -- --test-threads=1
 
       - name: Run clippy
         run: cargo clippy -- -D warnings
