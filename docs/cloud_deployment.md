@@ -9,6 +9,7 @@ This document outlines the strategy for deploying the `ymatch` platform to the c
 | Frontend | Firebase Hosting | https://ymatch-app.web.app |
 | Backend API | Cloud Run (us-west1) | https://ymatch-backend-82867116789.us-west1.run.app |
 | Database | e2-micro VM + Docker PostgreSQL | 10.0.0.2 (internal VPC) |
+| Image Storage | Google Cloud Storage | gs://ymatch-images (us-west1) |
 | Container Registry | Artifact Registry (us-central1) | us-central1-docker.pkg.dev/tangential-map-491113-b4/ymatch-repo |
 
 **GCP Project**: `tangential-map-491113-b4`
@@ -21,11 +22,21 @@ This document outlines the strategy for deploying the `ymatch` platform to the c
 │  Hosting         │                │  (ymatch-backend)│  Direct VPC Egress     │  PostgreSQL:5432 │
 │  (Flutter Web)   │                │  Port 8080       │                        │  (Docker)        │
 └─────────────────┘                └──────────────────┘                        └──────────────────┘
-    ymatch-app.web.app                  Auto-scaling                               us-west1-b
+    ymatch-app.web.app                  Auto-scaling           │                    us-west1-b
+                                                               │ upload/delete
+                                                               ▼
+                                               ┌──────────────────────────┐
+                                               │  Google Cloud Storage    │
+                                               │  gs://ymatch-images      │
+                                               │  (public read, us-west1) │
+                                               └──────────────────────────┘
+                                                   storage.googleapis.com
 ```
 
 - **Frontend → Backend**: The Flutter web app calls the Cloud Run backend URL directly (set at build time via `--dart-define=API_BASE_URL`).
 - **Backend → DB**: Cloud Run uses **Direct VPC Egress** (no VPC connector needed) to reach the VM's internal IP on the same VPC subnet.
+- **Backend → GCS**: Images are uploaded by the backend to `gs://ymatch-images` using Application Default Credentials (`gcp_auth` crate). The Cloud Run default service account has `roles/storage.objectAdmin` on the bucket.
+- **Frontend → GCS**: Image display fetches directly from `https://storage.googleapis.com/ymatch-images/...` (CORS configured for `ymatch-app.web.app`).
 - **Firewall**: Only port 5432 from `10.0.0.0/24` is allowed to the DB VM. SSH (port 22) is open for admin access.
 
 ## Cost Analysis (GCP Free Tier)
@@ -35,11 +46,15 @@ This document outlines the strategy for deploying the `ymatch` platform to the c
 | e2-micro VM (us-west1) | 1 instance, 744 hrs/month | 1 instance 24/7 | ✅ FREE |
 | Standard PD (disk) | 30 GB/month | 30 GB (~3.2 GB used) | ✅ FREE |
 | Cloud Run | 2M req, 360k GiB-sec, 180k vCPU-sec | Low usage | ✅ FREE |
+| Cloud Run Egress | 1 GB/month | Minimal (images served from GCS) | ✅ FREE |
 | Firebase Hosting | 1 GB stored, 10 GB/month transfer | ~few MB | ✅ FREE |
+| Cloud Storage (GCS) | 5 GB stored, 1 GB/day download | ~few MB images | ✅ FREE |
 | Artifact Registry | 0.5 GB storage | ~37 MB | ✅ FREE |
 | VPC, Subnet, Firewall | No charge | — | ✅ FREE |
 | **External IPv4 address** | **Not used (removed after setup)** | **None** | **✅ FREE** |
 | Network Egress | 1 GB/month (premium tier) | Low usage | ✅ FREE |
+
+> **Why GCS for images?** Storing images as base64 in the PostgreSQL `photo_url` column caused every API JSON response to include large binary data, consuming Cloud Run egress budget quickly. With GCS, images are served directly from `storage.googleapis.com` — entirely outside the Cloud Run egress path.
 
 ### Why the VM has no external IP
 The external IPv4 address costs ~$3.60/month and is only needed for initial setup (installing Docker, pulling images). After first boot, it is removed to stay within free tier.
@@ -137,7 +152,7 @@ cd frontend
 
 # Build with production API URL
 flutter build web \
-  --dart-define=API_BASE_URL=https://ymatch-backend-xbtg3vdbmq-uw.a.run.app \
+  --dart-define=API_BASE_URL=https://ymatch-backend-82867116789.us-west1.run.app \
   --release
 
 # Deploy to Firebase Hosting
@@ -145,11 +160,61 @@ cd ..
 firebase deploy --only hosting --project tangential-map-491113-b4
 ```
 
-### 5. Verify
+### 5. Set Up Image Storage (GCS)
+
+The backend stores uploaded images in a GCS bucket. This is created once:
+
+```bash
+# Create the bucket
+gcloud storage buckets create gs://ymatch-images \
+  --location=us-west1 \
+  --uniform-bucket-level-access
+
+# Allow public read (images are served directly to browsers)
+gcloud storage buckets add-iam-policy-binding gs://ymatch-images \
+  --member=allUsers \
+  --role=roles/storage.objectViewer
+
+# Configure CORS (allows browsers on ymatch-app.web.app to load images)
+cat > /tmp/cors.json << 'EOF'
+[
+  {
+    "origin": ["https://ymatch-app.web.app", "http://localhost:8081"],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]
+EOF
+gcloud storage buckets update gs://ymatch-images --cors-file=/tmp/cors.json
+```
+
+The Cloud Run service uses the **default Compute service account** (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`), which by default has `Editor` access and can read/write GCS objects.
+
+Cloud Run environment variables for image storage:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `IMAGE_STORAGE` | `firebase` | Selects the GCS backend (vs `local` for dev) |
+| `FIREBASE_STORAGE_BUCKET` | `ymatch-images` | GCS bucket name |
+
+These are already set on the Cloud Run service. To update:
+```bash
+gcloud run services update ymatch-backend \
+  --region us-west1 \
+  --update-env-vars IMAGE_STORAGE=firebase,FIREBASE_STORAGE_BUCKET=ymatch-images
+```
+
+### 6. Verify
 
 ```bash
 # Backend health check
-curl -s https://ymatch-backend-xbtg3vdbmq-uw.a.run.app/api/v1/events
+curl -s https://ymatch-backend-82867116789.us-west1.run.app/api/v1/events
+
+# Test image upload
+curl -s -X POST https://ymatch-backend-82867116789.us-west1.run.app/api/v1/images/upload \
+  -F "file=@/path/to/image.png"
+# → {"url": "https://storage.googleapis.com/ymatch-images/images/<uuid>.png"}
 
 # Frontend
 curl -s -o /dev/null -w "%{http_code}" https://ymatch-app.web.app/
@@ -184,7 +249,7 @@ cd /home/ubuntu/ws/ymatch/frontend
 
 # 1. Rebuild
 flutter build web \
-  --dart-define=API_BASE_URL=https://ymatch-backend-xbtg3vdbmq-uw.a.run.app \
+  --dart-define=API_BASE_URL=https://ymatch-backend-82867116789.us-west1.run.app \
   --release
 
 # 2. Deploy
@@ -226,6 +291,43 @@ docker exec postgres psql -U ymatch_user -d ymatch_db -c "
 ```bash
 df -h /
 ```
+
+## Image Storage (GCS)
+
+Images uploaded through the app are stored in the GCS bucket `gs://ymatch-images`.
+
+### Image Flow
+
+1. User picks image in app (resized to max 256px on device)
+2. Frontend sends `multipart/form-data` POST to `POST /api/v1/images/upload`
+3. Backend saves to GCS with a UUID filename → returns public URL
+4. Frontend stores the URL in the merch `photo_url` field
+5. Image is served directly from `https://storage.googleapis.com/ymatch-images/images/<uuid>.<ext>`
+
+### Bucket Details
+
+| Property | Value |
+|----------|-------|
+| Bucket name | `ymatch-images` |
+| Region | `us-west1` |
+| Access | Public read (`allUsers` → `roles/storage.objectViewer`) |
+| CORS | GET allowed from `https://ymatch-app.web.app`, `http://localhost:8081` |
+| Auth (writes) | Cloud Run default service account via ADC (`gcp_auth` crate) |
+| URL format | `https://storage.googleapis.com/ymatch-images/images/<uuid>.<ext>` |
+
+### Migrate Existing base64 Images
+
+If any items still have base64 `photo_url` values, run the migration script:
+
+```bash
+./scripts/migrate_images.sh https://ymatch-backend-82867116789.us-west1.run.app
+```
+
+This re-uploads each base64 image to GCS and updates the DB row with the new URL using an admin user account.
+
+### Local Development
+
+In local dev (`IMAGE_STORAGE` not set, defaults to `local`), images are saved to `./uploads/` and served at `http://localhost:3000/uploads/<uuid>.<ext>`. No GCS credentials needed.
 
 ## Admin Account Management
 
