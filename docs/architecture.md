@@ -20,6 +20,7 @@ The primary participant in the ecosystem.
 | Database   | PostgreSQL (Docker)      |
 | Frontend   | Flutter (Riverpod, GoRouter) |
 | API        | JSON REST                |
+| Image Storage | Google Cloud Storage (GCS) / Local filesystem (dev) |
 
 ## 3. Architecture Overview
 
@@ -28,4 +29,15 @@ The primary participant in the ecosystem.
 |   Flutter   | <---> |  Rust (Axum) | <---> | Postgres |
 |   (Mobile)  |       |  (REST API)  |       |   (DB)   |
 +-------------+       +--------------+       +----------+
+       |                     |
+       |                     | upload (multipart)
+       |                     ▼
+       |              +--------------+
+       |              |  GCS Bucket  |
+       |              | ymatch-images|
+       |              +--------------+
+       |                     |
+       +---------------------+
+         fetch image directly
+         (public URL, CORS enabled)
 ```
