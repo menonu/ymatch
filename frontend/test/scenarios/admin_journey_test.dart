@@ -155,8 +155,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // 1. Admin Login
-        expect(find.text('Start Guest Session'), findsOneWidget);
-        await tester.tap(find.text('Start Guest Session'));
+        expect(find.text('Start as New User'), findsOneWidget);
+        await tester.tap(find.text('Start as New User'));
         await tester.pumpAndSettle();
 
         // 2. Verify admin user is logged in
@@ -351,7 +351,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // 1. Login as admin
-        await tester.tap(find.text('Start Guest Session'));
+        await tester.tap(find.text('Start as New User'));
         await tester.pumpAndSettle();
 
         // 2. Create a draft event via mock backend
