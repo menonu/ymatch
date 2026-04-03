@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
+import '../utils/image_helper.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -11,8 +12,8 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final isAdminOrMod = user != null &&
-        (user.role == 'admin' || user.role == 'moderator');
+    final isAdminOrMod =
+        user != null && (user.role == 'admin' || user.role == 'moderator');
 
     if (!isAdminOrMod) {
       return const Scaffold(
@@ -162,26 +163,25 @@ class _AdminUsersTab extends ConsumerWidget {
                   backgroundColor: isBanned
                       ? Colors.red[100]
                       : role == 'admin'
-                          ? Colors.purple[100]
-                          : role == 'moderator'
-                              ? Colors.blue[100]
-                              : Colors.grey[200],
+                      ? Colors.purple[100]
+                      : role == 'moderator'
+                      ? Colors.blue[100]
+                      : Colors.grey[200],
                   child: Icon(
                     isBanned
                         ? Icons.block
                         : role == 'admin'
-                            ? Icons.admin_panel_settings
-                            : role == 'moderator'
-                                ? Icons.shield
-                                : Icons.person,
+                        ? Icons.admin_panel_settings
+                        : role == 'moderator'
+                        ? Icons.shield
+                        : Icons.person,
                     color: isBanned ? Colors.red : null,
                   ),
                 ),
                 title: Text(
                   user.username,
                   style: TextStyle(
-                    decoration:
-                        isBanned ? TextDecoration.lineThrough : null,
+                    decoration: isBanned ? TextDecoration.lineThrough : null,
                   ),
                 ),
                 subtitle: Text(
@@ -194,7 +194,10 @@ class _AdminUsersTab extends ConsumerWidget {
                     switch (value) {
                       case 'ban':
                         final reason = await _showInputDialog(
-                            context, 'Ban Reason', 'Enter reason (optional)');
+                          context,
+                          'Ban Reason',
+                          'Enter reason (optional)',
+                        );
                         await admin.banUser(user.id, adminId, reason: reason);
                         ref.invalidate(adminUsersProvider);
                         break;
@@ -208,7 +211,10 @@ class _AdminUsersTab extends ConsumerWidget {
                         break;
                       case 'role_moderator':
                         await admin.updateUserRole(
-                            user.id, adminId, 'moderator');
+                          user.id,
+                          adminId,
+                          'moderator',
+                        );
                         ref.invalidate(adminUsersProvider);
                         break;
                       case 'role_user':
@@ -220,18 +226,27 @@ class _AdminUsersTab extends ConsumerWidget {
                   itemBuilder: (context) => [
                     if (!isBanned)
                       const PopupMenuItem(
-                          value: 'ban', child: Text('🚫 Ban User')),
+                        value: 'ban',
+                        child: Text('🚫 Ban User'),
+                      ),
                     if (isBanned)
                       const PopupMenuItem(
-                          value: 'unban', child: Text('✅ Unban User')),
+                        value: 'unban',
+                        child: Text('✅ Unban User'),
+                      ),
                     const PopupMenuDivider(),
                     const PopupMenuItem(
-                        value: 'role_admin', child: Text('👑 Set Admin')),
+                      value: 'role_admin',
+                      child: Text('👑 Set Admin'),
+                    ),
                     const PopupMenuItem(
-                        value: 'role_moderator',
-                        child: Text('🛡️ Set Moderator')),
+                      value: 'role_moderator',
+                      child: Text('🛡️ Set Moderator'),
+                    ),
                     const PopupMenuItem(
-                        value: 'role_user', child: Text('👤 Set User')),
+                      value: 'role_user',
+                      child: Text('👤 Set User'),
+                    ),
                   ],
                 ),
               );
@@ -245,7 +260,10 @@ class _AdminUsersTab extends ConsumerWidget {
   }
 
   Future<String?> _showInputDialog(
-      BuildContext context, String title, String hint) async {
+    BuildContext context,
+    String title,
+    String hint,
+  ) async {
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -257,10 +275,13 @@ class _AdminUsersTab extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-              onPressed: () => Navigator.pop(context, controller.text),
-              child: const Text('OK')),
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -285,24 +306,27 @@ class _AdminEventsTab extends ConsumerWidget {
             final event = events[index];
             final isDraft = event.hasStatus() && event.status == 'draft';
             return ListTile(
-              leading: Icon(
-                Icons.event,
-                color: isDraft ? Colors.orange : null,
-              ),
+              leading: Icon(Icons.event, color: isDraft ? Colors.orange : null),
               title: Row(
                 children: [
                   Expanded(child: Text(event.name)),
                   if (isDraft)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.orange[100],
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text('DRAFT',
-                          style: TextStyle(
-                              fontSize: 10, color: Colors.orange[800])),
+                      child: Text(
+                        'DRAFT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.orange[800],
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -339,7 +363,9 @@ class _AdminEventsTab extends ConsumerWidget {
                       final client = ref.read(apiClientProvider);
                       final user = ref.read(currentUserProvider);
                       final userId = user?.id ?? 0;
-                      await client.delete('/api/v1/admin/events/${event.id}?user_id=$userId');
+                      await client.delete(
+                        '/api/v1/admin/events/${event.id}?user_id=$userId',
+                      );
                       ref.invalidate(eventsProvider);
                       if (context.mounted)
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -425,7 +451,9 @@ class _AdminItemsTab extends ConsumerWidget {
                       final client = ref.read(apiClientProvider);
                       final user = ref.read(currentUserProvider);
                       final userId = user?.id ?? 0;
-                      await client.delete('/api/v1/admin/merch/${item.id}?user_id=$userId');
+                      await client.delete(
+                        '/api/v1/admin/merch/${item.id}?user_id=$userId',
+                      );
                       ref.invalidate(adminMerchProvider);
                       if (context.mounted)
                         ScaffoldMessenger.of(context).showSnackBar(

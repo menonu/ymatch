@@ -5,7 +5,14 @@ class ConfigService {
   // Compile-time API_BASE_URL override (set via --dart-define=API_BASE_URL=...)
   static const String _apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
+  String? _testBaseUrl;
+
+  void setBaseUrlForTest(String url) {
+    _testBaseUrl = url;
+  }
+
   String get baseUrl {
+    if (_testBaseUrl != null) return _testBaseUrl!;
     // If a compile-time API_BASE_URL is provided, use it (production deploy)
     if (_apiBaseUrl.isNotEmpty) {
       return _apiBaseUrl;

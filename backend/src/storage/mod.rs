@@ -31,7 +31,7 @@ impl std::fmt::Display for StorageError {
 }
 
 /// Build an ImageStorage backend based on the IMAGE_STORAGE env var.
-pub async fn create_storage(base_url: &str) -> Arc<dyn ImageStorage> {
+pub async fn create_storage() -> Arc<dyn ImageStorage> {
     let backend = std::env::var("IMAGE_STORAGE").unwrap_or_else(|_| "local".to_string());
     match backend.as_str() {
         "firebase" => {
@@ -41,7 +41,7 @@ pub async fn create_storage(base_url: &str) -> Arc<dyn ImageStorage> {
         }
         _ => {
             let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-            Arc::new(LocalFileStorage::new(upload_dir, base_url.to_string()))
+            Arc::new(LocalFileStorage::new(upload_dir))
         }
     }
 }

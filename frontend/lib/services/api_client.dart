@@ -21,7 +21,9 @@ class ApiClient {
   Future<dynamic> get(String endpoint) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');
     try {
-      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 10));
       return _handleResponse(response);
     } on BackendUnavailableException {
       rethrow;
@@ -40,11 +42,13 @@ class ApiClient {
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');
     try {
-      final response = await _client.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
       return _handleResponse(response);
     } on BackendUnavailableException {
       rethrow;
@@ -63,11 +67,13 @@ class ApiClient {
   Future<dynamic> put(String endpoint, Map<String, dynamic> body) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');
     try {
-      final response = await _client.put(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await _client
+          .put(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
       return _handleResponse(response);
     } on BackendUnavailableException {
       rethrow;
@@ -86,7 +92,9 @@ class ApiClient {
   Future<dynamic> delete(String endpoint) async {
     final uri = Uri.parse('${config.baseUrl}$endpoint');
     try {
-      final response = await _client.delete(uri).timeout(const Duration(seconds: 10));
+      final response = await _client
+          .delete(uri)
+          .timeout(const Duration(seconds: 10));
       return _handleResponse(response);
     } on BackendUnavailableException {
       rethrow;
@@ -114,14 +122,27 @@ class ApiClient {
   /// Upload an image file via multipart POST. Returns the image URL.
   Future<String> uploadImage(List<int> bytes, String filename) async {
     final uri = Uri.parse('${config.baseUrl}/api/v1/images/upload');
+    final ext = filename.split('.').last.toLowerCase();
+    final contentType = switch (ext) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      _ => 'image/png',
+    };
     try {
       final request = http.MultipartRequest('POST', uri);
-      request.files.add(http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: filename,
-      ));
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+          contentType: http.MediaType.parse(contentType),
+        ),
+      );
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
       final response = await http.Response.fromStream(streamedResponse);
       final data = _handleResponse(response);
       return data['url'] as String;
