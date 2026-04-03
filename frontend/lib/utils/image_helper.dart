@@ -1,6 +1,29 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+/// Resolve a potentially-relative image URL to an absolute URL.
+/// - Absolute URLs (http/https) are returned as-is.
+/// - Relative paths (e.g. "uploads/uuid.png") are resolved against the current origin.
+String resolveImageUrl(String? url) {
+  if (url == null || url.isEmpty) return '';
+
+  // Handle Base64 Data URI
+  if (url.startsWith('data:image')) return url;
+
+  // Already an absolute URL
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+  // Relative path — resolve against current origin
+  if (kIsWeb) {
+    final scheme = Uri.base.scheme;
+    final host = Uri.base.host;
+    return '$scheme://$host:3000/$url';
+  }
+
+  // Fallback for non-web platforms
+  return 'http://localhost:3000/$url';
+}
 
 /// Helper to build an image widget from a URL string.
 /// Supports both standard HTTP(S) URLs and base64-encoded data URIs.
@@ -12,6 +35,7 @@ Widget buildImage(
   Widget? placeholder,
   Widget? errorWidget,
 }) {
+  final resolvedUrl = resolveImageUrl(url);
   final defaultPlaceholder =
       placeholder ??
       Container(
@@ -38,14 +62,14 @@ Widget buildImage(
         ),
       );
 
-  if (url == null || url.isEmpty) {
+  if (resolvedUrl.isEmpty) {
     return defaultPlaceholder;
   }
 
   // Handle Base64 Data URI
-  if (url.startsWith('data:image')) {
+  if (resolvedUrl.startsWith('data:image')) {
     try {
-      final base64String = url.split(',').last;
+      final base64String = resolvedUrl.split(',').last;
       final Uint8List bytes = base64Decode(base64String);
       return Image.memory(
         bytes,
@@ -61,7 +85,7 @@ Widget buildImage(
 
   // Handle standard HTTP URL
   return Image.network(
-    url,
+    resolvedUrl,
     width: width,
     height: height,
     fit: fit,

@@ -4,17 +4,15 @@ use tokio::fs;
 
 pub struct LocalFileStorage {
     upload_dir: PathBuf,
-    base_url: String,
 }
 
 impl LocalFileStorage {
-    pub fn new(upload_dir: String, base_url: String) -> Self {
+    pub fn new(upload_dir: String) -> Self {
         let path = PathBuf::from(&upload_dir);
         // Ensure the directory exists at construction time (best-effort)
         std::fs::create_dir_all(&path).ok();
         Self {
             upload_dir: path,
-            base_url: base_url.trim_end_matches('/').to_string(),
         }
     }
 }
@@ -27,12 +25,12 @@ impl ImageStorage for LocalFileStorage {
             .await
             .map_err(|e| StorageError::Io(e.to_string()))?;
 
-        let url = format!("{}/uploads/{}", self.base_url, filename);
-        Ok(url)
+        // Return relative path — resolved to full URL by the handler
+        Ok(format!("uploads/{}", filename))
     }
 
     async fn delete(&self, url: &str) -> Result<(), StorageError> {
-        // Extract filename from URL
+        // Extract filename from URL or relative path
         let filename = url
             .rsplit('/')
             .next()

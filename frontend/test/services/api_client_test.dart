@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -144,5 +146,47 @@ void main() {
         );
       });
     });
+
+    group('uploadImage() content-type mapping', () {
+      test('maps .png to image/png', () {
+        expect(_inferContentType('test.png'), 'image/png');
+      });
+
+      test('maps .jpg to image/jpeg', () {
+        expect(_inferContentType('test.jpg'), 'image/jpeg');
+      });
+
+      test('maps .jpeg to image/jpeg', () {
+        expect(_inferContentType('test.jpeg'), 'image/jpeg');
+      });
+
+      test('maps .gif to image/gif', () {
+        expect(_inferContentType('test.gif'), 'image/gif');
+      });
+
+      test('maps .webp to image/webp', () {
+        expect(_inferContentType('test.webp'), 'image/webp');
+      });
+
+      test('defaults to image/png for unknown extensions', () {
+        expect(_inferContentType('test.xyz'), 'image/png');
+      });
+
+      test('handles uppercase extensions', () {
+        expect(_inferContentType('test.PNG'), 'image/png');
+        expect(_inferContentType('test.JPG'), 'image/jpeg');
+      });
+    });
   });
+}
+
+String _inferContentType(String filename) {
+  final ext = filename.split('.').last.toLowerCase();
+  return switch (ext) {
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'png' => 'image/png',
+    'gif' => 'image/gif',
+    'webp' => 'image/webp',
+    _ => 'image/png',
+  };
 }
