@@ -44,35 +44,30 @@ cd backend && cargo clippy -- -D warnings && cargo fmt -- --check
 cd frontend && flutter analyze
 ```
 
-## GCP Production Deployment
+## GCP (Backup Only)
 
-See [Cloud Deployment Guide](./docs/cloud_deployment.md) for full details.
+GCP production services (Cloud Run, Compute Engine, Firebase Hosting) have been **stopped**.
+GCP is now used only for:
+- **Database backup storage**: GCS bucket `tangential-map-491113-b4-db-backups`
+- **Budget monitoring**: $1/month alert via Cloud Billing
 
-### Quick Reference
-| Component | Service | URL |
-|-----------|---------|-----|
-| Frontend | Firebase Hosting | https://ymatch-app.web.app |
-| Backend | Cloud Run (us-west1) | https://ymatch-backend-xbtg3vdbmq-uw.a.run.app |
-| Database | e2-micro VM (no external IP) | 10.0.0.2 (internal VPC) |
+### Database Backup
+Automated via GitHub Actions (`.github/workflows/db-backup.yml`):
+- **Daily** at 03:00 JST → `daily/` prefix (kept 7 days, max 7 backups)
+- **Weekly** on Sundays → `weekly/` prefix (kept 28 days, max 4 backups)
+- **Monthly** on 1st → `monthly/` prefix (kept 90 days, max 3 backups)
+- Total: up to **14 backups** at any time
+- Backup events reported to New Relic
 
-### Redeploy Backend
 ```bash
-export PATH="/home/ubuntu/google-cloud-sdk/bin:$PATH"
-docker build --platform linux/amd64 -t us-central1-docker.pkg.dev/tangential-map-491113-b4/ymatch-repo/ymatch-backend:latest -f backend.Dockerfile.prod .
-docker push us-central1-docker.pkg.dev/tangential-map-491113-b4/ymatch-repo/ymatch-backend:latest
-gcloud run services update ymatch-backend --region us-west1 --image us-central1-docker.pkg.dev/tangential-map-491113-b4/ymatch-repo/ymatch-backend:latest --project tangential-map-491113-b4
-```
+# Manual backup trigger (all types)
+gh workflow run db-backup.yml --field backup_type=all
 
-### Redeploy Frontend
-```bash
-cd frontend && flutter build web --dart-define=API_BASE_URL=https://ymatch-backend-xbtg3vdbmq-uw.a.run.app --release
-cd .. && firebase deploy --only hosting --project tangential-map-491113-b4
-```
-
-### DB Access (via IAP tunnel, no external IP)
-```bash
-gcloud compute ssh ymatch-db-vm --zone us-west1-b --tunnel-through-iap
-docker exec -it postgres psql -U ymatch_user -d ymatch_db
+# Restore from backup
+gcloud storage cp gs://tangential-map-491113-b4-db-backups/daily/ymatch-YYYY-MM-DD.sql.gz .
+gunzip ymatch-YYYY-MM-DD.sql.gz
+ssh -i ~/.ssh/oci_ymatch ubuntu@161.33.17.247 \
+  "docker exec -i ymatch_db psql -U ymatch_user ymatch" < ymatch-YYYY-MM-DD.sql
 ```
 
 ## OCI Production Deployment (Always Free ARM)
