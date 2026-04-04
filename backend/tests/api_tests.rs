@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
@@ -53,6 +54,10 @@ async fn setup_test_pool() -> PgPool {
     pool
 }
 
+fn test_storage() -> Arc<dyn backend::storage::ImageStorage> {
+    Arc::new(backend::storage::LocalFileStorage::new("./test_uploads".to_string()))
+}
+
 async fn body_to_string(body: Body) -> String {
     let bytes = body.collect().await.unwrap().to_bytes();
     String::from_utf8(bytes.to_vec()).unwrap()
@@ -63,7 +68,7 @@ async fn body_to_string(body: Body) -> String {
 #[tokio::test]
 async fn test_root_endpoint() {
     let pool = setup_test_pool().await;
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
 
     let response = app
         .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
@@ -80,7 +85,7 @@ async fn test_root_endpoint() {
 #[tokio::test]
 async fn test_system_status() {
     let pool = setup_test_pool().await;
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
 
     let response = app
         .oneshot(
@@ -104,7 +109,7 @@ async fn test_system_status() {
 #[tokio::test]
 async fn test_guest_login_creates_user() {
     let pool = setup_test_pool().await;
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
 
     let response = app
         .oneshot(
@@ -131,7 +136,7 @@ async fn test_guest_login_creates_user() {
 #[tokio::test]
 async fn test_guest_login_returns_existing_user() {
     let pool = setup_test_pool().await;
-    let app1 = backend::routes::create_router(pool.clone());
+    let app1 = backend::routes::create_router(pool.clone(), test_storage());
 
     let resp1 = app1
         .oneshot(
@@ -147,7 +152,7 @@ async fn test_guest_login_returns_existing_user() {
     let body1 = body_to_string(resp1.into_body()).await;
     let user1: serde_json::Value = serde_json::from_str(&body1).unwrap();
 
-    let app2 = backend::routes::create_router(pool);
+    let app2 = backend::routes::create_router(pool, test_storage());
     let resp2 = app2
         .oneshot(
             Request::builder()
@@ -171,7 +176,7 @@ async fn test_signup_and_login() {
     let pool = setup_test_pool().await;
 
     // Signup
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let response = app
         .oneshot(
             Request::builder()
@@ -191,7 +196,7 @@ async fn test_signup_and_login() {
     assert_eq!(user["username"].as_str().unwrap(), "testuser_api");
 
     // Login with correct password
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let response = app
         .oneshot(
             Request::builder()
@@ -208,7 +213,7 @@ async fn test_signup_and_login() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Login with wrong password
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let response = app
         .oneshot(
             Request::builder()
@@ -230,7 +235,7 @@ async fn test_list_users() {
     let pool = setup_test_pool().await;
 
     // Create a user first
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
         Request::builder()
             .method("POST")
@@ -242,7 +247,7 @@ async fn test_list_users() {
     .await
     .unwrap();
 
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let response = app
         .oneshot(
             Request::builder()
@@ -265,7 +270,7 @@ async fn test_create_and_list_events() {
     let pool = setup_test_pool().await;
 
     // Create a user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -282,7 +287,7 @@ async fn test_create_and_list_events() {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -304,7 +309,7 @@ async fn test_create_and_list_events() {
     assert_eq!(event["active_participants"].as_i64().unwrap(), 0);
 
     // List events
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -327,7 +332,7 @@ async fn test_create_and_list_merch() {
     let pool = setup_test_pool().await;
 
     // Create user + event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -343,7 +348,7 @@ async fn test_create_and_list_merch() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -363,7 +368,7 @@ async fn test_create_and_list_merch() {
     let event_id = event["id"].as_i64().unwrap();
 
     // Create merchandise
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -384,7 +389,7 @@ async fn test_create_and_list_merch() {
     assert_eq!(merch["event_id"].as_i64().unwrap(), event_id);
 
     // List merchandise
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -408,7 +413,7 @@ async fn test_inventory_upsert() {
     let pool = setup_test_pool().await;
 
     // Create user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -425,7 +430,7 @@ async fn test_inventory_upsert() {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event + merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -444,7 +449,7 @@ async fn test_inventory_upsert() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let event_id = event["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -461,7 +466,7 @@ async fn test_inventory_upsert() {
     let merch_id = merch["id"].as_i64().unwrap();
 
     // Set inventory HAVE=2
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -483,7 +488,7 @@ async fn test_inventory_upsert() {
     assert_eq!(inv["status"].as_str().unwrap(), "HAVE");
 
     // Update to HAVE=5 (upsert)
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -504,7 +509,7 @@ async fn test_inventory_upsert() {
     assert_eq!(inv["quantity"].as_i64().unwrap(), 5);
 
     // Get user inventory
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -526,7 +531,7 @@ async fn test_inventory_upsert() {
 #[tokio::test]
 async fn test_update_match_status_validation() {
     let pool = setup_test_pool().await;
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
 
     let resp = app
         .oneshot(
@@ -549,7 +554,7 @@ async fn test_search_returns_results() {
     let pool = setup_test_pool().await;
 
     // Create user + event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -565,7 +570,7 @@ async fn test_search_returns_results() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
         Request::builder()
             .method("POST")
@@ -581,7 +586,7 @@ async fn test_search_returns_results() {
     .unwrap();
 
     // Search
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -604,7 +609,7 @@ async fn test_search_excludes_draft_events() {
     let pool = setup_test_pool().await;
 
     // Create user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -621,7 +626,7 @@ async fn test_search_excludes_draft_events() {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create a draft event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
         Request::builder()
             .method("POST")
@@ -637,7 +642,7 @@ async fn test_search_excludes_draft_events() {
     .unwrap();
 
     // Search should NOT find the draft event
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -663,7 +668,7 @@ async fn test_admin_delete_event() {
     let pool = setup_test_pool().await;
 
     // Create user + event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -686,7 +691,7 @@ async fn test_admin_delete_event() {
         .await
         .unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -706,7 +711,7 @@ async fn test_admin_delete_event() {
     let event_id = event["id"].as_i64().unwrap();
 
     // Delete event (with admin user_id)
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -730,7 +735,7 @@ async fn test_messages_empty_list() {
     let pool = setup_test_pool().await;
 
     // Create two users and a match
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -746,7 +751,7 @@ async fn test_messages_empty_list() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let u1_id = u1["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -774,7 +779,7 @@ async fn test_messages_empty_list() {
     let match_id: i32 = sqlx::Row::get(&match_row, "id");
 
     // Send a message
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -792,7 +797,7 @@ async fn test_messages_empty_list() {
     assert_eq!(resp.status(), StatusCode::OK);
 
     // List messages
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -816,7 +821,7 @@ async fn test_banned_user_cannot_login() {
     let pool = setup_test_pool().await;
 
     // Create user via guest login
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -840,7 +845,7 @@ async fn test_banned_user_cannot_login() {
         .unwrap();
 
     // Try guest login again - should be forbidden
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -860,7 +865,7 @@ async fn test_admin_ban_unban_user() {
     let pool = setup_test_pool().await;
 
     // Create admin user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -882,7 +887,7 @@ async fn test_admin_ban_unban_user() {
         .unwrap();
 
     // Create target user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -899,7 +904,7 @@ async fn test_admin_ban_unban_user() {
     let target_id = target["id"].as_i64().unwrap();
 
     // Ban the target
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -929,7 +934,7 @@ async fn test_admin_ban_unban_user() {
     );
 
     // Unban the target
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -960,7 +965,7 @@ async fn test_non_admin_cannot_ban() {
     let pool = setup_test_pool().await;
 
     // Create regular user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -977,7 +982,7 @@ async fn test_non_admin_cannot_ban() {
     let user_id = user["id"].as_i64().unwrap();
 
     // Try to ban someone (should fail - not admin)
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -997,7 +1002,7 @@ async fn test_update_user_role() {
     let pool = setup_test_pool().await;
 
     // Create admin
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1019,7 +1024,7 @@ async fn test_update_user_role() {
         .unwrap();
 
     // Create target
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1036,7 +1041,7 @@ async fn test_update_user_role() {
     let target_id = target["id"].as_i64().unwrap();
 
     // Promote to moderator
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1068,7 +1073,7 @@ async fn test_draft_event_visibility() {
     let pool = setup_test_pool().await;
 
     // Create two users
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1084,7 +1089,7 @@ async fn test_draft_event_visibility() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let creator_id = creator["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1101,7 +1106,7 @@ async fn test_draft_event_visibility() {
     let viewer_id = viewer["id"].as_i64().unwrap();
 
     // Create draft event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1123,7 +1128,7 @@ async fn test_draft_event_visibility() {
     let event_id = event["id"].as_i64().unwrap();
 
     // Creator can see draft
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1138,7 +1143,7 @@ async fn test_draft_event_visibility() {
     assert!(events.iter().any(|e| e["name"] == "Draft Event"));
 
     // Other user cannot see draft
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1153,7 +1158,7 @@ async fn test_draft_event_visibility() {
     assert!(!events.iter().any(|e| e["name"] == "Draft Event"));
 
     // Publish event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1168,7 +1173,7 @@ async fn test_draft_event_visibility() {
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Now other user can see it
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1188,7 +1193,7 @@ async fn test_draft_merch_visibility() {
     let pool = setup_test_pool().await;
 
     // Create user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1205,7 +1210,7 @@ async fn test_draft_merch_visibility() {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1225,7 +1230,7 @@ async fn test_draft_merch_visibility() {
     let event_id = event["id"].as_i64().unwrap();
 
     // Create draft merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1247,7 +1252,7 @@ async fn test_draft_merch_visibility() {
     let merch_id = merch["id"].as_i64().unwrap();
 
     // Creator can see draft merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1265,7 +1270,7 @@ async fn test_draft_merch_visibility() {
     assert!(items.iter().any(|i| i["name"] == "Draft Item"));
 
     // Publish merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1290,7 +1295,7 @@ async fn test_soft_delete_merch_with_inventory() {
     let pool = setup_test_pool().await;
 
     // Create user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1307,7 +1312,7 @@ async fn test_soft_delete_merch_with_inventory() {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event + merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1326,7 +1331,7 @@ async fn test_soft_delete_merch_with_inventory() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let event_id = event["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1346,7 +1351,7 @@ async fn test_soft_delete_merch_with_inventory() {
     let merch_id = merch["id"].as_i64().unwrap();
 
     // Add inventory for this merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
         Request::builder()
             .method("POST")
@@ -1362,7 +1367,7 @@ async fn test_soft_delete_merch_with_inventory() {
     .unwrap();
 
     // Delete merch (should soft-delete since inventory exists)
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1388,7 +1393,7 @@ async fn test_soft_delete_merch_with_inventory() {
     assert!(!sqlx::Row::get::<bool, _>(&row, "trade_enabled"));
 
     // Inventory still accessible
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1409,7 +1414,7 @@ async fn test_hard_delete_merch_without_inventory() {
     let pool = setup_test_pool().await;
 
     // Create user + event + merch
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1425,7 +1430,7 @@ async fn test_hard_delete_merch_without_inventory() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1444,7 +1449,7 @@ async fn test_hard_delete_merch_without_inventory() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let event_id = event["id"].as_i64().unwrap();
 
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1464,7 +1469,7 @@ async fn test_hard_delete_merch_without_inventory() {
     let merch_id = merch["id"].as_i64().unwrap();
 
     // Delete merch (no inventory → hard delete)
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1493,7 +1498,7 @@ async fn test_hard_delete_merch_without_inventory() {
 async fn test_user_response_includes_role() {
     let pool = setup_test_pool().await;
 
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1517,7 +1522,7 @@ async fn test_banned_user_cannot_create_event() {
     let pool = setup_test_pool().await;
 
     // Create user
-    let app = backend::routes::create_router(pool.clone());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -1541,7 +1546,7 @@ async fn test_banned_user_cannot_create_event() {
         .unwrap();
 
     // Try to create event
-    let app = backend::routes::create_router(pool);
+    let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()

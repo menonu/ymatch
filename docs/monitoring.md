@@ -27,8 +27,11 @@ OCI/GCP budget alerts.
 │         └── Discord Webhook notification                │
 │                                                         │
 │  Dashboard ──────────── Production Overview             │
+│                          Database Backups               │
 │                                                         │
 │  GitHub Actions ──────── CI/CD Telemetry (via exporter) │
+│                          DB Backup workflow → NR events  │
+│                          Auto-deploy workflow → NR events│
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
@@ -96,6 +99,8 @@ Two ping monitors run from `AP_NORTHEAST_1` (Tokyo) every 15 minutes:
 | High Disk Usage | > 80% | 5 min |
 | Docker Container Not Running | < 4 containers | 5 min |
 | Synthetic Monitor Failure | ≥ 1 failure | 15 min |
+| Database Backup Failed | Any failure event | Immediate |
+| Database Backup Missing | No success event for 26h | Signal loss |
 
 **Notification**: Discord webhook → `#alerts` channel
 
@@ -111,7 +116,29 @@ as distributed traces in New Relic.
 | `NEW_RELIC_LICENSE_KEY` | Ingest license key (NRAL suffix) |
 | `NEW_RELIC_ACCOUNT_ID` | New Relic account ID |
 
-### 5. Cloud Billing Alerts
+### 5. Database Backup Monitoring
+
+The `.github/workflows/db-backup.yml` workflow runs daily at 03:00 JST and sends
+`DatabaseBackup` custom events to New Relic with backup status, size, and type.
+
+**Dashboard page**: "Database Backups" — shows backup status, size trends,
+hours since last backup, and type breakdown (daily/weekly/monthly).
+
+**Backup rotation** (via GCS lifecycle):
+| Type | Frequency | Retained |
+|------|-----------|----------|
+| Daily | Every day | 7 |
+| Weekly | Sunday | 4 |
+| Monthly | 1st of month | 3 |
+
+**GCS Bucket**: `tangential-map-491113-b4-db-backups` (us-west1)
+
+### 6. Auto-Deploy Workflow
+
+The `.github/workflows/deploy-oci.yml` deploys to OCI whenever CI passes on
+`main`. Sends a `DeploymentEvent` to New Relic on completion.
+
+### 7. Cloud Billing Alerts
 
 #### OCI Budget
 - **Name**: ymatch-always-free-guard
@@ -151,7 +178,7 @@ WHERE hostname = 'ymatch-oci-arm' TIMESERIES AUTO
 
 -- Docker container status
 SELECT latest(state), latest(cpuPercent), latest(memoryUsageBytes)/1e6
-FROM ContainerSample WHERE hostname = 'ymatch-oci-arm' FACET containerName
+FROM ContainerSample WHERE hostname = 'ymatch-oci-arm' FACET name
 
 -- Backend error logs
 SELECT count(*) FROM Log WHERE service = 'backend'

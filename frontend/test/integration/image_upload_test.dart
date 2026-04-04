@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+@Tags(['integration'])
 void main() {
   group('Image upload integration (real backend)', () {
     test('upload PNG image returns valid URL', () async {

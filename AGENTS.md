@@ -94,6 +94,16 @@ ssh ubuntu@<PUBLIC_IP>
 ```
 
 ## Development Guidelines
+
+### Branching Strategy: Trunk-Based Development
+- **`main`** is the single trunk branch. Production is always deployed from `main`.
+- All changes go through **Pull Requests** (PRs) targeting `main`.
+- PRs must pass **CI** (`Backend Build & Test` + `Frontend Build & Test`) before merging.
+- Use **short-lived feature branches** (e.g., `feat/xxx`, `fix/xxx`). Merge promptly after CI passes.
+- **Do NOT push directly to `main`** — always create a PR.
+- After merge to `main`, the `deploy-oci` workflow automatically deploys to production.
+
+### Other Guidelines
 - **Redeploy scripts**: Use `./scripts/redeploy_backend.sh` / `./scripts/redeploy_frontend.sh` after code changes.
 - **Smoke tests**: Run `./scripts/smoke_test.sh` after every backend redeploy.
 - **Process management**: Use `netstat` to verify ports. Use PID files (`backend.pid`, `flutter.pid`). Do NOT use `lsof` to kill processes.
