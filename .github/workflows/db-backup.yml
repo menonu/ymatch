@@ -1,0 +1,129 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Daily at 18:00 UTC (03:00 JST)
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      backup_type:
+        description: 'Backup type override (daily/weekly/monthly/all)'
+        required: false
+        default: 'daily'
+
+env:
+  GCS_BUCKET: tangential-map-491113-b4-db-backups
+  OCI_HOST: 161.33.17.247
+  DB_CONTAINER: ymatch_db
+  DB_USER: ymatch_user
+  DB_NAME: ymatch
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Determine backup types
+        id: types
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TYPE="${{ github.event.inputs.backup_type }}"
+            if [ "$TYPE" = "all" ]; then
+              echo "daily=true" >> $GITHUB_OUTPUT
+              echo "weekly=true" >> $GITHUB_OUTPUT
+              echo "monthly=true" >> $GITHUB_OUTPUT
+            else
+              echo "daily=$( [ '$TYPE' = 'daily' ] && echo true || echo false )" >> $GITHUB_OUTPUT
+              echo "weekly=$( [ '$TYPE' = 'weekly' ] && echo true || echo false )" >> $GITHUB_OUTPUT
+              echo "monthly=$( [ '$TYPE' = 'monthly' ] && echo true || echo false )" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Scheduled run: always daily
+            echo "daily=true" >> $GITHUB_OUTPUT
+            # Weekly on Sunday (day 0)
+            DOW=$(date -u +%w)
+            echo "weekly=$( [ $DOW -eq 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+            # Monthly on the 1st
+            DOM=$(date -u +%d)
+            echo "monthly=$( [ $DOM -eq 01 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+          fi
+
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OCI_SSH_PRIVATE_KEY }}" > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+          ssh-keyscan -H ${{ env.OCI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Create database dump
+        run: |
+          ssh -i ~/.ssh/oci_key -o StrictHostKeyChecking=no ubuntu@${{ env.OCI_HOST }} \
+            "docker exec ${{ env.DB_CONTAINER }} pg_dump -U ${{ env.DB_USER }} ${{ env.DB_NAME }} | gzip" \
+            > backup.sql.gz
+
+          SIZE=$(stat --format=%s backup.sql.gz)
+          echo "Backup size: $SIZE bytes"
+
+          if [ "$SIZE" -lt 100 ]; then
+            echo "::error::Backup file is suspiciously small ($SIZE bytes)"
+            exit 1
+          fi
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload daily backup
+        if: steps.types.outputs.daily == 'true'
+        run: |
+          gcloud storage cp backup.sql.gz \
+            "gs://${{ env.GCS_BUCKET }}/daily/ymatch-${{ steps.types.outputs.date }}.sql.gz"
+          echo "✅ Daily backup uploaded"
+
+      - name: Upload weekly backup
+        if: steps.types.outputs.weekly == 'true'
+        run: |
+          gcloud storage cp backup.sql.gz \
+            "gs://${{ env.GCS_BUCKET }}/weekly/ymatch-${{ steps.types.outputs.date }}.sql.gz"
+          echo "✅ Weekly backup uploaded"
+
+      - name: Upload monthly backup
+        if: steps.types.outputs.monthly == 'true'
+        run: |
+          gcloud storage cp backup.sql.gz \
+            "gs://${{ env.GCS_BUCKET }}/monthly/ymatch-${{ steps.types.outputs.date }}.sql.gz"
+          echo "✅ Monthly backup uploaded"
+
+      - name: Verify uploads
+        run: |
+          echo "=== Current backups in GCS ==="
+          gcloud storage ls "gs://${{ env.GCS_BUCKET }}/**" --long 2>/dev/null || echo "No backups found yet"
+
+      - name: Report to New Relic
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          curl -s -X POST "https://insights-collector.newrelic.com/v1/accounts/${{ secrets.NEW_RELIC_ACCOUNT_ID }}/events" \
+            -H "Api-Key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "[{
+              \"eventType\": \"DatabaseBackup\",
+              \"status\": \"$STATUS\",
+              \"backupDate\": \"${{ steps.types.outputs.date }}\",
+              \"daily\": ${{ steps.types.outputs.daily }},
+              \"weekly\": ${{ steps.types.outputs.weekly }},
+              \"monthly\": ${{ steps.types.outputs.monthly }},
+              \"sizeBytes\": $(stat --format=%s backup.sql.gz 2>/dev/null || echo 0)
+            }]" || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -f backup.sql.gz ~/.ssh/oci_key

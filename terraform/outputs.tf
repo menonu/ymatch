@@ -1,9 +1,9 @@
-output "backend_url" {
-  value       = google_cloud_run_v2_service.backend.uri
-  description = "The URL of the backend service"
+output "backup_bucket_name" {
+  value       = google_storage_bucket.db_backups.name
+  description = "GCS bucket for database backups"
 }
 
-output "db_vm_internal_ip" {
-  value       = google_compute_instance.db_vm.network_interface[0].network_ip
-  description = "The internal IP of the database VM"
+output "backup_service_account_email" {
+  value       = google_service_account.backup.email
+  description = "Service account for backup operations"
 }
