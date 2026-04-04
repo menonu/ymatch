@@ -120,4 +120,97 @@ resource "newrelic_one_dashboard" "production" {
       }
     }
   }
+
+  # ---------------------------------------------------
+  # Page 2: Database Backups
+  # ---------------------------------------------------
+  page {
+    name = "Database Backups"
+
+    widget_billboard {
+      title  = "Last Backup Status"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT latest(status) as 'Status' FROM DatabaseBackup SINCE 7 days ago"
+      }
+    }
+
+    widget_billboard {
+      title  = "Hours Since Last Backup"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT (now() - latest(timestamp)) / 3600000 as 'Hours Ago' FROM DatabaseBackup WHERE status = 'success'"
+      }
+      warning  = 26
+      critical = 50
+    }
+
+    widget_billboard {
+      title  = "Last Backup Size"
+      row    = 1
+      column = 9
+      width  = 4
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT latest(sizeBytes) / 1024 as 'Size (KB)' FROM DatabaseBackup WHERE status = 'success'"
+      }
+    }
+
+    widget_table {
+      title  = "Recent Backups"
+      row    = 4
+      column = 1
+      width  = 8
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT backupDate, status, daily, weekly, monthly, sizeBytes / 1024 as 'Size KB' FROM DatabaseBackup SINCE 30 days ago LIMIT 30"
+      }
+    }
+
+    widget_billboard {
+      title  = "Backups (Last 7 Days)"
+      row    = 4
+      column = 9
+      width  = 4
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT count(*) as 'Total', filter(count(*), WHERE status = 'success') as 'Success', filter(count(*), WHERE status != 'success') as 'Failed' FROM DatabaseBackup SINCE 7 days ago"
+      }
+    }
+
+    widget_line {
+      title  = "Backup Size Trend"
+      row    = 7
+      column = 1
+      width  = 6
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT latest(sizeBytes) / 1024 as 'Size KB' FROM DatabaseBackup WHERE status = 'success' TIMESERIES 1 day SINCE 30 days ago"
+      }
+    }
+
+    widget_bar {
+      title  = "Backups by Type (Last 30 Days)"
+      row    = 7
+      column = 7
+      width  = 6
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT filter(count(*), WHERE daily = 'true') as 'Daily', filter(count(*), WHERE weekly = 'true') as 'Weekly', filter(count(*), WHERE monthly = 'true') as 'Monthly' FROM DatabaseBackup WHERE status = 'success' SINCE 30 days ago"
+      }
+    }
+  }
 }
