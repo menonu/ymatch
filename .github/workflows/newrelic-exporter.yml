@@ -5,6 +5,10 @@ on:
     workflows: ["CI", "Deploy to OCI", "Database Backup"]
     types: [completed]
 
+permissions:
+  actions: read
+  contents: read
+
 env:
   GHA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
