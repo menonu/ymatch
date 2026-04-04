@@ -34,7 +34,12 @@ impl FirebaseStorage {
 
 #[async_trait::async_trait]
 impl ImageStorage for FirebaseStorage {
-    async fn upload(&self, bytes: &[u8], filename: &str, content_type: &str) -> Result<String, StorageError> {
+    async fn upload(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        content_type: &str,
+    ) -> Result<String, StorageError> {
         let token = self.get_access_token().await?;
 
         let upload_url = format!(
@@ -77,7 +82,9 @@ impl ImageStorage for FirebaseStorage {
                 .map(|s| s.to_string())
                 .unwrap_or_else(|_| name.to_string())
         } else {
-            return Err(StorageError::Remote("Cannot parse object name from URL".to_string()));
+            return Err(StorageError::Remote(
+                "Cannot parse object name from URL".to_string(),
+            ));
         };
 
         let token = self.get_access_token().await?;

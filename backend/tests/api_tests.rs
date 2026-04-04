@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use std::sync::Arc;
 use tower::ServiceExt;
 
 async fn setup_test_pool() -> PgPool {
@@ -55,7 +55,9 @@ async fn setup_test_pool() -> PgPool {
 }
 
 fn test_storage() -> Arc<dyn backend::storage::ImageStorage> {
-    Arc::new(backend::storage::LocalFileStorage::new("./test_uploads".to_string()))
+    Arc::new(backend::storage::LocalFileStorage::new(
+        "./test_uploads".to_string(),
+    ))
 }
 
 async fn body_to_string(body: Body) -> String {
@@ -456,7 +458,7 @@ async fn test_inventory_upsert() {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"name": "Inv Item"}"#))
+                .body(Body::from(r#"{"name": "Inv Item", "group_name": "Test"}"#))
                 .unwrap(),
         )
         .await
@@ -656,7 +658,9 @@ async fn test_search_excludes_draft_events() {
     let results: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert!(
-        !results.iter().any(|r| r["title"] == "DraftSearchTest Event"),
+        !results
+            .iter()
+            .any(|r| r["title"] == "DraftSearchTest Event"),
         "Draft events should not appear in search results"
     );
 }
@@ -1238,7 +1242,7 @@ async fn test_draft_merch_visibility() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Draft Item", "creator_id": {}, "status": "draft"}}"#,
+                    r#"{{"name": "Draft Item", "group_name": "Test", "creator_id": {}, "status": "draft"}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1339,7 +1343,7 @@ async fn test_soft_delete_merch_with_inventory() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "SoftDel Item", "creator_id": {}}}"#,
+                    r#"{{"name": "SoftDel Item", "group_name": "Test", "creator_id": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1457,7 +1461,7 @@ async fn test_hard_delete_merch_without_inventory() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "HardDel Item", "creator_id": {}}}"#,
+                    r#"{{"name": "HardDel Item", "group_name": "Test", "creator_id": {}}}"#,
                     user_id
                 )))
                 .unwrap(),

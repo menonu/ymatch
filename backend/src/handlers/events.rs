@@ -240,7 +240,9 @@ pub async fn update_event(
 
     permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
 
-    let name = payload.name.ok_or((StatusCode::BAD_REQUEST, "name is required".to_string()))?;
+    let name = payload
+        .name
+        .ok_or((StatusCode::BAD_REQUEST, "name is required".to_string()))?;
 
     sqlx::query("UPDATE events SET name = $1 WHERE id = $2")
         .bind(&name)
@@ -265,8 +267,12 @@ pub async fn update_event(
         id: updated.get("id"),
         name: updated.get("name"),
         creator_id: updated.get("creator_id"),
-        created_at: updated.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").map(|dt| dt.to_rfc3339()),
-        unique_views: updated.get::<Option<i64>, _>("unique_views").map(|v| v as i32),
+        created_at: updated
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
+            .map(|dt| dt.to_rfc3339()),
+        unique_views: updated
+            .get::<Option<i64>, _>("unique_views")
+            .map(|v| v as i32),
         active_participants: Some(updated.get::<i64, _>("active_participants") as i32),
         is_favorite: Some(false),
         is_joined: Some(false),

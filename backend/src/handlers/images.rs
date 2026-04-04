@@ -16,25 +16,18 @@ pub async fn upload_image(
     State(storage): State<Arc<dyn ImageStorage>>,
     mut multipart: Multipart,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": format!("Multipart error: {}", e)})),
-            )
-        })?
-    {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Multipart error: {}", e)})),
+        )
+    })? {
         let field_name = field.name().unwrap_or("").to_string();
         if field_name != "file" {
             continue;
         }
 
-        let content_type = field
-            .content_type()
-            .unwrap_or("image/png")
-            .to_string();
+        let content_type = field.content_type().unwrap_or("image/png").to_string();
 
         // Validate content type
         if !content_type.starts_with("image/") {
@@ -44,10 +37,7 @@ pub async fn upload_image(
             ));
         }
 
-        let original_filename = field
-            .file_name()
-            .unwrap_or("image.png")
-            .to_string();
+        let original_filename = field.file_name().unwrap_or("image.png").to_string();
 
         let bytes = field.bytes().await.map_err(|e| {
             (
@@ -65,10 +55,7 @@ pub async fn upload_image(
         }
 
         // Generate unique filename
-        let ext = original_filename
-            .rsplit('.')
-            .next()
-            .unwrap_or("png");
+        let ext = original_filename.rsplit('.').next().unwrap_or("png");
         let unique_name = format!("{}.{}", uuid::Uuid::new_v4(), ext);
 
         let url = storage

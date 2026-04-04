@@ -31,15 +31,19 @@ DB: `ymatch_user:secure_dev_password@localhost:5432/ymatch` | pgAdmin: `http://l
 
 ### Commands
 ```bash
-# Backend
-cd backend && DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch cargo run --bin backend
-# Frontend
-cd frontend && flutter run -d web-server --web-port 8081
-# Backend tests
+# Run all tests (backend + frontend)
+./scripts/test.sh
+
+# Backend only / Frontend only
+./scripts/test.sh backend
+./scripts/test.sh frontend
+
+# CI mode (includes lint + fmt + build checks)
+./scripts/test.sh --ci
+
+# Manual commands (equivalent to what test.sh runs)
 cd backend && DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test cargo test -- --test-threads=1
-# Frontend tests
-cd frontend && flutter test
-# Lint
+cd frontend && flutter test --exclude-tags=integration
 cd backend && cargo clippy -- -D warnings && cargo fmt -- --check
 cd frontend && flutter analyze
 ```

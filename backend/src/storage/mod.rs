@@ -1,8 +1,8 @@
-mod local;
 mod firebase;
+mod local;
 
-pub use local::LocalFileStorage;
 pub use firebase::FirebaseStorage;
+pub use local::LocalFileStorage;
 
 use std::sync::Arc;
 
@@ -10,7 +10,12 @@ use std::sync::Arc;
 #[async_trait::async_trait]
 pub trait ImageStorage: Send + Sync {
     /// Upload image bytes and return the public URL.
-    async fn upload(&self, bytes: &[u8], filename: &str, content_type: &str) -> Result<String, StorageError>;
+    async fn upload(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        content_type: &str,
+    ) -> Result<String, StorageError>;
     /// Delete a previously uploaded image by its URL or key.
     async fn delete(&self, url: &str) -> Result<(), StorageError>;
 }
@@ -37,10 +42,15 @@ pub async fn create_storage() -> Arc<dyn ImageStorage> {
         "firebase" => {
             let bucket = std::env::var("FIREBASE_STORAGE_BUCKET")
                 .expect("FIREBASE_STORAGE_BUCKET must be set when IMAGE_STORAGE=firebase");
-            Arc::new(FirebaseStorage::new(bucket).await.expect("Failed to initialize Firebase Storage"))
+            Arc::new(
+                FirebaseStorage::new(bucket)
+                    .await
+                    .expect("Failed to initialize Firebase Storage"),
+            )
         }
         _ => {
-            let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+            let upload_dir =
+                std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
             Arc::new(LocalFileStorage::new(upload_dir))
         }
     }
