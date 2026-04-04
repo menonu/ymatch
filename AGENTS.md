@@ -75,6 +75,29 @@ gcloud compute ssh ymatch-db-vm --zone us-west1-b --tunnel-through-iap
 docker exec -it postgres psql -U ymatch_user -d ymatch_db
 ```
 
+## OCI Production Deployment (Always Free ARM)
+
+See [OCI Deployment Guide](./docs/oci_deployment.md) for full details.
+
+### Quick Reference
+| Component | Service | URL |
+|-----------|---------|-----|
+| Full Stack | ARM A1 VM + Docker Compose | `https://<PUBLIC_IP>.nip.io` |
+
+### Deploy / Redeploy
+```bash
+# Provision infrastructure
+cd terraform/oci && terraform init && terraform apply
+
+# SSH into VM and deploy
+ssh ubuntu@<PUBLIC_IP>
+./scripts/oci_deploy.sh <db_password>
+
+# Redeploy backend/frontend
+./scripts/oci_redeploy_backend.sh
+./scripts/oci_redeploy_frontend.sh
+```
+
 ## Development Guidelines
 - **Redeploy scripts**: Use `./scripts/redeploy_backend.sh` / `./scripts/redeploy_frontend.sh` after code changes.
 - **Smoke tests**: Run `./scripts/smoke_test.sh` after every backend redeploy.
@@ -93,5 +116,6 @@ docker exec -it postgres psql -U ymatch_user -d ymatch_db
 - [Architecture & Actors](./docs/architecture.md)
 - [API Specification](./docs/api_spec.md)
 - [Database Schema](./docs/db_schema.md)
-- [Cloud Deployment](./docs/cloud_deployment.md)
+- [Cloud Deployment (GCP)](./docs/cloud_deployment.md)
+- [Cloud Deployment (OCI)](./docs/oci_deployment.md)
 - [Initial Idea](./docs/initial.md)
