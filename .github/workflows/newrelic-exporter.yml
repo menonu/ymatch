@@ -2,7 +2,7 @@ name: New Relic GitHub Actions Exporter
 
 on:
   workflow_run:
-    workflows: ["*"]
+    workflows: ["CI", "Deploy to OCI", "Database Backup"]
     types: [completed]
 
 env:
@@ -19,6 +19,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: New Relic Exporter
-        uses: newrelic-experimental/gha-new-relic-exporter@v1
-        with:
-          accountId: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+        uses: newrelic-experimental/gha-new-relic-exporter@1.0.1
