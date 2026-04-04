@@ -54,7 +54,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 3
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT latest(cpuPercent) as 'CPU %', latest(memoryUsageBytes)/1e6 as 'Memory MB', latest(state) as 'State' FROM ContainerSample WHERE hostname = 'ymatch-oci-arm' FACET containerName"
+        query      = "SELECT latest(cpuPercent) as 'CPU %', latest(memoryUsageBytes)/1e6 as 'Memory MB', latest(state) as 'State' FROM ContainerSample WHERE hostname = 'ymatch-oci-arm' FACET name"
       }
     }
 
