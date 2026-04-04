@@ -397,7 +397,7 @@ firebase hosting:disable --project tangential-map-491113-b4
 
 ## Secondary Target: Oracle Cloud Infrastructure (OCI)
 
-OCI offers an exceptionally generous "Always Free" tier that can serve as a fallback:
+OCI offers an exceptionally generous "Always Free" tier that serves as an alternative deployment:
 
 - **Compute**: Up to 4 ARM Ampere A1 instances (24 GB RAM total)
 - **Compute**: 2 AMD-based VMs
@@ -405,4 +405,25 @@ OCI offers an exceptionally generous "Always Free" tier that can serve as a fall
 - **Database**: Oracle Autonomous Database
 - **No external IPv4 charge** (unlike GCP)
 
-The Terraform configurations can be adapted to OCI by creating OCI-specific modules.
+See [OCI Deployment Guide](oci_deployment.md) for full details.
+
+### Quick Reference
+
+| Component | Service | URL |
+|-----------|---------|-----|
+| Full Stack | ARM A1 VM + Docker Compose | `https://<PUBLIC_IP>.nip.io` |
+| SSL | Caddy + Let's Encrypt (nip.io) | Auto-managed |
+
+### Deploy / Redeploy
+
+```bash
+# Terraform: provision infrastructure
+cd terraform/oci && terraform apply
+
+# Deploy: SSH into VM and run
+./scripts/oci_deploy.sh <db_password>
+
+# Redeploy backend/frontend individually
+./scripts/oci_redeploy_backend.sh
+./scripts/oci_redeploy_frontend.sh
+```

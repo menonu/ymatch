@@ -1,0 +1,95 @@
+# OCI Always Free Tier — Full Stack Deployment
+# Run on ARM Ampere A1 instance with Docker Compose
+#
+# Usage:
+#   PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx docker compose -f docker-compose.oci.yml up -d --build
+
+services:
+  # ---------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: ymatch_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ymatch_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD env var}
+      POSTGRES_DB: ymatch
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - ymatch
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ymatch_user -d ymatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------
+  # Backend (Rust/Axum API)
+  # ---------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile.prod
+    container_name: ymatch_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://ymatch_user:${DB_PASSWORD}@db:5432/ymatch"
+      RUST_LOG: info
+      PORT: "3000"
+      IMAGE_STORAGE: local
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - ymatch
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------------------------------------------------
+  # Frontend (Flutter Web via Nginx)
+  # ---------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile.prod
+      args:
+        API_BASE_URL: ""
+    container_name: ymatch_frontend
+    restart: unless-stopped
+    networks:
+      - ymatch
+
+  # ---------------------------------------------------
+  # Caddy Reverse Proxy (auto-SSL via nip.io)
+  # ---------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: ymatch_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.oci:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP env var}
+    networks:
+      - ymatch
+    depends_on:
+      - backend
+      - frontend
+
+networks:
+  ymatch:
+    driver: bridge
+
+volumes:
+  pg_data:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,21 @@
+# Caddy reverse proxy for OCI deployment
+# Uses nip.io for wildcard DNS → auto-SSL via Let's Encrypt
+#
+# {$PUBLIC_IP} is injected from docker-compose.oci.yml environment
+
+{$PUBLIC_IP}.nip.io {
+	# API requests → backend
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	# Uploaded images → backend static files
+	handle /uploads/* {
+		reverse_proxy backend:3000
+	}
+
+	# Everything else → frontend
+	handle {
+		reverse_proxy frontend:80
+	}
+}

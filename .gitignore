@@ -2301,9 +2301,14 @@ backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b
 .gemini/
 *.log
 terraform/terraform.tfvars
+terraform/oci/terraform.tfvars
 .firebase/
 terraform/.terraform/
+terraform/oci/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
+terraform/oci/terraform.tfstate
+terraform/oci/terraform.tfstate.backup
 terraform/tfplan
+terraform/oci/tfplan
 uploads/

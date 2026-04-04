@@ -25,7 +25,13 @@ COPY frontend ./
 COPY proto /proto
 
 # Build Flutter Web app
-RUN flutter build web --release --web-renderer canvaskit
+# API_BASE_URL can be set at build time (e.g., for OCI deployment behind reverse proxy)
+ARG API_BASE_URL=""
+RUN if [ -n "$API_BASE_URL" ]; then \
+      flutter build web --release --web-renderer canvaskit --dart-define=API_BASE_URL=$API_BASE_URL; \
+    else \
+      flutter build web --release --web-renderer canvaskit; \
+    fi
 
 # ---------------------------------------------------
 # Stage 2: Runtime Environment (Nginx)
