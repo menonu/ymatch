@@ -108,15 +108,41 @@ resource "newrelic_one_dashboard" "production" {
       critical = 1.0
     }
 
-    widget_table {
-      title  = "GitHub Actions Workflows"
+    widget_billboard {
+      title  = "GitHub Actions Latest Status"
       row    = 10
       column = 5
-      width  = 8
+      width  = 4
       height = 3
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT latest(conclusion) as 'Result', average(duration.ms)/1000 as 'Avg Duration (s)', count(*) as 'Runs' FROM Span WHERE workflow_name IS NOT NULL FACET workflow_name SINCE 7 days ago LIMIT 20"
+        query      = "SELECT latest(conclusion) as 'Latest' FROM Span WHERE workflow_name IS NOT NULL FACET workflow_name SINCE 7 days ago"
+      }
+    }
+
+    widget_billboard {
+      title  = "GitHub Actions Success Rate"
+      row    = 10
+      column = 9
+      width  = 4
+      height = 3
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT percentage(count(*), WHERE conclusion = 'success') as 'Success %' FROM Span WHERE workflow_name IS NOT NULL FACET workflow_name SINCE 30 days ago"
+      }
+      warning  = 90
+      critical = 70
+    }
+
+    widget_table {
+      title  = "Recent GitHub Actions Runs"
+      row    = 13
+      column = 1
+      width  = 12
+      height = 4
+      nrql_query {
+        account_id = var.account_id
+        query      = "SELECT workflow_name as 'Workflow', name as 'Job', conclusion as 'Result', duration.ms/1000 as 'Duration (s)', head_branch as 'Branch' FROM Span WHERE workflow_name IS NOT NULL SINCE 30 days ago LIMIT 10"
       }
     }
   }
