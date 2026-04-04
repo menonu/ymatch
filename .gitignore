@@ -2323,3 +2323,4 @@ terraform/newrelic/terraform.tfstate.*.backup
 terraform/newrelic/.terraform.lock.hcl
 terraform/oci/.terraform.lock.hcl
 terraform/.terraform.lock.hcl
+.task/

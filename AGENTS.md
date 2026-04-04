@@ -11,7 +11,7 @@
 ## Build & Test
 
 ### Prerequisites
-- Docker & Docker Compose, Rust (cargo), Flutter SDK
+- Docker & Docker Compose, Rust (cargo), Flutter SDK, [Task](https://taskfile.dev/) (go-task)
 
 ### Infrastructure
 ```bash
@@ -32,20 +32,23 @@ DB: `ymatch_user:secure_dev_password@localhost:5432/ymatch` | pgAdmin: `http://l
 ### Commands
 ```bash
 # Run all tests (backend + frontend)
-./scripts/test.sh
+task test
 
-# Backend only / Frontend only
-./scripts/test.sh backend
-./scripts/test.sh frontend
+# Full CI pipeline (lint + build + test)
+task ci
 
-# CI mode (includes lint + fmt + build checks)
-./scripts/test.sh --ci
+# Individual targets
+task backend:test       # Backend integration tests (auto-starts DB)
+task backend:lint       # cargo fmt --check + clippy
+task frontend:test      # Flutter unit/widget tests
+task frontend:build     # Flutter web build
 
-# Manual commands (equivalent to what test.sh runs)
-cd backend && DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test cargo test -- --test-threads=1
-cd frontend && flutter test --exclude-tags=integration
-cd backend && cargo clippy -- -D warnings && cargo fmt -- --check
-cd frontend && flutter analyze
+# Dev servers
+task dev:backend        # Rust/Axum on :3000
+task dev:frontend       # Flutter web on :8081
+
+# List all available tasks
+task --list
 ```
 
 ## GCP (Backup Only)
