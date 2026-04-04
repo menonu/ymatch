@@ -1,4 +1,3 @@
-use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 use axum::{
     body::Body,
     extract::Request,
@@ -10,6 +9,7 @@ use axum::{
 };
 use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter};
 use sqlx::PgPool;
+use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
 use crate::storage::ImageStorage;
@@ -32,11 +32,7 @@ fn extract_client_ip(req: &Request<Body>) -> IpAddr {
     IpAddr::from([0, 0, 0, 0])
 }
 
-async fn rate_limit(
-    req: Request<Body>,
-    next: Next,
-    limiter: Arc<IpLimiter>,
-) -> Response {
+async fn rate_limit(req: Request<Body>, next: Next, limiter: Arc<IpLimiter>) -> Response {
     let ip = extract_client_ip(&req);
     if limiter.check_key(&ip).is_err() {
         return (StatusCode::TOO_MANY_REQUESTS, "Too Many Requests").into_response();
@@ -52,14 +48,12 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
 
     // Auth endpoints: strict — 3 req/s per IP, burst 5 (brute-force protection)
     let auth_limiter = Arc::new(RateLimiter::keyed(
-        Quota::per_second(NonZeroU32::new(3).unwrap())
-            .allow_burst(NonZeroU32::new(5).unwrap()),
+        Quota::per_second(NonZeroU32::new(3).unwrap()).allow_burst(NonZeroU32::new(5).unwrap()),
     ));
 
     // General API endpoints: relaxed — 30 req/s per IP, burst 60
     let api_limiter = Arc::new(RateLimiter::keyed(
-        Quota::per_second(NonZeroU32::new(30).unwrap())
-            .allow_burst(NonZeroU32::new(60).unwrap()),
+        Quota::per_second(NonZeroU32::new(30).unwrap()).allow_burst(NonZeroU32::new(60).unwrap()),
     ));
 
     // Periodic cleanup to prevent unbounded memory growth

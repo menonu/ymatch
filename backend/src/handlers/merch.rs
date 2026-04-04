@@ -123,9 +123,18 @@ pub async fn update_merch(
 
     let mut sets = Vec::new();
     let mut idx = 2; // $1=merch_id, $2=event_id
-    if payload.name.is_some() { idx += 1; sets.push(format!("name = ${}", idx)); }
-    if payload.photo_url.is_some() { idx += 1; sets.push(format!("photo_url = ${}", idx)); }
-    if payload.group_name.is_some() { idx += 1; sets.push(format!("group_name = ${}", idx)); }
+    if payload.name.is_some() {
+        idx += 1;
+        sets.push(format!("name = ${}", idx));
+    }
+    if payload.photo_url.is_some() {
+        idx += 1;
+        sets.push(format!("photo_url = ${}", idx));
+    }
+    if payload.group_name.is_some() {
+        idx += 1;
+        sets.push(format!("group_name = ${}", idx));
+    }
 
     if sets.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "No fields to update".to_string()));
@@ -138,9 +147,15 @@ pub async fn update_merch(
     );
 
     let mut q = sqlx::query(&sql).bind(merch_id).bind(event_id);
-    if let Some(ref name) = payload.name { q = q.bind(name); }
-    if let Some(ref photo_url) = payload.photo_url { q = q.bind(photo_url); }
-    if let Some(ref group_name) = payload.group_name { q = q.bind(group_name); }
+    if let Some(ref name) = payload.name {
+        q = q.bind(name);
+    }
+    if let Some(ref photo_url) = payload.photo_url {
+        q = q.bind(photo_url);
+    }
+    if let Some(ref group_name) = payload.group_name {
+        q = q.bind(group_name);
+    }
 
     let updated = q
         .fetch_one(&pool)

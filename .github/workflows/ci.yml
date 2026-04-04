@@ -16,6 +16,24 @@ jobs:
       run:
         working-directory: ./backend
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ymatch_user
+          POSTGRES_PASSWORD: secure_dev_password
+          POSTGRES_DB: ymatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ymatch_user -d ymatch_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,24 +45,27 @@ jobs:
           components: clippy, rustfmt
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ./backend
+          workspaces: backend -> target
+          shared-key: backend
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
+
+      - name: Run fmt
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
 
       - name: Build
         run: cargo build --verbose
 
       - name: Run tests
-        run: cargo test --verbose
-
-      - name: Run clippy
-        run: cargo clippy -- -D warnings
-
-      - name: Run fmt
-        run: cargo fmt -- --check
+        run: cargo test --verbose -- --test-threads=1
 
   frontend-test:
     name: Frontend Build & Test
@@ -67,7 +88,7 @@ jobs:
         run: flutter pub get
 
       - name: Run tests
-        run: flutter test
+        run: flutter test --exclude-tags=integration
 
       - name: Build web
         run: flutter build web

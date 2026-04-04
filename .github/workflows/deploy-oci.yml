@@ -45,9 +45,11 @@ jobs:
           export PUBLIC_IP
           export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
           export API_BASE_URL="https://${PUBLIC_IP}.nip.io"
+          export GIT_HASH=$(git rev-parse --short HEAD)
 
           docker compose -f docker-compose.oci.yml build \
-            --build-arg API_BASE_URL="$API_BASE_URL"
+            --build-arg API_BASE_URL="$API_BASE_URL" \
+            --build-arg GIT_HASH="$GIT_HASH"
 
           echo "=== Restarting services ==="
           docker compose -f docker-compose.oci.yml up -d
