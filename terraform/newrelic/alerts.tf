@@ -82,7 +82,7 @@ resource "newrelic_nrql_alert_condition" "container_down" {
   violation_time_limit_seconds = 86400
 
   nrql {
-    query = "SELECT uniqueCount(containerName) FROM ContainerSample WHERE hostname = 'ymatch-oci-arm'"
+    query = "SELECT uniqueCount(name) FROM ContainerSample WHERE hostname = 'ymatch-oci-arm'"
   }
 
   critical {
