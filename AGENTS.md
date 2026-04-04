@@ -31,25 +31,43 @@ DB: `ymatch_user:secure_dev_password@localhost:5432/ymatch` | pgAdmin: `http://l
 
 ### Commands
 ```bash
-# Run all tests (backend + frontend)
-task test
-
-# Full CI pipeline (lint + build + test)
-task ci
-
-# Individual targets
+# Testing (via Taskfile — handles DB setup automatically)
+task test               # Run all tests (backend + frontend)
 task backend:test       # Backend integration tests (auto-starts DB)
-task backend:lint       # cargo fmt --check + clippy
 task frontend:test      # Flutter unit/widget tests
-task frontend:build     # Flutter web build
+
+# Lint (run directly — not part of Taskfile)
+cd backend && cargo fmt -- --check && cargo clippy -- -D warnings
+cd frontend && flutter analyze
+
+# Build
+cd backend && cargo build
+cd frontend && flutter build web
 
 # Dev servers
-task dev:backend        # Rust/Axum on :3000
-task dev:frontend       # Flutter web on :8081
+cd backend && DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch cargo run --bin backend
+cd frontend && flutter run -d web-server --web-port 8081
 
-# List all available tasks
+# List available test tasks
 task --list
 ```
+
+### Test Strategy
+
+**Backend** (`backend/tests/api_tests.rs`): 24 integration tests against PostgreSQL.
+- Each test calls `setup_test_pool()` which resets the database (DELETE all rows, re-run migrations).
+- Tests are fully isolated — no ordering dependencies, deterministic UUIDs.
+- **Must run with `--test-threads=1`** (shared database, sequential execution required).
+- `Taskfile.yml` handles DB container startup and test database creation idempotently.
+
+**Frontend** (`frontend/test/`): 24 unit/widget tests + 4 integration tests.
+- Unit/widget tests use `MockClient` — no external dependencies.
+- Integration tests (`test/integration/`) are tagged `@Tags(['integration'])` and excluded from CI.
+- Integration tests require a running backend at `localhost:3000`.
+
+**CI** (`.github/workflows/ci.yml`): Mirrors local test execution.
+- Backend: PostgreSQL service container → fmt → clippy → build → test (`--test-threads=1`).
+- Frontend: pub get → test (`--exclude-tags=integration`) → build web.
 
 ## GCP (Backup Only)
 

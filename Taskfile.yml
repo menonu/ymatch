@@ -10,7 +10,7 @@ env:
   DATABASE_URL: "postgres://{{.DB_USER}}:{{.DB_PASSWORD}}@localhost:5432/{{.DB_NAME}}"
 
 tasks:
-  # ─── Setup ──────────────────────────────────────────────────────────
+  # ─── Database Setup ────────────────────────────────────────────────
   db:up:
     desc: Start PostgreSQL via Docker Compose (idempotent)
     status:
@@ -40,114 +40,29 @@ tasks:
           echo "{{.DB_NAME}} already exists"
         fi
 
-  # ─── Backend ────────────────────────────────────────────────────────
-  backend:fmt:
-    desc: Check backend code formatting
-    dir: backend
-    cmds:
-      - cargo fmt -- --check
-
-  backend:clippy:
-    desc: Run clippy lints
-    dir: backend
-    cmds:
-      - cargo clippy -- -D warnings
-
-  backend:build:
-    desc: Build backend
-    dir: backend
-    cmds:
-      - cargo build
-
+  # ─── Tests ─────────────────────────────────────────────────────────
   backend:test:
-    desc: Run backend integration tests (needs PostgreSQL)
+    desc: Run backend tests (auto-starts PostgreSQL)
     dir: backend
     deps: [db:ensure-test]
     cmds:
       - cargo test -- --test-threads=1
 
-  backend:lint:
-    desc: Run all backend lint checks (fmt + clippy)
-    cmds:
-      - task: backend:fmt
-      - task: backend:clippy
-
-  # ─── Frontend ───────────────────────────────────────────────────────
-  frontend:deps:
-    desc: Install Flutter dependencies
-    dir: frontend
-    cmds:
-      - flutter pub get
-    sources:
-      - pubspec.yaml
-      - pubspec.lock
-    generates:
-      - .dart_tool/package_config.json
-
   frontend:test:
     desc: Run frontend unit/widget tests (excludes integration)
     dir: frontend
-    deps: [frontend:deps]
     cmds:
+      - flutter pub get
       - flutter test --exclude-tags=integration
 
-  frontend:build:
-    desc: Build Flutter web app
-    dir: frontend
-    deps: [frontend:deps]
-    cmds:
-      - flutter build web
-
-  frontend:analyze:
-    desc: Run Flutter static analysis
-    dir: frontend
-    deps: [frontend:deps]
-    cmds:
-      - flutter analyze
-
-  # ─── Integration ────────────────────────────────────────────────────
   frontend:integration:
     desc: Run frontend integration tests (needs running backend)
     dir: frontend
     cmds:
       - flutter test --tags=integration
 
-  # ─── Aggregate ──────────────────────────────────────────────────────
   test:
     desc: Run all tests (backend + frontend)
     cmds:
       - task: backend:test
       - task: frontend:test
-
-  lint:
-    desc: Run all lint checks
-    cmds:
-      - task: backend:lint
-      - task: frontend:analyze
-
-  ci:
-    desc: Full CI pipeline (lint + build + test)
-    cmds:
-      - task: backend:fmt
-      - task: backend:clippy
-      - task: backend:build
-      - task: backend:test
-      - task: frontend:test
-      - task: frontend:build
-
-  # ─── Dev ────────────────────────────────────────────────────────────
-  dev:backend:
-    desc: Run backend dev server
-    dir: backend
-    env:
-      DATABASE_URL: "postgres://{{.DB_USER}}:{{.DB_PASSWORD}}@localhost:5432/ymatch"
-    deps: [db:up]
-    cmds:
-      - cargo run --bin backend
-
-  dev:frontend:
-    desc: Run frontend dev server
-    dir: frontend
-    deps: [frontend:deps]
-    cmds:
-      - flutter run -d web-server --web-port 8081
