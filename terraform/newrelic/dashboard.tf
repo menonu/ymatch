@@ -116,7 +116,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 3
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT latest(ghWorkflowName) as 'Workflow', latest(ghJobConclusion) as 'Result', latest(duration.ms)/1000 as 'Duration (s)' FROM Span WHERE otel.library.name = 'github-actions' FACET ghWorkflowName SINCE 7 days ago LIMIT 20"
+        query      = "SELECT latest(conclusion) as 'Result', average(duration.ms)/1000 as 'Avg Duration (s)', count(*) as 'Runs' FROM Span WHERE workflow_name IS NOT NULL FACET workflow_name SINCE 7 days ago LIMIT 20"
       }
     }
   }
