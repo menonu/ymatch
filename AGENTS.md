@@ -109,6 +109,25 @@ ssh ubuntu@<PUBLIC_IP>
 - The GitHub CLI (`gh`) is installed and should be used to manage, fetch, and create issues directly from the workspace.
 - **Git Authentication**: Use the GitHub CLI (`gh`) authentication for `git` operations. Ensure the remote is set to HTTPS and run `gh auth setup-git` to allow `git push` without requiring SSH keys.
 
+## Monitoring
+
+See [Monitoring Guide](./docs/monitoring.md) for full details.
+
+- **New Relic** (Free tier): Infrastructure agent on OCI VM, Synthetic monitors, alert policies with Discord notifications
+- **Dashboard**: `ymatch Production Overview` in New Relic
+- **GitHub Actions**: Telemetry exported via `newrelic-exporter.yml` workflow
+- **Billing Alerts**: OCI budget ($1/month), GCP budget ($1/month) — native cloud alerts
+
+### Key Commands
+```bash
+# Agent status on OCI VM
+ssh -i ~/.ssh/oci_ymatch ubuntu@<VM_IP> 'sudo systemctl status newrelic-infra'
+
+# Reinstall agent
+ssh -i ~/.ssh/oci_ymatch ubuntu@<VM_IP>
+NEW_RELIC_LICENSE_KEY=<key> ./ymatch/scripts/setup_newrelic_agent.sh
+```
+
 ## Documentation
 - [Requirements](./docs/requirements.md)
 - [Use Cases](./docs/use_cases.md)
@@ -118,4 +137,5 @@ ssh ubuntu@<PUBLIC_IP>
 - [Database Schema](./docs/db_schema.md)
 - [Cloud Deployment (GCP)](./docs/cloud_deployment.md)
 - [Cloud Deployment (OCI)](./docs/oci_deployment.md)
+- [Monitoring](./docs/monitoring.md)
 - [Initial Idea](./docs/initial.md)

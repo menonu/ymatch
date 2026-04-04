@@ -1,0 +1,24 @@
+name: New Relic GitHub Actions Exporter
+
+on:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+env:
+  GHA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+  GHA_RUN_ID: ${{ github.event.workflow_run.id }}
+  GHA_RUN_NAME: ${{ github.event.workflow_run.name }}
+
+jobs:
+  new-relic-exporter:
+    name: Export telemetry to New Relic
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: New Relic Exporter
+        uses: newrelic-experimental/gha-new-relic-exporter@v1
+        with:
+          accountId: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}

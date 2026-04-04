@@ -62,3 +62,19 @@ variable "boot_volume_size_gb" {
   type        = number
   default     = 50
 }
+
+variable "nr_license_key" {
+  description = "New Relic Ingest License Key for Infrastructure agent"
+  type        = string
+  sensitive   = true
+}
+
+variable "nr_account_id" {
+  description = "New Relic Account ID (for Flex integration)"
+  type        = string
+}
+
+variable "alert_email" {
+  description = "Email address for OCI budget alerts"
+  type        = string
+}
