@@ -147,11 +147,17 @@ pub async fn update_username(
     Json(payload): Json<UpdateUsernameRequest>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     if payload.user_id != id {
-        return Err((StatusCode::FORBIDDEN, "You can only update your own username".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "You can only update your own username".to_string(),
+        ));
     }
     let username = payload.username.trim().to_string();
     if username.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "Username cannot be empty".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Username cannot be empty".to_string(),
+        ));
     }
     let row = sqlx::query(&format!(
         "UPDATE users SET username = $1 WHERE id = $2 RETURNING {}",

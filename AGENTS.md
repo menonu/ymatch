@@ -11,7 +11,7 @@
 ## Build & Test
 
 ### Prerequisites
-- Docker & Docker Compose, Rust (cargo), Flutter SDK
+- Docker & Docker Compose, Rust (cargo), Flutter SDK, [Task](https://taskfile.dev/) (go-task)
 
 ### Infrastructure
 ```bash
@@ -31,17 +31,24 @@ DB: `ymatch_user:secure_dev_password@localhost:5432/ymatch` | pgAdmin: `http://l
 
 ### Commands
 ```bash
-# Backend
-cd backend && DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch cargo run --bin backend
-# Frontend
-cd frontend && flutter run -d web-server --web-port 8081
-# Backend tests
-cd backend && DATABASE_URL=postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test cargo test -- --test-threads=1
-# Frontend tests
-cd frontend && flutter test
-# Lint
-cd backend && cargo clippy -- -D warnings && cargo fmt -- --check
-cd frontend && flutter analyze
+# Run all tests (backend + frontend)
+task test
+
+# Full CI pipeline (lint + build + test)
+task ci
+
+# Individual targets
+task backend:test       # Backend integration tests (auto-starts DB)
+task backend:lint       # cargo fmt --check + clippy
+task frontend:test      # Flutter unit/widget tests
+task frontend:build     # Flutter web build
+
+# Dev servers
+task dev:backend        # Rust/Axum on :3000
+task dev:frontend       # Flutter web on :8081
+
+# List all available tasks
+task --list
 ```
 
 ## GCP (Backup Only)
@@ -94,6 +101,16 @@ ssh ubuntu@<PUBLIC_IP>
 ```
 
 ## Development Guidelines
+
+### Branching Strategy: Trunk-Based Development
+- **`main`** is the single trunk branch. Production is always deployed from `main`.
+- All changes go through **Pull Requests** (PRs) targeting `main`.
+- PRs must pass **CI** (`Backend Build & Test` + `Frontend Build & Test`) before merging.
+- Use **short-lived feature branches** (e.g., `feat/xxx`, `fix/xxx`). Merge promptly after CI passes.
+- **Do NOT push directly to `main`** — always create a PR.
+- After merge to `main`, the `deploy-oci` workflow automatically deploys to production.
+
+### Other Guidelines
 - **Redeploy scripts**: Use `./scripts/redeploy_backend.sh` / `./scripts/redeploy_frontend.sh` after code changes.
 - **Smoke tests**: Run `./scripts/smoke_test.sh` after every backend redeploy.
 - **Process management**: Use `netstat` to verify ports. Use PID files (`backend.pid`, `flutter.pid`). Do NOT use `lsof` to kill processes.

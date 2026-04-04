@@ -11,15 +11,18 @@ impl LocalFileStorage {
         let path = PathBuf::from(&upload_dir);
         // Ensure the directory exists at construction time (best-effort)
         std::fs::create_dir_all(&path).ok();
-        Self {
-            upload_dir: path,
-        }
+        Self { upload_dir: path }
     }
 }
 
 #[async_trait::async_trait]
 impl ImageStorage for LocalFileStorage {
-    async fn upload(&self, bytes: &[u8], filename: &str, _content_type: &str) -> Result<String, StorageError> {
+    async fn upload(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        _content_type: &str,
+    ) -> Result<String, StorageError> {
         let file_path = self.upload_dir.join(filename);
         fs::write(&file_path, bytes)
             .await

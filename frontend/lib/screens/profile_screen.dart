@@ -269,6 +269,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               onPressed: () => ref.read(authProvider.notifier).logout(),
             ),
+            const SizedBox(height: 16),
+            _buildRevisionInfo(ref),
             const SizedBox(height: 24),
           ],
         ),
@@ -308,5 +310,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildRevisionInfo(WidgetRef ref) {
+    const frontendRev = String.fromEnvironment('GIT_HASH', defaultValue: 'dev');
+    final statusAsync = ref.watch(backendSystemStatusProvider);
+    final backendRev = statusAsync.when(
+      data: (data) => (data['backend_version'] as String?) ?? 'unknown',
+      loading: () => '...',
+      error: (_, __) => 'error',
+    );
+    return Text(
+      'frontend: ${_shortHash(frontendRev)}  /  backend: ${_shortHash(backendRev)}',
+      textAlign: TextAlign.center,
+      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+    );
+  }
+
+  String _shortHash(String hash) {
+    if (hash.length > 7) return hash.substring(0, 7);
+    return hash;
   }
 }

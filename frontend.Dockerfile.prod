@@ -27,10 +27,11 @@ COPY proto /proto
 # Build Flutter Web app
 # API_BASE_URL can be set at build time (e.g., for OCI deployment behind reverse proxy)
 ARG API_BASE_URL=""
+ARG GIT_HASH=""
 RUN if [ -n "$API_BASE_URL" ]; then \
-      flutter build web --release --dart-define=API_BASE_URL=$API_BASE_URL; \
+      flutter build web --release --dart-define=API_BASE_URL=$API_BASE_URL --dart-define=GIT_HASH=$GIT_HASH; \
     else \
-      flutter build web --release; \
+      flutter build web --release --dart-define=GIT_HASH=$GIT_HASH; \
     fi
 
 # ---------------------------------------------------
