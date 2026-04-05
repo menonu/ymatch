@@ -490,7 +490,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                           crossAxisCount: 3,
                                           crossAxisSpacing: 8,
                                           mainAxisSpacing: 8,
-                                          childAspectRatio: 0.55,
+                                          childAspectRatio: 0.6,
                                         ),
                                     itemCount: items.length,
                                     itemBuilder: (context, index) =>
@@ -636,7 +636,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 1,
               child: Stack(
                 children: [
                   Positioned.fill(
@@ -949,10 +950,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: buildImage(
-                  item.hasPhotoUrl() ? item.photoUrl : null,
-                  width: 64,
-                  height: 64,
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: buildImage(
+                    item.hasPhotoUrl() ? item.photoUrl : null,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1175,78 +1181,95 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     required Function(int) onUpdate,
   }) {
     return Container(
+      width: 56,
+      height: 44,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          // Left tap area: decrease
-          GestureDetector(
-            onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
-            child: Container(
-              width: 32,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              color: qty > 0
-                  ? color.withValues(alpha: 0.10)
-                  : Colors.grey.withValues(alpha: 0.05),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '',
-                    style: TextStyle(fontSize: 9, color: color),
+          // Tap areas: left = decrease, right = increase
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+                  child: Container(
+                    color: Colors.transparent,
                   ),
-                  Icon(Icons.remove, size: 12,
-                    color: qty > 0 ? color : Colors.grey[400]),
-                ],
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  key: Key('stepper_inc_$label'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onUpdate(qty + 1),
+                  child: Container(
+                    color: Colors.transparent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // −/+ hint icons centered on left/right edges
+          Positioned(
+            left: 2,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Text(
+                '−',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: qty > 0
+                      ? color.withValues(alpha: 0.5)
+                      : Colors.grey.withValues(alpha: 0.3),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
-          // Center: label + quantity
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            color: color.withValues(alpha: 0.03),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                    color: color,
-                  ),
+          Positioned(
+            right: 3,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Text(
+                '+',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: color.withValues(alpha: 0.5),
+                  fontWeight: FontWeight.bold,
                 ),
-                Text(
-                  '$qty',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: qty > 0 ? color : Colors.grey[600],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-          // Right tap area: increase
-          GestureDetector(
-            onTap: () => onUpdate(qty + 1),
-            child: Container(
-              width: 32,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              color: color.withValues(alpha: 0.10),
+          // Centered label + quantity (non-interactive, taps pass through)
+          Center(
+            child: IgnorePointer(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '',
-                    style: TextStyle(fontSize: 9, color: color),
+                    label,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: qty > 0 ? color : Colors.grey[500],
+                    ),
                   ),
-                  Icon(Icons.add, size: 12, color: color),
+                  Text(
+                    '$qty',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                      color: qty > 0 ? color : Colors.grey[500],
+                    ),
+                  ),
                 ],
               ),
             ),
