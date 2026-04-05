@@ -317,13 +317,12 @@ void main() {
 
         expect(find.text('Acrylic Stand A'), findsOneWidget);
 
-        // 7. Inventory Management: Increment HAVE (tap right side of first stepper)
-        final addIcons = find.byIcon(Icons.add);
-        await tester.tap(addIcons.first);
+        // 7. Inventory Management: Increment HAVE (tap right side of stepper)
+        await tester.tap(find.byKey(const Key('stepper_inc_HAVE')));
         await tester.pumpAndSettle();
 
-        // 8. Increment TRADE (tap right side of last stepper)
-        await tester.tap(addIcons.last);
+        // 8. Increment TRADE (tap right side of stepper)
+        await tester.tap(find.byKey(const Key('stepper_inc_TRADE')));
         await tester.pumpAndSettle();
 
         // Verify state was sent to mock backend
