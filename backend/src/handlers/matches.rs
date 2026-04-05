@@ -6,7 +6,7 @@ pub async fn list_all_matches(
     State(pool): State<PgPool>,
 ) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
     let rows = sqlx::query(
-        "SELECT id, user1_id, user2_id, status, offered_by, created_at FROM matches ORDER BY created_at DESC",
+        "SELECT id, user1_id, user2_id, status, offered_by, inventory_applied_at, created_at FROM matches ORDER BY created_at DESC",
     )
     .fetch_all(&pool)
     .await
@@ -23,6 +23,9 @@ pub async fn list_all_matches(
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
             offered_by: row.get("offered_by"),
+            inventory_applied: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("inventory_applied_at")
+                .is_some(),
             other_user: None,
             user_haves: vec![],
             user_wants: vec![],
@@ -38,7 +41,7 @@ pub async fn list_matches(
     Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
     let rows = sqlx::query(
-        "SELECT id, user1_id, user2_id, status, offered_by, created_at FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status != 'REJECTED' ORDER BY created_at DESC"
+        "SELECT id, user1_id, user2_id, status, offered_by, inventory_applied_at, created_at FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status != 'REJECTED' ORDER BY created_at DESC"
     )
     .bind(user_id)
     .fetch_all(&pool)
@@ -173,6 +176,9 @@ pub async fn list_matches(
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
             offered_by: row.get("offered_by"),
+            inventory_applied: row
+                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("inventory_applied_at")
+                .is_some(),
             other_user,
             user_haves,
             user_wants,
@@ -352,11 +358,13 @@ pub async fn apply_trade_inventory(
     Path(match_id): Path<i32>,
     Json(payload): Json<ApplyInventoryRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let match_row = sqlx::query("SELECT status FROM matches WHERE id = $1")
-        .bind(match_id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let match_row = sqlx::query(
+        "SELECT user1_id, user2_id, status, offered_by, inventory_applied_at FROM matches WHERE id = $1",
+    )
+    .bind(match_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
     let status: String = match_row.get("status");
@@ -366,6 +374,23 @@ pub async fn apply_trade_inventory(
             "Can only apply inventory on COMPLETED matches".to_string(),
         ));
     }
+
+    let applied: Option<chrono::DateTime<chrono::Utc>> = match_row.get("inventory_applied_at");
+    if applied.is_some() {
+        return Err((
+            StatusCode::CONFLICT,
+            "Inventory already applied for this trade".to_string(),
+        ));
+    }
+
+    let u1: i32 = match_row.get("user1_id");
+    let u2: i32 = match_row.get("user2_id");
+    if payload.user_id != u1 && payload.user_id != u2 {
+        return Err((StatusCode::FORBIDDEN, "Not part of this match".to_string()));
+    }
+    let offered_by: Option<i32> = match_row.get("offered_by");
+    let offerer = offered_by.unwrap_or(u1);
+    let other = if offerer == u1 { u2 } else { u1 };
 
     let items = sqlx::query(
         "SELECT merch_id, owner_id, direction, quantity FROM match_items WHERE match_id = $1",
@@ -380,60 +405,65 @@ pub async fn apply_trade_inventory(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    for item in items {
-        let owner_id: i32 = item.get("owner_id");
+    for item in &items {
         let merch_id: i32 = item.get("merch_id");
         let direction: String = item.get("direction");
         let qty: i32 = item.get("quantity");
 
-        if direction == "GIVE" && owner_id == payload.user_id {
-            // Decrease TRADE quantity, increase HAVE for receiver would be separate
+        // Items are stored from the offerer's perspective:
+        //   GIVE = offerer gives this item, other receives it
+        //   RECEIVE = offerer receives this item, other gives it
+        if direction == "GIVE" {
+            // Offerer gives: decrease offerer's TRADE
             sqlx::query(
                 "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
             )
-            .bind(qty)
-            .bind(owner_id)
-            .bind(merch_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .bind(qty).bind(offerer).bind(merch_id)
+            .execute(&mut *tx).await.ok();
 
-            // Decrease WANT for the user (they got what they wanted)
-            sqlx::query(
-                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'WANT'",
-            )
-            .bind(qty)
-            .bind(owner_id)
-            .bind(merch_id)
-            .execute(&mut *tx)
-            .await
-            .ok();
-        } else if direction == "RECEIVE" && owner_id == payload.user_id {
-            // User receives: increase HAVE, decrease WANT
+            // Other receives: increase other's HAVE
             sqlx::query(
                 r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
                    VALUES ($1, $2, 'HAVE', $3)
                    ON CONFLICT (user_id, merch_id, status)
                    DO UPDATE SET quantity = inventory.quantity + $3"#,
             )
-            .bind(owner_id)
+            .bind(other)
             .bind(merch_id)
             .bind(qty)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-            sqlx::query(
-                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'WANT'",
-            )
-            .bind(qty)
-            .bind(owner_id)
-            .bind(merch_id)
             .execute(&mut *tx)
             .await
             .ok();
+        } else if direction == "RECEIVE" {
+            // Offerer receives: increase offerer's HAVE
+            sqlx::query(
+                r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
+                   VALUES ($1, $2, 'HAVE', $3)
+                   ON CONFLICT (user_id, merch_id, status)
+                   DO UPDATE SET quantity = inventory.quantity + $3"#,
+            )
+            .bind(offerer)
+            .bind(merch_id)
+            .bind(qty)
+            .execute(&mut *tx)
+            .await
+            .ok();
+
+            // Other gives: decrease other's TRADE
+            sqlx::query(
+                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
+            )
+            .bind(qty).bind(other).bind(merch_id)
+            .execute(&mut *tx).await.ok();
         }
     }
+
+    // Mark as applied (one-time only)
+    sqlx::query("UPDATE matches SET inventory_applied_at = NOW() WHERE id = $1")
+        .bind(match_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tx.commit()
         .await
