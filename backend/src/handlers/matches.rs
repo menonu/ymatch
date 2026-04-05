@@ -6,7 +6,7 @@ pub async fn list_all_matches(
     State(pool): State<PgPool>,
 ) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
     let rows = sqlx::query(
-        "SELECT id, user1_id, user2_id, status, created_at FROM matches ORDER BY created_at DESC",
+        "SELECT id, user1_id, user2_id, status, offered_by, created_at FROM matches ORDER BY created_at DESC",
     )
     .fetch_all(&pool)
     .await
@@ -14,21 +14,20 @@ pub async fn list_all_matches(
 
     let mut matches = Vec::new();
     for row in rows {
-        let match_id: i32 = row.get("id");
-        let trade_match = TradeMatch {
-            id: match_id,
+        matches.push(TradeMatch {
+            id: row.get("id"),
             user1_id: row.get("user1_id"),
             user2_id: row.get("user2_id"),
             status: row.get("status"),
             created_at: row
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
+            offered_by: row.get("offered_by"),
             other_user: None,
             user_haves: vec![],
             user_wants: vec![],
-        };
-
-        matches.push(trade_match);
+            selected_items: vec![],
+        });
     }
 
     Ok(Json(matches))
@@ -39,7 +38,7 @@ pub async fn list_matches(
     Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
     let rows = sqlx::query(
-        "SELECT id, user1_id, user2_id, status, created_at FROM matches WHERE user1_id = $1 OR user2_id = $1 ORDER BY created_at DESC"
+        "SELECT id, user1_id, user2_id, status, offered_by, created_at FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status != 'REJECTED' ORDER BY created_at DESC"
     )
     .bind(user_id)
     .fetch_all(&pool)
@@ -71,6 +70,7 @@ pub async fn list_matches(
             banned_until: None,
         });
 
+        // Potential items user can give (user's TRADE that other WANTs)
         let haves_rows = sqlx::query(
             r#"
             SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity, m.name as merch_name, m.photo_url
@@ -88,7 +88,7 @@ pub async fn list_matches(
         .await
         .unwrap_or_default();
 
-        let user_haves = haves_rows
+        let user_haves: Vec<InventoryItem> = haves_rows
             .into_iter()
             .map(|r| InventoryItem {
                 id: r.get("id"),
@@ -102,6 +102,7 @@ pub async fn list_matches(
             })
             .collect();
 
+        // Potential items user receives (other's TRADE that user WANTs)
         let wants_rows = sqlx::query(
             r#"
             SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity, m.name as merch_name, m.photo_url
@@ -119,7 +120,7 @@ pub async fn list_matches(
         .await
         .unwrap_or_default();
 
-        let user_wants = wants_rows
+        let user_wants: Vec<InventoryItem> = wants_rows
             .into_iter()
             .map(|r| InventoryItem {
                 id: r.get("id"),
@@ -133,6 +134,36 @@ pub async fn list_matches(
             })
             .collect();
 
+        // Selected items for OFFERED/ACCEPTED/COMPLETED matches
+        let selected_items_rows = sqlx::query(
+            r#"
+            SELECT mi.id, mi.match_id, mi.merch_id, mi.owner_id, mi.direction, mi.quantity,
+                   m.name as merch_name, m.photo_url
+            FROM match_items mi
+            JOIN merchandise m ON mi.merch_id = m.id
+            WHERE mi.match_id = $1
+            ORDER BY mi.direction, mi.id
+            "#,
+        )
+        .bind(match_id)
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+
+        let selected_items: Vec<MatchItem> = selected_items_rows
+            .into_iter()
+            .map(|r| MatchItem {
+                id: r.get("id"),
+                match_id: r.get("match_id"),
+                merch_id: r.get("merch_id"),
+                owner_id: r.get("owner_id"),
+                direction: r.get("direction"),
+                quantity: r.get("quantity"),
+                merch_name: Some(r.get("merch_name")),
+                photo_url: r.get("photo_url"),
+            })
+            .collect();
+
         matches.push(TradeMatch {
             id: match_id,
             user1_id: u1,
@@ -141,13 +172,86 @@ pub async fn list_matches(
             created_at: row
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
                 .map(|dt| dt.to_rfc3339()),
+            offered_by: row.get("offered_by"),
             other_user,
             user_haves,
             user_wants,
+            selected_items,
         });
     }
 
     Ok(Json(matches))
+}
+
+/// Submit an offer: select items for trade, transition PENDING → OFFERED
+pub async fn offer_trade(
+    State(pool): State<PgPool>,
+    Path(match_id): Path<i32>,
+    Json(payload): Json<OfferTradeRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Verify match is PENDING and user is part of it
+    let match_row =
+        sqlx::query("SELECT user1_id, user2_id, status FROM matches WHERE id = $1 FOR UPDATE")
+            .bind(match_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
+    let status: String = match_row.get("status");
+    if status != "PENDING" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Can only offer on PENDING matches".to_string(),
+        ));
+    }
+
+    let u1: i32 = match_row.get("user1_id");
+    let u2: i32 = match_row.get("user2_id");
+    if payload.user_id != u1 && payload.user_id != u2 {
+        return Err((StatusCode::FORBIDDEN, "Not part of this match".to_string()));
+    }
+
+    if payload.items.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Must select at least one item".to_string(),
+        ));
+    }
+
+    // Insert selected items
+    for item in &payload.items {
+        sqlx::query(
+            "INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity) VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(match_id)
+        .bind(item.merch_id)
+        .bind(payload.user_id)
+        .bind(&item.direction)
+        .bind(item.quantity)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    // Update match status to OFFERED
+    sqlx::query("UPDATE matches SET status = 'OFFERED', offered_by = $1 WHERE id = $2")
+        .bind(payload.user_id)
+        .bind(match_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
 }
 
 pub async fn update_match_status(
@@ -165,6 +269,46 @@ pub async fn update_match_status(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let match_row = sqlx::query(
+        "SELECT user1_id, user2_id, status, offered_by FROM matches WHERE id = $1 FOR UPDATE",
+    )
+    .bind(match_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
+    let current_status: String = match_row.get("status");
+
+    // Validate state transitions
+    match payload.status.as_str() {
+        "ACCEPTED" => {
+            if current_status != "OFFERED" {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Can only accept OFFERED matches".to_string(),
+                ));
+            }
+        }
+        "COMPLETED" => {
+            if current_status != "ACCEPTED" {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Can only complete ACCEPTED matches".to_string(),
+                ));
+            }
+        }
+        "REJECTED" => {
+            if current_status != "PENDING" && current_status != "OFFERED" {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Can only reject PENDING or OFFERED matches".to_string(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
     sqlx::query("UPDATE matches SET status = $1 WHERE id = $2")
         .bind(&payload.status)
         .bind(match_id)
@@ -172,13 +316,8 @@ pub async fn update_match_status(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // On ACCEPTED: delete other PENDING matches between these users
     if payload.status == "ACCEPTED" {
-        let match_row = sqlx::query("SELECT user1_id, user2_id FROM matches WHERE id = $1")
-            .bind(match_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
         let u1: i32 = match_row.get("user1_id");
         let u2: i32 = match_row.get("user2_id");
 
@@ -191,9 +330,171 @@ pub async fn update_match_status(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
 
+    // On REJECTED: clean up match_items
+    if payload.status == "REJECTED" {
+        sqlx::query("DELETE FROM match_items WHERE match_id = $1")
+            .bind(match_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
     tx.commit()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(StatusCode::OK)
+}
+
+/// Post-complete: apply inventory changes based on traded items
+pub async fn apply_trade_inventory(
+    State(pool): State<PgPool>,
+    Path(match_id): Path<i32>,
+    Json(payload): Json<ApplyInventoryRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let match_row = sqlx::query("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
+    let status: String = match_row.get("status");
+    if status != "COMPLETED" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Can only apply inventory on COMPLETED matches".to_string(),
+        ));
+    }
+
+    let items = sqlx::query(
+        "SELECT merch_id, owner_id, direction, quantity FROM match_items WHERE match_id = $1",
+    )
+    .bind(match_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    for item in items {
+        let owner_id: i32 = item.get("owner_id");
+        let merch_id: i32 = item.get("merch_id");
+        let direction: String = item.get("direction");
+        let qty: i32 = item.get("quantity");
+
+        if direction == "GIVE" && owner_id == payload.user_id {
+            // Decrease TRADE quantity, increase HAVE for receiver would be separate
+            sqlx::query(
+                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
+            )
+            .bind(qty)
+            .bind(owner_id)
+            .bind(merch_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            // Decrease WANT for the user (they got what they wanted)
+            sqlx::query(
+                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'WANT'",
+            )
+            .bind(qty)
+            .bind(owner_id)
+            .bind(merch_id)
+            .execute(&mut *tx)
+            .await
+            .ok();
+        } else if direction == "RECEIVE" && owner_id == payload.user_id {
+            // User receives: increase HAVE, decrease WANT
+            sqlx::query(
+                r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
+                   VALUES ($1, $2, 'HAVE', $3)
+                   ON CONFLICT (user_id, merch_id, status)
+                   DO UPDATE SET quantity = inventory.quantity + $3"#,
+            )
+            .bind(owner_id)
+            .bind(merch_id)
+            .bind(qty)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            sqlx::query(
+                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0) WHERE user_id = $2 AND merch_id = $3 AND status = 'WANT'",
+            )
+            .bind(qty)
+            .bind(owner_id)
+            .bind(merch_id)
+            .execute(&mut *tx)
+            .await
+            .ok();
+        }
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
+/// Get notification counts for matches
+pub async fn match_notification_counts(
+    State(pool): State<PgPool>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<NotificationCounts>, (StatusCode, String)> {
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status = 'PENDING'",
+    )
+    .bind(user_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let offers_in: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status = 'OFFERED' AND offered_by != $1",
+    )
+    .bind(user_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let accepted: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status = 'ACCEPTED'",
+    )
+    .bind(user_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Unread messages: messages in active matches not sent by this user, created after user's last read
+    let unread: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM messages msg
+           JOIN matches m ON msg.match_id = m.id
+           WHERE (m.user1_id = $1 OR m.user2_id = $1)
+             AND m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+             AND msg.sender_id != $1
+             AND msg.created_at > COALESCE(
+               (SELECT matches_read_at FROM users WHERE id = $1),
+               '1970-01-01'::timestamptz
+             )"#,
+    )
+    .bind(user_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let total = pending + offers_in + accepted + unread;
+
+    Ok(Json(NotificationCounts {
+        pending_matches: pending as i32,
+        offers_in: offers_in as i32,
+        accepted: accepted as i32,
+        unread_messages: unread as i32,
+        total: total as i32,
+    }))
 }

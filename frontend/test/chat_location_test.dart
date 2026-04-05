@@ -33,6 +33,17 @@ void main() {
           return http.Response(jsonEncode([]), 200);
         } else if (request.url.path == '/api/v1/system/status') {
           return http.Response(jsonEncode({'backend_version': '1.0.0'}), 200);
+        } else if (request.url.path == '/api/v1/matches/user/1/counts') {
+          return http.Response(
+            jsonEncode({
+              'pendingMatches': 0,
+              'offersIn': 0,
+              'accepted': 1,
+              'unreadMessages': 0,
+              'total': 1,
+            }),
+            200,
+          );
         } else if (request.url.path == '/api/v1/matches/user/1') {
           return http.Response(
             jsonEncode([
@@ -96,19 +107,23 @@ void main() {
       await tester.tap(find.text('Matches').last);
       await tester.pumpAndSettle();
 
-      // 3. Enter Chat
-      await tester.tap(find.text('Trade Match #100'));
+      // 3. Navigate to Active tab (match is ACCEPTED)
+      await tester.tap(find.text('Active'));
       await tester.pumpAndSettle();
 
-      // 4. Open Map Picker
+      // 4. Enter Chat by tapping the card
+      await tester.tap(find.byType(Card).first);
+      await tester.pumpAndSettle();
+
+      // 5. Open Map Picker
       await tester.tap(find.byIcon(Icons.add_location_alt_outlined));
       await tester.pumpAndSettle();
 
-      // 5. Confirm Location
+      // 6. Confirm Location
       await tester.tap(find.text('Confirm'));
       await tester.pumpAndSettle();
 
-      // 6. Verify message sent and displayed
+      // 7. Verify message sent and displayed
       expect(messageSent, isTrue);
 
       // Wait for polling to fetch the new message (polling is every 3 seconds)

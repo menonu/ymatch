@@ -716,6 +716,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     User? otherUser,
     $core.Iterable<InventoryItem>? userHaves,
     $core.Iterable<InventoryItem>? userWants,
+    $core.int? offeredBy,
+    $core.Iterable<MatchItem>? selectedItems,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -726,6 +728,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (otherUser != null) result.otherUser = otherUser;
     if (userHaves != null) result.userHaves.addAll(userHaves);
     if (userWants != null) result.userWants.addAll(userWants);
+    if (offeredBy != null) result.offeredBy = offeredBy;
+    if (selectedItems != null) result.selectedItems.addAll(selectedItems);
     return result;
   }
 
@@ -752,6 +756,9 @@ class TradeMatch extends $pb.GeneratedMessage {
         subBuilder: InventoryItem.create)
     ..pPM<InventoryItem>(8, _omitFieldNames ? '' : 'userWants',
         subBuilder: InventoryItem.create)
+    ..aI(9, _omitFieldNames ? '' : 'offeredBy')
+    ..pPM<MatchItem>(10, _omitFieldNames ? '' : 'selectedItems',
+        subBuilder: MatchItem.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -833,6 +840,155 @@ class TradeMatch extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(8)
   $pb.PbList<InventoryItem> get userWants => $_getList(7);
+
+  @$pb.TagNumber(9)
+  $core.int get offeredBy => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set offeredBy($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasOfferedBy() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearOfferedBy() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $pb.PbList<MatchItem> get selectedItems => $_getList(9);
+}
+
+class MatchItem extends $pb.GeneratedMessage {
+  factory MatchItem({
+    $core.int? id,
+    $core.int? matchId,
+    $core.int? merchId,
+    $core.int? ownerId,
+    $core.String? direction,
+    $core.int? quantity,
+    $core.String? merchName,
+    $core.String? photoUrl,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (matchId != null) result.matchId = matchId;
+    if (merchId != null) result.merchId = merchId;
+    if (ownerId != null) result.ownerId = ownerId;
+    if (direction != null) result.direction = direction;
+    if (quantity != null) result.quantity = quantity;
+    if (merchName != null) result.merchName = merchName;
+    if (photoUrl != null) result.photoUrl = photoUrl;
+    return result;
+  }
+
+  MatchItem._();
+
+  factory MatchItem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MatchItem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MatchItem',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'id')
+    ..aI(2, _omitFieldNames ? '' : 'matchId')
+    ..aI(3, _omitFieldNames ? '' : 'merchId')
+    ..aI(4, _omitFieldNames ? '' : 'ownerId')
+    ..aOS(5, _omitFieldNames ? '' : 'direction')
+    ..aI(6, _omitFieldNames ? '' : 'quantity')
+    ..aOS(7, _omitFieldNames ? '' : 'merchName')
+    ..aOS(8, _omitFieldNames ? '' : 'photoUrl')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MatchItem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MatchItem copyWith(void Function(MatchItem) updates) =>
+      super.copyWith((message) => updates(message as MatchItem)) as MatchItem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MatchItem create() => MatchItem._();
+  @$core.override
+  MatchItem createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MatchItem getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<MatchItem>(create);
+  static MatchItem? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get id => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set id($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get matchId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set matchId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMatchId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMatchId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get merchId => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set merchId($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMerchId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMerchId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get ownerId => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set ownerId($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOwnerId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOwnerId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get direction => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set direction($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDirection() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDirection() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get quantity => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set quantity($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasQuantity() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearQuantity() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get merchName => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set merchName($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasMerchName() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMerchName() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get photoUrl => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set photoUrl($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPhotoUrl() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPhotoUrl() => $_clearField(8);
 }
 
 /// Request/Response Models
@@ -1124,6 +1280,72 @@ class CreateEventRequest extends $pb.GeneratedMessage {
   void clearStatus() => $_clearField(3);
 }
 
+class UpdateEventRequest extends $pb.GeneratedMessage {
+  factory UpdateEventRequest({
+    $core.int? userId,
+    $core.String? name,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (name != null) result.name = name;
+    return result;
+  }
+
+  UpdateEventRequest._();
+
+  factory UpdateEventRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateEventRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateEventRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateEventRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateEventRequest copyWith(void Function(UpdateEventRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateEventRequest))
+          as UpdateEventRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateEventRequest create() => UpdateEventRequest._();
+  @$core.override
+  UpdateEventRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateEventRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateEventRequest>(create);
+  static UpdateEventRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+}
+
 class UpdateInventoryRequest extends $pb.GeneratedMessage {
   factory UpdateInventoryRequest({
     $core.int? userId,
@@ -1384,6 +1606,96 @@ class CreateMerchRequest extends $pb.GeneratedMessage {
   void clearStatus() => $_clearField(5);
 }
 
+class UpdateMerchRequest extends $pb.GeneratedMessage {
+  factory UpdateMerchRequest({
+    $core.int? userId,
+    $core.String? name,
+    $core.String? photoUrl,
+    $core.String? groupName,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (name != null) result.name = name;
+    if (photoUrl != null) result.photoUrl = photoUrl;
+    if (groupName != null) result.groupName = groupName;
+    return result;
+  }
+
+  UpdateMerchRequest._();
+
+  factory UpdateMerchRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateMerchRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateMerchRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'photoUrl')
+    ..aOS(4, _omitFieldNames ? '' : 'groupName')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateMerchRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateMerchRequest copyWith(void Function(UpdateMerchRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateMerchRequest))
+          as UpdateMerchRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateMerchRequest create() => UpdateMerchRequest._();
+  @$core.override
+  UpdateMerchRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateMerchRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateMerchRequest>(create);
+  static UpdateMerchRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get photoUrl => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set photoUrl($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPhotoUrl() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPhotoUrl() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get groupName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set groupName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasGroupName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearGroupName() => $_clearField(4);
+}
+
 class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
   factory UpdateMatchStatusRequest({
     $core.String? status,
@@ -1437,6 +1749,301 @@ class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
   $core.bool hasStatus() => $_has(0);
   @$pb.TagNumber(1)
   void clearStatus() => $_clearField(1);
+}
+
+class OfferTradeRequest extends $pb.GeneratedMessage {
+  factory OfferTradeRequest({
+    $core.int? userId,
+    $core.Iterable<OfferItem>? items,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (items != null) result.items.addAll(items);
+    return result;
+  }
+
+  OfferTradeRequest._();
+
+  factory OfferTradeRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory OfferTradeRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'OfferTradeRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..pPM<OfferItem>(2, _omitFieldNames ? '' : 'items',
+        subBuilder: OfferItem.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OfferTradeRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OfferTradeRequest copyWith(void Function(OfferTradeRequest) updates) =>
+      super.copyWith((message) => updates(message as OfferTradeRequest))
+          as OfferTradeRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static OfferTradeRequest create() => OfferTradeRequest._();
+  @$core.override
+  OfferTradeRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static OfferTradeRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<OfferTradeRequest>(create);
+  static OfferTradeRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<OfferItem> get items => $_getList(1);
+}
+
+class OfferItem extends $pb.GeneratedMessage {
+  factory OfferItem({
+    $core.int? merchId,
+    $core.String? direction,
+    $core.int? quantity,
+  }) {
+    final result = create();
+    if (merchId != null) result.merchId = merchId;
+    if (direction != null) result.direction = direction;
+    if (quantity != null) result.quantity = quantity;
+    return result;
+  }
+
+  OfferItem._();
+
+  factory OfferItem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory OfferItem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'OfferItem',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'merchId')
+    ..aOS(2, _omitFieldNames ? '' : 'direction')
+    ..aI(3, _omitFieldNames ? '' : 'quantity')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OfferItem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OfferItem copyWith(void Function(OfferItem) updates) =>
+      super.copyWith((message) => updates(message as OfferItem)) as OfferItem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static OfferItem create() => OfferItem._();
+  @$core.override
+  OfferItem createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static OfferItem getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<OfferItem>(create);
+  static OfferItem? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get merchId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set merchId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMerchId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMerchId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get direction => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set direction($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDirection() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDirection() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get quantity => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set quantity($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasQuantity() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearQuantity() => $_clearField(3);
+}
+
+class ApplyInventoryRequest extends $pb.GeneratedMessage {
+  factory ApplyInventoryRequest({
+    $core.int? userId,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    return result;
+  }
+
+  ApplyInventoryRequest._();
+
+  factory ApplyInventoryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ApplyInventoryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ApplyInventoryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ApplyInventoryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ApplyInventoryRequest copyWith(
+          void Function(ApplyInventoryRequest) updates) =>
+      super.copyWith((message) => updates(message as ApplyInventoryRequest))
+          as ApplyInventoryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ApplyInventoryRequest create() => ApplyInventoryRequest._();
+  @$core.override
+  ApplyInventoryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ApplyInventoryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ApplyInventoryRequest>(create);
+  static ApplyInventoryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+}
+
+class NotificationCounts extends $pb.GeneratedMessage {
+  factory NotificationCounts({
+    $core.int? pendingMatches,
+    $core.int? offersIn,
+    $core.int? accepted,
+    $core.int? unreadMessages,
+    $core.int? total,
+  }) {
+    final result = create();
+    if (pendingMatches != null) result.pendingMatches = pendingMatches;
+    if (offersIn != null) result.offersIn = offersIn;
+    if (accepted != null) result.accepted = accepted;
+    if (unreadMessages != null) result.unreadMessages = unreadMessages;
+    if (total != null) result.total = total;
+    return result;
+  }
+
+  NotificationCounts._();
+
+  factory NotificationCounts.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NotificationCounts.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NotificationCounts',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'pendingMatches')
+    ..aI(2, _omitFieldNames ? '' : 'offersIn')
+    ..aI(3, _omitFieldNames ? '' : 'accepted')
+    ..aI(4, _omitFieldNames ? '' : 'unreadMessages')
+    ..aI(5, _omitFieldNames ? '' : 'total')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NotificationCounts clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NotificationCounts copyWith(void Function(NotificationCounts) updates) =>
+      super.copyWith((message) => updates(message as NotificationCounts))
+          as NotificationCounts;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NotificationCounts create() => NotificationCounts._();
+  @$core.override
+  NotificationCounts createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NotificationCounts getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NotificationCounts>(create);
+  static NotificationCounts? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get pendingMatches => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pendingMatches($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPendingMatches() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPendingMatches() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get offersIn => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set offersIn($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOffersIn() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOffersIn() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get accepted => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set accepted($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAccepted() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAccepted() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get unreadMessages => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set unreadMessages($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUnreadMessages() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUnreadMessages() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get total => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set total($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTotal() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTotal() => $_clearField(5);
 }
 
 class Message extends $pb.GeneratedMessage {
@@ -1804,6 +2411,7 @@ class SearchResult extends $pb.GeneratedMessage {
   void clearEventId() => $_clearField(6);
 }
 
+/// Admin request types
 class BanUserRequest extends $pb.GeneratedMessage {
   factory BanUserRequest({
     $core.String? reason,
@@ -1925,6 +2533,7 @@ class UpdateUserRoleRequest extends $pb.GeneratedMessage {
   void clearRole() => $_clearField(1);
 }
 
+/// Generic request with user_id for permission checks
 class UserActionRequest extends $pb.GeneratedMessage {
   factory UserActionRequest({
     $core.int? userId,
