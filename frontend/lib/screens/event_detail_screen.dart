@@ -804,71 +804,61 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ? () => _showMerchActions(context, ref, item)
           : null,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Row 1: Image + Name
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: buildImage(
-                    item.hasPhotoUrl() ? item.photoUrl : null,
-                    width: 28,
-                    height: 28,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (isOwner)
-                  Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
-              ],
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: buildImage(
+                item.hasPhotoUrl() ? item.photoUrl : null,
+                width: 28,
+                height: 28,
+              ),
             ),
-            const SizedBox(height: 2),
-            // Row 2: Compact counters
-            Row(
-              children: [
-                const SizedBox(width: 36),
-                if (showHave)
-                  _buildCompactCounter(
-                    context,
-                    'HAVE',
-                    haveQty,
-                    AppTheme.haveColor,
-                    (q) => _updateInv(ref, user, item.id, 'HAVE', q),
-                  ),
-                if (showHave && showWantTrade) const SizedBox(width: 6),
-                if (showWantTrade) ...[
-                  _buildCompactCounter(
-                    context,
-                    'WANT',
-                    wantQty,
-                    AppTheme.wantColor,
-                    (q) => _updateInv(ref, user, item.id, 'WANT', q),
-                  ),
-                  const SizedBox(width: 6),
-                  _buildCompactCounter(
-                    context,
-                    'TRADE',
-                    tradeQty,
-                    AppTheme.tradeColor,
-                    (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-                  ),
-                ],
-              ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                item.name,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            if (isOwner)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
+              ),
+            if (showHave)
+              _buildCompactCounter(
+                context,
+                'HAVE',
+                haveQty,
+                AppTheme.haveColor,
+                (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+              ),
+            if (showHave && showWantTrade) const SizedBox(width: 4),
+            if (showWantTrade) ...[
+              _buildCompactCounter(
+                context,
+                'WANT',
+                wantQty,
+                AppTheme.wantColor,
+                (q) => _updateInv(ref, user, item.id, 'WANT', q),
+              ),
+              const SizedBox(width: 4),
+              _buildCompactCounter(
+                context,
+                'TRADE',
+                tradeQty,
+                AppTheme.tradeColor,
+                (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+              ),
+            ],
           ],
         ),
       ),
@@ -1185,37 +1175,81 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     required Function(int) onUpdate,
   }) {
     return Container(
-      height: 32,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _StepperButton(
-            icon: Icons.remove,
-            color: color,
+          // Left tap area: decrease
+          GestureDetector(
             onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
-            label: 'Decrease $label',
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Text(
-              '$label $qty',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: color,
+            child: Container(
+              width: 32,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              color: qty > 0
+                  ? color.withValues(alpha: 0.10)
+                  : Colors.grey.withValues(alpha: 0.05),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '',
+                    style: TextStyle(fontSize: 9, color: color),
+                  ),
+                  Icon(Icons.remove, size: 12,
+                    color: qty > 0 ? color : Colors.grey[400]),
+                ],
               ),
             ),
           ),
-          _StepperButton(
-            icon: Icons.add,
-            color: color,
+          // Center: label + quantity
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            color: color.withValues(alpha: 0.03),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  '$qty',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: qty > 0 ? color : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Right tap area: increase
+          GestureDetector(
             onTap: () => onUpdate(qty + 1),
-            label: 'Increase $label',
+            child: Container(
+              width: 32,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              color: color.withValues(alpha: 0.10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '',
+                    style: TextStyle(fontSize: 9, color: color),
+                  ),
+                  Icon(Icons.add, size: 12, color: color),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -1241,45 +1275,4 @@ int _naturalCompare(String a, String b) {
     if (cmp != 0) return cmp;
   }
   return a.length.compareTo(b.length);
-}
-
-class _StepperButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final VoidCallback? onTap;
-  final String label;
-
-  const _StepperButton({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isEnabled = onTap != null;
-    return Semantics(
-      label: label,
-      button: true,
-      enabled: isEnabled,
-      child: Material(
-        color: isEnabled ? color : Colors.grey[300],
-        borderRadius: BorderRadius.circular(4),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(4),
-          onTap: onTap,
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: Icon(
-              icon,
-              color: isEnabled ? Colors.white : Colors.grey[500],
-              size: 14,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
