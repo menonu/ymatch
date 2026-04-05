@@ -494,21 +494,38 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           ),
         ];
       case TradeTab.completed:
-        return [
+        final actions = <Widget>[
           const SizedBox(height: 12),
           const Divider(height: 1),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _applyInventory(user.id, match.id),
-                icon: const Icon(Icons.inventory, size: 16),
-                label: const Text('Update Inventory'),
-              ),
-            ],
-          ),
         ];
+        if (!match.inventoryApplied) {
+          actions.add(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _applyInventory(user.id, match.id),
+                  icon: const Icon(Icons.inventory, size: 16),
+                  label: const Text('Update Inventory'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          actions.add(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                const SizedBox(width: 4),
+                Text('Inventory Updated',
+                    style: TextStyle(color: Colors.green[700], fontSize: 13)),
+              ],
+            ),
+          );
+        }
+        return actions;
     }
   }
 

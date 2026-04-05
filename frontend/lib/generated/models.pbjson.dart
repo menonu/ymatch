@@ -400,6 +400,13 @@ const TradeMatch$json = {
       '6': '.ymatch.MatchItem',
       '10': 'selectedItems'
     },
+    {
+      '1': 'inventory_applied',
+      '3': 11,
+      '4': 1,
+      '5': 8,
+      '10': 'inventoryApplied'
+    },
   ],
   '8': [
     {'1': '_created_at'},
@@ -417,7 +424,8 @@ final $typed_data.Uint8List tradeMatchDescriptor = $convert.base64Decode(
     'SW52ZW50b3J5SXRlbVIJdXNlckhhdmVzEjQKCnVzZXJfd2FudHMYCCADKAsyFS55bWF0Y2guSW'
     '52ZW50b3J5SXRlbVIJdXNlcldhbnRzEiIKCm9mZmVyZWRfYnkYCSABKAVIAlIJb2ZmZXJlZEJ5'
     'iAEBEjgKDnNlbGVjdGVkX2l0ZW1zGAogAygLMhEueW1hdGNoLk1hdGNoSXRlbVINc2VsZWN0ZW'
-    'RJdGVtc0INCgtfY3JlYXRlZF9hdEINCgtfb3RoZXJfdXNlckINCgtfb2ZmZXJlZF9ieQ==');
+    'RJdGVtcxIrChFpbnZlbnRvcnlfYXBwbGllZBgLIAEoCFIQaW52ZW50b3J5QXBwbGllZEINCgtf'
+    'Y3JlYXRlZF9hdEINCgtfb3RoZXJfdXNlckINCgtfb2ZmZXJlZF9ieQ==');
 
 @$core.Deprecated('Use matchItemDescriptor instead')
 const MatchItem$json = {
