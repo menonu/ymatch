@@ -718,6 +718,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     $core.Iterable<InventoryItem>? userWants,
     $core.int? offeredBy,
     $core.Iterable<MatchItem>? selectedItems,
+    $core.bool? inventoryApplied,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -730,6 +731,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (userWants != null) result.userWants.addAll(userWants);
     if (offeredBy != null) result.offeredBy = offeredBy;
     if (selectedItems != null) result.selectedItems.addAll(selectedItems);
+    if (inventoryApplied != null) result.inventoryApplied = inventoryApplied;
     return result;
   }
 
@@ -759,6 +761,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     ..aI(9, _omitFieldNames ? '' : 'offeredBy')
     ..pPM<MatchItem>(10, _omitFieldNames ? '' : 'selectedItems',
         subBuilder: MatchItem.create)
+    ..aOB(11, _omitFieldNames ? '' : 'inventoryApplied')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -852,6 +855,15 @@ class TradeMatch extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(10)
   $pb.PbList<MatchItem> get selectedItems => $_getList(9);
+
+  @$pb.TagNumber(11)
+  $core.bool get inventoryApplied => $_getBF(10);
+  @$pb.TagNumber(11)
+  set inventoryApplied($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasInventoryApplied() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearInventoryApplied() => $_clearField(11);
 }
 
 class MatchItem extends $pb.GeneratedMessage {

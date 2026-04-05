@@ -144,6 +144,9 @@ pub struct TradeMatch {
     /// items selected in offer/accept
     #[prost(message, repeated, tag = "10")]
     pub selected_items: ::prost::alloc::vec::Vec<MatchItem>,
+    /// true if inventory update already executed
+    #[prost(bool, tag = "11")]
+    pub inventory_applied: bool,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
