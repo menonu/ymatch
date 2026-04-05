@@ -64,12 +64,25 @@ message TradeMatch {
   int32 id = 1;
   int32 user1_id = 2;
   int32 user2_id = 3;
-  string status = 4; // "PROPOSED", "ACCEPTED", "REJECTED", "COMPLETED"
+  string status = 4; // "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED"
   optional string created_at = 5;
 
   optional User other_user = 6;
-  repeated InventoryItem user_haves = 7;
-  repeated InventoryItem user_wants = 8;
+  repeated InventoryItem user_haves = 7;  // potential items to give
+  repeated InventoryItem user_wants = 8;  // potential items to receive
+  optional int32 offered_by = 9;
+  repeated MatchItem selected_items = 10; // items selected in offer/accept
+}
+
+message MatchItem {
+  int32 id = 1;
+  int32 match_id = 2;
+  int32 merch_id = 3;
+  int32 owner_id = 4;
+  string direction = 5; // "GIVE" or "RECEIVE"
+  int32 quantity = 6;
+  optional string merch_name = 7;
+  optional string photo_url = 8;
 }
 
 // Request/Response Models
@@ -95,6 +108,11 @@ message CreateEventRequest {
   optional string status = 3; // "draft" or "published" (default: "published")
 }
 
+message UpdateEventRequest {
+  int32 user_id = 1;
+  optional string name = 2;
+}
+
 message UpdateInventoryRequest {
   int32 user_id = 1;
   int32 merch_id = 2;
@@ -115,8 +133,38 @@ message CreateMerchRequest {
   optional string status = 5; // "draft" or "published" (default: "published")
 }
 
+message UpdateMerchRequest {
+  int32 user_id = 1;
+  optional string name = 2;
+  optional string photo_url = 3;
+  optional string group_name = 4;
+}
+
 message UpdateMatchStatusRequest {
   string status = 1; // "ACCEPTED", "REJECTED", "COMPLETED"
+}
+
+message OfferTradeRequest {
+  int32 user_id = 1;
+  repeated OfferItem items = 2;
+}
+
+message OfferItem {
+  int32 merch_id = 1;
+  string direction = 2; // "GIVE" or "RECEIVE"
+  int32 quantity = 3;
+}
+
+message ApplyInventoryRequest {
+  int32 user_id = 1;
+}
+
+message NotificationCounts {
+  int32 pending_matches = 1;
+  int32 offers_in = 2;
+  int32 accepted = 3;
+  int32 unread_messages = 4;
+  int32 total = 5;
 }
 
 message Message {

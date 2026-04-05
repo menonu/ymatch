@@ -15,15 +15,31 @@ class ScaffoldWithNavBar extends ConsumerWidget {
         user != null && (user.role == 'admin' || user.role == 'moderator');
     final backendHealth = ref.watch(backendHealthProvider);
 
+    // Notification counts for badge
+    final notifAsync = user != null
+        ? ref.watch(notificationCountsProvider(user.id))
+        : null;
+    final badgeCount = notifAsync?.whenOrNull(data: (c) => c.total) ?? 0;
+
     final destinations = <NavigationDestination>[
       const NavigationDestination(
         icon: Icon(Icons.event_outlined),
         selectedIcon: Icon(Icons.event),
         label: 'Items',
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.swap_horiz_outlined),
-        selectedIcon: Icon(Icons.swap_horiz),
+      NavigationDestination(
+        icon: badgeCount > 0
+            ? Badge(
+                label: Text('$badgeCount'),
+                child: const Icon(Icons.swap_horiz_outlined),
+              )
+            : const Icon(Icons.swap_horiz_outlined),
+        selectedIcon: badgeCount > 0
+            ? Badge(
+                label: Text('$badgeCount'),
+                child: const Icon(Icons.swap_horiz),
+              )
+            : const Icon(Icons.swap_horiz),
         label: 'Matches',
       ),
       const NavigationDestination(
