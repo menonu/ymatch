@@ -522,6 +522,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                   );
                                 } else {
                                   return ReorderableListView.builder(
+                                    buildDefaultDragHandles: false,
                                     padding: const EdgeInsets.only(
                                       top: 16,
                                       bottom: 80,
@@ -559,6 +560,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                           item,
                                           inventoryLookup,
                                           displayMode,
+                                          reorderIndex: index,
                                         ),
                                       );
                                     },
@@ -918,8 +920,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     User? user,
     Merchandise item,
     Map<int, Map<String, int>> lookup,
-    InventoryDisplayMode displayMode,
-  ) {
+    InventoryDisplayMode displayMode, {
+    int reorderIndex = 0,
+  }) {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
@@ -948,16 +951,19 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: buildImage(
-                    item.hasPhotoUrl() ? item.photoUrl : null,
+              ReorderableDragStartListener(
+                index: reorderIndex,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
                     width: 72,
                     height: 72,
-                    fit: BoxFit.cover,
+                    child: buildImage(
+                      item.hasPhotoUrl() ? item.photoUrl : null,
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
@@ -991,29 +997,38 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     Row(
                       children: [
                         if (showHave)
-                          _buildStepper(
-                            label: 'HAVE',
-                            color: AppTheme.haveColor,
-                            qty: haveQty,
-                            onUpdate: (q) =>
-                                _updateInv(ref, user, item.id, 'HAVE', q),
+                          Expanded(
+                            flex: 5,
+                            child: _buildStepper(
+                              label: 'HAVE',
+                              color: AppTheme.haveColor,
+                              qty: haveQty,
+                              onUpdate: (q) =>
+                                  _updateInv(ref, user, item.id, 'HAVE', q),
+                            ),
                           ),
-                        if (showHave && showWantTrade) const SizedBox(width: 4),
+                        if (showHave && showWantTrade) const Spacer(flex: 1),
                         if (showWantTrade) ...[
-                          _buildStepper(
-                            label: 'WANT',
-                            color: AppTheme.wantColor,
-                            qty: wantQty,
-                            onUpdate: (q) =>
-                                _updateInv(ref, user, item.id, 'WANT', q),
+                          Expanded(
+                            flex: 5,
+                            child: _buildStepper(
+                              label: 'WANT',
+                              color: AppTheme.wantColor,
+                              qty: wantQty,
+                              onUpdate: (q) =>
+                                  _updateInv(ref, user, item.id, 'WANT', q),
+                            ),
                           ),
-                          const SizedBox(width: 4),
-                          _buildStepper(
-                            label: 'TRADE',
-                            color: AppTheme.tradeColor,
-                            qty: tradeQty,
-                            onUpdate: (q) =>
-                                _updateInv(ref, user, item.id, 'TRADE', q),
+                          const Spacer(flex: 1),
+                          Expanded(
+                            flex: 5,
+                            child: _buildStepper(
+                              label: 'TRADE',
+                              color: AppTheme.tradeColor,
+                              qty: tradeQty,
+                              onUpdate: (q) =>
+                                  _updateInv(ref, user, item.id, 'TRADE', q),
+                            ),
                           ),
                         ],
                       ],
@@ -1181,7 +1196,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     required Function(int) onUpdate,
   }) {
     return Container(
-      width: 56,
       height: 44,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
