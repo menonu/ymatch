@@ -14,14 +14,19 @@ String resolveImageUrl(String? url) {
   // Already an absolute URL
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
 
-  // Relative path — resolve against current origin
+  // Use compile-time API_BASE_URL if set (production behind reverse proxy)
+  const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+  if (apiBaseUrl.isNotEmpty) {
+    return '$apiBaseUrl/$url';
+  }
+
+  // Local development: backend runs on :3000
   if (kIsWeb) {
     final scheme = Uri.base.scheme;
     final host = Uri.base.host;
     return '$scheme://$host:3000/$url';
   }
 
-  // Fallback for non-web platforms
   return 'http://localhost:3000/$url';
 }
 
