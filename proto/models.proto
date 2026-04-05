@@ -72,6 +72,7 @@ message TradeMatch {
   repeated InventoryItem user_wants = 8;  // potential items to receive
   optional int32 offered_by = 9;
   repeated MatchItem selected_items = 10; // items selected in offer/accept
+  bool inventory_applied = 11; // true if inventory update already executed
 }
 
 message MatchItem {
