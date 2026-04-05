@@ -650,6 +650,25 @@ final adminControllerProvider =
       return AdminController(ref.watch(apiClientProvider));
     });
 
+// --- Matches ---
+final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((
+  ref,
+  userId,
+) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/matches/user/$userId');
+  return (json as List)
+      .map((e) => TradeMatch()..mergeFromProto3Json(e))
+      .toList();
+});
+
+final notificationCountsProvider =
+    FutureProvider.family<NotificationCounts, int>((ref, userId) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/matches/user/$userId/counts');
+  return NotificationCounts()..mergeFromProto3Json(json);
+});
+
 // --- Search ---
 final searchQueryProvider = StateProvider<String>((ref) => '');
 

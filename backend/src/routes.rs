@@ -141,8 +141,17 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         )
         .route("/api/v1/matches/user/:id", get(handlers::list_matches))
         .route(
+            "/api/v1/matches/user/:id/counts",
+            get(handlers::match_notification_counts),
+        )
+        .route("/api/v1/matches/:id/offer", post(handlers::offer_trade))
+        .route(
             "/api/v1/matches/:id/status",
             post(handlers::update_match_status),
+        )
+        .route(
+            "/api/v1/matches/:id/apply-inventory",
+            post(handlers::apply_trade_inventory),
         )
         .route(
             "/api/v1/matches/:id/messages",

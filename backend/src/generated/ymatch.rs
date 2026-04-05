@@ -15,6 +15,7 @@ pub struct User {
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    /// "user", "moderator", "admin"
     #[prost(string, optional, tag = "6")]
     pub role: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(bool, optional, tag = "7")]
@@ -45,6 +46,7 @@ pub struct Event {
     pub is_favorite: ::core::option::Option<bool>,
     #[prost(bool, optional, tag = "8")]
     pub is_joined: ::core::option::Option<bool>,
+    /// "draft", "published"
     #[prost(string, optional, tag = "9")]
     pub status: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -80,6 +82,7 @@ pub struct Merchandise {
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, optional, tag = "6")]
     pub sort_order: ::core::option::Option<i32>,
+    /// "draft", "published"
     #[prost(string, optional, tag = "7")]
     pub status: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(bool, optional, tag = "8")]
@@ -123,17 +126,47 @@ pub struct TradeMatch {
     pub user1_id: i32,
     #[prost(int32, tag = "3")]
     pub user2_id: i32,
-    /// "PROPOSED", "ACCEPTED", "REJECTED", "COMPLETED"
+    /// "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED"
     #[prost(string, tag = "4")]
     pub status: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "6")]
     pub other_user: ::core::option::Option<User>,
+    /// potential items to give
     #[prost(message, repeated, tag = "7")]
     pub user_haves: ::prost::alloc::vec::Vec<InventoryItem>,
+    /// potential items to receive
     #[prost(message, repeated, tag = "8")]
     pub user_wants: ::prost::alloc::vec::Vec<InventoryItem>,
+    #[prost(int32, optional, tag = "9")]
+    pub offered_by: ::core::option::Option<i32>,
+    /// items selected in offer/accept
+    #[prost(message, repeated, tag = "10")]
+    pub selected_items: ::prost::alloc::vec::Vec<MatchItem>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MatchItem {
+    #[prost(int32, tag = "1")]
+    pub id: i32,
+    #[prost(int32, tag = "2")]
+    pub match_id: i32,
+    #[prost(int32, tag = "3")]
+    pub merch_id: i32,
+    #[prost(int32, tag = "4")]
+    pub owner_id: i32,
+    /// "GIVE" or "RECEIVE"
+    #[prost(string, tag = "5")]
+    pub direction: ::prost::alloc::string::String,
+    #[prost(int32, tag = "6")]
+    pub quantity: i32,
+    #[prost(string, optional, tag = "7")]
+    pub merch_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "8")]
+    pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// Request/Response Models
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -177,8 +210,19 @@ pub struct CreateEventRequest {
     pub name: ::prost::alloc::string::String,
     #[prost(int32, tag = "2")]
     pub creator_id: i32,
+    /// "draft" or "published" (default: "published")
     #[prost(string, optional, tag = "3")]
     pub status: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateEventRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(string, optional, tag = "2")]
+    pub name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -218,26 +262,23 @@ pub struct CreateMerchRequest {
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, optional, tag = "4")]
     pub creator_id: ::core::option::Option<i32>,
+    /// "draft" or "published" (default: "published")
     #[prost(string, optional, tag = "5")]
     pub status: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateMerchRequest {
+    #[prost(int32, tag = "1")]
     pub user_id: i32,
-    pub name: Option<String>,
-    pub photo_url: Option<String>,
-    pub group_name: Option<String>,
-}
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq)]
-pub struct UpdateEventRequest {
-    pub user_id: i32,
-    pub name: Option<String>,
+    #[prost(string, optional, tag = "2")]
+    pub name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "4")]
+    pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -247,6 +288,53 @@ pub struct UpdateMatchStatusRequest {
     /// "ACCEPTED", "REJECTED", "COMPLETED"
     #[prost(string, tag = "1")]
     pub status: ::prost::alloc::string::String,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OfferTradeRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(message, repeated, tag = "2")]
+    pub items: ::prost::alloc::vec::Vec<OfferItem>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OfferItem {
+    #[prost(int32, tag = "1")]
+    pub merch_id: i32,
+    /// "GIVE" or "RECEIVE"
+    #[prost(string, tag = "2")]
+    pub direction: ::prost::alloc::string::String,
+    #[prost(int32, tag = "3")]
+    pub quantity: i32,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ApplyInventoryRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NotificationCounts {
+    #[prost(int32, tag = "1")]
+    pub pending_matches: i32,
+    #[prost(int32, tag = "2")]
+    pub offers_in: i32,
+    #[prost(int32, tag = "3")]
+    pub accepted: i32,
+    #[prost(int32, tag = "4")]
+    pub unread_messages: i32,
+    #[prost(int32, tag = "5")]
+    pub total: i32,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -311,6 +399,7 @@ pub struct SearchResult {
     #[prost(int32, tag = "6")]
     pub event_id: i32,
 }
+/// Admin request types
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -331,6 +420,7 @@ pub struct UpdateUserRoleRequest {
     #[prost(string, tag = "1")]
     pub role: ::prost::alloc::string::String,
 }
+/// Generic request with user_id for permission checks
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::derive_partial_eq_without_eq)]
