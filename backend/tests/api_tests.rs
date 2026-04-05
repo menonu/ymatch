@@ -1799,7 +1799,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // 9. Apply inventory
+    // 9. User1 applies inventory (only User1's inventory should change)
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1841,6 +1841,91 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
     assert!(u1_have_b.is_some(), "User1 should HAVE Card B");
     assert_eq!(u1_have_b.unwrap()["quantity"].as_i64().unwrap(), 1);
 
+    // Verify User2's inventory is NOT yet changed (User2 hasn't applied)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/user/{}/inventory", user2_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let inv2_before: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let u2_trade_b_before = inv2_before
+        .iter()
+        .find(|i| i["merch_id"] == merch_b_id && i["status"] == "TRADE");
+    assert!(
+        u2_trade_b_before.is_some()
+            && u2_trade_b_before.unwrap()["quantity"].as_i64().unwrap() == 1,
+        "User2 TRADE Card B should still be 1 (not yet applied)"
+    );
+
+    // 11. inventory_applied: true for User1, false for User2
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(matches[0]["inventory_applied"], true);
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user2_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches2: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        matches2[0]["inventory_applied"].is_null() || matches2[0]["inventory_applied"] == false,
+        "User2 inventory_applied should still be false"
+    );
+
+    // 12. Double-apply for User1 → 409 Conflict
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user1_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+
+    // 13. User2 applies inventory
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user2_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
     // Verify User2: gave Card B (TRADE=0), received Card A (HAVE=1)
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1868,22 +1953,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
     assert!(u2_have_a.is_some(), "User2 should HAVE Card A");
     assert_eq!(u2_have_a.unwrap()["quantity"].as_i64().unwrap(), 1);
 
-    // 11. inventoryApplied = true
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .uri(&format!("/api/v1/matches/user/{}", user1_id))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let matches: Vec<serde_json::Value> =
-        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(matches[0]["inventory_applied"], true);
-
-    // 12. Double-apply → 409 Conflict
+    // 14. Double-apply for User2 → 409 Conflict
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1891,14 +1961,14 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user1_id)))
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user2_id)))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CONFLICT);
 
-    // 13. Notification counts
+    // 15. Notification counts
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
