@@ -804,38 +804,43 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ? () => _showMerchActions(context, ref, item)
           : null,
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
           ),
         ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: buildImage(
-              item.hasPhotoUrl() ? item.photoUrl : null,
-              width: 40,
-              height: 40,
-            ),
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-              ),
-              if (isOwner)
-                Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
-            ],
-          ),
-          trailing: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: Image + Name
+            Row(
               children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: buildImage(
+                    item.hasPhotoUrl() ? item.photoUrl : null,
+                    width: 28,
+                    height: 28,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isOwner)
+                  Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
+              ],
+            ),
+            const SizedBox(height: 2),
+            // Row 2: Compact counters
+            Row(
+              children: [
+                const SizedBox(width: 36),
                 if (showHave)
                   _buildCompactCounter(
                     context,
@@ -844,7 +849,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     AppTheme.haveColor,
                     (q) => _updateInv(ref, user, item.id, 'HAVE', q),
                   ),
-                if (showHave && showWantTrade) const SizedBox(width: 8),
+                if (showHave && showWantTrade) const SizedBox(width: 6),
                 if (showWantTrade) ...[
                   _buildCompactCounter(
                     context,
@@ -853,7 +858,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     AppTheme.wantColor,
                     (q) => _updateInv(ref, user, item.id, 'WANT', q),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   _buildCompactCounter(
                     context,
                     'TRADE',
@@ -864,7 +869,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ],
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -877,53 +882,41 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     Color color,
     Function(int) onUpdate,
   ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label[0],
-          style: TextStyle(
-            fontSize: 10,
-            color: color,
-            fontWeight: FontWeight.bold,
+    return Container(
+      height: 26,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(Icons.remove, size: 12,
+                color: qty > 0 ? color : Colors.grey[400]),
+            ),
           ),
-        ),
-        const SizedBox(width: 4),
-        Container(
-          height: 32,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
+          Text(
+            '${label[0]}$qty',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.remove, size: 14),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28),
-                color: color,
-                onPressed: qty > 0 ? () => onUpdate(qty - 1) : null,
-              ),
-              Text(
-                '$qty',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 14),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28),
-                color: color,
-                onPressed: () => onUpdate(qty + 1),
-              ),
-            ],
+          InkWell(
+            onTap: () => onUpdate(qty + 1),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(Icons.add, size: 12, color: color),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -957,22 +950,22 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ? () => _showMerchActions(context, ref, item)
           : null,
       child: Card(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 8),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 child: buildImage(
                   item.hasPhotoUrl() ? item.photoUrl : null,
-                  width: 80,
-                  height: 80,
+                  width: 64,
+                  height: 64,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -998,10 +991,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    const SizedBox(height: 8),
+                    Row(
                       children: [
                         if (showHave)
                           _buildStepper(
@@ -1011,6 +1002,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             onUpdate: (q) =>
                                 _updateInv(ref, user, item.id, 'HAVE', q),
                           ),
+                        if (showHave && showWantTrade) const SizedBox(width: 4),
                         if (showWantTrade) ...[
                           _buildStepper(
                             label: 'WANT',
@@ -1019,6 +1011,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             onUpdate: (q) =>
                                 _updateInv(ref, user, item.id, 'WANT', q),
                           ),
+                          const SizedBox(width: 4),
                           _buildStepper(
                             label: 'TRADE',
                             color: AppTheme.tradeColor,
@@ -1192,52 +1185,37 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     required Function(int) onUpdate,
   }) {
     return Container(
-      width:
-          100, // Fixed width to ensure it doesn't squish too much and looks uniform in Wrap
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      height: 32,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
-              color: color,
+          _StepperButton(
+            icon: Icons.remove,
+            color: color,
+            onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+            label: 'Decrease $label',
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Text(
+              '$label $qty',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _StepperButton(
-                icon: Icons.remove,
-                color: color,
-                onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
-                label: 'Decrease $label',
-              ),
-              Expanded(
-                child: Text(
-                  '$qty',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              _StepperButton(
-                icon: Icons.add,
-                color: color,
-                onTap: () => onUpdate(qty + 1),
-                label: 'Increase $label',
-              ),
-            ],
+          _StepperButton(
+            icon: Icons.add,
+            color: color,
+            onTap: () => onUpdate(qty + 1),
+            label: 'Increase $label',
           ),
         ],
       ),
@@ -1287,17 +1265,17 @@ class _StepperButton extends StatelessWidget {
       enabled: isEnabled,
       child: Material(
         color: isEnabled ? color : Colors.grey[300],
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(4),
         child: InkWell(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(4),
           onTap: onTap,
           child: SizedBox(
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             child: Icon(
               icon,
               color: isEnabled ? Colors.white : Colors.grey[500],
-              size: 18,
+              size: 14,
             ),
           ),
         ),
