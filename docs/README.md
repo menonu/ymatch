@@ -49,6 +49,7 @@ Fact-based, technical specifications describing the machinery, endpoints, schema
 * [API Specification](file:///home/menonu/ws/ymatch/docs/reference/api_spec.md): REST endpoints, request/response formats, parameters, and headers.
 * [Database Schema](file:///home/menonu/ws/ymatch/docs/reference/db_schema.md): Database tables, fields, constraints, indexes, and entity-relationship mapping.
 * [UI Specifications](file:///home/menonu/ws/ymatch/docs/reference/ui_specs.md): Layout structures, screens, navigation specs, and views.
+* [UI Components Reference](file:///home/menonu/ws/ymatch/docs/reference/ui_components.md): Component identifiers for screens, dialogs, cards, forms, and providers.
 
 ---
 
