@@ -18,7 +18,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Setup SSH
