@@ -289,30 +289,24 @@ pub async fn update_match_status(
     let current_status: String = match_row.get("status");
 
     // Validate state transitions
-    match payload.status.as_str() {
-        "ACCEPTED" => {
-            if current_status != "OFFERED" {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Can only accept OFFERED matches".to_string(),
-                ));
-            }
+    match (payload.status.as_str(), current_status.as_str()) {
+        ("ACCEPTED", status) if status != "OFFERED" => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Can only accept OFFERED matches".to_string(),
+            ));
         }
-        "COMPLETED" => {
-            if current_status != "ACCEPTED" {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Can only complete ACCEPTED matches".to_string(),
-                ));
-            }
+        ("COMPLETED", status) if status != "ACCEPTED" => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Can only complete ACCEPTED matches".to_string(),
+            ));
         }
-        "REJECTED" => {
-            if current_status != "PENDING" && current_status != "OFFERED" {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Can only reject PENDING or OFFERED matches".to_string(),
-                ));
-            }
+        ("REJECTED", status) if status != "PENDING" && status != "OFFERED" => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Can only reject PENDING or OFFERED matches".to_string(),
+            ));
         }
         _ => {}
     }
