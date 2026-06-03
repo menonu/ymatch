@@ -74,13 +74,33 @@ resource "oci_core_security_list" "ymatch" {
     }
   }
 
-  # HTTPS
+  # HTTPS (Production)
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
     tcp_options {
       min = 443
       max = 443
+    }
+  }
+
+  # Staging HTTP
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+    tcp_options {
+      min = 8080
+      max = 8080
+    }
+  }
+
+  # Staging HTTPS
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+    tcp_options {
+      min = 8443
+      max = 8443
     }
   }
 

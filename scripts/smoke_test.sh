@@ -1,10 +1,17 @@
 #!/bin/bash
 
 # Configuration
-API_URL="http://localhost:3000/api/v1"
-TEST_UUID="smoke-test-uuid-$(date +%s)"
+ENV="${1:-production}"  # "production" or "staging"
+if [ "$ENV" = "staging" ]; then
+  API_URL="http://localhost:3001/api/v1"
+  DISPLAY_NAME="STAGING"
+else
+  API_URL="http://localhost:3000/api/v1"
+  DISPLAY_NAME="PRODUCTION"
+fi
+TEST_UUID="smoke-test-${ENV}-$(date +%s)"
 
-echo "Starting YMatch API Smoke Tests..."
+echo "Starting YMatch API Smoke Tests ($DISPLAY_NAME)..."
 echo "API URL: $API_URL"
 
 # Helper function to check response code
@@ -46,5 +53,5 @@ LIST_RESP=$(curl -s -w "\n%{http_code}" -X GET "$API_URL/events")
 LIST_STATUS=$(echo "$LIST_RESP" | tail -n1)
 check_status "$LIST_STATUS" 200 "List Events"
 
-echo -e "\n🎉 All smoke tests passed successfully!"
+echo -e "\n🎉 All smoke tests passed successfully! ($DISPLAY_NAME)"
 exit 0
