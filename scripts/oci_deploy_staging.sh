@@ -2,17 +2,18 @@
 # Deploy ymatch STAGING to OCI ARM instance
 # Run this ON the OCI VM after SSH-ing in
 #
-# Usage: ./scripts/oci_deploy_staging.sh <db_password> [public_ip]
+# Usage: ./scripts/oci_deploy_staging.sh <staging_db_password> <production_db_password> [public_ip]
 #
-# If public_ip is not provided, it auto-detects via metadata service.
+# production_db_password is required because docker-compose validates all service env vars.
 
 set -euo pipefail
 
-DB_PASSWORD="${1:?Usage: $0 <staging_db_password> [public_ip]}"
+STAGING_DB_PASSWORD="${1:?Usage: $0 <staging_db_password> <production_db_password> [public_ip]}"
+PROD_DB_PASSWORD="${2:?Usage: $0 <staging_db_password> <production_db_password> [public_ip]}"
 
 # Auto-detect public IP from OCI metadata if not provided
-if [ -n "${2:-}" ]; then
-  PUBLIC_IP="$2"
+if [ -n "${3:-}" ]; then
+  PUBLIC_IP="$3"
 else
   PUBLIC_IP=$(curl -sf -H "Authorization: Bearer Oracle" \
     http://169.254.169.254/opc/v2/vnics/ | \
@@ -49,7 +50,8 @@ fi
 echo ""
 echo "Building and starting staging containers..."
 export PUBLIC_IP
-export STAGING_DB_PASSWORD="$DB_PASSWORD"
+export DB_PASSWORD="$PROD_DB_PASSWORD"
+export STAGING_DB_PASSWORD="$STAGING_DB_PASSWORD"
 export GIT_HASH=$(git rev-parse --short HEAD)
 
 # Build staging frontend with correct API base URL (port 8080)
