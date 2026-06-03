@@ -97,7 +97,7 @@ ssh -i ~/.ssh/oci_ymatch ubuntu@161.33.17.247 \
 
 ## OCI Production Deployment (Always Free ARM)
 
-See [OCI Deployment Guide](./docs/oci_deployment.md) for full details.
+See [OCI Deployment Guide](./docs/how_to/oci_deployment.md) for full details.
 
 ### Quick Reference
 | Component | Service | URL |
@@ -141,7 +141,7 @@ ssh ubuntu@<PUBLIC_IP>
 
 ## Monitoring
 
-See [Monitoring Guide](./docs/monitoring.md) for full details.
+See [Monitoring Guide](./docs/how_to/monitoring_setup.md) for full details.
 
 - **New Relic** (Free tier): Infrastructure agent on OCI VM, Synthetic monitors, alert policies with Discord notifications
 - **Dashboard**: `ymatch Production Overview` in New Relic
@@ -159,13 +159,15 @@ NEW_RELIC_LICENSE_KEY=<key> ./ymatch/scripts/setup_newrelic_agent.sh
 ```
 
 ## Documentation
-- [Requirements](./docs/requirements.md)
-- [Use Cases](./docs/use_cases.md)
-- [UI Specs](./docs/ui_specs.md)
-- [Architecture & Actors](./docs/architecture.md)
-- [API Specification](./docs/api_spec.md)
-- [Database Schema](./docs/db_schema.md)
-- [Cloud Deployment (GCP)](./docs/cloud_deployment.md)
-- [Cloud Deployment (OCI)](./docs/oci_deployment.md)
-- [Monitoring](./docs/monitoring.md)
-- [Initial Idea](./docs/initial.md)
+See the [Documentation Index](./docs/README.md) for full details.
+- [Requirements](./docs/explanation/requirements.md)
+- [Use Cases](./docs/explanation/use_cases.md)
+- [UI Specs](./docs/reference/ui_specs.md)
+- [Architecture & Actors](./docs/explanation/architecture.md)
+- [API Specification](./docs/reference/api_spec.md)
+- [Database Schema](./docs/reference/db_schema.md)
+- [Development Workflow](./docs/how_to/development_workflow.md)
+- [Cloud Deployment (GCP)](./docs/how_to/cloud_deployment.md)
+- [Cloud Deployment (OCI)](./docs/how_to/oci_deployment.md)
+- [Monitoring](./docs/how_to/monitoring_setup.md)
+- [Initial Idea](./docs/explanation/initial_concept.md)
