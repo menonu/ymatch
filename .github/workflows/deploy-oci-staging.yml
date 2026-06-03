@@ -43,6 +43,7 @@ jobs:
           echo "=== Building staging containers ==="
           PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com)
           export PUBLIC_IP
+          export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
           export STAGING_DB_PASSWORD="${{ secrets.OCI_STAGING_DB_PASSWORD }}"
           export GIT_HASH=$(git rev-parse --short HEAD)
 
