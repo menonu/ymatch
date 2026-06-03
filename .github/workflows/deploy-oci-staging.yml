@@ -1,0 +1,105 @@
+name: Deploy to OCI (Staging)
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    timeout-minutes: 30
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OCI_SSH_PRIVATE_KEY }}" > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+          ssh-keyscan -H ${{ secrets.OCI_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to Staging
+        env:
+          HOST: ${{ secrets.OCI_VM_HOST }}
+        run: |
+          ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'DEPLOY_SCRIPT'
+          set -euo pipefail
+          cd ~/ymatch
+
+          echo "=== Pulling latest code ==="
+          git fetch origin main
+          git reset --hard origin/main
+
+          echo "=== Building staging containers ==="
+          PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com)
+          export PUBLIC_IP
+          export STAGING_DB_PASSWORD="${{ secrets.OCI_STAGING_DB_PASSWORD }}"
+          export GIT_HASH=$(git rev-parse --short HEAD)
+
+          docker compose -f docker-compose.oci.yml build \
+            --build-arg API_BASE_URL="https://${PUBLIC_IP}.nip.io:8443" \
+            --build-arg GIT_HASH="$GIT_HASH" \
+            staging_backend staging_frontend staging_caddy
+
+          echo "=== Restarting staging services ==="
+          docker compose -f docker-compose.oci.yml up -d staging_db staging_backend staging_frontend staging_caddy
+
+          echo "=== Waiting for staging services ==="
+          sleep 10
+
+          echo "=== Staging service status ==="
+          docker compose -f docker-compose.oci.yml ps staging_db staging_backend staging_frontend staging_caddy
+
+          echo "=== Running staging migrations ==="
+          docker exec ymatch_staging_backend ymatch_backend migrate 2>/dev/null || true
+          DEPLOY_SCRIPT
+
+      - name: Health check (Staging)
+        env:
+          HOST: ${{ secrets.OCI_VM_HOST }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "http://${HOST}:8080/api/v1/system/status" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Staging backend healthy (attempt $i)"
+              break
+            fi
+            echo "⏳ Waiting for staging backend... (attempt $i, status: $STATUS)"
+            sleep 5
+          done
+
+          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "http://${HOST}:8080/" || true)
+          if [ "$FRONTEND" = "200" ]; then
+            echo "✅ Staging frontend healthy"
+          else
+            echo "⚠️ Staging frontend returned $FRONTEND"
+          fi
+
+      - name: Report to New Relic
+        if: always()
+        run: |
+          curl -s -X POST "https://insights-collector.newrelic.com/v1/accounts/${{ secrets.NEW_RELIC_ACCOUNT_ID }}/events" \
+            -H "Api-Key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "[{
+              \"eventType\": \"Deployment\",
+              \"status\": \"${{ job.status }}\",
+              \"trigger\": \"${{ github.event_name }}\",
+              \"commitSha\": \"${{ github.event.workflow_run.head_sha || github.sha }}\",
+              \"branch\": \"main\",
+              \"target\": \"oci-staging\"
+            }]" || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/oci_key
