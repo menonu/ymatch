@@ -1,26 +1,31 @@
-name: Deploy to OCI
+name: Deploy to OCI (Production)
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
+  push:
+    tags:
+      - 'release/*'
   workflow_dispatch:
 
 concurrency:
-  group: deploy-oci
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
     timeout-minutes: 30
 
     steps:
+      - name: Validate tag format
+        if: startsWith(github.ref, 'refs/tags/release/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/release/}"
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid tag format: $TAG (expected: X.Y.Z)"
+            exit 1
+          fi
+          echo "Deploying release: $TAG"
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -28,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/oci_key
           ssh-keyscan -H ${{ secrets.OCI_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy
+      - name: Deploy to Production
         env:
           HOST: ${{ secrets.OCI_VM_HOST }}
         run: |
@@ -40,50 +45,63 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          echo "=== Building containers ==="
+          echo "=== Building production containers ==="
           PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com)
           export PUBLIC_IP
           export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
-          export API_BASE_URL="https://${PUBLIC_IP}.nip.io"
           export GIT_HASH=$(git rev-parse --short HEAD)
 
           docker compose -f docker-compose.oci.yml build \
-            --build-arg API_BASE_URL="$API_BASE_URL" \
-            --build-arg GIT_HASH="$GIT_HASH"
+            --build-arg API_BASE_URL="https://${PUBLIC_IP}.nip.io" \
+            --build-arg GIT_HASH="$GIT_HASH" \
+            backend frontend caddy
 
-          echo "=== Restarting services ==="
-          docker compose -f docker-compose.oci.yml up -d
+          echo "=== Restarting production services ==="
+          docker compose -f docker-compose.oci.yml up -d db backend frontend caddy
 
-          echo "=== Waiting for services ==="
+          echo "=== Waiting for production services ==="
           sleep 10
 
-          echo "=== Service status ==="
-          docker compose -f docker-compose.oci.yml ps
+          echo "=== Production service status ==="
+          docker compose -f docker-compose.oci.yml ps db backend frontend caddy
 
-          echo "=== Running migrations ==="
+          echo "=== Running production migrations ==="
           docker exec ymatch_backend ymatch_backend migrate 2>/dev/null || true
           DEPLOY_SCRIPT
 
-      - name: Health check
+      - name: Health check (Production)
         env:
           HOST: ${{ secrets.OCI_VM_HOST }}
         run: |
           for i in $(seq 1 12); do
             STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/api/v1/system/status" || true)
             if [ "$STATUS" = "200" ]; then
-              echo "✅ Backend healthy (attempt $i)"
+              echo "✅ Production backend healthy (attempt $i)"
               break
             fi
-            echo "⏳ Waiting for backend... (attempt $i, status: $STATUS)"
+            echo "⏳ Waiting for production backend... (attempt $i, status: $STATUS)"
             sleep 5
           done
 
           FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/" || true)
           if [ "$FRONTEND" = "200" ]; then
-            echo "✅ Frontend healthy"
+            echo "✅ Production frontend healthy"
           else
-            echo "⚠️ Frontend returned $FRONTEND"
+            echo "⚠️ Production frontend returned $FRONTEND"
           fi
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/release/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Deployed to production.
+            - URL: https://${{ secrets.OCI_VM_HOST }}.nip.io
+            - Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
 
       - name: Report to New Relic
         if: always()
@@ -95,9 +113,10 @@ jobs:
               \"eventType\": \"Deployment\",
               \"status\": \"${{ job.status }}\",
               \"trigger\": \"${{ github.event_name }}\",
-              \"commitSha\": \"${{ github.event.workflow_run.head_sha || github.sha }}\",
+              \"commitSha\": \"${{ github.sha }}\",
               \"branch\": \"main\",
-              \"target\": \"oci\"
+              \"target\": \"oci-production\",
+              \"releaseTag\": \"${{ github.ref_name || '' }}\"
             }]" || true
 
       - name: Cleanup
