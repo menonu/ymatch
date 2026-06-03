@@ -1,0 +1,61 @@
+# ymatch Documentation Index
+
+This directory contains the documentation for the `ymatch` merchandise trading platform, structured according to the **Diátaxis documentation framework**.
+
+The documentation is organized into four distinct genres based on their purpose and audience:
+
+```
+                  ┌───────────────────────────────┐
+                  │          DOCUMENTATION        │
+                  └───────────────────────────────┘
+                                  │
+         ┌────────────────────────┼────────────────────────┐
+         ▼                        ▼                        ▼
+  ┌─────────────┐          ┌─────────────┐          ┌─────────────┐
+  │  TUTORIALS  │          │   HOW-TO    │          │  REFERENCE  │
+  │  (Learning) │          │   (Tasks)   │          │ (Technical) │
+  └─────────────┘          └─────────────┘          └─────────────┘
+         │                        │                        │
+         └────────────────────────┼────────────────────────┘
+                                  ▼
+                           ┌─────────────┐
+                           │ EXPLANATION │
+                           │ (Concept)   │
+                           └─────────────┘
+```
+
+---
+
+## 1. Tutorials (Learning-Oriented)
+Practical steps to help you get started and learn how to develop with `ymatch`.
+
+* [Developer Quickstart](file:///home/menonu/ws/ymatch/docs/tutorials/developer_quickstart.md): Walkthrough of database setup, tests, and running backend & frontend servers locally.
+
+---
+
+## 2. How-To Guides (Task-Oriented)
+Direct, action-oriented instructions to solve specific problems or accomplish key deployment/operation tasks.
+
+* [Development Workflow Guide](file:///home/menonu/ws/ymatch/docs/how_to/development_workflow.md): Step-by-step workflow for branches, pull requests, local lints, and tests.
+* [OCI Production Deployment (Always Free ARM)](file:///home/menonu/ws/ymatch/docs/how_to/oci_deployment.md): Steps to provision infrastructure with Terraform and deploy the full stack on OCI.
+* [Monitoring Setup Guide](file:///home/menonu/ws/ymatch/docs/how_to/monitoring_setup.md): Setup and queries for New Relic application/infrastructure alerts and monitoring.
+* [GCP Historical Deployment](file:///home/menonu/ws/ymatch/docs/how_to/cloud_deployment.md): Historical GCP backup & deployment strategy (GCP services are currently stopped except for backup bucket storage).
+
+---
+
+## 3. Reference Guides (Information-Oriented)
+Fact-based, technical specifications describing the machinery, endpoints, schemas, and configurations of the system.
+
+* [API Specification](file:///home/menonu/ws/ymatch/docs/reference/api_spec.md): REST endpoints, request/response formats, parameters, and headers.
+* [Database Schema](file:///home/menonu/ws/ymatch/docs/reference/db_schema.md): Database tables, fields, constraints, indexes, and entity-relationship mapping.
+* [UI Specifications](file:///home/menonu/ws/ymatch/docs/reference/ui_specs.md): Layout structures, screens, navigation specs, and views.
+
+---
+
+## 4. Explanation (Understanding-Oriented)
+Conceptual explanations, architecture reviews, design decisions, and background context to clarify *why* the system is designed this way.
+
+* [Requirements Specification](file:///home/menonu/ws/ymatch/docs/explanation/requirements.md): Functional and non-functional requirements of the system.
+* [System Architecture & Actors](file:///home/menonu/ws/ymatch/docs/explanation/architecture.md): Overview of components, tech stack, and roles (User, System).
+* [Use Cases](file:///home/menonu/ws/ymatch/docs/explanation/use_cases.md): User interaction flows, triggers, goals, and pre-conditions.
+* [Initial Project Idea](file:///home/menonu/ws/ymatch/docs/explanation/initial_concept.md): Original prompt, core matching rules, and initial requirements definition.
