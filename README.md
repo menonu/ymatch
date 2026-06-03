@@ -139,12 +139,13 @@ ymatch/
 
 ## Documentation
 
-- [API Specification](./docs/api_spec.md)
-- [Database Schema](./docs/db_schema.md)
-- [Requirements](./docs/requirements.md)
-- [Architecture](./docs/architecture.md)
-- [UI Specs](./docs/ui_specs.md)
-- [Use Cases](./docs/use_cases.md)
+See the [Documentation Index](./docs/README.md) for full details.
+- [API Specification](./docs/reference/api_spec.md)
+- [Database Schema](./docs/reference/db_schema.md)
+- [Requirements](./docs/explanation/requirements.md)
+- [Architecture](./docs/explanation/architecture.md)
+- [UI Specs](./docs/reference/ui_specs.md)
+- [Use Cases](./docs/explanation/use_cases.md)
 
 ## Permission System
 
