@@ -274,7 +274,7 @@ locals {
     # New Relic Infrastructure Agent
     # ---------------------------------------------------
     echo "license_key: ${var.nr_license_key}" > /etc/newrelic-infra.yml
-    echo "display_name: ymatch-oci-arm" >> /etc/newrelic-infra.yml
+    echo "display_name: ${var.nr_display_name}" >> /etc/newrelic-infra.yml
 
     curl -fsSL https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg \
       | gpg --dearmor -o /etc/apt/trusted.gpg.d/newrelic-infra.gpg --yes
@@ -291,55 +291,11 @@ locals {
         interval: 30s
     DCONF
 
-    # ---------------------------------------------------
-    # OCI CLI (for Flex billing integration)
-    # ---------------------------------------------------
-    apt-get install -y -qq python3-pip
-    pip3 install oci-cli --break-system-packages -q
-
-    # Flex integration: OCI billing → New Relic custom event
-    mkdir -p /etc/newrelic-infra/integrations.d
-    cat > /etc/newrelic-infra/integrations.d/oci-billing-config.yml <<FLEXCONF
-    integrations:
-      - name: nri-flex
-        interval: 6h
-        config:
-          name: OCIBillingFlex
-          apis:
-            - event_type: OCIBillingSample
-              commands:
-                - run: /usr/local/bin/oci_billing_to_nr.sh
-                  split_by: ":"
-    FLEXCONF
-
-    # Billing query script (uses instance principal auth)
-    cat > /usr/local/bin/oci_billing_to_nr.sh <<'BILLING'
-    #!/bin/bash
-    MONTH_START=$(date -u +"%Y-%m-01T00:00:00.000Z")
-    TOMORROW=$(date -u -d "+1 day" +"%Y-%m-%dT00:00:00.000Z")
-    TENANCY="${var.tenancy_ocid}"
-
-    RESULT=$(oci usage-api usage-summary request-summarized-usages \
-      --auth instance_principal \
-      --tenant-id "$TENANCY" \
-      --time-usage-started "$MONTH_START" \
-      --time-usage-ended "$TOMORROW" \
-      --granularity MONTHLY \
-      --query-type COST 2>/dev/null)
-
-    COST=$(echo "$RESULT" | python3 -c "
-    import sys, json
-    data = json.load(sys.stdin)
-    items = data.get('data', {}).get('items', [])
-    print(sum(float(i.get('computed-amount', 0) or 0) for i in items))
-    " 2>/dev/null || echo "0")
-
-    echo "totalCostUSD:$COST"
-    echo "provider:OCI"
-    echo "billingPeriod:$(date -u +%Y-%m)"
-    echo "region:${var.region}"
-    BILLING
-    chmod +x /usr/local/bin/oci_billing_to_nr.sh
+    # NOTE: OCI CLI and OCI billing Flex integration were removed from cloud-init
+    # because pip install of oci-cli fails on this image (urllib3 conflict),
+    # which causes the entire cloud-init script to abort. OCI billing data
+    # is now collected via local cron on a machine that has OCI CLI installed
+    # (see scripts/oci_cost_to_newrelic.sh). See issue #140.
 
     systemctl restart newrelic-infra
 

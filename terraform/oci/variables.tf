@@ -79,6 +79,12 @@ variable "nr_account_id" {
   type        = string
 }
 
+variable "nr_display_name" {
+  description = "Display name for the New Relic Infrastructure agent. Use a unique name per instance to distinguish in NR dashboards."
+  type        = string
+  default     = "ymatch-oci-arm"
+}
+
 variable "alert_email" {
   description = "Email address for OCI budget alerts"
   type        = string
