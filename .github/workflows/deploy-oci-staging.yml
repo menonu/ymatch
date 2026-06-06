@@ -35,16 +35,20 @@ jobs:
           ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'SYNC_SCRIPT'
           set -euo pipefail
           REPO_DIR="$HOME/ymatch"
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/menonu/ymatch.git"
 
           if [ -d "$REPO_DIR/.git" ]; then
-            echo "=== Repo already a git working tree, pulling latest ==="
+            echo "=== Repo already a git working tree, updating remote URL and pulling ==="
             cd "$REPO_DIR"
+            # Update the origin URL to use the current GITHUB_TOKEN (rotates
+            # per workflow run, so the previous run's token is invalid).
+            git remote set-url origin "$REPO_URL"
             git fetch origin main
             git reset --hard origin/main
           else
             echo "=== Cloning repo via GH_TOKEN ==="
             rm -rf "$REPO_DIR"
-            git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/menonu/ymatch.git" "$REPO_DIR"
+            git clone "$REPO_URL" "$REPO_DIR"
           fi
           SYNC_SCRIPT
 
