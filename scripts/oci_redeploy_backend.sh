@@ -3,17 +3,24 @@
 # Run ON the OCI VM
 #
 # Usage: ./scripts/oci_redeploy_backend.sh
+#
+# Optional env:
+#   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
+#   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=oci_deploy_common.sh
+source "$SCRIPT_DIR/oci_deploy_common.sh"
+
 REPO_DIR="$HOME/ymatch"
+oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 
 echo "=== Rebuilding backend ==="
-git pull --ff-only
-
-docker compose -f docker-compose.oci.yml build backend
-docker compose -f docker-compose.oci.yml up -d backend
+docker compose -f "$REPO_DIR/docker-compose.oci.yml" build backend
+docker compose -f "$REPO_DIR/docker-compose.oci.yml" up -d backend
 
 echo "Waiting for backend to restart..."
 sleep 5
