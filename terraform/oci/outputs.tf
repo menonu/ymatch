@@ -22,3 +22,13 @@ output "vcn_id" {
   description = "OCID of the VCN"
   value       = oci_core_vcn.ymatch.id
 }
+
+output "instance_v2_public_ip" {
+  description = "Public IP of the replacement instance (ymatch-arm-v2)"
+  value       = oci_core_instance.ymatch_v2.public_ip
+}
+
+output "instance_v2_id" {
+  description = "OCID of the replacement compute instance"
+  value       = oci_core_instance.ymatch_v2.id
+}

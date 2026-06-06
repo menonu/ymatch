@@ -2324,3 +2324,10 @@ terraform/newrelic/.terraform.lock.hcl
 terraform/oci/.terraform.lock.hcl
 terraform/.terraform.lock.hcl
 .task/
+
+# Environment files (use .env.example as template)
+backend/.env
+frontend/.env
+**/.env
+!.env.example
+!backend/.env.example
