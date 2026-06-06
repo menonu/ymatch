@@ -20,7 +20,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/oci_deploy_common.sh"
 
 STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:-${1:?Usage: $0 <staging_db_password> <production_db_password> [public_ip]}}"
-PROD_DB_PASSWORD="${PROD_DB_PASSWORD:-${2:?Usage: $0 <staging_db_password> <production_db_password> [public_ip]}}"
+# Accept DB_PASSWORD as a fallback for PROD_DB_PASSWORD (the latter name is
+# clearer in scripts that take both passwords as args; the former is the
+# conventional name used in the CI workflows).
+PROD_DB_PASSWORD="${PROD_DB_PASSWORD:-${DB_PASSWORD:-${2:?Usage: $0 <staging_db_password> <production_db_password> [public_ip]}}}"
 PUBLIC_IP="$(oci_detect_public_ip "${3:-}")"
 
 echo "=== ymatch STAGING Deploy ==="
