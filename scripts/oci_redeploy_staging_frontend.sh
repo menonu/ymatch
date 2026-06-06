@@ -7,6 +7,7 @@
 # Optional env:
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
+#   DB_PASSWORD / STAGING_DB_PASSWORD - reused from a previous deploy
 
 set -euo pipefail
 
@@ -22,13 +23,20 @@ PUBLIC_IP="$(oci_detect_public_ip "${1:-}")"
 export PUBLIC_IP
 export API_BASE_URL="https://${PUBLIC_IP}.nip.io:8443"
 
+# docker-compose.oci.yml validates all services; regenerate .env from
+# current env vars to ensure consistency.
+DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD env var required (or run oci_deploy_staging.sh first)}"
+STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:?STAGING_DB_PASSWORD env var required (or run oci_deploy_staging.sh first)}"
+GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
+oci_write_compose_env "$REPO_DIR" DB_PASSWORD STAGING_DB_PASSWORD PUBLIC_IP GIT_HASH
+
 echo "=== Rebuilding staging frontend (API_BASE_URL=${API_BASE_URL}) ==="
 
-docker compose -f "$REPO_DIR/docker-compose.oci.yml" build \
+docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" build \
   --build-arg API_BASE_URL="$API_BASE_URL" \
   staging_frontend
 
-docker compose -f "$REPO_DIR/docker-compose.oci.yml" up -d staging_frontend
+docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" up -d staging_frontend
 
 echo "✅ Staging frontend redeployed"
 echo "Staging: http://${PUBLIC_IP}:8080"
