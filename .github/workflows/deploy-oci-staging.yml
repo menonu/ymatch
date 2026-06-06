@@ -36,19 +36,25 @@ jobs:
           set -euo pipefail
           REPO_DIR="$HOME/ymatch"
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/menonu/ymatch.git"
+          # Fetch the same ref that triggered this workflow, not always main.
+          # For workflow_dispatch on a branch: that branch. For workflow_run
+          # from CI: the head_branch of the completed CI run.
+          REF="${{ github.ref_name }}"
 
           if [ -d "$REPO_DIR/.git" ]; then
-            echo "=== Repo already a git working tree, updating remote URL and pulling ==="
+            echo "=== Repo already a git working tree, updating remote URL and pulling $REF ==="
             cd "$REPO_DIR"
             # Update the origin URL to use the current GITHUB_TOKEN (rotates
             # per workflow run, so the previous run's token is invalid).
             git remote set-url origin "$REPO_URL"
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch origin "$REF"
+            git reset --hard "origin/$REF"
           else
-            echo "=== Cloning repo via GH_TOKEN ==="
+            echo "=== Cloning repo (ref=$REF) via GH_TOKEN ==="
             rm -rf "$REPO_DIR"
             git clone "$REPO_URL" "$REPO_DIR"
+            cd "$REPO_DIR"
+            git checkout "$REF"
           fi
           SYNC_SCRIPT
 
