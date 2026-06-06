@@ -62,6 +62,73 @@ oci_get_git_hash() {
   (cd "$repo_dir" && git rev-parse --short HEAD 2>/dev/null) || echo "manual"
 }
 
+# Configure New Relic log forwarding for the ymatch containers.
+# Generates /etc/newrelic-infra/logging.d/docker-logs.yml and restarts the agent.
+# Containers must already be running.
+#
+# Args (all optional):
+#   $1 = environment label (default: "oci-production", e.g. "oci-staging")
+oci_setup_nr_log_forwarding() {
+  local env_label="${1:-oci-production}"
+  local logging_dir="/etc/newrelic-infra/logging.d"
+  local config_file="$logging_dir/docker-logs.yml"
+
+  # Ensure logging.d exists with permissive permissions
+  sudo mkdir -p "$logging_dir"
+
+  # Find running container IDs by service name
+  local backend_id caddy_id db_id
+  backend_id=$(docker inspect --format='{{.Id}}' ymatch_backend 2>/dev/null || echo "")
+  caddy_id=$(docker inspect --format='{{.Id}}' ymatch_caddy 2>/dev/null || echo "")
+  db_id=$(docker inspect --format='{{.Id}}' ymatch_db 2>/dev/null || echo "")
+
+  # Build a YAML block with whichever containers are present
+  local logs_block=""
+  if [ -n "$backend_id" ]; then
+    logs_block="${logs_block}  - name: ymatch-backend
+    file: /var/lib/docker/containers/${backend_id}/${backend_id}-json.log
+    attributes:
+      logtype: ymatch-backend
+      service: backend
+      environment: ${env_label}
+"
+  fi
+  if [ -n "$caddy_id" ]; then
+    logs_block="${logs_block}  - name: ymatch-caddy
+    file: /var/lib/docker/containers/${caddy_id}/${caddy_id}-json.log
+    attributes:
+      logtype: ymatch-caddy
+      service: caddy
+      environment: ${env_label}
+"
+  fi
+  if [ -n "$db_id" ]; then
+    logs_block="${logs_block}  - name: ymatch-db
+    file: /var/lib/docker/containers/${db_id}/${db_id}-json.log
+    attributes:
+      logtype: ymatch-db
+      service: postgresql
+      environment: ${env_label}
+"
+  fi
+
+  if [ -z "$logs_block" ]; then
+    echo "⚠️  No ymatch containers found; skipping NR log forwarding setup"
+    return 0
+  fi
+
+  # Write config and restart agent (requires sudo).
+  # The heredoc terminator (EOFLOGS) must be on its own line, so we
+  # expand ${logs_block} via a separate printf and then append.
+  {
+    printf 'logs:\n%s' "$logs_block"
+  } | sudo tee "$config_file" > /dev/null
+
+  echo "✓ Wrote NR log forwarding config to $config_file"
+  sudo systemctl restart newrelic-infra
+  echo "✓ Restarted newrelic-infra"
+}
+
 # Write a .env file under <dir> for docker compose to consume.
 # Reads variable names from the args and writes them in KEY=VALUE form.
 # This avoids leaking secrets through `export ...` in the parent shell.
