@@ -110,7 +110,12 @@ This triggers the CI pipeline (`.github/workflows/ci.yml`) to build and test you
 ---
 
 ## Step 8: Merge to `main`
-Once the CI pipeline passes and any requested reviews are completed, merge the PR. The OCI deployment workflow is automatically triggered upon merging to `main`.
+
+> **Human-only step.** The merge itself is performed by a human, not by an AI agent or automation.
+
+- **Do not** run `gh pr merge` (or any equivalent command) unless the user has given an **explicit, in-conversation instruction** authorizing the merge for that specific PR.
+- A human merges the PR once the CI pipeline passes and any requested reviews are completed.
+- The OCI deployment workflow is automatically triggered upon merging to `main`. The trigger (the merge) is gated by human action or explicit user approval — never by the agent on its own.
 
 ---
 
