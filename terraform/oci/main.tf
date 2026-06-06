@@ -178,6 +178,40 @@ resource "oci_core_instance" "ymatch" {
   }
 
   lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [metadata, source_details]
+  }
+}
+
+resource "oci_core_instance" "ymatch_v2" {
+  compartment_id      = var.compartment_ocid
+  availability_domain = var.availability_domain != "" ? var.availability_domain : data.oci_identity_availability_domains.ads.availability_domains[0].name
+  display_name        = "ymatch-arm-v2"
+  shape               = "VM.Standard.A1.Flex"
+
+  shape_config {
+    ocpus         = var.instance_ocpus
+    memory_in_gbs = var.instance_memory_gb
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.ymatch.id
+    assign_public_ip = true
+    display_name     = "ymatch-vnic-v2"
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_arm.images[0].id
+    boot_volume_size_in_gbs = var.boot_volume_size_gb
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key_v2
+    user_data           = base64encode(local.cloud_init)
+  }
+
+  lifecycle {
     ignore_changes = [metadata, source_details]
   }
 }
@@ -225,6 +259,8 @@ locals {
     # Open ports in iptables (OCI Ubuntu images have restrictive iptables by default)
     iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
     iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+    iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8080 -j ACCEPT
+    iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8443 -j ACCEPT
 
     # Persist iptables rules (works on both 22.04 and 24.04)
     if command -v netfilter-persistent &>/dev/null; then
