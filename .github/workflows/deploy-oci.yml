@@ -33,6 +33,36 @@ jobs:
           chmod 600 ~/.ssh/oci_key
           ssh-keyscan -H ${{ secrets.OCI_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Sync repo to VM
+        env:
+          HOST: ${{ secrets.OCI_VM_HOST }}
+        run: |
+          ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'SYNC_SCRIPT'
+          set -euo pipefail
+          REPO_DIR="$HOME/ymatch"
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/menonu/ymatch.git"
+          # Fetch the same ref that triggered this workflow. For tag
+          # pushes this is the tag name; for workflow_dispatch it's the
+          # branch name.
+          REF="${{ github.ref_name }}"
+
+          if [ -d "$REPO_DIR/.git" ]; then
+            echo "=== Repo already a git working tree, updating remote URL and pulling $REF ==="
+            cd "$REPO_DIR"
+            # Update the origin URL to use the current GITHUB_TOKEN (rotates
+            # per workflow run, so the previous run's token is invalid).
+            git remote set-url origin "$REPO_URL"
+            git fetch origin "$REF"
+            git reset --hard "origin/$REF"
+          else
+            echo "=== Cloning repo (ref=$REF) via GH_TOKEN ==="
+            rm -rf "$REPO_DIR"
+            git clone "$REPO_URL" "$REPO_DIR"
+            cd "$REPO_DIR"
+            git checkout "$REF"
+          fi
+          SYNC_SCRIPT
+
       - name: Deploy to Production
         env:
           HOST: ${{ secrets.OCI_VM_HOST }}
@@ -41,29 +71,11 @@ jobs:
           set -euo pipefail
           cd ~/ymatch
 
-          echo "=== Pulling latest code ==="
-          git fetch origin main
-          git reset --hard origin/main
-
-          echo "=== Building production containers ==="
-          PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com)
-          export PUBLIC_IP
+          # Use the new deploy script which handles env vars safely
+          # (--env-file) and supports non-git working trees.
           export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
-          export GIT_HASH=$(git rev-parse --short HEAD)
 
-          docker compose -f docker-compose.oci.yml build \
-            --build-arg API_BASE_URL="https://${PUBLIC_IP}.nip.io" \
-            --build-arg GIT_HASH="$GIT_HASH" \
-            backend frontend caddy
-
-          echo "=== Restarting production services ==="
-          docker compose -f docker-compose.oci.yml up -d db backend frontend caddy
-
-          echo "=== Waiting for production services ==="
-          sleep 10
-
-          echo "=== Production service status ==="
-          docker compose -f docker-compose.oci.yml ps db backend frontend caddy
+          ./scripts/oci_deploy_production.sh
 
           echo "=== Running production migrations ==="
           docker exec ymatch_backend ymatch_backend migrate 2>/dev/null || true
