@@ -62,7 +62,7 @@ See [Documentation Index](./docs/README.md) for the full file listing.
 5. Run lints and tests: `task test`, `cargo fmt -- --check && cargo clippy -- -D warnings`, `flutter analyze`
 6. Commit and push
 7. Create PR via `gh pr create`
-8. Merge after CI passes — OCI deployment triggers automatically
+8. **Merge is human-only.** Do **not** run `gh pr merge` (or any equivalent) yourself. Either a human merges the PR after CI passes, or wait for an explicit, in-conversation instruction from the user authorizing the merge for that specific PR. OCI deployment triggers automatically once the merge happens.
 
 See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
 
