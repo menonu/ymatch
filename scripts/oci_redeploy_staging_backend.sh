@@ -7,6 +7,7 @@
 # Optional env:
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
+#   DB_PASSWORD / STAGING_DB_PASSWORD - reused from a previous deploy
 
 set -euo pipefail
 
@@ -18,10 +19,18 @@ REPO_DIR="$HOME/ymatch"
 oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 
+# docker-compose.oci.yml validates all services; regenerate .env from
+# current env vars to ensure consistency.
+PUBLIC_IP="$(oci_detect_public_ip)"
+DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD env var required (or run oci_deploy_staging.sh first)}"
+STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:?STAGING_DB_PASSWORD env var required (or run oci_deploy_staging.sh first)}"
+GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
+oci_write_compose_env "$REPO_DIR" DB_PASSWORD STAGING_DB_PASSWORD PUBLIC_IP GIT_HASH
+
 echo "=== Rebuilding staging backend ==="
 
-docker compose -f "$REPO_DIR/docker-compose.oci.yml" build staging_backend
-docker compose -f "$REPO_DIR/docker-compose.oci.yml" up -d staging_backend
+docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" build staging_backend
+docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" up -d staging_backend
 
 echo "Waiting for staging backend to restart..."
 sleep 5
