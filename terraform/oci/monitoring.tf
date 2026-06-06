@@ -12,8 +12,8 @@ resource "oci_budget_budget" "ymatch" {
 }
 
 resource "oci_budget_alert_rule" "spend_alert" {
-  budget_id     = oci_budget_budget.ymatch.id
-  type          = "ACTUAL"
+  budget_id      = oci_budget_budget.ymatch.id
+  type           = "ACTUAL"
   threshold      = 80
   threshold_type = "PERCENTAGE"
   display_name   = "ymatch-spend-alert"
