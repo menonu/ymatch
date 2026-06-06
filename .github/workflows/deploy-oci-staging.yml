@@ -31,7 +31,6 @@ jobs:
       - name: Sync repo to VM
         env:
           HOST: ${{ secrets.OCI_VM_HOST }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'SYNC_SCRIPT'
           set -euo pipefail
@@ -45,7 +44,7 @@ jobs:
           else
             echo "=== Cloning repo via GH_TOKEN ==="
             rm -rf "$REPO_DIR"
-            git clone "https://x-access-token:${GH_TOKEN}@github.com/menonu/ymatch.git" "$REPO_DIR"
+            git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/menonu/ymatch.git" "$REPO_DIR"
           fi
           SYNC_SCRIPT
 
