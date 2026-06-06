@@ -29,9 +29,12 @@ echo ""
 REPO_DIR="$HOME/ymatch"
 oci_sync_repo "$REPO_DIR"
 
-# Determine env vars for docker compose
+# Determine env vars for docker compose.
+# `STAGING_DB_PASSWORD` is also required because docker-compose.oci.yml
+# validates all services; default to DB_PASSWORD if not set.
+STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:-$DB_PASSWORD}"
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-oci_write_compose_env "$REPO_DIR" DB_PASSWORD PUBLIC_IP GIT_HASH
+oci_write_compose_env "$REPO_DIR" DB_PASSWORD STAGING_DB_PASSWORD PUBLIC_IP GIT_HASH
 
 cd "$REPO_DIR"
 
