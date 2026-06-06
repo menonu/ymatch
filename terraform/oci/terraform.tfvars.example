@@ -27,3 +27,4 @@ boot_volume_size_gb = 50
 # - nr_license_key
 # - nr_account_id
 # - alert_email
+# - nr_display_name (default: ymatch-oci-arm; override per instance, e.g. ymatch-oci-arm-v2)
