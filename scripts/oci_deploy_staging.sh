@@ -85,3 +85,6 @@ echo "=== Staging Deployment Complete ==="
 echo "Staging URL: http://${PUBLIC_IP}:8080"
 echo "Staging API: http://${PUBLIC_IP}:8080/api/v1/events"
 echo "SSH:         ssh ubuntu@${PUBLIC_IP}"
+
+# Configure New Relic log forwarding (containers are running now)
+oci_setup_nr_log_forwarding "oci-staging" || echo "⚠️  NR log forwarding setup failed"

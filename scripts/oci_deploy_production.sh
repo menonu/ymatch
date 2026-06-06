@@ -75,3 +75,6 @@ echo "=== Production Deployment Complete ==="
 echo "Production URL: https://${PUBLIC_IP}.nip.io"
 echo "Production API: https://${PUBLIC_IP}.nip.io/api/v1/events"
 echo "SSH:            ssh ubuntu@${PUBLIC_IP}"
+
+# Configure New Relic log forwarding (containers are running now)
+oci_setup_nr_log_forwarding "oci-production" || echo "⚠️  NR log forwarding setup failed"
