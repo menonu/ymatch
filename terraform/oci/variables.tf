@@ -33,6 +33,11 @@ variable "ssh_public_key" {
   type        = string
 }
 
+variable "ssh_public_key_v2" {
+  description = "SSH public key for replacement instance (ymatch-arm-v2)"
+  type        = string
+}
+
 variable "db_password" {
   description = "PostgreSQL database password"
   type        = string

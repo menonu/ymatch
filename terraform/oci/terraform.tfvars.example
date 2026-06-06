@@ -1,0 +1,29 @@
+# OCI Terraform variables template
+# Copy to terraform/oci/terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored.
+
+# OCI authentication
+tenancy_ocid     = "ocid1.tenancy.oc1..YOUR_TENANCY_OCID"
+user_ocid        = "ocid1.user.oc1..YOUR_USER_OCID"
+fingerprint      = "XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX"
+private_key_path = "/path/to/your/oci_api_key.pem"
+region           = "ap-osaka-1"
+compartment_ocid = "ocid1.tenancy.oc1..YOUR_TENANCY_OCID"
+
+# SSH public keys (for VM access)
+# Generate with: ssh-keygen -t ed25519 -C "ymatch-oci" -f ~/.ssh/oci_ymatch
+ssh_public_key   = "ssh-ed25519 AAAA... ymatch-oci"
+ssh_public_key_v2 = "ssh-ed25519 AAAA... ymatch-oci-v2"
+
+# Database
+db_password = "your_secure_db_password"
+
+# Instance sizing
+instance_ocpus      = 2
+instance_memory_gb  = 12
+boot_volume_size_gb = 50
+
+# New Relic / Alerting (passed via TF_VAR_* env vars from .env, not here)
+# - nr_license_key
+# - nr_account_id
+# - alert_email
