@@ -28,6 +28,27 @@ jobs:
           chmod 600 ~/.ssh/oci_key
           ssh-keyscan -H ${{ secrets.OCI_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Sync repo to VM
+        env:
+          HOST: ${{ secrets.OCI_VM_HOST }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'SYNC_SCRIPT'
+          set -euo pipefail
+          REPO_DIR="$HOME/ymatch"
+
+          if [ -d "$REPO_DIR/.git" ]; then
+            echo "=== Repo already a git working tree, pulling latest ==="
+            cd "$REPO_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+          else
+            echo "=== Cloning repo via GH_TOKEN ==="
+            rm -rf "$REPO_DIR"
+            git clone "https://x-access-token:${GH_TOKEN}@github.com/menonu/ymatch.git" "$REPO_DIR"
+          fi
+          SYNC_SCRIPT
+
       - name: Deploy to Staging
         env:
           HOST: ${{ secrets.OCI_VM_HOST }}
@@ -36,30 +57,12 @@ jobs:
           set -euo pipefail
           cd ~/ymatch
 
-          echo "=== Pulling latest code ==="
-          git fetch origin main
-          git reset --hard origin/main
-
-          echo "=== Building staging containers ==="
-          PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com)
-          export PUBLIC_IP
+          # Use the new deploy script which handles env vars safely
+          # (--env-file) and supports non-git working trees.
           export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
           export STAGING_DB_PASSWORD="${{ secrets.OCI_STAGING_DB_PASSWORD }}"
-          export GIT_HASH=$(git rev-parse --short HEAD)
 
-          docker compose -f docker-compose.oci.yml build \
-            --build-arg API_BASE_URL="https://${PUBLIC_IP}.nip.io:8443" \
-            --build-arg GIT_HASH="$GIT_HASH" \
-            staging_backend staging_frontend staging_caddy
-
-          echo "=== Restarting staging services ==="
-          docker compose -f docker-compose.oci.yml up -d staging_db staging_backend staging_frontend staging_caddy
-
-          echo "=== Waiting for staging services ==="
-          sleep 10
-
-          echo "=== Staging service status ==="
-          docker compose -f docker-compose.oci.yml ps staging_db staging_backend staging_frontend staging_caddy
+          ./scripts/oci_deploy_staging.sh
 
           echo "=== Running staging migrations ==="
           docker exec ymatch_staging_backend ymatch_backend migrate 2>/dev/null || true
