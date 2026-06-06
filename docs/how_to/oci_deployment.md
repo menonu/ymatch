@@ -183,6 +183,112 @@ df -h /
 docker system df
 ```
 
+## GitHub Secrets Management
+
+CI/CD workflows (`.github/workflows/deploy-oci.yml` and `deploy-oci-staging.yml`) read several OCI-related values from GitHub Secrets. You must update these whenever the underlying credential changes — most commonly when the VM is recreated and gets a new public IP.
+
+### Secrets Reference
+
+| Secret | Used by | When to update |
+|--------|---------|----------------|
+| `OCI_VM_HOST` | All deploy workflows | **Every time the VM's public IP changes** (recreates via Terraform) |
+| `OCI_SSH_PRIVATE_KEY` | All deploy workflows | When the SSH key pair used for VM access is rotated |
+| `OCI_DB_PASSWORD` | `deploy-oci.yml` (production) and `deploy-oci-staging.yml` (validates compose) | When the production database password changes |
+| `OCI_STAGING_DB_PASSWORD` | `deploy-oci-staging.yml` | When the staging database password changes |
+| `GCP_SA_KEY` | (not OCI-specific; for billing backup) | When the GCP service account is rotated |
+| `NEW_RELIC_LICENSE_KEY` | NR deployment report | When the NR license is rotated |
+| `NEW_RELIC_ACCOUNT_ID` | NR deployment report | When the NR account changes |
+
+The workflows also use the automatic `GITHUB_TOKEN` (not a secret) to clone the repo over HTTPS.
+
+### Update Procedure
+
+The simplest way is to set each secret individually with `gh secret set`. The recommended pattern uses a `.env` file to avoid leaking values in shell history:
+
+```bash
+# Create a throwaway file (do not commit it; add to .gitignore if reused)
+cat > /tmp/oci-secrets.env <<'EOF'
+OCI_VM_HOST=217.142.244.253
+OCI_SSH_PRIVATE_KEY=/home/you/.ssh/oci_ymatch_v2
+OCI_DB_PASSWORD=ymatch_oci_prod_2026
+OCI_STAGING_DB_PASSWORD=ymatch_oci_staging_2026
+EOF
+
+# Source the values into the current shell
+set -a
+source /tmp/oci-secrets.env
+set +a
+
+# Update each secret
+gh auth status > /dev/null || { echo "Run 'gh auth login' first"; exit 1; }
+
+gh secret set OCI_VM_HOST --body "$OCI_VM_HOST"
+gh secret set OCI_SSH_PRIVATE_KEY < "$OCI_SSH_PRIVATE_KEY"
+gh secret set OCI_DB_PASSWORD --body "$OCI_DB_PASSWORD"
+gh secret set OCI_STAGING_DB_PASSWORD --body "$OCI_STAGING_DB_PASSWORD"
+
+# Clean up
+shred -u /tmp/oci-secrets.env
+```
+
+For a **single-value update** (the most common case after a VM recreate):
+
+```bash
+# Just the new IP — only OCI_VM_HOST changes in a typical recreate
+gh secret set OCI_VM_HOST --body "217.142.244.253"
+
+# Verify (the value is not echoed, only the metadata)
+gh secret list
+```
+
+### When a VM is Recreated
+
+Terraform may assign a **different public IP** when an instance is destroyed and recreated (observed in issue #148). The new IP must be set in `OCI_VM_HOST` before the next CI run, otherwise workflows will fail with SSH connection errors.
+
+```bash
+# After terraform apply, get the new IP
+cd terraform/oci
+terraform output instance_v2_public_ip
+# Output: "217.142.244.253"
+
+# Update the secret
+gh secret set OCI_VM_HOST --body "217.142.244.253"
+```
+
+The SSH key in `OCI_SSH_PRIVATE_KEY` does **not** need to change on a recreate if the Terraform `ssh_public_key_v2` variable is unchanged — the new instance is provisioned with the same public key.
+
+> **Future work**: A `scripts/update_oci_secrets.sh` helper was discussed (issue #139) but rejected in favor of documenting the manual procedure. The `gh secret set` invocation is short enough that a wrapper script adds little value, and the manual flow keeps the operation visible.
+
+### When an SSH Key is Rotated
+
+```bash
+# 1. Generate new key
+ssh-keygen -t ed25519 -C "ymatch-oci-v3" -f ~/.ssh/oci_ymatch_v3
+# Save the public key to your password manager
+
+# 2. Add the new public key to terraform.tfvars
+#    (ssh_public_key_v2 = "ssh-ed25519 AAAA... ymatch-oci-v3")
+
+# 3. Run terraform apply to add the new public key to the VM
+cd terraform/oci
+terraform apply
+
+# 4. Update the GitHub secret
+gh secret set OCI_SSH_PRIVATE_KEY < ~/.ssh/oci_ymatch_v3
+
+# 5. Verify the new key works
+ssh -i ~/.ssh/oci_ymatch_v3 ubuntu@$(terraform output -raw instance_v2_public_ip) "echo OK"
+
+# 6. Remove the old public key from the VM (manual edit of ~/.ssh/authorized_keys)
+```
+
+### Security Notes
+
+- **Never paste secrets in chat, emails, or unencrypted files.** `gh secret set` reads from a file (via shell redirection) or `--body` arg.
+- **Do not log secret values.** Avoid `echo "$OCI_DB_PASSWORD"` in scripts; `set -x` is especially dangerous.
+- **Audit regularly**: `gh secret list` shows all secrets and their last update time. Remove any you don't recognize.
+- **Use `~/.netrc` or `gh auth login`** so `gh` works without re-authentication.
+
 ## Image Storage
 
 On OCI, images use **local storage** (`IMAGE_STORAGE=local`):
