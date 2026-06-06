@@ -55,9 +55,10 @@ Fact-based, technical specifications describing the machinery, endpoints, schema
 ---
 
 ## 4. Explanation (Understanding-Oriented)
-Conceptual explanations, architecture reviews, design decisions, and background context to clarify *why* the system is designed this way.
+Conceptual explanations, architecture reviews, design decisions, and background context to clarify *why* the system is designed the way it is.
 
 * [Requirements Specification](file:///home/menonu/ws/ymatch/docs/explanation/requirements.md): Functional and non-functional requirements of the system.
 * [System Architecture & Actors](file:///home/menonu/ws/ymatch/docs/explanation/architecture.md): Overview of components, tech stack, and roles (User, System).
 * [Use Cases](file:///home/menonu/ws/ymatch/docs/explanation/use_cases.md): User interaction flows, triggers, goals, and pre-conditions.
 * [Initial Project Idea](file:///home/menonu/ws/ymatch/docs/explanation/initial_concept.md): Original prompt, core matching rules, and initial requirements definition.
+* [Disaster Recovery](file:///home/menonu/ws/ymatch/docs/explanation/disaster_recovery.md): Recovery procedure, lessons learned from the June 2026 end-to-end test, and known gaps.
