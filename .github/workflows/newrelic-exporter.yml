@@ -2,7 +2,7 @@ name: New Relic GitHub Actions Exporter
 
 on:
   workflow_run:
-    workflows: ["CI", "Deploy to OCI", "Database Backup"]
+    workflows: ["CI", "Deploy to OCI (Production)", "Deploy to OCI (Staging)", "Database Backup"]
     types: [completed]
 
 permissions:
