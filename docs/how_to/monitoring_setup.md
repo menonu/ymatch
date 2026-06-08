@@ -102,7 +102,80 @@ Two ping monitors run from `AP_NORTHEAST_1` (Tokyo) every 15 minutes:
 | Database Backup Failed | Any failure event | Immediate |
 | Database Backup Missing | No success event for 26h | Signal loss |
 
-**Notification**: Discord webhook → `#alerts` channel
+**Notification**: Discord webhook via GitHub Actions relay (see [Discord Alert Relayer](#discord-alert-relayer) below) → `#alerts` channel
+
+### Discord Alert Relayer
+
+The NR Alert Policy's native Discord integration sends a message with
+"Policy: N/A, Condition: N/A, Details: N/A" — useless for the
+on-call engineer. To get meaningful alerts, NR is configured to send
+to a **GitHub webhook** (via `repository_dispatch`), which the
+`.github/workflows/discord-alert-relay.yml` workflow relays to
+Discord as a rich embed with structured fields:
+
+- Policy name (e.g. "ymatch OCI Production")
+- Condition name (e.g. "High CPU Usage > 85%"), color-coded by severity
+- Host (from NR labels `hostname` or `displayName`)
+- Triggered timestamp
+- Threshold, current value, duration
+- Runbook link (if provided by the NR payload)
+
+#### Setup Steps
+
+1. **Create a GitHub Personal Access Token (PAT)** with `repo` scope.
+   Store it as a GitHub secret `NR_ALERT_WEBHOOK_TOKEN` (the workflow
+   is invoked by NR with this token in the `Authorization` header).
+
+2. **Create a Discord webhook** for the `#alerts` channel. Store the
+   URL as the GitHub secret `DISCORD_WEBHOOK_URL`.
+
+3. **In New Relic** (one-time, per Alert Policy):
+   - Go to **Alerts** → your Policy → **Notification settings**
+   - Remove the existing Discord destination (if any)
+   - Add a **Webhook** destination with:
+     - URL: `https://api.github.com/repos/menonu/ymatch/dispatches`
+     - Method: `POST`
+     - Custom headers:
+       - `Accept: application/vnd.github+json`
+       - `Authorization: Bearer ${NR_ALERT_WEBHOOK_TOKEN}`
+       - `User-Agent: newrelic-webhook`
+     - Payload (JSON):
+       ```json
+       {
+         "event_type": "newrelic-alert",
+         "client_payload": {
+           "policy_name": "{{policyName}}",
+           "condition_name": "{{conditionName}}",
+           "severity": "{{severity}}",
+           "details": "{{details}}",
+           "created_at": "{{createdAt}}",
+           "labels": {{json labels}},
+           "runbook_url": "{{runbookUrl}}"
+         }
+       }
+       ```
+
+#### Why this indirection?
+
+- The GitHub workflow is **code-managed**: the Discord embed format
+  is in `discord-alert-relay.yml`, versioned, and reviewable.
+- Future improvements (e.g. paginating long messages, adding
+  mention roles, or sending to multiple channels) only require a
+  workflow change — no NR UI work.
+- Other alert sources (e.g. Datadog, Sentry) can also trigger the
+  same `repository_dispatch` event with the same payload format and
+  get the same Discord formatting for free.
+
+#### Testing
+
+```bash
+# Manual trigger with a sample payload
+gh api -X POST repos/menonu/ymatch/dispatches --input sample-alert.json
+```
+
+A `sample-alert.json` is provided in the test fixtures (not yet
+checked in). The workflow prints the parsed embed to the run log
+so you can verify the format even without a real Discord webhook.
 
 ### 4. GitHub Actions Exporter
 
