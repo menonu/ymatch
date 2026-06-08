@@ -13,7 +13,11 @@ on:
 
 env:
   GCS_BUCKET: tangential-map-491113-b4-db-backups
-  OCI_HOST: 161.33.17.247
+  # OCI_HOST must be updated alongside the OCI_VM_HOST GitHub secret
+  # when the VM is recreated. Both the deploy workflows and this
+  # backup workflow should source from the same secret to avoid
+  # drift. See docs/how_to/oci_deployment.md#github-secrets-management
+  OCI_HOST: ${{ secrets.OCI_VM_HOST }}
   DB_CONTAINER: ymatch_db
   DB_USER: ymatch_user
   DB_NAME: ymatch
