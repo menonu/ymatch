@@ -20,18 +20,23 @@ fn merch_from_row(row: &sqlx::postgres::PgRow) -> Merchandise {
         is_deleted: Some(row.get("is_deleted")),
         trade_enabled: Some(row.get("trade_enabled")),
         creator_id: row.get("creator_id"),
+        group_description: row
+            .get::<Option<String>, _>("group_description")
+            .filter(|s| !s.is_empty()),
     }
 }
 
 const MERCH_COLUMNS: &str =
     "id, event_id, name, photo_url, group_name, sort_order, status, is_deleted, trade_enabled, creator_id";
 
+const MERCH_SELECT: &str = "m.id, m.event_id, m.name, m.photo_url, m.group_name, m.sort_order, m.status, m.is_deleted, m.trade_enabled, m.creator_id, COALESCE(g.description, '') AS group_description";
+
 pub async fn list_all_merch(
     State(pool): State<PgPool>,
 ) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
     let rows = sqlx::query(&format!(
-        "SELECT {} FROM merchandise WHERE is_deleted = false ORDER BY id ASC",
-        MERCH_COLUMNS
+        "SELECT {} FROM merchandise m LEFT JOIN merchandise_groups g ON g.event_id = m.event_id AND g.group_name = m.group_name WHERE m.is_deleted = false ORDER BY m.id ASC",
+        MERCH_SELECT
     ))
     .fetch_all(&pool)
     .await
@@ -48,11 +53,12 @@ pub async fn list_merch(
 ) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
     // Show published non-deleted items + user's own drafts
     let rows = sqlx::query(&format!(
-        r#"SELECT {} FROM merchandise 
-        WHERE event_id = $1 AND is_deleted = false 
-        AND (status = 'published' OR creator_id = $2)
-        ORDER BY sort_order ASC, id ASC"#,
-        MERCH_COLUMNS
+        r#"SELECT {} FROM merchandise m
+        LEFT JOIN merchandise_groups g ON g.event_id = m.event_id AND g.group_name = m.group_name
+        WHERE m.event_id = $1 AND m.is_deleted = false
+        AND (m.status = 'published' OR m.creator_id = $2)
+        ORDER BY m.sort_order ASC, m.id ASC"#,
+        MERCH_SELECT
     ))
     .bind(event_id)
     .bind(query.user_id)
@@ -84,10 +90,28 @@ pub async fn create_merch(
 
     let status = payload.status.as_deref().unwrap_or("published");
 
-    let row = sqlx::query(&format!(
-        "INSERT INTO merchandise (event_id, name, photo_url, group_name, creator_id, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING {}",
-        MERCH_COLUMNS
-    ))
+    // Auto-upsert the group row so the first merch in a new group sets created_by.
+    // If a group row already exists (e.g., user clicked "New Group" first),
+    // we don't overwrite description or created_by.
+    if let Some(creator_id) = payload.creator_id {
+        sqlx::query(
+            r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by)
+               VALUES ($1, $2, '', $3)
+               ON CONFLICT (event_id, group_name) DO NOTHING"#,
+        )
+        .bind(event_id)
+        .bind(group)
+        .bind(creator_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    let row = sqlx::query(
+        r#"INSERT INTO merchandise (event_id, name, photo_url, group_name, creator_id, status)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, event_id, name, photo_url, group_name, sort_order, status, is_deleted, trade_enabled, creator_id, '' AS group_description"#,
+    )
     .bind(event_id)
     .bind(&payload.name)
     .bind(&payload.photo_url)
@@ -98,7 +122,20 @@ pub async fn create_merch(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(merch_from_row(&row)))
+    // Fetch group description separately to keep the INSERT RETURNING simple.
+    let description: Option<String> = sqlx::query_scalar(
+        "SELECT description FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id)
+    .bind(group)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .flatten();
+
+    let mut merch = merch_from_row(&row);
+    merch.group_description = description.filter(|s| !s.is_empty());
+    Ok(Json(merch))
 }
 
 pub async fn update_merch(
@@ -141,7 +178,7 @@ pub async fn update_merch(
     }
 
     let sql = format!(
-        "UPDATE merchandise SET {} WHERE id = $1 AND event_id = $2 RETURNING {}",
+        "UPDATE merchandise SET {} WHERE id = $1 AND event_id = $2 RETURNING {}, '' AS group_description",
         sets.join(", "),
         MERCH_COLUMNS
     );
@@ -162,7 +199,25 @@ pub async fn update_merch(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(merch_from_row(&updated)))
+    // Fetch group description separately (may differ if group_name was renamed).
+    let description: Option<String> = sqlx::query_scalar(
+        "SELECT description FROM merchandise_groups
+         WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id)
+    .bind(
+        updated
+            .get::<Option<String>, _>("group_name")
+            .unwrap_or_default(),
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .flatten();
+
+    let mut merch = merch_from_row(&updated);
+    merch.group_description = description.filter(|s| !s.is_empty());
+    Ok(Json(merch))
 }
 
 pub async fn publish_merch(

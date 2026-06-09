@@ -114,6 +114,14 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             post(handlers::update_merch_sort_order),
         )
         .route(
+            "/api/v1/events/:id/groups",
+            get(handlers::list_event_groups).post(handlers::create_event_group),
+        )
+        .route(
+            "/api/v1/events/:id/groups/:group_name",
+            put(handlers::update_event_group),
+        )
+        .route(
             "/api/v1/events/:id/merch/:merch_id/publish",
             post(handlers::publish_merch),
         )

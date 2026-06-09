@@ -47,6 +47,17 @@ message Merchandise {
   optional bool is_deleted = 8;
   optional bool trade_enabled = 9;
   optional int32 creator_id = 10;
+  optional string group_description = 11; // mirrored from merchandise_groups; empty if unset
+}
+
+message MerchandiseGroup {
+  int32 id = 1;
+  int32 event_id = 2;
+  string group_name = 3;
+  optional string description = 4;
+  optional int32 created_by = 5;
+  optional string created_at = 6;
+  optional string updated_at = 7;
 }
 
 message InventoryItem {
@@ -210,4 +221,22 @@ message UpdateUserRoleRequest {
 // Generic request with user_id for permission checks
 message UserActionRequest {
   int32 user_id = 1;
+}
+
+message CreateGroupRequest {
+  int32 event_id = 1;
+  int32 user_id = 2;
+  string group_name = 3;
+  optional string description = 4;
+}
+
+message UpdateGroupRequest {
+  int32 event_id = 1;
+  int32 user_id = 2;
+  string group_name = 3;
+  optional string description = 4;
+}
+
+message ListGroupsResponse {
+  repeated MerchandiseGroup groups = 1;
 }
