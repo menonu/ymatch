@@ -1,6 +1,12 @@
+use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::mappers::to_rfc3339;
 use crate::handlers::permissions;
-use axum::{extract::Path, extract::State, http::StatusCode, Json};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use sqlx::{PgPool, Row};
 
 #[derive(serde::Deserialize)]
@@ -11,11 +17,9 @@ pub struct AdminQuery {
 async fn require_admin_or_mod(
     pool: &PgPool,
     query_user_id: Option<i32>,
-) -> Result<permissions::VerifiedUser, (StatusCode, String)> {
-    let uid = query_user_id.ok_or((
-        StatusCode::BAD_REQUEST,
-        "user_id query parameter required".to_string(),
-    ))?;
+) -> Result<permissions::VerifiedUser, AppError> {
+    let uid =
+        query_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
     let user = permissions::get_verified_user(pool, uid).await?;
     permissions::require_not_banned(&user)?;
     permissions::check_role(&user, &["admin", "moderator"])?;
@@ -26,14 +30,13 @@ pub async fn delete_event(
     State(pool): State<PgPool>,
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&pool, query.user_id).await?;
 
     sqlx::query("DELETE FROM events WHERE id = $1")
         .bind(id)
         .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
     Ok(StatusCode::OK)
 }
 
@@ -41,7 +44,7 @@ pub async fn delete_merch(
     State(pool): State<PgPool>,
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&pool, query.user_id).await?;
 
     // Soft-delete if inventory exists
@@ -50,8 +53,7 @@ pub async fn delete_merch(
     )
     .bind(id)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let has_inv: bool = has_inventory.get("has_inv");
 
@@ -61,14 +63,12 @@ pub async fn delete_merch(
         )
         .bind(id)
         .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
     } else {
         sqlx::query("DELETE FROM merchandise WHERE id = $1")
             .bind(id)
             .execute(&pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .await?;
     }
 
     Ok(StatusCode::OK)
@@ -78,14 +78,13 @@ pub async fn delete_match(
     State(pool): State<PgPool>,
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&pool, query.user_id).await?;
 
     sqlx::query("DELETE FROM matches WHERE id = $1")
         .bind(id)
         .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
     Ok(StatusCode::OK)
 }
 
@@ -94,7 +93,7 @@ pub async fn ban_user(
     Path(target_id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
     Json(payload): Json<BanUserRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&pool, query.user_id).await?;
 
     let banned_until = payload
@@ -110,8 +109,7 @@ pub async fn ban_user(
     .bind(banned_until)
     .bind(target_id)
     .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     Ok(StatusCode::OK)
 }
@@ -120,7 +118,7 @@ pub async fn unban_user(
     State(pool): State<PgPool>,
     Path(target_id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&pool, query.user_id).await?;
 
     sqlx::query(
@@ -128,8 +126,7 @@ pub async fn unban_user(
     )
     .bind(target_id)
     .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     Ok(StatusCode::OK)
 }
@@ -139,11 +136,10 @@ pub async fn update_user_role(
     Path(target_id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
     Json(payload): Json<UpdateUserRoleRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    let uid = query.user_id.ok_or((
-        StatusCode::BAD_REQUEST,
-        "user_id query parameter required".to_string(),
-    ))?;
+) -> Result<StatusCode, AppError> {
+    let uid = query
+        .user_id
+        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
     let user = permissions::get_verified_user(&pool, uid).await?;
     permissions::require_not_banned(&user)?;
     // Only admin can change roles
@@ -151,18 +147,17 @@ pub async fn update_user_role(
 
     let valid_roles = ["user", "moderator", "admin"];
     if !valid_roles.contains(&payload.role.as_str()) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            format!("Invalid role. Must be one of: {}", valid_roles.join(", ")),
-        ));
+        return Err(AppError::bad_request(format!(
+            "Invalid role. Must be one of: {}",
+            valid_roles.join(", ")
+        )));
     }
 
     sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
         .bind(&payload.role)
         .bind(target_id)
         .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
 
     Ok(StatusCode::OK)
 }
@@ -170,30 +165,24 @@ pub async fn update_user_role(
 pub async fn get_user_details(
     State(pool): State<PgPool>,
     Path(target_id): Path<i32>,
-) -> Result<Json<User>, (StatusCode, String)> {
+) -> Result<Json<User>, AppError> {
     let row = sqlx::query(
         "SELECT id, username, uuid, device_token, created_at, role, is_banned, ban_reason, banned_until FROM users WHERE id = $1",
     )
     .bind(target_id)
     .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let row = row.ok_or((StatusCode::NOT_FOUND, "User not found".to_string()))?;
+    .await?
+    .ok_or_else(|| AppError::not_found("User not found"))?;
 
     Ok(Json(User {
         id: row.get("id"),
         username: row.get("username"),
         uuid: row.get("uuid"),
         device_token: row.get("device_token"),
-        created_at: row
-            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-            .map(|dt| dt.to_rfc3339()),
+        created_at: to_rfc3339(row.get("created_at")),
         role: Some(row.get("role")),
         is_banned: Some(row.get("is_banned")),
         ban_reason: row.get("ban_reason"),
-        banned_until: row
-            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("banned_until")
-            .map(|dt| dt.to_rfc3339()),
+        banned_until: to_rfc3339(row.get("banned_until")),
     }))
 }

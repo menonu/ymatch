@@ -1,16 +1,21 @@
+use crate::error::AppError;
 use crate::generated::ymatch::*;
-use axum::{extract::Path, extract::State, http::StatusCode, Json};
+use crate::handlers::mappers::to_rfc3339;
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use sqlx::{PgPool, Row};
 
 pub async fn list_all_matches(
     State(pool): State<PgPool>,
-) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
+) -> Result<Json<Vec<TradeMatch>>, AppError> {
     let rows = sqlx::query(
         "SELECT id, user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at, created_at FROM matches ORDER BY created_at DESC",
     )
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let mut matches = Vec::new();
     for row in rows {
@@ -19,9 +24,7 @@ pub async fn list_all_matches(
             user1_id: row.get("user1_id"),
             user2_id: row.get("user2_id"),
             status: row.get("status"),
-            created_at: row
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-                .map(|dt| dt.to_rfc3339()),
+            created_at: to_rfc3339(row.get("created_at")),
             offered_by: row.get("offered_by"),
             inventory_applied: false,
             other_user: None,
@@ -37,14 +40,13 @@ pub async fn list_all_matches(
 pub async fn list_matches(
     State(pool): State<PgPool>,
     Path(user_id): Path<i32>,
-) -> Result<Json<Vec<TradeMatch>>, (StatusCode, String)> {
+) -> Result<Json<Vec<TradeMatch>>, AppError> {
     let rows = sqlx::query(
         "SELECT id, user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at, created_at FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status != 'REJECTED' ORDER BY created_at DESC"
     )
     .bind(user_id)
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let mut matches = Vec::new();
     for row in rows {
@@ -81,7 +83,7 @@ pub async fn list_matches(
             AND EXISTS (
                 SELECT 1 FROM inventory w WHERE w.user_id = $2 AND w.merch_id = i.merch_id AND w.status = 'WANT' AND w.quantity > 0
             )
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(other_user_id)
@@ -113,7 +115,7 @@ pub async fn list_matches(
             AND EXISTS (
                 SELECT 1 FROM inventory w WHERE w.user_id = $1 AND w.merch_id = i.merch_id AND w.status = 'WANT' AND w.quantity > 0
             )
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(other_user_id)
@@ -170,9 +172,7 @@ pub async fn list_matches(
             user1_id: u1,
             user2_id: u2,
             status: row.get("status"),
-            created_at: row
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at")
-                .map(|dt| dt.to_rfc3339()),
+            created_at: to_rfc3339(row.get("created_at")),
             offered_by: row.get("offered_by"),
             inventory_applied: if u1 == user_id {
                 row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
@@ -196,40 +196,29 @@ pub async fn offer_trade(
     State(pool): State<PgPool>,
     Path(match_id): Path<i32>,
     Json(payload): Json<OfferTradeRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+) -> Result<StatusCode, AppError> {
+    let mut tx = pool.begin().await?;
 
     // Verify match is PENDING and user is part of it
     let match_row =
         sqlx::query("SELECT user1_id, user2_id, status FROM matches WHERE id = $1 FOR UPDATE")
             .bind(match_id)
             .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
+            .await?
+            .ok_or_else(|| AppError::not_found("Match not found"))?;
     let status: String = match_row.get("status");
     if status != "PENDING" {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Can only offer on PENDING matches".to_string(),
-        ));
+        return Err(AppError::bad_request("Can only offer on PENDING matches"));
     }
 
     let u1: i32 = match_row.get("user1_id");
     let u2: i32 = match_row.get("user2_id");
     if payload.user_id != u1 && payload.user_id != u2 {
-        return Err((StatusCode::FORBIDDEN, "Not part of this match".to_string()));
+        return Err(AppError::forbidden("Not part of this match"));
     }
 
     if payload.items.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Must select at least one item".to_string(),
-        ));
+        return Err(AppError::bad_request("Must select at least one item"));
     }
 
     // Insert selected items
@@ -243,8 +232,7 @@ pub async fn offer_trade(
         .bind(&item.direction)
         .bind(item.quantity)
         .execute(&mut *tx)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
     }
 
     // Update match status to OFFERED
@@ -252,12 +240,9 @@ pub async fn offer_trade(
         .bind(payload.user_id)
         .bind(match_id)
         .execute(&mut *tx)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
 
-    tx.commit()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tx.commit().await?;
 
     Ok(StatusCode::OK)
 }
@@ -266,46 +251,34 @@ pub async fn update_match_status(
     State(pool): State<PgPool>,
     Path(match_id): Path<i32>,
     Json(payload): Json<UpdateMatchStatusRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     let valid_statuses = ["ACCEPTED", "REJECTED", "COMPLETED"];
     if !valid_statuses.contains(&payload.status.as_str()) {
-        return Err((StatusCode::BAD_REQUEST, "Invalid status".to_string()));
+        return Err(AppError::bad_request("Invalid status"));
     }
 
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut tx = pool.begin().await?;
 
     let match_row = sqlx::query(
         "SELECT user1_id, user2_id, status, offered_by FROM matches WHERE id = $1 FOR UPDATE",
     )
     .bind(match_id)
     .fetch_optional(&mut *tx)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
+    .await?
+    .ok_or_else(|| AppError::not_found("Match not found"))?;
     let current_status: String = match_row.get("status");
 
     // Validate state transitions
     match (payload.status.as_str(), current_status.as_str()) {
         ("ACCEPTED", status) if status != "OFFERED" => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Can only accept OFFERED matches".to_string(),
-            ));
+            return Err(AppError::bad_request("Can only accept OFFERED matches"));
         }
         ("COMPLETED", status) if status != "ACCEPTED" => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Can only complete ACCEPTED matches".to_string(),
-            ));
+            return Err(AppError::bad_request("Can only complete ACCEPTED matches"));
         }
         ("REJECTED", status) if status != "PENDING" && status != "OFFERED" => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Can only reject PENDING or OFFERED matches".to_string(),
+            return Err(AppError::bad_request(
+                "Can only reject PENDING or OFFERED matches",
             ));
         }
         _ => {}
@@ -315,8 +288,7 @@ pub async fn update_match_status(
         .bind(&payload.status)
         .bind(match_id)
         .execute(&mut *tx)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
 
     // On ACCEPTED: delete other PENDING matches between these users
     if payload.status == "ACCEPTED" {
@@ -328,8 +300,7 @@ pub async fn update_match_status(
             .bind(u1)
             .bind(u2)
             .execute(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .await?;
     }
 
     // On REJECTED: clean up match_items
@@ -337,13 +308,10 @@ pub async fn update_match_status(
         sqlx::query("DELETE FROM match_items WHERE match_id = $1")
             .bind(match_id)
             .execute(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .await?;
     }
 
-    tx.commit()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tx.commit().await?;
 
     Ok(StatusCode::OK)
 }
@@ -353,28 +321,25 @@ pub async fn apply_trade_inventory(
     State(pool): State<PgPool>,
     Path(match_id): Path<i32>,
     Json(payload): Json<ApplyInventoryRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     let match_row = sqlx::query(
         "SELECT user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at FROM matches WHERE id = $1",
     )
     .bind(match_id)
     .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let match_row = match_row.ok_or((StatusCode::NOT_FOUND, "Match not found".to_string()))?;
+    .await?
+    .ok_or_else(|| AppError::not_found("Match not found"))?;
     let status: String = match_row.get("status");
     if status != "COMPLETED" {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Can only apply inventory on COMPLETED matches".to_string(),
+        return Err(AppError::bad_request(
+            "Can only apply inventory on COMPLETED matches",
         ));
     }
 
     let u1: i32 = match_row.get("user1_id");
     let u2: i32 = match_row.get("user2_id");
     if payload.user_id != u1 && payload.user_id != u2 {
-        return Err((StatusCode::FORBIDDEN, "Not part of this match".to_string()));
+        return Err(AppError::forbidden("Not part of this match"));
     }
 
     let is_user1 = payload.user_id == u1;
@@ -384,9 +349,8 @@ pub async fn apply_trade_inventory(
         match_row.get("user2_inventory_applied_at")
     };
     if already_applied.is_some() {
-        return Err((
-            StatusCode::CONFLICT,
-            "Inventory already applied for this user".to_string(),
+        return Err(AppError::conflict(
+            "Inventory already applied for this user",
         ));
     }
 
@@ -399,13 +363,9 @@ pub async fn apply_trade_inventory(
     )
     .bind(match_id)
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut tx = pool.begin().await?;
 
     // Only update the requesting user's inventory
     for item in &items {
@@ -486,12 +446,9 @@ pub async fn apply_trade_inventory(
     ))
     .bind(match_id)
     .execute(&mut *tx)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
-    tx.commit()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tx.commit().await?;
 
     Ok(StatusCode::OK)
 }
@@ -500,30 +457,27 @@ pub async fn apply_trade_inventory(
 pub async fn match_notification_counts(
     State(pool): State<PgPool>,
     Path(user_id): Path<i32>,
-) -> Result<Json<NotificationCounts>, (StatusCode, String)> {
+) -> Result<Json<NotificationCounts>, AppError> {
     let pending: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status = 'PENDING'",
     )
     .bind(user_id)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let offers_in: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status = 'OFFERED' AND offered_by != $1",
     )
     .bind(user_id)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let accepted: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM matches WHERE (user1_id = $1 OR user2_id = $1) AND status = 'ACCEPTED'",
     )
     .bind(user_id)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     // Unread messages: messages in active matches not sent by this user, created after user's last read
     let unread: i64 = sqlx::query_scalar(
@@ -539,8 +493,7 @@ pub async fn match_notification_counts(
     )
     .bind(user_id)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let total = pending + offers_in + accepted + unread;
 
