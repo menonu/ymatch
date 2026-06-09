@@ -3,6 +3,7 @@ mod auth;
 mod events;
 mod images;
 mod inventory;
+pub mod mappers;
 mod matches;
 mod merch;
 mod messages;

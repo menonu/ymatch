@@ -1,5 +1,6 @@
+use crate::error::AppError;
 use crate::generated::ymatch::*;
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{Json, extract::State};
 use sqlx::{PgPool, Row};
 
 #[derive(serde::Deserialize)]
@@ -10,7 +11,7 @@ pub struct SearchQuery {
 pub async fn global_search(
     State(pool): State<PgPool>,
     axum::extract::Query(query): axum::extract::Query<SearchQuery>,
-) -> Result<Json<Vec<SearchResult>>, (StatusCode, String)> {
+) -> Result<Json<Vec<SearchResult>>, AppError> {
     let search_term = format!("%{}%", query.q);
     let mut results = Vec::new();
 
@@ -19,8 +20,7 @@ pub async fn global_search(
     )
     .bind(&search_term)
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     for row in event_rows {
         results.push(SearchResult {
@@ -34,9 +34,9 @@ pub async fn global_search(
     }
 
     let merch_rows = sqlx::query(
-        "SELECT m.id, m.name, m.group_name, m.photo_url, m.event_id, e.name as event_name 
-         FROM merchandise m 
-         JOIN events e ON m.event_id = e.id 
+        "SELECT m.id, m.name, m.group_name, m.photo_url, m.event_id, e.name as event_name
+         FROM merchandise m
+         JOIN events e ON m.event_id = e.id
          WHERE (m.name ILIKE $1 OR m.group_name ILIKE $1)
            AND m.is_deleted = false AND m.status = 'published'
            AND e.status = 'published'
@@ -44,8 +44,7 @@ pub async fn global_search(
     )
     .bind(&search_term)
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     for row in merch_rows {
         let group_name: Option<String> = row.get("group_name");

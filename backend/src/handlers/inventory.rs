@@ -1,11 +1,15 @@
+use crate::error::AppError;
 use crate::generated::ymatch::*;
-use axum::{extract::Path, extract::State, http::StatusCode, Json};
+use axum::{
+    Json,
+    extract::{Path, State},
+};
 use sqlx::{PgPool, Row};
 
 pub async fn update_inventory(
     State(pool): State<PgPool>,
     Json(payload): Json<UpdateInventoryRequest>,
-) -> Result<Json<InventoryItem>, (StatusCode, String)> {
+) -> Result<Json<InventoryItem>, AppError> {
     let row = sqlx::query(
         r#"
         INSERT INTO inventory (user_id, merch_id, status, quantity)
@@ -20,8 +24,7 @@ pub async fn update_inventory(
     .bind(payload.status)
     .bind(payload.quantity)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     Ok(Json(InventoryItem {
         id: row.get("id"),
@@ -38,10 +41,10 @@ pub async fn update_inventory(
 pub async fn get_user_inventory(
     State(pool): State<PgPool>,
     Path(user_id): Path<i32>,
-) -> Result<Json<Vec<InventoryItem>>, (StatusCode, String)> {
+) -> Result<Json<Vec<InventoryItem>>, AppError> {
     let rows = sqlx::query(
         r#"
-        SELECT 
+        SELECT
             i.id, i.user_id, i.merch_id, i.status, i.quantity,
             m.name as merch_name, m.photo_url, m.group_name
         FROM inventory i
@@ -51,8 +54,7 @@ pub async fn get_user_inventory(
     )
     .bind(user_id)
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let items = rows
         .into_iter()
