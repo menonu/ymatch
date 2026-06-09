@@ -1,0 +1,123 @@
+name: Discord Alert Relayer
+
+on:
+  repository_dispatch:
+    types: [newrelic-alert]
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Parse New Relic alert payload
+        id: parse
+        env:
+          PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          # The client_payload from NR can have any shape depending on how the
+          # webhook was configured. We accept two common shapes:
+          #
+          #   1. Direct NR alert fields (the simplest)
+          #   2. A `nr_alert` wrapper object (if NR sends nested)
+          #
+          # The shape we get from the NR "Webhook" destination is roughly:
+          #   {
+          #     "policy_name": "...",
+          #     "condition_name": "...",
+          #     "policy_id": 1234,
+          #     "condition_id": 5678,
+          #     "severity": "CRITICAL",
+          #     "runbook_url": [...],
+          #     "labels": {"hostname": "..."},
+          #     "details": "...",
+          #     "created_at": "..."
+          #   }
+
+          echo "raw_payload<<EOF" >> $GITHUB_OUTPUT
+          echo "$PAYLOAD" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send to Discord
+        env:
+          PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          HOSTNAME: ${{ secrets.OCI_VM_HOST }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::error::DISCORD_WEBHOOK_URL secret is not set"
+            exit 1
+          fi
+
+          python3 <<'PYEOF'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          payload = json.loads(os.environ["PAYLOAD"])
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          host_ip = os.environ.get("HOSTNAME", "")
+
+          # Extract fields with sensible defaults.
+          policy = payload.get("policy_name") or payload.get("policy") or "Unknown policy"
+          condition = payload.get("condition_name") or payload.get("condition") or "Unknown condition"
+          severity = (payload.get("severity") or "INFO").upper()
+          details = payload.get("details") or payload.get("description") or "(no details provided)"
+          runbook = payload.get("runbook_url")
+          if isinstance(runbook, list):
+              runbook = runbook[0] if runbook else None
+          labels = payload.get("labels") or {}
+          hostname = labels.get("hostname") or labels.get("displayName") or "unknown-host"
+          created_at = payload.get("created_at") or payload.get("timestamp")
+          threshold = payload.get("threshold") or "N/A"
+          duration = payload.get("duration") or "N/A"
+
+          # Determine color based on severity
+          color_map = {
+              "CRITICAL": 0xCC0000,  # red
+              "HIGH": 0xFF6600,      # orange
+              "WARNING": 0xFFCC00,   # yellow
+              "INFO": 0x0099CC,      # blue
+          }
+          color = color_map.get(severity, 0x808080)  # default gray
+
+          # Build Discord embed
+          embed = {
+              "title": f"🚨 {policy}",
+              "description": f"**{condition}**",
+              "color": color,
+              "fields": [
+                  {"name": "Severity", "value": severity, "inline": True},
+                  {"name": "Host", "value": f"`{hostname}`", "inline": True},
+                  {"name": "Triggered", "value": created_at or "now", "inline": True},
+                  {"name": "Details", "value": f"```{details[:1000]}```", "inline": False},
+              ],
+              "footer": {"text": "ymatch OCI Production"},
+          }
+
+          if runbook:
+              embed["fields"].append({
+                  "name": "Runbook",
+                  "value": f"[Open]({runbook})",
+                  "inline": False,
+              })
+
+          # Compose the webhook payload
+          body = {
+              "username": "New Relic",
+              "embeds": [embed],
+          }
+
+          # POST to Discord
+          req = urllib.request.Request(
+              webhook,
+              data=json.dumps(body).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(req, timeout=10) as resp:
+              if resp.status not in (200, 204):
+                  print(f"Discord returned {resp.status}", file=sys.stderr)
+                  sys.exit(1)
+              print(f"Discord accepted the alert (status={resp.status})")
+          PYEOF
