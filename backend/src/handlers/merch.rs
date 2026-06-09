@@ -1,6 +1,12 @@
+use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::mappers::merch_from_row;
 use crate::handlers::permissions;
-use axum::{extract::Path, extract::State, http::StatusCode, Json};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use sqlx::{PgPool, Row};
 
 #[derive(serde::Deserialize)]
@@ -8,34 +14,17 @@ pub struct ListMerchQuery {
     pub user_id: Option<i32>,
 }
 
-fn merch_from_row(row: &sqlx::postgres::PgRow) -> Merchandise {
-    Merchandise {
-        id: row.get("id"),
-        event_id: row.get("event_id"),
-        name: row.get("name"),
-        photo_url: row.get("photo_url"),
-        group_name: row.get("group_name"),
-        sort_order: row.get::<Option<i32>, _>("sort_order"),
-        status: Some(row.get("status")),
-        is_deleted: Some(row.get("is_deleted")),
-        trade_enabled: Some(row.get("trade_enabled")),
-        creator_id: row.get("creator_id"),
-    }
-}
-
-const MERCH_COLUMNS: &str =
-    "id, event_id, name, photo_url, group_name, sort_order, status, is_deleted, trade_enabled, creator_id";
+const MERCH_COLUMNS: &str = "id, event_id, name, photo_url, group_name, sort_order, status, is_deleted, trade_enabled, creator_id";
 
 pub async fn list_all_merch(
     State(pool): State<PgPool>,
-) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
+) -> Result<Json<Vec<Merchandise>>, AppError> {
     let rows = sqlx::query(&format!(
         "SELECT {} FROM merchandise WHERE is_deleted = false ORDER BY id ASC",
         MERCH_COLUMNS
     ))
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let merch = rows.iter().map(merch_from_row).collect();
     Ok(Json(merch))
@@ -45,11 +34,11 @@ pub async fn list_merch(
     State(pool): State<PgPool>,
     Path(event_id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<ListMerchQuery>,
-) -> Result<Json<Vec<Merchandise>>, (StatusCode, String)> {
+) -> Result<Json<Vec<Merchandise>>, AppError> {
     // Show published non-deleted items + user's own drafts
     let rows = sqlx::query(&format!(
-        r#"SELECT {} FROM merchandise 
-        WHERE event_id = $1 AND is_deleted = false 
+        r#"SELECT {} FROM merchandise
+        WHERE event_id = $1 AND is_deleted = false
         AND (status = 'published' OR creator_id = $2)
         ORDER BY sort_order ASC, id ASC"#,
         MERCH_COLUMNS
@@ -57,8 +46,7 @@ pub async fn list_merch(
     .bind(event_id)
     .bind(query.user_id)
     .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let merch = rows.iter().map(merch_from_row).collect();
     Ok(Json(merch))
@@ -68,7 +56,7 @@ pub async fn create_merch(
     State(pool): State<PgPool>,
     Path(event_id): Path<i32>,
     Json(payload): Json<CreateMerchRequest>,
-) -> Result<Json<Merchandise>, (StatusCode, String)> {
+) -> Result<Json<Merchandise>, AppError> {
     if let Some(creator_id) = payload.creator_id {
         let user = permissions::get_verified_user(&pool, creator_id).await?;
         permissions::require_not_banned(&user)?;
@@ -76,10 +64,7 @@ pub async fn create_merch(
 
     let group = payload.group_name.as_deref().unwrap_or("").trim();
     if group.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "group_name is required".to_string(),
-        ));
+        return Err(AppError::bad_request("group_name is required"));
     }
 
     let status = payload.status.as_deref().unwrap_or("published");
@@ -95,8 +80,7 @@ pub async fn create_merch(
     .bind(payload.creator_id)
     .bind(status)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     Ok(Json(merch_from_row(&row)))
 }
@@ -105,7 +89,7 @@ pub async fn update_merch(
     State(pool): State<PgPool>,
     Path((event_id, merch_id)): Path<(i32, i32)>,
     Json(payload): Json<UpdateMerchRequest>,
-) -> Result<Json<Merchandise>, (StatusCode, String)> {
+) -> Result<Json<Merchandise>, AppError> {
     let user = permissions::get_verified_user(&pool, payload.user_id).await?;
     permissions::require_not_banned(&user)?;
 
@@ -113,10 +97,8 @@ pub async fn update_merch(
         .bind(merch_id)
         .bind(event_id)
         .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let row = row.ok_or((StatusCode::NOT_FOUND, "Merchandise not found".to_string()))?;
+        .await?
+        .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
     permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
@@ -137,7 +119,7 @@ pub async fn update_merch(
     }
 
     if sets.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "No fields to update".to_string()));
+        return Err(AppError::bad_request("No fields to update"));
     }
 
     let sql = format!(
@@ -157,10 +139,7 @@ pub async fn update_merch(
         q = q.bind(group_name);
     }
 
-    let updated = q
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let updated = q.fetch_one(&pool).await?;
 
     Ok(Json(merch_from_row(&updated)))
 }
@@ -169,7 +148,7 @@ pub async fn publish_merch(
     State(pool): State<PgPool>,
     Path((event_id, merch_id)): Path<(i32, i32)>,
     Json(payload): Json<UserActionRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     let user = permissions::get_verified_user(&pool, payload.user_id).await?;
     permissions::require_not_banned(&user)?;
 
@@ -177,10 +156,8 @@ pub async fn publish_merch(
         .bind(merch_id)
         .bind(event_id)
         .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let row = row.ok_or((StatusCode::NOT_FOUND, "Merchandise not found".to_string()))?;
+        .await?
+        .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
     permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
@@ -189,8 +166,7 @@ pub async fn publish_merch(
         .bind(merch_id)
         .bind(event_id)
         .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
 
     Ok(StatusCode::OK)
 }
@@ -199,11 +175,10 @@ pub async fn delete_merch_by_creator(
     State(pool): State<PgPool>,
     Path((event_id, merch_id)): Path<(i32, i32)>,
     axum::extract::Query(query): axum::extract::Query<ListMerchQuery>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    let requester_id = query.user_id.ok_or((
-        StatusCode::BAD_REQUEST,
-        "user_id query parameter required".to_string(),
-    ))?;
+) -> Result<StatusCode, AppError> {
+    let requester_id = query
+        .user_id
+        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
     let user = permissions::get_verified_user(&pool, requester_id).await?;
     permissions::require_not_banned(&user)?;
 
@@ -211,18 +186,15 @@ pub async fn delete_merch_by_creator(
         .bind(merch_id)
         .bind(event_id)
         .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let row = row.ok_or((StatusCode::NOT_FOUND, "Merchandise not found".to_string()))?;
+        .await?
+        .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
     // Check: event creator also allowed
     let event_row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
         .bind(event_id)
         .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
     let event_creator_id = event_row.and_then(|r| r.get::<Option<i32>, _>("creator_id"));
 
     let is_merch_creator = creator_id.is_some() && creator_id == Some(user.id);
@@ -230,10 +202,7 @@ pub async fn delete_merch_by_creator(
     let is_elevated = user.role == "admin" || user.role == "moderator";
 
     if !is_merch_creator && !is_event_creator && !is_elevated {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Not authorized to delete this item".to_string(),
-        ));
+        return Err(AppError::forbidden("Not authorized to delete this item"));
     }
 
     // Soft-delete if any user has inventory referencing this merch
@@ -242,8 +211,7 @@ pub async fn delete_merch_by_creator(
     )
     .bind(merch_id)
     .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .await?;
 
     let has_inv: bool = has_inventory.get("has_inv");
 
@@ -253,14 +221,12 @@ pub async fn delete_merch_by_creator(
         )
         .bind(merch_id)
         .execute(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
     } else {
         sqlx::query("DELETE FROM merchandise WHERE id = $1")
             .bind(merch_id)
             .execute(&pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .await?;
     }
 
     Ok(StatusCode::OK)
@@ -270,15 +236,12 @@ pub async fn update_merch_sort_order(
     State(pool): State<PgPool>,
     Path(event_id): Path<i32>,
     Json(payload): Json<UpdateMerchSortOrderRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<StatusCode, AppError> {
     if payload.event_id != event_id {
-        return Err((StatusCode::BAD_REQUEST, "Event ID mismatch".to_string()));
+        return Err(AppError::bad_request("Event ID mismatch"));
     }
 
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut tx = pool.begin().await?;
 
     for (merch_id, sort_order) in payload.sort_orders {
         sqlx::query("UPDATE merchandise SET sort_order = $1 WHERE id = $2 AND event_id = $3")
@@ -286,13 +249,10 @@ pub async fn update_merch_sort_order(
             .bind(merch_id)
             .bind(event_id)
             .execute(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .await?;
     }
 
-    tx.commit()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tx.commit().await?;
 
     Ok(StatusCode::OK)
 }

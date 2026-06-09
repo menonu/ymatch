@@ -1,4 +1,4 @@
-use super::{ImageStorage, StorageError};
+use super::{ImageStorage, StorageError, StorageFuture};
 use std::sync::Arc;
 
 /// Firebase Storage (Google Cloud Storage) backend.
@@ -32,85 +32,88 @@ impl FirebaseStorage {
     }
 }
 
-#[async_trait::async_trait]
 impl ImageStorage for FirebaseStorage {
-    async fn upload(
-        &self,
-        bytes: &[u8],
-        filename: &str,
-        content_type: &str,
-    ) -> Result<String, StorageError> {
-        let token = self.get_access_token().await?;
+    fn upload<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        filename: &'a str,
+        content_type: &'a str,
+    ) -> StorageFuture<'a, Result<String, StorageError>> {
+        Box::pin(async move {
+            let token = self.get_access_token().await?;
 
-        let upload_url = format!(
-            "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name=images/{}",
-            self.bucket, filename
-        );
+            let upload_url = format!(
+                "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name=images/{}",
+                self.bucket, filename
+            );
 
-        let resp = self
-            .client
-            .post(&upload_url)
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", content_type)
-            .body(bytes.to_vec())
-            .send()
-            .await
-            .map_err(|e| StorageError::Remote(format!("Upload failed: {}", e)))?;
+            let resp = self
+                .client
+                .post(&upload_url)
+                .header("Authorization", format!("Bearer {}", token))
+                .header("Content-Type", content_type)
+                .body(bytes.to_vec())
+                .send()
+                .await
+                .map_err(|e| StorageError::Remote(format!("Upload failed: {}", e)))?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(StorageError::Remote(format!(
-                "Upload returned {}: {}",
-                status, body
-            )));
-        }
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                return Err(StorageError::Remote(format!(
+                    "Upload returned {}: {}",
+                    status, body
+                )));
+            }
 
-        // Public URL via Google Cloud Storage
-        let public_url = format!(
-            "https://storage.googleapis.com/{}/images/{}",
-            self.bucket, filename
-        );
-        Ok(public_url)
+            // Public URL via Google Cloud Storage
+            let public_url = format!(
+                "https://storage.googleapis.com/{}/images/{}",
+                self.bucket, filename
+            );
+            Ok(public_url)
+        })
     }
 
-    async fn delete(&self, url: &str) -> Result<(), StorageError> {
-        let object_name = if url.contains("/o/") {
-            let after_o = url.split("/o/").nth(1).unwrap_or("");
-            let name = after_o.split('?').next().unwrap_or(after_o);
-            urlencoding::decode(name)
-                .map(|s| s.to_string())
-                .unwrap_or_else(|_| name.to_string())
-        } else {
-            return Err(StorageError::Remote(
-                "Cannot parse object name from URL".to_string(),
-            ));
-        };
+    fn delete<'a>(&'a self, url: &'a str) -> StorageFuture<'a, Result<(), StorageError>> {
+        Box::pin(async move {
+            let object_name = if url.contains("/o/") {
+                let after_o = url.split("/o/").nth(1).unwrap_or("");
+                let name = after_o.split('?').next().unwrap_or(after_o);
+                urlencoding::decode(name)
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|_| name.to_string())
+            } else {
+                return Err(StorageError::Remote(
+                    "Cannot parse object name from URL".to_string(),
+                ));
+            };
 
-        let token = self.get_access_token().await?;
-        let delete_url = format!(
-            "https://storage.googleapis.com/storage/v1/b/{}/o/{}",
-            self.bucket,
-            urlencoding::encode(&object_name)
-        );
+            let token = self.get_access_token().await?;
+            let delete_url = format!(
+                "https://storage.googleapis.com/storage/v1/b/{}/o/{}",
+                self.bucket,
+                urlencoding::encode(&object_name)
+            );
 
-        let resp = self
-            .client
-            .delete(&delete_url)
-            .header("Authorization", format!("Bearer {}", token))
-            .send()
-            .await
-            .map_err(|e| StorageError::Remote(format!("Delete failed: {}", e)))?;
+            let resp = self
+                .client
+                .delete(&delete_url)
+                .header("Authorization", format!("Bearer {}", token))
+                .send()
+                .await
+                .map_err(|e| StorageError::Remote(format!("Delete failed: {}", e)))?;
 
-        if !resp.status().is_success() && resp.status().as_u16() != 404 {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(StorageError::Remote(format!(
-                "Delete returned {}: {}",
-                status, body
-            )));
-        }
+            if !resp.status().is_success() && resp.status().as_u16() != 404 {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                return Err(StorageError::Remote(format!(
+                    "Delete returned {}: {}",
+                    status, body
+                )));
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 }
