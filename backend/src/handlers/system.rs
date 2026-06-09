@@ -1,4 +1,4 @@
-use axum::{http::StatusCode, Json};
+use axum::{Json, http::StatusCode};
 
 pub async fn get_system_status() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let rev = option_env!("GIT_HASH").unwrap_or("unknown");

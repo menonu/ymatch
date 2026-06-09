@@ -4,20 +4,32 @@ mod local;
 pub use firebase::FirebaseStorage;
 pub use local::LocalFileStorage;
 
+use std::pin::Pin;
 use std::sync::Arc;
 
+/// Future type returned by [`ImageStorage`] trait methods.
+///
+/// `async fn` in traits is not `dyn`-compatible in edition 2024 without an
+/// explicit `BoxFuture`-style return position. We keep `Arc<dyn ImageStorage>`
+/// for runtime backend selection, so each method returns a boxed future.
+pub type StorageFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
 /// Abstraction for image storage backends.
-#[async_trait::async_trait]
+///
+/// The methods return [`StorageFuture`] to keep the trait `dyn`-compatible
+/// after dropping the `#[async_trait]` macro in edition 2024. The same shape
+/// is used by the Repository pattern introduced in Phase 2-5.
 pub trait ImageStorage: Send + Sync {
     /// Upload image bytes and return the public URL.
-    async fn upload(
-        &self,
-        bytes: &[u8],
-        filename: &str,
-        content_type: &str,
-    ) -> Result<String, StorageError>;
+    fn upload<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        filename: &'a str,
+        content_type: &'a str,
+    ) -> StorageFuture<'a, Result<String, StorageError>>;
+
     /// Delete a previously uploaded image by its URL or key.
-    async fn delete(&self, url: &str) -> Result<(), StorageError>;
+    fn delete<'a>(&'a self, url: &'a str) -> StorageFuture<'a, Result<(), StorageError>>;
 }
 
 #[derive(Debug)]
@@ -34,6 +46,8 @@ impl std::fmt::Display for StorageError {
         }
     }
 }
+
+impl std::error::Error for StorageError {}
 
 /// Build an ImageStorage backend based on the IMAGE_STORAGE env var.
 pub async fn create_storage() -> Arc<dyn ImageStorage> {

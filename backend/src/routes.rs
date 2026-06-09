@@ -1,11 +1,11 @@
 use axum::{
+    Router,
     body::Body,
     extract::Request,
     http::StatusCode,
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
-    Router,
 };
 use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter};
 use sqlx::PgPool;
