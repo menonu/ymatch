@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::mappers::merch_from_row;
-use crate::handlers::permissions;
+use crate::routes::AppState;
 use axum::{
     Json,
     extract::{Path, State},
@@ -53,13 +53,12 @@ pub async fn list_merch(
 }
 
 pub async fn create_merch(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(event_id): Path<i32>,
     Json(payload): Json<CreateMerchRequest>,
 ) -> Result<Json<Merchandise>, AppError> {
     if let Some(creator_id) = payload.creator_id {
-        let user = permissions::get_verified_user(&pool, creator_id).await?;
-        permissions::require_not_banned(&user)?;
+        state.policy.verify_active(creator_id).await?;
     }
 
     let group = payload.group_name.as_deref().unwrap_or("").trim();
@@ -79,29 +78,30 @@ pub async fn create_merch(
     .bind(&payload.group_name)
     .bind(payload.creator_id)
     .bind(status)
-    .fetch_one(&pool)
+    .fetch_one(&state.pool)
     .await?;
 
     Ok(Json(merch_from_row(&row)))
 }
 
 pub async fn update_merch(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((event_id, merch_id)): Path<(i32, i32)>,
     Json(payload): Json<UpdateMerchRequest>,
 ) -> Result<Json<Merchandise>, AppError> {
-    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
-    permissions::require_not_banned(&user)?;
+    let user = state.policy.verify_active(payload.user_id).await?;
 
     let row = sqlx::query("SELECT creator_id FROM merchandise WHERE id = $1 AND event_id = $2")
         .bind(merch_id)
         .bind(event_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
-    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+    state
+        .policy
+        .require_owner_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
 
     let mut sets = Vec::new();
     let mut idx = 2; // $1=merch_id, $2=event_id
@@ -139,53 +139,53 @@ pub async fn update_merch(
         q = q.bind(group_name);
     }
 
-    let updated = q.fetch_one(&pool).await?;
+    let updated = q.fetch_one(&state.pool).await?;
 
     Ok(Json(merch_from_row(&updated)))
 }
 
 pub async fn publish_merch(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((event_id, merch_id)): Path<(i32, i32)>,
     Json(payload): Json<UserActionRequest>,
 ) -> Result<StatusCode, AppError> {
-    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
-    permissions::require_not_banned(&user)?;
+    let user = state.policy.verify_active(payload.user_id).await?;
 
     let row = sqlx::query("SELECT creator_id FROM merchandise WHERE id = $1 AND event_id = $2")
         .bind(merch_id)
         .bind(event_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
-    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+    state
+        .policy
+        .require_owner_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
 
     sqlx::query("UPDATE merchandise SET status = 'published' WHERE id = $1 AND event_id = $2")
         .bind(merch_id)
         .bind(event_id)
-        .execute(&pool)
+        .execute(&state.pool)
         .await?;
 
     Ok(StatusCode::OK)
 }
 
 pub async fn delete_merch_by_creator(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((event_id, merch_id)): Path<(i32, i32)>,
     axum::extract::Query(query): axum::extract::Query<ListMerchQuery>,
 ) -> Result<StatusCode, AppError> {
     let requester_id = query
         .user_id
         .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
-    let user = permissions::get_verified_user(&pool, requester_id).await?;
-    permissions::require_not_banned(&user)?;
+    let user = state.policy.verify_active(requester_id).await?;
 
     let row = sqlx::query("SELECT creator_id FROM merchandise WHERE id = $1 AND event_id = $2")
         .bind(merch_id)
         .bind(event_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
@@ -193,7 +193,7 @@ pub async fn delete_merch_by_creator(
     // Check: event creator also allowed
     let event_row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
         .bind(event_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await?;
     let event_creator_id = event_row.and_then(|r| r.get::<Option<i32>, _>("creator_id"));
 
@@ -210,7 +210,7 @@ pub async fn delete_merch_by_creator(
         "SELECT EXISTS(SELECT 1 FROM inventory WHERE merch_id = $1 AND quantity > 0) as has_inv",
     )
     .bind(merch_id)
-    .fetch_one(&pool)
+    .fetch_one(&state.pool)
     .await?;
 
     let has_inv: bool = has_inventory.get("has_inv");
@@ -220,12 +220,12 @@ pub async fn delete_merch_by_creator(
             "UPDATE merchandise SET is_deleted = true, trade_enabled = false WHERE id = $1",
         )
         .bind(merch_id)
-        .execute(&pool)
+        .execute(&state.pool)
         .await?;
     } else {
         sqlx::query("DELETE FROM merchandise WHERE id = $1")
             .bind(merch_id)
-            .execute(&pool)
+            .execute(&state.pool)
             .await?;
     }
 

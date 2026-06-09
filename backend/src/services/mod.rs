@@ -1,0 +1,8 @@
+//! Application services — cross-cutting business logic that does not belong
+//! inside a single handler or a single repository.
+//!
+//! Phase 2 of #163 introduces [`PermissionPolicy`], which centralizes the
+//! `verify + check ban + check role + check ownership` chain that was
+//! previously duplicated across 5+ handlers. Future services will live
+//! here too (e.g. a `MatchLifecycleService` in Phase 4).
+pub mod permissions;
