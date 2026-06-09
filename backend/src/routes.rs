@@ -1,7 +1,7 @@
 use axum::{
     Router,
     body::Body,
-    extract::Request,
+    extract::{FromRef, Request},
     http::StatusCode,
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -12,6 +12,8 @@ use sqlx::PgPool;
 use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
+use crate::repositories::user::{PgUserRepository, UserRepository};
+use crate::services::permissions::PermissionPolicy;
 use crate::storage::ImageStorage;
 
 type IpLimiter = DefaultKeyedRateLimiter<IpAddr>;
@@ -40,7 +42,51 @@ async fn rate_limit(req: Request<Body>, next: Next, limiter: Arc<IpLimiter>) -> 
     next.run(req).await
 }
 
+/// Single state object passed to every handler. Phase 2 of #163 adds the
+/// `users` repository and `policy` service; subsequent phases will replace
+/// the raw `pool` access in handlers with more `Repository` fields.
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: PgPool,
+    pub storage: Arc<dyn ImageStorage>,
+    pub users: Arc<dyn UserRepository>,
+    pub policy: Arc<PermissionPolicy>,
+}
+
+impl FromRef<AppState> for PgPool {
+    fn from_ref(input: &AppState) -> Self {
+        input.pool.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn ImageStorage> {
+    fn from_ref(input: &AppState) -> Self {
+        input.storage.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn UserRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.users.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<PermissionPolicy> {
+    fn from_ref(input: &AppState) -> Self {
+        input.policy.clone()
+    }
+}
+
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
+    let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
+    let policy = Arc::new(PermissionPolicy::new(users.clone()));
+    let state = AppState {
+        pool,
+        storage,
+        users,
+        policy,
+    };
+
     let cors = tower_http::cors::CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any)
@@ -67,18 +113,18 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         }
     });
 
-    let auth_routes: Router<PgPool> = Router::new()
+    let auth_routes: Router<AppState> = Router::new()
         .route("/api/v1/auth/signup", post(handlers::signup))
         .route("/api/v1/auth/login", post(handlers::login))
         .route("/api/v1/auth/guest", post(handlers::guest_login))
         .layer(middleware::from_fn_with_state(
-            auth_limiter,
+            auth_limiter.clone(),
             |axum::extract::State(lim): axum::extract::State<Arc<IpLimiter>>,
              req: Request<Body>,
              next: Next| async move { rate_limit(req, next, lim).await },
         ));
 
-    let api_routes: Router<PgPool> = Router::new()
+    let api_routes: Router<AppState> = Router::new()
         .route("/", get(|| async { "Hello from ymatch Rust Backend!" }))
         .route("/api/v1/users", get(handlers::list_users))
         .route("/api/v1/users/:id", put(handlers::update_username))
@@ -158,7 +204,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             get(handlers::list_messages).post(handlers::send_message),
         )
         .layer(middleware::from_fn_with_state(
-            api_limiter,
+            api_limiter.clone(),
             |axum::extract::State(lim): axum::extract::State<Arc<IpLimiter>>,
              req: Request<Body>,
              next: Next| async move { rate_limit(req, next, lim).await },
@@ -168,15 +214,15 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let image_routes = Router::new()
         .route("/api/v1/images/upload", post(handlers::upload_image))
         .route("/api/v1/images/:filename", delete(handlers::delete_image))
-        .with_state(storage);
+        .with_state(state.storage.clone());
 
     // Serve local uploads directory as static files
     let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
     let static_service = tower_http::services::ServeDir::new(upload_dir);
 
     Router::new()
-        .merge(auth_routes.with_state(pool.clone()))
-        .merge(api_routes.with_state(pool))
+        .merge(auth_routes.with_state(state.clone()))
+        .merge(api_routes.with_state(state.clone()))
         .merge(image_routes)
         .nest_service("/uploads", static_service)
         .layer(cors)
