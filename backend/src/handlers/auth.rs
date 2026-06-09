@@ -1,39 +1,26 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::mappers::user_from_row;
+use crate::repositories::user::UsernameLookup;
+use crate::routes::AppState;
 use axum::{Json, extract::Path, extract::State};
-use sqlx::{PgPool, Row};
-
-const USER_COLUMNS: &str =
-    "id, username, uuid, device_token, created_at, role, is_banned, ban_reason, banned_until";
 
 pub async fn guest_login(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<GuestLoginRequest>,
 ) -> Result<Json<User>, AppError> {
-    let row = sqlx::query(&format!(
-        "SELECT {} FROM users WHERE uuid = $1",
-        USER_COLUMNS
-    ))
-    .bind(&payload.uuid)
-    .fetch_optional(&pool)
-    .await?;
-
-    if let Some(row) = row {
-        let is_banned: bool = row.get("is_banned");
-        if is_banned {
+    if let Some(user) = state.users.get_by_uuid(&payload.uuid).await? {
+        if user.is_banned.unwrap_or(false) {
             return Err(AppError::forbidden("User is banned"));
         }
 
         if let Some(ref token) = payload.device_token {
-            sqlx::query("UPDATE users SET device_token = $1 WHERE id = $2")
-                .bind(token)
-                .bind(row.get::<i32, _>("id"))
-                .execute(&pool)
+            state
+                .users
+                .update_device_token(user.id, Some(token))
                 .await?;
         }
 
-        let mut user = user_from_row(&row);
+        let mut user = user;
         if payload.device_token.is_some() {
             user.device_token = payload.device_token;
         }
@@ -44,71 +31,56 @@ pub async fn guest_login(
     let uuid_suffix = &payload.uuid[payload.uuid.len() - suffix_len..];
     let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
     let new_username = format!("Guest_{}_{}", uuid_suffix, unique_id);
-    let row = sqlx::query(&format!(
-        "INSERT INTO users (username, uuid, device_token) VALUES ($1, $2, $3) RETURNING {}",
-        USER_COLUMNS
-    ))
-    .bind(new_username)
-    .bind(&payload.uuid)
-    .bind(&payload.device_token)
-    .fetch_one(&pool)
-    .await?;
-
-    Ok(Json(user_from_row(&row)))
+    let user = state
+        .users
+        .create_guest(
+            &new_username,
+            &payload.uuid,
+            payload.device_token.as_deref(),
+        )
+        .await?;
+    Ok(Json(user))
 }
 
 pub async fn login(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<User>, AppError> {
-    let row = sqlx::query(&format!(
-        "SELECT {}, password_hash FROM users WHERE username = $1",
-        USER_COLUMNS
-    ))
-    .bind(&payload.username)
-    .fetch_optional(&pool)
-    .await?;
+    let (user, password_hash) = state
+        .users
+        .get_by_username(&payload.username, UsernameLookup::WithPassword)
+        .await?
+        .ok_or_else(|| AppError::unauthorized("Invalid credentials"))?;
 
-    if let Some(row) = row {
-        let password_hash: Option<String> = row.get("password_hash");
-        if password_hash.as_deref() == Some(&payload.password) {
-            let is_banned: bool = row.get("is_banned");
-            if is_banned {
-                return Err(AppError::forbidden("User is banned"));
-            }
-            Ok(Json(user_from_row(&row)))
-        } else {
-            Err(AppError::unauthorized("Invalid credentials"))
-        }
-    } else {
-        Err(AppError::unauthorized("Invalid credentials"))
+    if password_hash.as_deref() != Some(&payload.password) {
+        return Err(AppError::unauthorized("Invalid credentials"));
     }
+
+    if user.is_banned.unwrap_or(false) {
+        return Err(AppError::forbidden("User is banned"));
+    }
+
+    Ok(Json(user))
 }
 
 pub async fn signup(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<CreateUserRequest>,
 ) -> Result<Json<User>, AppError> {
-    let row = sqlx::query(&format!(
-        "INSERT INTO users (username, password_hash, device_token) VALUES ($1, $2, $3) RETURNING {}",
-        USER_COLUMNS
-    ))
-    .bind(&payload.username)
-    .bind(&payload.password)
-    .bind(&payload.device_token)
-    .fetch_one(&pool)
-    .await?;
-
-    Ok(Json(user_from_row(&row)))
+    let user = state
+        .users
+        .create_with_password(
+            &payload.username,
+            &payload.password,
+            payload.device_token.as_deref(),
+        )
+        .await?;
+    Ok(Json(user))
 }
 
-pub async fn list_users(State(pool): State<PgPool>) -> Result<Json<Vec<User>>, AppError> {
-    let rows = sqlx::query(&format!("SELECT {} FROM users", USER_COLUMNS))
-        .fetch_all(&pool)
-        .await?;
-
-    let users = rows.iter().map(user_from_row).collect();
-    Ok(Json(users))
+pub async fn list_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, AppError> {
+    let all = state.users.list_all().await?;
+    Ok(Json(all))
 }
 
 #[derive(serde::Deserialize)]
@@ -118,7 +90,7 @@ pub struct UpdateUsernameRequest {
 }
 
 pub async fn update_username(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<UpdateUsernameRequest>,
 ) -> Result<Json<User>, AppError> {
@@ -129,15 +101,10 @@ pub async fn update_username(
     if username.is_empty() {
         return Err(AppError::bad_request("Username cannot be empty"));
     }
-    let row = sqlx::query(&format!(
-        "UPDATE users SET username = $1 WHERE id = $2 RETURNING {}",
-        USER_COLUMNS
-    ))
-    .bind(&username)
-    .bind(id)
-    .fetch_optional(&pool)
-    .await?
-    .ok_or_else(|| AppError::not_found("User not found"))?;
-
-    Ok(Json(user_from_row(&row)))
+    let user = state
+        .users
+        .update_username(id, &username)
+        .await?
+        .ok_or_else(|| AppError::not_found("User not found"))?;
+    Ok(Json(user))
 }

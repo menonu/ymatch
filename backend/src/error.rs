@@ -15,7 +15,7 @@ use axum::{
 use std::fmt;
 
 /// All errors that handlers in this crate can return to the client.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum AppError {
     /// 400 — the request payload was syntactically valid but semantically wrong
     /// (missing required field, bad enum value, etc.).
