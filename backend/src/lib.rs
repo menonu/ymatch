@@ -3,5 +3,7 @@ pub mod generated;
 pub mod handlers;
 pub mod matching;
 pub mod notifications;
+pub mod repositories;
 pub mod routes;
+pub mod services;
 pub mod storage;
