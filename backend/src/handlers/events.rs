@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::mappers::to_rfc3339;
-use crate::handlers::permissions;
+use crate::routes::AppState;
 use axum::{Json, extract::State};
 use sqlx::{PgPool, Row};
 
@@ -181,11 +181,10 @@ pub async fn toggle_favorite(
 }
 
 pub async fn create_event(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<CreateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
-    let user = permissions::get_verified_user(&pool, payload.creator_id).await?;
-    permissions::require_not_banned(&user)?;
+    state.policy.verify_active(payload.creator_id).await?;
 
     let status = payload.status.as_deref().unwrap_or("published");
 
@@ -195,7 +194,7 @@ pub async fn create_event(
     .bind(&payload.name)
     .bind(payload.creator_id)
     .bind(status)
-    .fetch_one(&pool)
+    .fetch_one(&state.pool)
     .await?;
 
     Ok(Json(Event {
@@ -212,21 +211,22 @@ pub async fn create_event(
 }
 
 pub async fn update_event(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     axum::extract::Path(event_id): axum::extract::Path<i32>,
     Json(payload): Json<UpdateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
-    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
-    permissions::require_not_banned(&user)?;
+    let user = state.policy.verify_active(payload.user_id).await?;
 
     let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
         .bind(event_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("Event not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
-    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+    state
+        .policy
+        .require_owner_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
 
     let name = payload
         .name
@@ -235,7 +235,7 @@ pub async fn update_event(
     sqlx::query("UPDATE events SET name = $1 WHERE id = $2")
         .bind(&name)
         .bind(event_id)
-        .execute(&pool)
+        .execute(&state.pool)
         .await?;
 
     // Return the updated event with stats
@@ -246,7 +246,7 @@ pub async fn update_event(
            FROM events e WHERE e.id = $1"#,
     )
     .bind(event_id)
-    .fetch_one(&pool)
+    .fetch_one(&state.pool)
     .await?;
 
     Ok(Json(Event {
@@ -265,25 +265,26 @@ pub async fn update_event(
 }
 
 pub async fn publish_event(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     axum::extract::Path(event_id): axum::extract::Path<i32>,
     Json(payload): Json<UserActionRequest>,
 ) -> Result<axum::http::StatusCode, AppError> {
-    let user = permissions::get_verified_user(&pool, payload.user_id).await?;
-    permissions::require_not_banned(&user)?;
+    let user = state.policy.verify_active(payload.user_id).await?;
 
     let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
         .bind(event_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("Event not found"))?;
     let creator_id: Option<i32> = row.get("creator_id");
 
-    permissions::check_ownership_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+    state
+        .policy
+        .require_owner_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
 
     sqlx::query("UPDATE events SET status = 'published' WHERE id = $1")
         .bind(event_id)
-        .execute(&pool)
+        .execute(&state.pool)
         .await?;
 
     Ok(axum::http::StatusCode::OK)
