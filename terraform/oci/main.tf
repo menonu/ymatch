@@ -291,6 +291,16 @@ locals {
         interval: 30s
     DCONF
 
+    # Replace `MemoryLimit=` (deprecated since systemd v243) with
+    # `MemoryMax=` in the NR agent's systemd unit. Without this,
+    # journal logs a deprecation warning on every boot, and a future
+    # systemd release will silently ignore MemoryLimit, leaving the
+    # agent with no memory cap. See issue #155.
+    sed -i 's/^MemoryLimit=/MemoryMax=/' /etc/systemd/system/newrelic-infra.service
+    sed -i '/^# MemoryMax=/d' /etc/systemd/system/newrelic-infra.service
+    systemctl daemon-reload
+    systemctl restart newrelic-infra
+
     # NOTE: OCI CLI and OCI billing Flex integration were removed from cloud-init
     # because pip install of oci-cli fails on this image (urllib3 conflict),
     # which causes the entire cloud-init script to abort. OCI billing data
