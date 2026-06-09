@@ -62,3 +62,4 @@ Conceptual explanations, architecture reviews, design decisions, and background 
 * [Use Cases](file:///home/menonu/ws/ymatch/docs/explanation/use_cases.md): User interaction flows, triggers, goals, and pre-conditions.
 * [Initial Project Idea](file:///home/menonu/ws/ymatch/docs/explanation/initial_concept.md): Original prompt, core matching rules, and initial requirements definition.
 * [Disaster Recovery](file:///home/menonu/ws/ymatch/docs/explanation/disaster_recovery.md): Recovery procedure, lessons learned from the June 2026 end-to-end test, and known gaps.
+* [Backend Refactoring Plan](file:///home/menonu/ws/ymatch/docs/explanation/refactoring_plan.md): Phase-by-phase plan to introduce a Repository pattern, central `AppError`, and edition 2024. Tracked by GitHub Issue #163.
