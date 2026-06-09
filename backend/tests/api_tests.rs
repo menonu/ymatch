@@ -1,8 +1,8 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tower::ServiceExt;
 
@@ -605,9 +605,11 @@ async fn test_search_returns_results() {
     assert_eq!(resp.status(), StatusCode::OK);
     let results: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert!(results
-        .iter()
-        .any(|r| r["title"] == "Searchable Convention"));
+    assert!(
+        results
+            .iter()
+            .any(|r| r["title"] == "Searchable Convention")
+    );
 }
 
 #[tokio::test]
