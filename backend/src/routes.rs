@@ -13,8 +13,12 @@ use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
 use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupRepository};
+use crate::repositories::inventory::{InventoryRepository, PgInventoryRepository};
+use crate::repositories::match_::{MatchRepository, PgMatchRepository};
 use crate::repositories::merch::{MerchandiseRepository, PgMerchandiseRepository};
+use crate::repositories::message::{MessageRepository, PgMessageRepository};
 use crate::repositories::user::{PgUserRepository, UserRepository};
+use crate::services::match_lifecycle::MatchLifecycleService;
 use crate::services::merch_permissions::MerchPermissionPolicy;
 use crate::services::permissions::PermissionPolicy;
 use crate::storage::ImageStorage;
@@ -55,8 +59,12 @@ pub struct AppState {
     pub users: Arc<dyn UserRepository>,
     pub merch: Arc<dyn MerchandiseRepository>,
     pub groups: Arc<dyn MerchandiseGroupRepository>,
+    pub matches: Arc<dyn MatchRepository>,
+    pub inventory: Arc<dyn InventoryRepository>,
+    pub messages: Arc<dyn MessageRepository>,
     pub policy: Arc<PermissionPolicy>,
     pub merch_policy: Arc<MerchPermissionPolicy>,
+    pub match_lifecycle: Arc<MatchLifecycleService>,
 }
 
 impl FromRef<AppState> for PgPool {
@@ -101,6 +109,30 @@ impl FromRef<AppState> for Arc<MerchPermissionPolicy> {
     }
 }
 
+impl FromRef<AppState> for Arc<dyn MatchRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.matches.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn InventoryRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.inventory.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn MessageRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.messages.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<MatchLifecycleService> {
+    fn from_ref(input: &AppState) -> Self {
+        input.match_lifecycle.clone()
+    }
+}
+
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
@@ -108,15 +140,28 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         Arc::new(PgMerchandiseRepository::new(pool.clone()));
     let groups: Arc<dyn MerchandiseGroupRepository> =
         Arc::new(PgMerchandiseGroupRepository::new(pool.clone()));
+    let matches: Arc<dyn MatchRepository> = Arc::new(PgMatchRepository::new(pool.clone()));
+    let inventory: Arc<dyn InventoryRepository> =
+        Arc::new(PgInventoryRepository::new(pool.clone()));
+    let messages: Arc<dyn MessageRepository> = Arc::new(PgMessageRepository::new(pool.clone()));
     let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
+    let match_lifecycle = Arc::new(MatchLifecycleService::new(
+        pool.clone(),
+        matches.clone(),
+        inventory.clone(),
+    ));
     let state = AppState {
         pool,
         storage,
         users,
         merch,
         groups,
+        matches,
+        inventory,
+        messages,
         policy,
         merch_policy,
+        match_lifecycle,
     };
 
     let cors = tower_http::cors::CorsLayer::new()
