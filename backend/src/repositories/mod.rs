@@ -26,7 +26,11 @@ use std::pin::Pin;
 /// it) plus the input arguments.
 pub type RepositoryFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+pub mod event;
+pub mod event_favorites;
+pub mod event_views;
 pub mod group;
+pub mod group_favorites;
 pub mod inventory;
 pub mod match_;
 pub mod merch;
