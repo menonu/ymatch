@@ -145,11 +145,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         Arc::new(PgInventoryRepository::new(pool.clone()));
     let messages: Arc<dyn MessageRepository> = Arc::new(PgMessageRepository::new(pool.clone()));
     let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
-    let match_lifecycle = Arc::new(MatchLifecycleService::new(
-        pool.clone(),
-        matches.clone(),
-        inventory.clone(),
-    ));
+    let match_lifecycle = Arc::new(MatchLifecycleService::new(pool.clone(), matches.clone()));
     let state = AppState {
         pool,
         storage,
