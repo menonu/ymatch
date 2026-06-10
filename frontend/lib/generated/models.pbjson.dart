@@ -264,6 +264,15 @@ const Merchandise$json = {
       '10': 'creatorId',
       '17': true
     },
+    {
+      '1': 'group_description',
+      '3': 11,
+      '4': 1,
+      '5': 9,
+      '9': 7,
+      '10': 'groupDescription',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_photo_url'},
@@ -273,6 +282,7 @@ const Merchandise$json = {
     {'1': '_is_deleted'},
     {'1': '_trade_enabled'},
     {'1': '_creator_id'},
+    {'1': '_group_description'},
   ],
 };
 
@@ -283,9 +293,72 @@ final $typed_data.Uint8List merchandiseDescriptor = $convert.base64Decode(
     'IgoKZ3JvdXBfbmFtZRgFIAEoCUgBUglncm91cE5hbWWIAQESIgoKc29ydF9vcmRlchgGIAEoBU'
     'gCUglzb3J0T3JkZXKIAQESGwoGc3RhdHVzGAcgASgJSANSBnN0YXR1c4gBARIiCgppc19kZWxl'
     'dGVkGAggASgISARSCWlzRGVsZXRlZIgBARIoCg10cmFkZV9lbmFibGVkGAkgASgISAVSDHRyYW'
-    'RlRW5hYmxlZIgBARIiCgpjcmVhdG9yX2lkGAogASgFSAZSCWNyZWF0b3JJZIgBAUIMCgpfcGhv'
-    'dG9fdXJsQg0KC19ncm91cF9uYW1lQg0KC19zb3J0X29yZGVyQgkKB19zdGF0dXNCDQoLX2lzX2'
-    'RlbGV0ZWRCEAoOX3RyYWRlX2VuYWJsZWRCDQoLX2NyZWF0b3JfaWQ=');
+    'RlRW5hYmxlZIgBARIiCgpjcmVhdG9yX2lkGAogASgFSAZSCWNyZWF0b3JJZIgBARIwChFncm91'
+    'cF9kZXNjcmlwdGlvbhgLIAEoCUgHUhBncm91cERlc2NyaXB0aW9uiAEBQgwKCl9waG90b191cm'
+    'xCDQoLX2dyb3VwX25hbWVCDQoLX3NvcnRfb3JkZXJCCQoHX3N0YXR1c0INCgtfaXNfZGVsZXRl'
+    'ZEIQCg5fdHJhZGVfZW5hYmxlZEINCgtfY3JlYXRvcl9pZEIUChJfZ3JvdXBfZGVzY3JpcHRpb2'
+    '4=');
+
+@$core.Deprecated('Use merchandiseGroupDescriptor instead')
+const MerchandiseGroup$json = {
+  '1': 'MerchandiseGroup',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 5, '10': 'id'},
+    {'1': 'event_id', '3': 2, '4': 1, '5': 5, '10': 'eventId'},
+    {'1': 'group_name', '3': 3, '4': 1, '5': 9, '10': 'groupName'},
+    {
+      '1': 'description',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'description',
+      '17': true
+    },
+    {
+      '1': 'created_by',
+      '3': 5,
+      '4': 1,
+      '5': 5,
+      '9': 1,
+      '10': 'createdBy',
+      '17': true
+    },
+    {
+      '1': 'created_at',
+      '3': 6,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'createdAt',
+      '17': true
+    },
+    {
+      '1': 'updated_at',
+      '3': 7,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'updatedAt',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_description'},
+    {'1': '_created_by'},
+    {'1': '_created_at'},
+    {'1': '_updated_at'},
+  ],
+};
+
+/// Descriptor for `MerchandiseGroup`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List merchandiseGroupDescriptor = $convert.base64Decode(
+    'ChBNZXJjaGFuZGlzZUdyb3VwEg4KAmlkGAEgASgFUgJpZBIZCghldmVudF9pZBgCIAEoBVIHZX'
+    'ZlbnRJZBIdCgpncm91cF9uYW1lGAMgASgJUglncm91cE5hbWUSJQoLZGVzY3JpcHRpb24YBCAB'
+    'KAlIAFILZGVzY3JpcHRpb26IAQESIgoKY3JlYXRlZF9ieRgFIAEoBUgBUgljcmVhdGVkQnmIAQ'
+    'ESIgoKY3JlYXRlZF9hdBgGIAEoCUgCUgljcmVhdGVkQXSIAQESIgoKdXBkYXRlZF9hdBgHIAEo'
+    'CUgDUgl1cGRhdGVkQXSIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC19jcmVhdGVkX2J5Qg0KC19jcm'
+    'VhdGVkX2F0Qg0KC191cGRhdGVkX2F0');
 
 @$core.Deprecated('Use inventoryItemDescriptor instead')
 const InventoryItem$json = {
@@ -995,3 +1068,79 @@ const UserActionRequest$json = {
 /// Descriptor for `UserActionRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List userActionRequestDescriptor = $convert.base64Decode(
     'ChFVc2VyQWN0aW9uUmVxdWVzdBIXCgd1c2VyX2lkGAEgASgFUgZ1c2VySWQ=');
+
+@$core.Deprecated('Use createGroupRequestDescriptor instead')
+const CreateGroupRequest$json = {
+  '1': 'CreateGroupRequest',
+  '2': [
+    {'1': 'event_id', '3': 1, '4': 1, '5': 5, '10': 'eventId'},
+    {'1': 'user_id', '3': 2, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'group_name', '3': 3, '4': 1, '5': 9, '10': 'groupName'},
+    {
+      '1': 'description',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'description',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_description'},
+  ],
+};
+
+/// Descriptor for `CreateGroupRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createGroupRequestDescriptor = $convert.base64Decode(
+    'ChJDcmVhdGVHcm91cFJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SWQSFwoHdXNlcl'
+    '9pZBgCIAEoBVIGdXNlcklkEh0KCmdyb3VwX25hbWUYAyABKAlSCWdyb3VwTmFtZRIlCgtkZXNj'
+    'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBAUIOCgxfZGVzY3JpcHRpb24=');
+
+@$core.Deprecated('Use updateGroupRequestDescriptor instead')
+const UpdateGroupRequest$json = {
+  '1': 'UpdateGroupRequest',
+  '2': [
+    {'1': 'event_id', '3': 1, '4': 1, '5': 5, '10': 'eventId'},
+    {'1': 'user_id', '3': 2, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'group_name', '3': 3, '4': 1, '5': 9, '10': 'groupName'},
+    {
+      '1': 'description',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'description',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_description'},
+  ],
+};
+
+/// Descriptor for `UpdateGroupRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateGroupRequestDescriptor = $convert.base64Decode(
+    'ChJVcGRhdGVHcm91cFJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SWQSFwoHdXNlcl'
+    '9pZBgCIAEoBVIGdXNlcklkEh0KCmdyb3VwX25hbWUYAyABKAlSCWdyb3VwTmFtZRIlCgtkZXNj'
+    'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBAUIOCgxfZGVzY3JpcHRpb24=');
+
+@$core.Deprecated('Use listGroupsResponseDescriptor instead')
+const ListGroupsResponse$json = {
+  '1': 'ListGroupsResponse',
+  '2': [
+    {
+      '1': 'groups',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.ymatch.MerchandiseGroup',
+      '10': 'groups'
+    },
+  ],
+};
+
+/// Descriptor for `ListGroupsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listGroupsResponseDescriptor = $convert.base64Decode(
+    'ChJMaXN0R3JvdXBzUmVzcG9uc2USMAoGZ3JvdXBzGAEgAygLMhgueW1hdGNoLk1lcmNoYW5kaX'
+    'NlR3JvdXBSBmdyb3Vwcw==');

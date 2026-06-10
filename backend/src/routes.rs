@@ -12,7 +12,10 @@ use sqlx::PgPool;
 use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
+use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupRepository};
+use crate::repositories::merch::{MerchandiseRepository, PgMerchandiseRepository};
 use crate::repositories::user::{PgUserRepository, UserRepository};
+use crate::services::merch_permissions::MerchPermissionPolicy;
 use crate::services::permissions::PermissionPolicy;
 use crate::storage::ImageStorage;
 
@@ -50,7 +53,10 @@ pub struct AppState {
     pub pool: PgPool,
     pub storage: Arc<dyn ImageStorage>,
     pub users: Arc<dyn UserRepository>,
+    pub merch: Arc<dyn MerchandiseRepository>,
+    pub groups: Arc<dyn MerchandiseGroupRepository>,
     pub policy: Arc<PermissionPolicy>,
+    pub merch_policy: Arc<MerchPermissionPolicy>,
 }
 
 impl FromRef<AppState> for PgPool {
@@ -71,20 +77,46 @@ impl FromRef<AppState> for Arc<dyn UserRepository> {
     }
 }
 
+impl FromRef<AppState> for Arc<dyn MerchandiseRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.merch.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn MerchandiseGroupRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.groups.clone()
+    }
+}
+
 impl FromRef<AppState> for Arc<PermissionPolicy> {
     fn from_ref(input: &AppState) -> Self {
         input.policy.clone()
     }
 }
 
+impl FromRef<AppState> for Arc<MerchPermissionPolicy> {
+    fn from_ref(input: &AppState) -> Self {
+        input.merch_policy.clone()
+    }
+}
+
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
+    let merch: Arc<dyn MerchandiseRepository> =
+        Arc::new(PgMerchandiseRepository::new(pool.clone()));
+    let groups: Arc<dyn MerchandiseGroupRepository> =
+        Arc::new(PgMerchandiseGroupRepository::new(pool.clone()));
+    let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
     let state = AppState {
         pool,
         storage,
         users,
+        merch,
+        groups,
         policy,
+        merch_policy,
     };
 
     let cors = tower_http::cors::CorsLayer::new()
@@ -158,6 +190,14 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         .route(
             "/api/v1/events/:id/merch/sort",
             post(handlers::update_merch_sort_order),
+        )
+        .route(
+            "/api/v1/events/:id/groups",
+            get(handlers::list_event_groups).post(handlers::create_event_group),
+        )
+        .route(
+            "/api/v1/events/:id/groups/:group_name",
+            put(handlers::update_event_group),
         )
         .route(
             "/api/v1/events/:id/merch/:merch_id/publish",

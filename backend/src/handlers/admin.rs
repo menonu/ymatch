@@ -7,7 +7,6 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-use sqlx::Row;
 
 #[derive(serde::Deserialize)]
 pub struct AdminQuery {
@@ -53,30 +52,22 @@ pub async fn delete_merch(
 ) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&state.policy, query.user_id).await?;
 
-    // Soft-delete if inventory exists
-    let has_inventory = sqlx::query(
-        "SELECT EXISTS(SELECT 1 FROM inventory WHERE merch_id = $1 AND quantity > 0) as has_inv",
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
-
-    let has_inv: bool = has_inventory.get("has_inv");
-
-    if has_inv {
-        sqlx::query(
-            "UPDATE merchandise SET is_deleted = true, trade_enabled = false WHERE id = $1",
-        )
-        .bind(id)
-        .execute(&state.pool)
-        .await?;
-    } else {
-        sqlx::query("DELETE FROM merchandise WHERE id = $1")
+    // The merch_id is also the only thing we have. The repository needs
+    // (event_id, merch_id) to construct its SQL, so we look up the event
+    // id from the merch row first. This is the one place that bridges the
+    // old admin path and the new repository; once Phase 5 introduces
+    // EventRepository this lookup can move there.
+    let event_id: Option<i32> =
+        sqlx::query_scalar("SELECT event_id FROM merchandise WHERE id = $1")
             .bind(id)
-            .execute(&state.pool)
+            .fetch_optional(&state.pool)
             .await?;
-    }
 
+    let Some(event_id) = event_id else {
+        return Ok(StatusCode::OK);
+    };
+
+    state.merch.delete_merch(event_id, id).await?;
     Ok(StatusCode::OK)
 }
 
