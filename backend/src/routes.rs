@@ -12,7 +12,11 @@ use sqlx::PgPool;
 use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
+use crate::repositories::event::{EventRepository, PgEventRepository};
+use crate::repositories::event_favorites::{EventFavoritesRepository, PgEventFavoritesRepository};
+use crate::repositories::event_views::{EventViewsRepository, PgEventViewsRepository};
 use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupRepository};
+use crate::repositories::group_favorites::{GroupFavoritesRepository, PgGroupFavoritesRepository};
 use crate::repositories::inventory::{InventoryRepository, PgInventoryRepository};
 use crate::repositories::match_::{MatchRepository, PgMatchRepository};
 use crate::repositories::merch::{MerchandiseRepository, PgMerchandiseRepository};
@@ -62,6 +66,10 @@ pub struct AppState {
     pub matches: Arc<dyn MatchRepository>,
     pub inventory: Arc<dyn InventoryRepository>,
     pub messages: Arc<dyn MessageRepository>,
+    pub events: Arc<dyn EventRepository>,
+    pub event_favorites: Arc<dyn EventFavoritesRepository>,
+    pub event_views: Arc<dyn EventViewsRepository>,
+    pub group_favorites: Arc<dyn GroupFavoritesRepository>,
     pub policy: Arc<PermissionPolicy>,
     pub merch_policy: Arc<MerchPermissionPolicy>,
     pub match_lifecycle: Arc<MatchLifecycleService>,
@@ -133,6 +141,30 @@ impl FromRef<AppState> for Arc<MatchLifecycleService> {
     }
 }
 
+impl FromRef<AppState> for Arc<dyn EventRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.events.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn EventFavoritesRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.event_favorites.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn EventViewsRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.event_views.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn GroupFavoritesRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.group_favorites.clone()
+    }
+}
+
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
@@ -144,6 +176,13 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let inventory: Arc<dyn InventoryRepository> =
         Arc::new(PgInventoryRepository::new(pool.clone()));
     let messages: Arc<dyn MessageRepository> = Arc::new(PgMessageRepository::new(pool.clone()));
+    let events: Arc<dyn EventRepository> = Arc::new(PgEventRepository::new(pool.clone()));
+    let event_favorites: Arc<dyn EventFavoritesRepository> =
+        Arc::new(PgEventFavoritesRepository::new(pool.clone()));
+    let event_views: Arc<dyn EventViewsRepository> =
+        Arc::new(PgEventViewsRepository::new(pool.clone()));
+    let group_favorites: Arc<dyn GroupFavoritesRepository> =
+        Arc::new(PgGroupFavoritesRepository::new(pool.clone()));
     let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
     let match_lifecycle = Arc::new(MatchLifecycleService::new(pool.clone(), matches.clone()));
     let state = AppState {
@@ -155,6 +194,10 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         matches,
         inventory,
         messages,
+        events,
+        event_favorites,
+        event_views,
+        group_favorites,
         policy,
         merch_policy,
         match_lifecycle,

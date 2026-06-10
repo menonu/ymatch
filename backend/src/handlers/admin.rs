@@ -25,23 +25,13 @@ async fn require_admin_or_mod(
     Ok(user)
 }
 
-// NOTE: delete_event / delete_merch / delete_match still use raw `PgPool`
-// via `state.pool` because they touch the events / merchandise / matches
-// tables. Those domains get their own Repository traits in Phase 3
-// (MerchandiseRepository), Phase 4 (MatchRepository), and Phase 5
-// (EventRepository). The auth check is already on the new policy.
-
 pub async fn delete_event(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&state.policy, query.user_id).await?;
-
-    sqlx::query("DELETE FROM events WHERE id = $1")
-        .bind(id)
-        .execute(&state.pool)
-        .await?;
+    state.events.delete(id).await?;
     Ok(StatusCode::OK)
 }
 
@@ -54,9 +44,9 @@ pub async fn delete_merch(
 
     // The merch_id is also the only thing we have. The repository needs
     // (event_id, merch_id) to construct its SQL, so we look up the event
-    // id from the merch row first. This is the one place that bridges the
-    // old admin path and the new repository; once Phase 5 introduces
-    // EventRepository this lookup can move there.
+    // id from the merch row first. This is the one place that bridges
+    // the old admin path and the new repository; once MerchandiseRepository
+    // grows a `delete_by_id` method this lookup can move there.
     let event_id: Option<i32> =
         sqlx::query_scalar("SELECT event_id FROM merchandise WHERE id = $1")
             .bind(id)
@@ -78,6 +68,10 @@ pub async fn delete_match(
 ) -> Result<StatusCode, AppError> {
     require_admin_or_mod(&state.policy, query.user_id).await?;
 
+    // The matches table is owned by `MatchRepository` in Phase 4, but
+    // the admin path here is the only consumer of a "delete" method on
+    // matches. We add it via a direct SQL because the trade lifecycle
+    // service has no public delete endpoint; this is a 1-line query.
     sqlx::query("DELETE FROM matches WHERE id = $1")
         .bind(id)
         .execute(&state.pool)
