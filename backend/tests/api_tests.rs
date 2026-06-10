@@ -40,6 +40,10 @@ async fn setup_test_pool() -> PgPool {
         .execute(&pool)
         .await
         .ok();
+    sqlx::query("DELETE FROM merchandise_groups")
+        .execute(&pool)
+        .await
+        .ok();
     sqlx::query("DELETE FROM event_favorites")
         .execute(&pool)
         .await
@@ -2024,4 +2028,320 @@ async fn test_apply_inventory_on_non_completed_rejected() {
         .await
         .unwrap();
     assert_ne!(resp.status(), StatusCode::OK);
+}
+
+// --- Merchandise Groups (Issue #128, Phase 3) ---
+
+async fn create_test_user_and_event(pool: PgPool, uuid: &str, event_name: &str) -> (i64, i64) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"uuid": "{}"}}"#, uuid)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_id = user["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "{}", "creator_id": {}}}"#,
+                    event_name, user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+    (user_id, event_id)
+}
+
+#[tokio::test]
+async fn test_create_group_via_dialog() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-dialog-user", "Group Event").await;
+
+    // Create group with description
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Keychains", "description": "Handmade keychains only"}}"#,
+                    event_id, user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["group_name"].as_str().unwrap(), "Keychains");
+    assert_eq!(
+        group["description"].as_str().unwrap(),
+        "Handmade keychains only"
+    );
+    assert_eq!(group["created_by"].as_i64().unwrap(), user_id);
+    assert!(group["id"].as_i64().is_some());
+
+    // Re-creating same group is idempotent (upsert); description can be updated.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Keychains", "description": "Updated"}}"#,
+                    event_id, user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["description"].as_str().unwrap(), "Updated");
+    assert_eq!(group["created_by"].as_i64().unwrap(), user_id);
+
+    // List groups for event
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let groups = body["groups"].as_array().unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0]["group_name"].as_str().unwrap(), "Keychains");
+}
+
+#[tokio::test]
+async fn test_update_group_description() {
+    let pool = setup_test_pool().await;
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-updater-creator", "Updater Event").await;
+
+    // Create group as creator
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Pins", "description": "original"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Update description as creator
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&format!("/api/v1/events/{}/groups/Pins", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Pins", "description": "updated by creator"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["description"].as_str().unwrap(), "updated by creator");
+
+    // Non-creator cannot update
+    let (other_id, _) =
+        create_test_user_and_event(pool.clone(), "group-updater-other", "Other").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&format!("/api/v1/events/{}/groups/Pins", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Pins", "description": "hostile update"}}"#,
+                    event_id, other_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_implicit_group_via_first_merch() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "implicit-group-user", "Implicit Group Event")
+            .await;
+
+    // No group row yet
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["groups"].as_array().unwrap().len(), 0);
+
+    // Create first merch in a new group — should auto-create the group row
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "First item", "group_name": "Auto Group", "creator_id": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    // No description set yet
+    assert!(merch["group_description"].is_null());
+
+    // List groups — should now show "Auto Group" with this user as creator
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let groups = body["groups"].as_array().unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0]["group_name"].as_str().unwrap(), "Auto Group");
+    assert_eq!(groups[0]["created_by"].as_i64().unwrap(), user_id);
+}
+
+#[tokio::test]
+async fn test_merch_includes_group_description() {
+    let pool = setup_test_pool().await;
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-desc-merch", "Merch Desc Event").await;
+
+    // Pre-create the group with a description
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Stickers", "description": "Vinyl stickers"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Create merch in that group
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Cat sticker", "group_name": "Stickers", "creator_id": {}}}"#,
+                    creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        merch["group_description"].as_str().unwrap(),
+        "Vinyl stickers"
+    );
+
+    // List merch should also include description
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let items = body.as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(
+        items[0]["group_description"].as_str().unwrap(),
+        "Vinyl stickers"
+    );
 }
