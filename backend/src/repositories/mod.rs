@@ -27,5 +27,8 @@ use std::pin::Pin;
 pub type RepositoryFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub mod group;
+pub mod inventory;
+pub mod match_;
 pub mod merch;
+pub mod message;
 pub mod user;
