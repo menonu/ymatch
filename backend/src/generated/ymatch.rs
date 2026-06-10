@@ -91,6 +91,29 @@ pub struct Merchandise {
     pub trade_enabled: ::core::option::Option<bool>,
     #[prost(int32, optional, tag = "10")]
     pub creator_id: ::core::option::Option<i32>,
+    /// mirrored from merchandise_groups; empty if unset
+    #[prost(string, optional, tag = "11")]
+    pub group_description: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MerchandiseGroup {
+    #[prost(int32, tag = "1")]
+    pub id: i32,
+    #[prost(int32, tag = "2")]
+    pub event_id: i32,
+    #[prost(string, tag = "3")]
+    pub group_name: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "4")]
+    pub description: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, optional, tag = "5")]
+    pub created_by: ::core::option::Option<i32>,
+    #[prost(string, optional, tag = "6")]
+    pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "7")]
+    pub updated_at: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -431,4 +454,40 @@ pub struct UpdateUserRoleRequest {
 pub struct UserActionRequest {
     #[prost(int32, tag = "1")]
     pub user_id: i32,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateGroupRequest {
+    #[prost(int32, tag = "1")]
+    pub event_id: i32,
+    #[prost(int32, tag = "2")]
+    pub user_id: i32,
+    #[prost(string, tag = "3")]
+    pub group_name: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "4")]
+    pub description: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateGroupRequest {
+    #[prost(int32, tag = "1")]
+    pub event_id: i32,
+    #[prost(int32, tag = "2")]
+    pub user_id: i32,
+    #[prost(string, tag = "3")]
+    pub group_name: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "4")]
+    pub description: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListGroupsResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub groups: ::prost::alloc::vec::Vec<MerchandiseGroup>,
 }
