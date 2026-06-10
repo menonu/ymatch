@@ -10,7 +10,7 @@
 //! converted to `None` for proto3 `optional string` fields, which is the
 //! convention the proto schema relies on.
 
-use crate::generated::ymatch::{Merchandise, User};
+use crate::generated::ymatch::{Merchandise, MerchandiseGroup, User};
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
@@ -48,11 +48,16 @@ pub fn user_from_row(row: &sqlx::postgres::PgRow) -> User {
 
 /// Map a `merchandise` row to [`Merchandise`].
 ///
-/// Required columns: `id, event_id, name, photo_url, group_name, sort_order,
-/// status, is_deleted, trade_enabled, creator_id`. A future schema change
-/// may add optional columns (e.g. mirrored metadata); this mapper will be
-/// extended at that time.
+/// If the SELECT includes a `group_description` column (e.g. from a LEFT JOIN
+/// to `merchandise_groups`), the value is read and returned in
+/// [`Merchandise::group_description`]. Empty strings are normalized to
+/// `None` to match the proto3 `optional string` convention.
 pub fn merch_from_row(row: &sqlx::postgres::PgRow) -> Merchandise {
+    let group_description: Option<String> = row
+        .try_get::<Option<String>, _>("group_description")
+        .ok()
+        .flatten()
+        .or_else(|| row.try_get::<String, _>("group_description").ok());
     Merchandise {
         id: row.get("id"),
         event_id: row.get("event_id"),
@@ -64,6 +69,20 @@ pub fn merch_from_row(row: &sqlx::postgres::PgRow) -> Merchandise {
         is_deleted: Some(row.get("is_deleted")),
         trade_enabled: row.get("trade_enabled"),
         creator_id: row.get("creator_id"),
+        group_description: empty_to_none(group_description),
+    }
+}
+
+/// Map a `merchandise_groups` row to [`MerchandiseGroup`].
+pub fn group_from_row(row: &sqlx::postgres::PgRow) -> MerchandiseGroup {
+    MerchandiseGroup {
+        id: row.get("id"),
+        event_id: row.get("event_id"),
+        group_name: row.get("group_name"),
+        description: empty_to_none(row.get("description")),
+        created_by: row.get("created_by"),
+        created_at: to_rfc3339(row.get("created_at")),
+        updated_at: to_rfc3339(row.get("updated_at")),
     }
 }
 
