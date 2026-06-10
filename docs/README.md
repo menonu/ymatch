@@ -63,3 +63,4 @@ Conceptual explanations, architecture reviews, design decisions, and background 
 * [Initial Project Idea](file:///home/menonu/ws/ymatch/docs/explanation/initial_concept.md): Original prompt, core matching rules, and initial requirements definition.
 * [Disaster Recovery](file:///home/menonu/ws/ymatch/docs/explanation/disaster_recovery.md): Recovery procedure, lessons learned from the June 2026 end-to-end test, and known gaps.
 * [Backend Refactoring Plan](file:///home/menonu/ws/ymatch/docs/explanation/refactoring_plan.md): Phase-by-phase plan to introduce a Repository pattern, central `AppError`, and edition 2024. Tracked by GitHub Issue #163.
+* [Phase 4 Design](file:///home/menonu/ws/ymatch/docs/explanation/refactoring_phase_4.md): Match/Inventory/Message repository design, N+1 fix (1+4N → 3 queries), state-machine model for the trade lifecycle.
