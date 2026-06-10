@@ -31,19 +31,6 @@ pub trait InventoryRepository: Send + Sync {
         &'a self,
         user_id: i32,
     ) -> RepositoryFuture<'a, Result<Vec<InventoryItem>, AppError>>;
-
-    /// Apply a single trade delta. Either `delta_trade` is non-zero (the
-    /// user's TRADE row is decremented, clamped to 0) or `delta_have` is
-    /// non-zero (a HAVE row is upserted with the new total). This is the
-    /// primitive used by the lifecycle service when applying the
-    /// consequences of a completed match.
-    fn apply_trade_delta<'a>(
-        &'a self,
-        user_id: i32,
-        merch_id: i32,
-        delta_trade: i32,
-        delta_have: i32,
-    ) -> RepositoryFuture<'a, Result<(), AppError>>;
 }
 
 /// PostgreSQL implementation of [`InventoryRepository`].
@@ -121,45 +108,6 @@ impl InventoryRepository for PgInventoryRepository {
                     group_name: row.get("group_name"),
                 })
                 .collect())
-        })
-    }
-
-    fn apply_trade_delta<'a>(
-        &'a self,
-        user_id: i32,
-        merch_id: i32,
-        delta_trade: i32,
-        delta_have: i32,
-    ) -> RepositoryFuture<'a, Result<(), AppError>> {
-        Box::pin(async move {
-            if delta_trade != 0 {
-                // Decrement the user's TRADE row, clamped at 0.
-                sqlx::query(
-                    "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0)
-                     WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
-                )
-                .bind(delta_trade)
-                .bind(user_id)
-                .bind(merch_id)
-                .execute(&self.pool)
-                .await?;
-            }
-            if delta_have != 0 {
-                // Upsert: the user gains this item. We use ON CONFLICT to
-                // sum the new quantity onto any existing HAVE row.
-                sqlx::query(
-                    r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
-                       VALUES ($1, $2, 'HAVE', $3)
-                       ON CONFLICT (user_id, merch_id, status)
-                       DO UPDATE SET quantity = inventory.quantity + $3"#,
-                )
-                .bind(user_id)
-                .bind(merch_id)
-                .bind(delta_have)
-                .execute(&self.pool)
-                .await?;
-            }
-            Ok(())
         })
     }
 }

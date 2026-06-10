@@ -20,7 +20,6 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::OfferTradeRequest;
-use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::MatchRepository;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
@@ -36,20 +35,11 @@ const STATUS_REJECTED: &str = "REJECTED";
 pub struct MatchLifecycleService {
     pool: PgPool,
     matches: Arc<dyn MatchRepository>,
-    inventory: Arc<dyn InventoryRepository>,
 }
 
 impl MatchLifecycleService {
-    pub fn new(
-        pool: PgPool,
-        matches: Arc<dyn MatchRepository>,
-        inventory: Arc<dyn InventoryRepository>,
-    ) -> Self {
-        Self {
-            pool,
-            matches,
-            inventory,
-        }
+    pub fn new(pool: PgPool, matches: Arc<dyn MatchRepository>) -> Self {
+        Self { pool, matches }
     }
 
     /// Transition PENDING -> OFFERED.
@@ -183,8 +173,10 @@ impl MatchLifecycleService {
     /// (`user{1,2}_inventory_applied_at`) prevents double-application.
     ///
     /// The 4-branch logic from the old `apply_trade_inventory` is now
-    /// folded into a single `apply_trade_delta` repository call per
-    /// match_item row.
+    /// folded into a single transaction here (inventory delta + applied
+    /// flag are written atomically). The SQL is inlined rather than
+    /// going through the [`InventoryRepository`] trait so the same
+    /// `&mut *tx` can be threaded through all writes.
     pub async fn apply_inventory(&self, match_id: i32, user_id: i32) -> Result<(), AppError> {
         let snapshot = self
             .matches
@@ -217,6 +209,14 @@ impl MatchLifecycleService {
         let requesting_is_offerer = user_id == offered_by;
 
         let items = self.matches.list_match_items(match_id).await?;
+
+        // Open a single transaction so the inventory writes and the
+        // per-user applied flag are atomic. If we crash between the
+        // deltas and the flag, the next retry sees
+        // `user{1,2}_inventory_applied_at IS NOT NULL` and refuses to
+        // re-apply. The old handler did this same wrap.
+        let mut tx = self.pool.begin().await?;
+
         for item in &items {
             // Items stored from offerer's perspective:
             //   GIVE = offerer gives, other receives
@@ -234,16 +234,50 @@ impl MatchLifecycleService {
             if delta_trade == 0 && delta_have == 0 {
                 continue;
             }
-            self.inventory
-                .apply_trade_delta(user_id, item.merch_id, delta_trade, delta_have)
+            if delta_trade != 0 {
+                sqlx::query(
+                    "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0)
+                     WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
+                )
+                .bind(delta_trade)
+                .bind(user_id)
+                .bind(item.merch_id)
+                .execute(&mut *tx)
                 .await?;
+            }
+            if delta_have != 0 {
+                sqlx::query(
+                    r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
+                       VALUES ($1, $2, 'HAVE', $3)
+                       ON CONFLICT (user_id, merch_id, status)
+                       DO UPDATE SET quantity = inventory.quantity + $3"#,
+                )
+                .bind(user_id)
+                .bind(item.merch_id)
+                .bind(delta_have)
+                .execute(&mut *tx)
+                .await?;
+            }
         }
 
-        self.matches
-            .set_user_inventory_applied(match_id, is_user1)
-            .await?
-            .ok_or_else(|| AppError::not_found("Match disappeared mid-apply"))?;
+        let applied_col = if is_user1 {
+            "user1_inventory_applied_at"
+        } else {
+            "user2_inventory_applied_at"
+        };
+        let affected = sqlx::query(&format!(
+            "UPDATE matches SET {} = NOW() WHERE id = $1",
+            applied_col
+        ))
+        .bind(match_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if affected == 0 {
+            return Err(AppError::not_found("Match disappeared mid-apply"));
+        }
 
+        tx.commit().await?;
         Ok(())
     }
 }

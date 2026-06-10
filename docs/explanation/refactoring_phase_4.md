@@ -11,7 +11,7 @@ Replace the 637 lines of handlers in `matches.rs` (507), `inventory.rs` (74),
 and `messages.rs` (56) with thin handlers backed by:
 
 1. **`MatchRepository`** — abstract + sqlx impl, with the **N+1 query fix**
-   for `list_matches` (currently 1 + 3N queries → 1 + 2 batched IN queries)
+   for `list_matches` (currently 1 + 4N queries → 4 batched queries)
 2. **`InventoryRepository`** — abstract + sqlx impl
 3. **`MessageRepository`** — abstract + sqlx impl
 4. **`MatchLifecycleService`** — the state-machine logic that today is
@@ -55,8 +55,9 @@ pub trait MatchRepository: Send + Sync {
 
     /// List matches for a user with all related data pre-loaded.
     /// This replaces the current N+1 implementation in `list_matches`
-    /// (1 + 3N queries) with 1 + 2 queries (1 for matches, 1 batched
-    /// for haves+selected_items, 1 batched for wants).
+    /// (1 + 4N queries) with 4 batched queries (1 for matches+other_user
+    /// via JOIN, 1 for haves, 1 for wants, 1 for match_items). The
+    /// in-memory join happens inside the repository.
     fn list_for_user<'a>(
         &'a self,
         user_id: i32,
@@ -251,16 +252,25 @@ WHERE i.user_id = $1
   AND i.status = 'TRADE' AND i.quantity > 0
   AND EXISTS (SELECT 1 FROM inventory w WHERE w.user_id = ANY($match_user_ids) AND w.merch_id = i.merch_id AND w.status = 'WANT' AND w.quantity > 0);
 
--- Query 3: all selected items for all matches, batched
+-- Query 3: all potential wants for the user (the mirror of haves)
+SELECT i.user_id, i.merch_id, i.quantity, m.name AS merch_name, m.photo_url
+FROM inventory i
+JOIN merchandise m ON m.id = i.merch_id
+JOIN inventory w ON w.merch_id = i.merch_id AND w.status = 'WANT' AND w.quantity > 0
+WHERE i.user_id <> $1
+  AND i.status = 'TRADE' AND i.quantity > 0
+  AND w.user_id = $1;
+
+-- Query 4: all selected items for all matches, batched
 SELECT mi.*, m.name AS merch_name, m.photo_url
 FROM match_items mi
 JOIN merchandise m ON m.id = mi.merch_id
 WHERE mi.match_id = ANY($match_ids);
 ```
-= 3 queries total. For a user with 20 matches: 3 queries (27× faster).
+= 4 queries total. For a user with 20 matches: 4 queries (20× faster).
 
-The repository does the **in-memory join** between the 3 result sets using
-`HashMap<match_id, Vec<X>>` lookups. This is fine because all three
+The repository does the **in-memory join** between the 4 result sets using
+`HashMap<match_id, Vec<X>>` lookups. This is fine because all four
 result sets are bounded by the number of matches the user has.
 
 ## State Machine Model
