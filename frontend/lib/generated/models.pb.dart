@@ -418,6 +418,7 @@ class Merchandise extends $pb.GeneratedMessage {
     $core.bool? isDeleted,
     $core.bool? tradeEnabled,
     $core.int? creatorId,
+    $core.String? groupDescription,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -430,6 +431,7 @@ class Merchandise extends $pb.GeneratedMessage {
     if (isDeleted != null) result.isDeleted = isDeleted;
     if (tradeEnabled != null) result.tradeEnabled = tradeEnabled;
     if (creatorId != null) result.creatorId = creatorId;
+    if (groupDescription != null) result.groupDescription = groupDescription;
     return result;
   }
 
@@ -456,6 +458,7 @@ class Merchandise extends $pb.GeneratedMessage {
     ..aOB(8, _omitFieldNames ? '' : 'isDeleted')
     ..aOB(9, _omitFieldNames ? '' : 'tradeEnabled')
     ..aI(10, _omitFieldNames ? '' : 'creatorId')
+    ..aOS(11, _omitFieldNames ? '' : 'groupDescription')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -566,6 +569,141 @@ class Merchandise extends $pb.GeneratedMessage {
   $core.bool hasCreatorId() => $_has(9);
   @$pb.TagNumber(10)
   void clearCreatorId() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get groupDescription => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set groupDescription($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasGroupDescription() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearGroupDescription() => $_clearField(11);
+}
+
+class MerchandiseGroup extends $pb.GeneratedMessage {
+  factory MerchandiseGroup({
+    $core.int? id,
+    $core.int? eventId,
+    $core.String? groupName,
+    $core.String? description,
+    $core.int? createdBy,
+    $core.String? createdAt,
+    $core.String? updatedAt,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (eventId != null) result.eventId = eventId;
+    if (groupName != null) result.groupName = groupName;
+    if (description != null) result.description = description;
+    if (createdBy != null) result.createdBy = createdBy;
+    if (createdAt != null) result.createdAt = createdAt;
+    if (updatedAt != null) result.updatedAt = updatedAt;
+    return result;
+  }
+
+  MerchandiseGroup._();
+
+  factory MerchandiseGroup.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MerchandiseGroup.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MerchandiseGroup',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'id')
+    ..aI(2, _omitFieldNames ? '' : 'eventId')
+    ..aOS(3, _omitFieldNames ? '' : 'groupName')
+    ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..aI(5, _omitFieldNames ? '' : 'createdBy')
+    ..aOS(6, _omitFieldNames ? '' : 'createdAt')
+    ..aOS(7, _omitFieldNames ? '' : 'updatedAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MerchandiseGroup clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MerchandiseGroup copyWith(void Function(MerchandiseGroup) updates) =>
+      super.copyWith((message) => updates(message as MerchandiseGroup))
+          as MerchandiseGroup;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MerchandiseGroup create() => MerchandiseGroup._();
+  @$core.override
+  MerchandiseGroup createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MerchandiseGroup getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MerchandiseGroup>(create);
+  static MerchandiseGroup? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get id => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set id($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get eventId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set eventId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEventId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEventId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get groupName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set groupName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGroupName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGroupName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get description => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set description($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDescription() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDescription() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get createdBy => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set createdBy($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCreatedBy() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCreatedBy() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get createdAt => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set createdAt($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreatedAt() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreatedAt() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get updatedAt => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set updatedAt($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasUpdatedAt() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearUpdatedAt() => $_clearField(7);
 }
 
 class InventoryItem extends $pb.GeneratedMessage {
@@ -2598,6 +2736,235 @@ class UserActionRequest extends $pb.GeneratedMessage {
   $core.bool hasUserId() => $_has(0);
   @$pb.TagNumber(1)
   void clearUserId() => $_clearField(1);
+}
+
+class CreateGroupRequest extends $pb.GeneratedMessage {
+  factory CreateGroupRequest({
+    $core.int? eventId,
+    $core.int? userId,
+    $core.String? groupName,
+    $core.String? description,
+  }) {
+    final result = create();
+    if (eventId != null) result.eventId = eventId;
+    if (userId != null) result.userId = userId;
+    if (groupName != null) result.groupName = groupName;
+    if (description != null) result.description = description;
+    return result;
+  }
+
+  CreateGroupRequest._();
+
+  factory CreateGroupRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CreateGroupRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateGroupRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'eventId')
+    ..aI(2, _omitFieldNames ? '' : 'userId')
+    ..aOS(3, _omitFieldNames ? '' : 'groupName')
+    ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateGroupRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateGroupRequest copyWith(void Function(CreateGroupRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateGroupRequest))
+          as CreateGroupRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CreateGroupRequest create() => CreateGroupRequest._();
+  @$core.override
+  CreateGroupRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CreateGroupRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateGroupRequest>(create);
+  static CreateGroupRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get eventId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set eventId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEventId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEventId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get userId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set userId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUserId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUserId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get groupName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set groupName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGroupName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGroupName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get description => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set description($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDescription() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDescription() => $_clearField(4);
+}
+
+class UpdateGroupRequest extends $pb.GeneratedMessage {
+  factory UpdateGroupRequest({
+    $core.int? eventId,
+    $core.int? userId,
+    $core.String? groupName,
+    $core.String? description,
+  }) {
+    final result = create();
+    if (eventId != null) result.eventId = eventId;
+    if (userId != null) result.userId = userId;
+    if (groupName != null) result.groupName = groupName;
+    if (description != null) result.description = description;
+    return result;
+  }
+
+  UpdateGroupRequest._();
+
+  factory UpdateGroupRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateGroupRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateGroupRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'eventId')
+    ..aI(2, _omitFieldNames ? '' : 'userId')
+    ..aOS(3, _omitFieldNames ? '' : 'groupName')
+    ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateGroupRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateGroupRequest copyWith(void Function(UpdateGroupRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateGroupRequest))
+          as UpdateGroupRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateGroupRequest create() => UpdateGroupRequest._();
+  @$core.override
+  UpdateGroupRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateGroupRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateGroupRequest>(create);
+  static UpdateGroupRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get eventId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set eventId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEventId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEventId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get userId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set userId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUserId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUserId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get groupName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set groupName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGroupName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGroupName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get description => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set description($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDescription() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDescription() => $_clearField(4);
+}
+
+class ListGroupsResponse extends $pb.GeneratedMessage {
+  factory ListGroupsResponse({
+    $core.Iterable<MerchandiseGroup>? groups,
+  }) {
+    final result = create();
+    if (groups != null) result.groups.addAll(groups);
+    return result;
+  }
+
+  ListGroupsResponse._();
+
+  factory ListGroupsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ListGroupsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListGroupsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..pPM<MerchandiseGroup>(1, _omitFieldNames ? '' : 'groups',
+        subBuilder: MerchandiseGroup.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListGroupsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListGroupsResponse copyWith(void Function(ListGroupsResponse) updates) =>
+      super.copyWith((message) => updates(message as ListGroupsResponse))
+          as ListGroupsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ListGroupsResponse create() => ListGroupsResponse._();
+  @$core.override
+  ListGroupsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ListGroupsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListGroupsResponse>(create);
+  static ListGroupsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<MerchandiseGroup> get groups => $_getList(0);
 }
 
 const $core.bool _omitFieldNames =
