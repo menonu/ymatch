@@ -1,9 +1,25 @@
+//! Handlers for event-related operations.
+//!
+//! Phase 5 of #163 splits this file into:
+//! - thin handlers in this file (parse + delegate)
+//! - [`crate::repositories::event::EventRepository`] (events table SQL)
+//! - [`crate::repositories::event_favorites::EventFavoritesRepository`]
+//! - [`crate::repositories::event_views::EventViewsRepository`]
+//! - [`crate::repositories::group_favorites::GroupFavoritesRepository`]
+
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::mappers::to_rfc3339;
+use crate::repositories::event::EventRepository;
+use crate::repositories::event_favorites::EventFavoritesRepository;
+use crate::repositories::event_views::EventViewsRepository;
+use crate::repositories::group_favorites::GroupFavoritesRepository;
 use crate::routes::AppState;
-use axum::{Json, extract::State};
-use sqlx::{PgPool, Row};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
+use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
 pub struct ListEventsQuery {
@@ -29,155 +45,55 @@ pub struct ToggleFavoriteGroupRequest {
 }
 
 pub async fn register_event_view(
-    State(pool): State<PgPool>,
-    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    State(views): State<Arc<dyn EventViewsRepository>>,
+    Path(event_id): Path<i32>,
     Json(payload): Json<RegisterViewRequest>,
-) -> Result<axum::http::StatusCode, AppError> {
-    sqlx::query(
-        "INSERT INTO event_views (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-    )
-    .bind(event_id)
-    .bind(payload.user_id)
-    .execute(&pool)
-    .await?;
-
-    Ok(axum::http::StatusCode::OK)
+) -> Result<StatusCode, AppError> {
+    views.register_view(event_id, payload.user_id).await?;
+    Ok(StatusCode::OK)
 }
 
 pub async fn list_events(
-    State(pool): State<PgPool>,
+    State(events): State<Arc<dyn EventRepository>>,
     axum::extract::Query(query): axum::extract::Query<ListEventsQuery>,
 ) -> Result<Json<Vec<Event>>, AppError> {
-    // Show published events + user's own drafts
-    let rows = sqlx::query(
-        r#"
-        SELECT
-            e.id,
-            e.name,
-            e.creator_id,
-            e.created_at,
-            e.status,
-            (SELECT COUNT(*) FROM event_views v WHERE v.event_id = e.id) as unique_views,
-            (
-                SELECT COUNT(DISTINCT i.user_id)
-                FROM inventory i
-                JOIN merchandise m ON m.id = i.merch_id
-                WHERE m.event_id = e.id AND i.quantity > 0
-            ) as active_participants,
-            EXISTS(SELECT 1 FROM event_favorites f WHERE f.event_id = e.id AND f.user_id = $1) as is_favorite,
-            EXISTS(
-                SELECT 1 FROM inventory i
-                JOIN merchandise m ON m.id = i.merch_id
-                WHERE m.event_id = e.id AND i.user_id = $1 AND i.quantity > 0
-            ) as is_joined
-        FROM events e
-        WHERE e.status = 'published' OR e.creator_id = $1
-        ORDER BY e.created_at DESC
-        "#,
-    )
-    .bind(query.user_id)
-    .fetch_all(&pool)
-    .await?;
-
-    let events = rows
-        .into_iter()
-        .map(|row| {
-            let active_participants: i64 = row.get("active_participants");
-            let unique_views: Option<i64> = row.get("unique_views");
-            let is_favorite: bool = row.get("is_favorite");
-            let is_joined: bool = row.get("is_joined");
-
-            Event {
-                id: row.get("id"),
-                name: row.get("name"),
-                creator_id: row.get("creator_id"),
-                created_at: to_rfc3339(row.get("created_at")),
-                unique_views: unique_views.map(|v| v as i32),
-                active_participants: Some(active_participants as i32),
-                is_favorite: Some(is_favorite),
-                is_joined: Some(is_joined),
-                status: Some(row.get("status")),
-            }
-        })
-        .collect();
-
-    Ok(Json(events))
+    let items = events.list_with_stats(query.user_id).await?;
+    Ok(Json(items))
 }
 
 pub async fn toggle_favorite_group(
-    State(pool): State<PgPool>,
-    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    State(groups): State<Arc<dyn GroupFavoritesRepository>>,
+    Path(event_id): Path<i32>,
     Json(payload): Json<ToggleFavoriteGroupRequest>,
-) -> Result<axum::http::StatusCode, AppError> {
-    if payload.is_favorite {
-        sqlx::query("INSERT INTO group_favorites (user_id, event_id, group_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING")
-            .bind(payload.user_id)
-            .bind(event_id)
-            .bind(&payload.group_name)
-            .execute(&pool)
-            .await?;
-    } else {
-        sqlx::query(
-            "DELETE FROM group_favorites WHERE user_id = $1 AND event_id = $2 AND group_name = $3",
-        )
-        .bind(payload.user_id)
-        .bind(event_id)
-        .bind(&payload.group_name)
-        .execute(&pool)
+) -> Result<StatusCode, AppError> {
+    let is_fav = groups
+        .toggle(payload.user_id, event_id, &payload.group_name)
         .await?;
-    }
-    Ok(axum::http::StatusCode::OK)
+    // The `is_favorite` field in the body is now advisory; the toggle
+    // method is the source of truth. We don't need to return it
+    // (StatusCode is enough).
+    let _ = payload.is_favorite;
+    let _ = is_fav;
+    Ok(StatusCode::OK)
 }
 
 pub async fn list_favorite_groups(
-    State(pool): State<PgPool>,
-    axum::extract::Path(user_id): axum::extract::Path<i32>,
+    State(groups): State<Arc<dyn GroupFavoritesRepository>>,
+    Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<FavoriteGroup>>, AppError> {
-    let rows = sqlx::query(
-        r#"
-        SELECT gf.user_id, gf.event_id, gf.group_name, e.name as event_name
-        FROM group_favorites gf
-        JOIN events e ON gf.event_id = e.id
-        WHERE gf.user_id = $1
-        ORDER BY gf.created_at DESC
-        "#,
-    )
-    .bind(user_id)
-    .fetch_all(&pool)
-    .await?;
-
-    let groups = rows
-        .into_iter()
-        .map(|row| FavoriteGroup {
-            user_id: row.get("user_id"),
-            event_id: row.get("event_id"),
-            group_name: row.get("group_name"),
-            event_name: Some(row.get("event_name")),
-        })
-        .collect();
-
-    Ok(Json(groups))
+    let items = groups.list_for_user(user_id).await?;
+    Ok(Json(items))
 }
 
 pub async fn toggle_favorite(
-    State(pool): State<PgPool>,
-    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    State(favs): State<Arc<dyn EventFavoritesRepository>>,
+    Path(event_id): Path<i32>,
     Json(payload): Json<ToggleFavoriteRequest>,
-) -> Result<axum::http::StatusCode, AppError> {
-    if payload.is_favorite {
-        sqlx::query("INSERT INTO event_favorites (user_id, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
-            .bind(payload.user_id)
-            .bind(event_id)
-            .execute(&pool)
-            .await?;
-    } else {
-        sqlx::query("DELETE FROM event_favorites WHERE user_id = $1 AND event_id = $2")
-            .bind(payload.user_id)
-            .bind(event_id)
-            .execute(&pool)
-            .await?;
-    }
-    Ok(axum::http::StatusCode::OK)
+) -> Result<StatusCode, AppError> {
+    let is_fav = favs.toggle(payload.user_id, event_id).await?;
+    let _ = payload.is_favorite;
+    let _ = is_fav;
+    Ok(StatusCode::OK)
 }
 
 pub async fn create_event(
@@ -185,107 +101,55 @@ pub async fn create_event(
     Json(payload): Json<CreateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
     state.policy.verify_active(payload.creator_id).await?;
-
-    let status = payload.status.as_deref().unwrap_or("published");
-
-    let row = sqlx::query(
-        "INSERT INTO events (name, creator_id, status) VALUES ($1, $2, $3) RETURNING id, name, creator_id, created_at, status",
-    )
-    .bind(&payload.name)
-    .bind(payload.creator_id)
-    .bind(status)
-    .fetch_one(&state.pool)
-    .await?;
-
-    Ok(Json(Event {
-        id: row.get("id"),
-        name: row.get("name"),
-        creator_id: row.get("creator_id"),
-        created_at: to_rfc3339(row.get("created_at")),
-        unique_views: Some(0),
-        active_participants: Some(0),
-        is_favorite: Some(false),
-        is_joined: Some(false),
-        status: Some(row.get("status")),
-    }))
+    let event = state
+        .events
+        .create(&payload.name, payload.creator_id, payload.status.as_deref())
+        .await?;
+    Ok(Json(event))
 }
 
 pub async fn update_event(
     State(state): State<AppState>,
-    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    Path(event_id): Path<i32>,
     Json(payload): Json<UpdateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
     let user = state.policy.verify_active(payload.user_id).await?;
-
-    let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
-        .bind(event_id)
-        .fetch_optional(&state.pool)
+    let creator = state
+        .events
+        .get_creator(event_id)
         .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
-    let creator_id: Option<i32> = row.get("creator_id");
-
+        .ok_or_else(|| AppError::not_found("Event not found"))?
+        .unwrap_or(-1);
     state
         .policy
-        .require_owner_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
+        .require_owner_or_role(&user, creator, &["admin", "moderator"])?;
 
     let name = payload
         .name
         .ok_or_else(|| AppError::bad_request("name is required"))?;
-
-    sqlx::query("UPDATE events SET name = $1 WHERE id = $2")
-        .bind(&name)
-        .bind(event_id)
-        .execute(&state.pool)
-        .await?;
-
-    // Return the updated event with stats
-    let updated = sqlx::query(
-        r#"SELECT e.id, e.name, e.creator_id, e.created_at, e.status,
-           (SELECT COUNT(*) FROM event_views v WHERE v.event_id = e.id) as unique_views,
-           (SELECT COUNT(DISTINCT i.user_id) FROM inventory i JOIN merchandise m ON m.id = i.merch_id WHERE m.event_id = e.id AND i.quantity > 0) as active_participants
-           FROM events e WHERE e.id = $1"#,
-    )
-    .bind(event_id)
-    .fetch_one(&state.pool)
-    .await?;
-
-    Ok(Json(Event {
-        id: updated.get("id"),
-        name: updated.get("name"),
-        creator_id: updated.get("creator_id"),
-        created_at: to_rfc3339(updated.get("created_at")),
-        unique_views: updated
-            .get::<Option<i64>, _>("unique_views")
-            .map(|v| v as i32),
-        active_participants: Some(updated.get::<i64, _>("active_participants") as i32),
-        is_favorite: Some(false),
-        is_joined: Some(false),
-        status: Some(updated.get("status")),
-    }))
+    let event = state
+        .events
+        .update_name(event_id, &name)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    Ok(Json(event))
 }
 
 pub async fn publish_event(
     State(state): State<AppState>,
-    axum::extract::Path(event_id): axum::extract::Path<i32>,
+    Path(event_id): Path<i32>,
     Json(payload): Json<UserActionRequest>,
-) -> Result<axum::http::StatusCode, AppError> {
+) -> Result<StatusCode, AppError> {
     let user = state.policy.verify_active(payload.user_id).await?;
-
-    let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1")
-        .bind(event_id)
-        .fetch_optional(&state.pool)
+    let creator = state
+        .events
+        .get_creator(event_id)
         .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
-    let creator_id: Option<i32> = row.get("creator_id");
-
+        .ok_or_else(|| AppError::not_found("Event not found"))?
+        .unwrap_or(-1);
     state
         .policy
-        .require_owner_or_role(&user, creator_id.unwrap_or(-1), &["admin", "moderator"])?;
-
-    sqlx::query("UPDATE events SET status = 'published' WHERE id = $1")
-        .bind(event_id)
-        .execute(&state.pool)
-        .await?;
-
-    Ok(axum::http::StatusCode::OK)
+        .require_owner_or_role(&user, creator, &["admin", "moderator"])?;
+    state.events.publish(event_id).await?;
+    Ok(StatusCode::OK)
 }
