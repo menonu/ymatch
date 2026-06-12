@@ -1,2 +1,3 @@
 target/backend.log
 target/
+coverage/
