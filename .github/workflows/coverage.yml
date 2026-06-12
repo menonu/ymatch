@@ -167,22 +167,22 @@ jobs:
           print(f"Function coverage: {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf} functions)")
 
           # Write a markdown summary for the workflow summary view.
-          with open('coverage/summary.md', 'w') as f:
-              f.write(f"## Coverage\n\n")
-              f.write(f"- **Lines:** {line_pct:.2f}%  ({total_lh}/{total_lf})\n")
-              f.write(f"- **Functions:** {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf})\n\n")
-              f.write("### Per-file coverage (lowest first)\n\n")
-              f.write("| File | Line % | LH/LF | Func % | FNH/FNF |\n")
-              f.write("|------|-------:|------:|-------:|--------:|\n")
+          with open('coverage/summary.md', 'w') as out:
+              out.write("## Coverage\n\n")
+              out.write(f"- **Lines:** {line_pct:.2f}%  ({total_lh}/{total_lf})\n")
+              out.write(f"- **Functions:** {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf})\n\n")
+              out.write("### Per-file coverage (lowest first)\n\n")
+              out.write("| File | Line % | LH/LF | Func % | FNH/FNF |\n")
+              out.write("|------|-------:|------:|-------:|--------:|\n")
               rows = []
-              for path, f in files.items():
-                  lp = pct(f['LH'], f['LF'])
-                  fp = pct(f['FNF'] - f['FNH'], f['FNF'])
-                  rows.append((lp, path, f))
-              for lp, path, f in sorted(rows):
-                  f.write(f"| `{path}` | {lp:.1f}% | {f['LH']}/{f['LF']} | "
-                          f"{pct(f['FNF'] - f['FNH'], f['FNF']):.1f}% | "
-                          f"{f['FNH']}/{f['FNF']} |\n")
+              for path, metrics in files.items():
+                  lp = pct(metrics['LH'], metrics['LF'])
+                  fp = pct(metrics['FNF'] - metrics['FNH'], metrics['FNF'])
+                  rows.append((lp, path, metrics))
+              for lp, path, metrics in sorted(rows):
+                  fp = pct(metrics['FNF'] - metrics['FNH'], metrics['FNF'])
+                  out.write(f"| `{path}` | {lp:.1f}% | {metrics['LH']}/{metrics['LF']} | "
+                            f"{fp:.1f}% | {metrics['FNH']}/{metrics['FNF']} |\n")
           PY
 
       - name: Print coverage summary
