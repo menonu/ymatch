@@ -22,42 +22,35 @@ async fn setup_test_pool() -> PgPool {
         .await
         .expect("Failed to run migrations");
 
-    // Clean up test data
-    sqlx::query("DELETE FROM messages")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM match_items")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM matches").execute(&pool).await.ok();
-    sqlx::query("DELETE FROM inventory")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM group_favorites")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM merchandise_groups")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM event_favorites")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM event_views")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM merchandise")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DELETE FROM events").execute(&pool).await.ok();
-    sqlx::query("DELETE FROM users").execute(&pool).await.ok();
+    // Reset all tables to a known-empty state at the start of every
+    // test. `TRUNCATE ... RESTART IDENTITY CASCADE` is used in
+    // preference to `DELETE FROM ...` because it:
+    //   1. Resets SERIAL sequences (so id=1, id=2, ... are guaranteed
+    //      to be assigned to the first inserts, regardless of what
+    //      tests ran previously).
+    //   2. CASCADE handles the dependency ordering automatically
+    //      (children → parents) so we don't have to maintain a
+    //      manual list.
+    //   3. Performs better than per-table DELETE (single statement,
+    //      smaller WAL traffic).
+    sqlx::query(
+        "TRUNCATE TABLE
+             messages,
+             match_items,
+             matches,
+             inventory,
+             group_favorites,
+             merchandise_groups,
+             event_favorites,
+             event_views,
+             merchandise,
+             events,
+             users
+         RESTART IDENTITY CASCADE",
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to TRUNCATE test tables");
 
     pool
 }
@@ -2344,4 +2337,367 @@ async fn test_merch_includes_group_description() {
         items[0]["group_description"].as_str().unwrap(),
         "Vinyl stickers"
     );
+}
+
+// --- Issue #173 follow-up: extra tests for notification_counts and upsert shape ---
+
+#[tokio::test]
+async fn test_notification_counts_values() {
+    // Set up: 2 users, 1 event, 2 merch items ("Card A", "Card B").
+    // We'll create three matches in different states and verify the
+    // counts endpoint returns the correct values for each side.
+    let pool = setup_test_pool().await;
+    let (u1, event_id) =
+        create_test_user_and_event(pool.clone(), "notif-user-1", "Notif Event").await;
+    let (u2, _) = create_test_user_and_event(pool.clone(), "notif-user-2", "Notif Event 2").await;
+
+    // Create merch for each user
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Card A", "group_name": "cards", "creator_id": {}}}"#,
+                    u1
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let m_a: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let m_a_id = m_a["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Card B", "group_name": "cards", "creator_id": {}}}"#,
+                    u2
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let m_b: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let m_b_id = m_b["id"].as_i64().unwrap();
+
+    // Each user puts the other's card as WANT and their own as TRADE
+    for (user_id, merch_id) in [(u1, m_b_id), (u2, m_a_id)] {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let _ = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(&format!("/api/v1/user/{}/inventory", user_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"user_id": {}, "merch_id": {}, "status": "WANT", "quantity": 1}}"#,
+                        user_id, merch_id
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let _ = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(&format!("/api/v1/user/{}/inventory", user_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"user_id": {}, "merch_id": {}, "status": "TRADE", "quantity": 1}}"#,
+                        user_id,
+                        if user_id == u1 { m_a_id } else { m_b_id }
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+
+    // Insert match directly (the matching algorithm is out of scope for
+    // integration tests; it runs in a background task).
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING') RETURNING id",
+    )
+    .bind(u1)
+    .bind(u2)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // ---- Query counts: 1 PENDING match exists, 0 messages ----
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["pending_matches"].as_i64().unwrap(), 1);
+    assert_eq!(body["offers_in"].as_i64().unwrap(), 0);
+    assert_eq!(body["accepted"].as_i64().unwrap(), 0);
+    assert_eq!(body["unread_messages"].as_i64().unwrap(), 0);
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+
+    // User2 should also see pending=1 (they are a participant)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u2))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["pending_matches"].as_i64().unwrap(), 1);
+
+    // ---- Transition to OFFERED via u1; send a message from u2 (unread for u1) ----
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "items": [{{"merch_id": {}, "direction": "GIVE", "quantity": 1}}]}}"#,
+                    u1, m_a_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // u2 sends a message (unread for u1)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/messages", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"match_id": {}, "sender_id": {}, "content": "hi", "message_type": "TEXT"}}"#,
+                    match_id, u2
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Query counts for u1 (the offerer): pending=0, offers_in=0 (u1 is the
+    // offerer — they don't see "offers in" for their own offers),
+    // unread=1 (u2 just sent a message that u1 hasn't read yet)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["pending_matches"].as_i64().unwrap(), 0);
+    assert_eq!(body["offers_in"].as_i64().unwrap(), 0);
+    assert_eq!(body["accepted"].as_i64().unwrap(), 0);
+    assert_eq!(body["unread_messages"].as_i64().unwrap(), 1);
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+
+    // Query counts for u2 (the non-offerer): pending=0, offers_in=1 (u2 sees
+    // u1's offer as an incoming offer), unread=0 (u2 sent the message; doesn't
+    // count as unread for themselves)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u2))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["pending_matches"].as_i64().unwrap(), 0);
+    assert_eq!(body["offers_in"].as_i64().unwrap(), 1);
+    assert_eq!(body["accepted"].as_i64().unwrap(), 0);
+    assert_eq!(body["unread_messages"].as_i64().unwrap(), 0);
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+
+    // ---- u1 marks their matches_read_at = NOW; unread should drop to 0 ----
+    let _ = sqlx::query("UPDATE users SET matches_read_at = NOW() WHERE id = $1")
+        .bind(u1)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["unread_messages"].as_i64().unwrap(), 0);
+    assert_eq!(body["total"].as_i64().unwrap(), 0); // all zeros for u1 now
+
+    // ---- Transition OFFERED -> ACCEPTED: counts should change again ----
+    // Note: the offer's "offeree" is u2; for ACCEPTED, the user_id in
+    // the body is the offeree accepting.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let _ = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/status", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"status": "ACCEPTED"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u2))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["pending_matches"].as_i64().unwrap(), 0);
+    assert_eq!(body["offers_in"].as_i64().unwrap(), 0);
+    assert_eq!(body["accepted"].as_i64().unwrap(), 1);
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+}
+
+#[tokio::test]
+async fn test_upsert_response_shape_preserved() {
+    // Issue #173 item #5: the upsert response body should retain the
+    // pre-Phase-4 shape: merch_name = Some("") (not None). The frontend
+    // re-fetches via get_user_inventory (which joins merch) before
+    // display, so the empty string never reaches the user; this
+    // preserves the historical shape.
+    let pool = setup_test_pool().await;
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "upsert-shape-creator", "Upsert Shape").await;
+
+    // Create merch (so the inventory row's merch_id is valid)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Sticker", "group_name": "stickers", "creator_id": {}}}"#,
+                    creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let merch_id = merch["id"].as_i64().unwrap();
+
+    // Now upsert inventory (this is the post-Phase-4 InventoryRepository
+    // path that previously returned merch_name: None)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/user/inventory")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "merch_id": {}, "status": "HAVE", "quantity": 2}}"#,
+                    creator_id, merch_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+
+    // Verify the shape: merch_name must be present, equal to "",
+    // and photo_url + group_name must be absent (consistent with old
+    // behavior).
+    // Verify the shape:
+    // - merch_name must be present and equal to "" (not null, not missing)
+    // - photo_url and group_name are optional fields; when None, the proto3
+    //   JSON encoding omits them from the response body (not serialized as
+    //   null). So `body.get("photo_url")` returns Value::Null and the key
+    //   is absent — both shapes are acceptable per the test.
+    assert!(
+        body.get("merch_name").is_some(),
+        "merch_name must be present"
+    );
+    assert_eq!(
+        body["merch_name"].as_str().unwrap(),
+        "",
+        "merch_name must be Some(\"\") not null"
+    );
+    let photo_url = body.get("photo_url");
+    assert!(
+        photo_url.is_none() || photo_url.and_then(|v| v.as_str()).is_none(),
+        "photo_url must be absent or null, got: {:?}",
+        photo_url
+    );
+    let group_name = body.get("group_name");
+    assert!(
+        group_name.is_none() || group_name.and_then(|v| v.as_str()).is_none(),
+        "group_name must be absent or null, got: {:?}",
+        group_name
+    );
+    // After the TRUNCATE ... RESTART IDENTITY in setup_test_pool, the
+    // first inserted inventory row gets id=1.
+    assert_eq!(body["id"].as_i64().unwrap(), 1);
+    assert_eq!(body["user_id"].as_i64().unwrap(), creator_id);
+    assert_eq!(body["merch_id"].as_i64().unwrap(), merch_id);
+    assert_eq!(body["status"].as_str().unwrap(), "HAVE");
+    assert_eq!(body["quantity"].as_i64().unwrap(), 2);
 }
