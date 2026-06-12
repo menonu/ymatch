@@ -72,7 +72,14 @@ impl InventoryRepository for PgInventoryRepository {
                 merch_id: row.get("merch_id"),
                 status: row.get("status"),
                 quantity: row.get("quantity"),
-                merch_name: None,
+                // Preserved from the pre-Phase-4 handler behavior: an
+                // upserted row has no joined merch data, so we set
+                // merch_name to Some("") to match the old default.
+                // The frontend re-fetches via list_for_user (which
+                // joins) before display, so the empty string never
+                // reaches the user; this preserves the historical
+                // shape of the upsert response (see #173 item #5).
+                merch_name: Some("".to_string()),
                 photo_url: None,
                 group_name: None,
             })
