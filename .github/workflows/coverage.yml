@@ -1,0 +1,211 @@
+name: Backend Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  coverage:
+    name: Generate coverage report
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ymatch_user
+          POSTGRES_PASSWORD: secure_dev_password
+          POSTGRES_DB: ymatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ymatch_user -d ymatch_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test
+      CARGO_INCREMENTAL: 0
+      RUSTFLAGS: "-Cinstrument-coverage"
+      LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install grcov
+        run: |
+          cargo install grcov --locked
+          grcov --version
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config zlib1g-dev
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend -> target
+          shared-key: backend-coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
+
+      - name: Run tests with coverage
+        run: |
+          cargo test --verbose -- --test-threads=1
+          # The Rust integration test binary doesn't instrument itself
+          # by default. The env var LLVM_PROFILE_FILE makes the
+          # libtest harness emit .profraw for the test binary too.
+          cargo test --test api_tests --verbose -- --test-threads=1
+          # Build with --tests to ensure all unit + integration test
+          # binaries are compiled with instrumentation.
+          cargo test --no-run --verbose
+        env:
+          RUSTFLAGS: "-Cinstrument-coverage"
+          LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
+
+      - name: Collect coverage data
+        run: |
+          mkdir -p coverage
+          # Demangle Rust symbols so the lcov report is human-readable.
+          grcov . \
+            --binary-path target/debug/deps/ \
+            --source-dir . \
+            --output-file coverage/lcov.info \
+            --branch \
+            --ignore "target/*" \
+            --ignore "**/tests/*" \
+            --ignore "**/generated/*" \
+            --ignore "**/migrations/*"
+          ls -la coverage/
+
+      - name: Generate HTML report
+        run: |
+          # grcov can render the HTML directly.
+          grcov . \
+            --binary-path target/debug/deps/ \
+            --source-dir . \
+            --output-path coverage/html \
+            --branch \
+            --ignore "target/*" \
+            --ignore "**/tests/*" \
+            --ignore "**/generated/*" \
+            --ignore "**/migrations/*" \
+            --html
+          echo "HTML report at coverage/html/index.html"
+
+      - name: Compute summary metrics
+        id: summary
+        run: |
+          # Parse lcov.info to extract a percentage summary, write to
+          # $GITHUB_STEP_SUMMARY for visibility in the PR / workflow
+          # run view.
+          python3 - <<'PY'
+          import re, sys
+          with open('coverage/lcov.info') as f:
+              text = f.read()
+          # Parse: SF:<file>\n... LF:<lines> LH:<hit>
+          files = {}
+          cur = None
+          for line in text.splitlines():
+              if line.startswith('SF:'):
+                  cur = line[3:].strip()
+                  files[cur] = {'LF': 0, 'LH': 0, 'FNF': 0, 'FNH': 0}
+              elif line.startswith('LF:') and cur:
+                  files[cur]['LF'] = int(line[3:])
+              elif line.startswith('LH:') and cur:
+                  files[cur]['LH'] = int(line[3:])
+              elif line.startswith('FNF:') and cur:
+                  files[cur]['FNF'] = int(line[4:])
+              elif line.startswith('FNH:') and cur:
+                  files[cur]['FNH'] = int(line[4:])
+
+          def pct(n, d): return (100.0 * n / d) if d else 0.0
+
+          # Aggregate: line coverage = sum(LH) / sum(LF); function
+          # coverage = sum(FNF - FNH) / sum(FNF).
+          total_lf = sum(f['LF'] for f in files.values())
+          total_lh = sum(f['LH'] for f in files.values())
+          total_fnf = sum(f['FNF'] for f in files.values())
+          total_fnh = sum(f['FNH'] for f in files.values())
+
+          line_pct = pct(total_lh, total_lf)
+          func_pct = pct(total_fnf - total_fnh, total_fnf)
+
+          print(f"Line coverage:  {line_pct:.2f}%  ({total_lh}/{total_lf} lines)")
+          print(f"Function coverage: {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf} functions)")
+
+          # Write a markdown summary for the workflow summary view.
+          with open('coverage/summary.md', 'w') as f:
+              f.write(f"## Coverage\n\n")
+              f.write(f"- **Lines:** {line_pct:.2f}%  ({total_lh}/{total_lf})\n")
+              f.write(f"- **Functions:** {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf})\n\n")
+              f.write("### Per-file coverage (lowest first)\n\n")
+              f.write("| File | Line % | LH/LF | Func % | FNH/FNF |\n")
+              f.write("|------|-------:|------:|-------:|--------:|\n")
+              rows = []
+              for path, f in files.items():
+                  lp = pct(f['LH'], f['LF'])
+                  fp = pct(f['FNF'] - f['FNH'], f['FNF'])
+                  rows.append((lp, path, f))
+              for lp, path, f in sorted(rows):
+                  f.write(f"| `{path}` | {lp:.1f}% | {f['LH']}/{f['LF']} | "
+                          f"{pct(f['FNF'] - f['FNH'], f['FNF']):.1f}% | "
+                          f"{f['FNH']}/{f['FNF']} |\n")
+          PY
+
+      - name: Print coverage summary
+        run: cat coverage/summary.md
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage
+          path: coverage/summary.md
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/html/
+            coverage/summary.md
+          retention-days: 14
+
+      - name: Fail if coverage drops below threshold
+        run: |
+          # Extract line coverage from summary.md and check threshold.
+          # Adjust this number as the project grows; 40% is a starting
+          # point for a backend that just completed a major refactor
+          # (#163) and has historically been light on unit tests.
+          THRESHOLD=40
+          COVERAGE=$(python3 -c "
+          import re
+          with open('coverage/summary.md') as f:
+              m = re.search(r'Lines:\*\* (\d+\.\d+)%', f.read())
+              print(m.group(1) if m else '0')
+          ")
+          echo "Coverage: $COVERAGE% (threshold: $THRESHOLD%)"
+          python3 -c "
+          import sys
+          c = float('$COVERAGE')
+          t = float('$THRESHOLD')
+          if c < t:
+              print(f'::error::Coverage {c:.2f}% is below threshold {t}%')
+              sys.exit(1)
+          print('OK')
+          "
