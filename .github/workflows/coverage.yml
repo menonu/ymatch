@@ -108,11 +108,13 @@ jobs:
 
       - name: Generate HTML report
         run: |
-          # grcov can render the HTML directly.
+          # grcov renders HTML via -t html, --output-path must be a
+          # directory when multiple output types are requested.
           grcov . \
             --binary-path target/debug/deps/ \
             --source-dir . \
             --output-path coverage/html \
+            -t html \
             --branch \
             --ignore "target/*" \
             --ignore "tests/*" \
@@ -120,8 +122,7 @@ jobs:
             --ignore "migrations/*" \
             --ignore "../frontend/*" \
             --ignore ".cargo/*" \
-            --ignore "**/.cargo/registry/**" \
-            --html
+            --ignore "**/.cargo/registry/**"
           echo "HTML report at coverage/html/index.html"
 
       - name: Compute summary metrics
