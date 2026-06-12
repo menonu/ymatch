@@ -39,12 +39,26 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+          components: llvm-tools
+
+      # grcov invokes `llvm-profdata` (provided by the `llvm-tools`
+      # rustup component) under the hood. The binary lives in
+      #   $RUSTUP_HOME/toolchains/<toolchain>/lib/rustlib/<host>/bin/
+      # which is not on $PATH. Add it so grcov can find it.
+      - name: Add llvm-tools to PATH
+        run: |
+          HOST=$(rustc -vV | sed -n 's|host: ||p')
+          TOOLCHAIN=$(rustup show active-toolchain | awk '{print $1}')
+          LLDBIN="$HOME/.rustup/toolchains/$TOOLCHAIN/lib/rustlib/$HOST/bin"
+          echo "$LLDBIN" >> "$GITHUB_PATH"
+          echo "llvm-profdata path: $LLDBIN/llvm-profdata"
+          "$LLDBIN/llvm-profdata" --version
 
       - name: Install grcov
         run: |
@@ -64,14 +78,10 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          # Unit tests (lib) + integration tests (api_tests). The
+          # LLVM_PROFILE_FILE env var makes libtest emit .profraw for
+          # the test binary too, so we can cover test setup code.
           cargo test --verbose -- --test-threads=1
-          # The Rust integration test binary doesn't instrument itself
-          # by default. The env var LLVM_PROFILE_FILE makes the
-          # libtest harness emit .profraw for the test binary too.
-          cargo test --test api_tests --verbose -- --test-threads=1
-          # Build with --tests to ensure all unit + integration test
-          # binaries are compiled with instrumentation.
-          cargo test --no-run --verbose
         env:
           RUSTFLAGS: "-Cinstrument-coverage"
           LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
@@ -80,15 +90,20 @@ jobs:
         run: |
           mkdir -p coverage
           # Demangle Rust symbols so the lcov report is human-readable.
+          # Filters: dependencies (.cargo/registry), build artifacts,
+          # generated proto code, and migrations.
           grcov . \
             --binary-path target/debug/deps/ \
             --source-dir . \
             --output-file coverage/lcov.info \
             --branch \
             --ignore "target/*" \
-            --ignore "**/tests/*" \
-            --ignore "**/generated/*" \
-            --ignore "**/migrations/*"
+            --ignore "tests/*" \
+            --ignore "generated/*" \
+            --ignore "migrations/*" \
+            --ignore "../frontend/*" \
+            --ignore ".cargo/*" \
+            --ignore "**/.cargo/registry/**"
           ls -la coverage/
 
       - name: Generate HTML report
@@ -100,9 +115,12 @@ jobs:
             --output-path coverage/html \
             --branch \
             --ignore "target/*" \
-            --ignore "**/tests/*" \
-            --ignore "**/generated/*" \
-            --ignore "**/migrations/*" \
+            --ignore "tests/*" \
+            --ignore "generated/*" \
+            --ignore "migrations/*" \
+            --ignore "../frontend/*" \
+            --ignore ".cargo/*" \
+            --ignore "**/.cargo/registry/**" \
             --html
           echo "HTML report at coverage/html/index.html"
 
