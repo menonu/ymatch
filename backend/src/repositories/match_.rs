@@ -40,8 +40,9 @@ pub struct MatchStatusSnapshot {
 /// its own transactions and does **not** call into this trait for the
 /// transactional methods (lock_for_update, set_status, etc.) — those
 /// were removed when the service went transactional. The trait exposes
-/// only the **read** paths and a few **idempotent single-statement
-/// writes** that don't need a transaction.
+/// only the **read** paths; transactional writes are inlined in the
+/// lifecycle service (see issue #174 for the follow-up to push them
+/// back into the repository with `&mut sqlx::Transaction` parameters).
 pub trait MatchRepository: Send + Sync {
     /// List all matches in the system (admin).
     fn list_all<'a>(&'a self) -> RepositoryFuture<'a, Result<Vec<TradeMatch>, AppError>>;
@@ -144,16 +145,17 @@ impl MatchRepository for PgMatchRepository {
                 return Ok(vec![]);
             }
 
-            // Collect all match ids and the (other_user_id) per match in
-            // a single pass — used by the next two queries.
+            // Collect all match ids in a single pass — used by query 4
+            // (the `match_items` batched query below). The haves and
+            // wants queries (2 and 3) do not need this list because they
+            // filter by the user's own user_id and any peer's WANT, not
+            // by match id.
             let match_ids: Vec<i32> = match_rows.iter().map(|r| r.get::<i32, _>("id")).collect();
 
             // Query 2: haves — the requesting user's TRADE items that
-            // match some WANT of the other participant. Batched: a
-            // single IN clause over the (user_id, peer_id) pairs is
-            // approximated by selecting the user's TRADE rows and
-            // filtering on peer-user WANTs via a single EXISTS check
-            // against a temp list. We use unnest() for the peer list.
+            // match some WANT of any peer.
+            // (See #173 item #6 / #7: this is not a regression — the old
+            // handler also fetched by-peer-not-by-match.)
             //
             // The current implementation in handlers::matches::list_matches
             // runs this query once per match; we instead run it ONCE for
@@ -337,46 +339,36 @@ impl MatchRepository for PgMatchRepository {
         user_id: i32,
     ) -> RepositoryFuture<'a, Result<NotificationCounts, AppError>> {
         Box::pin(async move {
-            let pending: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM matches
-                 WHERE (user1_id = $1 OR user2_id = $1) AND status = 'PENDING'",
+            // Single query with 4 sub-selects. Replaces the previous
+            // 4 sequential `SELECT COUNT(*)` calls (#173 item #4).
+            let row = sqlx::query(
+                r#"SELECT
+                       (SELECT COUNT(*) FROM matches
+                        WHERE (user1_id = $1 OR user2_id = $1) AND status = 'PENDING') AS pending,
+                       (SELECT COUNT(*) FROM matches
+                        WHERE (user1_id = $1 OR user2_id = $1)
+                          AND status = 'OFFERED' AND offered_by != $1) AS offers_in,
+                       (SELECT COUNT(*) FROM matches
+                        WHERE (user1_id = $1 OR user2_id = $1) AND status = 'ACCEPTED') AS accepted,
+                       (SELECT COUNT(*) FROM messages msg
+                        JOIN matches m ON msg.match_id = m.id
+                        WHERE (m.user1_id = $1 OR m.user2_id = $1)
+                          AND m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                          AND msg.sender_id != $1
+                          AND msg.created_at > COALESCE(
+                            (SELECT matches_read_at FROM users WHERE id = $1),
+                            '1970-01-01'::timestamptz
+                          )) AS unread
+                   "#,
             )
             .bind(user_id)
             .fetch_one(&self.pool)
             .await?;
 
-            let offers_in: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM matches
-                 WHERE (user1_id = $1 OR user2_id = $1)
-                   AND status = 'OFFERED' AND offered_by != $1",
-            )
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await?;
-
-            let accepted: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM matches
-                 WHERE (user1_id = $1 OR user2_id = $1) AND status = 'ACCEPTED'",
-            )
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await?;
-
-            let unread: i64 = sqlx::query_scalar(
-                r#"SELECT COUNT(*) FROM messages msg
-                   JOIN matches m ON msg.match_id = m.id
-                   WHERE (m.user1_id = $1 OR m.user2_id = $1)
-                     AND m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
-                     AND msg.sender_id != $1
-                     AND msg.created_at > COALESCE(
-                       (SELECT matches_read_at FROM users WHERE id = $1),
-                       '1970-01-01'::timestamptz
-                     )"#,
-            )
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await?;
-
+            let pending: i64 = row.get("pending");
+            let offers_in: i64 = row.get("offers_in");
+            let accepted: i64 = row.get("accepted");
+            let unread: i64 = row.get("unread");
             let total = pending + offers_in + accepted + unread;
             Ok(NotificationCounts {
                 pending_matches: pending as i32,
