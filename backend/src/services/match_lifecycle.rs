@@ -146,12 +146,7 @@ impl MatchLifecycleService {
         if new_status == STATUS_ACCEPTED {
             // Purge other PENDING matches between the same pair.
             self.matches
-                .purge_other_pending_conn(
-                    &mut tx,
-                    match_id,
-                    locked.user1_id,
-                    locked.user2_id,
-                )
+                .purge_other_pending_conn(&mut tx, match_id, locked.user1_id, locked.user2_id)
                 .await?;
         }
 
@@ -232,13 +227,7 @@ impl MatchLifecycleService {
                 continue;
             }
             self.inventory
-                .apply_trade_delta_conn(
-                    &mut tx,
-                    user_id,
-                    item.merch_id,
-                    delta_trade,
-                    delta_have,
-                )
+                .apply_trade_delta_conn(&mut tx, user_id, item.merch_id, delta_trade, delta_have)
                 .await?;
         }
 
