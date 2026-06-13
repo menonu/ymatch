@@ -942,6 +942,591 @@ async fn test_publish_event_non_owner_forbidden() {
     assert_eq!(row.0, "published");
 }
 
+// --- Image upload / delete (Issue #178 Task 3) ---
+
+/// Build a minimal but valid `multipart/form-data` body for a single file
+/// field. The handler only ever looks at the "file" field; tests that want
+/// to exercise other paths pass a different `field_name`.
+fn multipart_image_body(
+    boundary: &str,
+    field_name: &str,
+    filename: &str,
+    content_type: &str,
+    bytes: &[u8],
+) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+    body.extend_from_slice(
+        format!(
+            "Content-Disposition: form-data; name=\"{field_name}\"; filename=\"{filename}\"\r\n"
+        )
+        .as_bytes(),
+    );
+    body.extend_from_slice(format!("Content-Type: {content_type}\r\n\r\n").as_bytes());
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    body
+}
+
+/// Minimal PNG signature so the storage path is exercised even though
+/// the handler does not decode the image.
+fn minimal_png_bytes() -> Vec<u8> {
+    vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52,
+    ]
+}
+
+#[tokio::test]
+async fn test_upload_image_png_succeeds() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let boundary = "TESTBOUNDARY";
+    let body = multipart_image_body(
+        boundary,
+        "file",
+        "tiny.png",
+        "image/png",
+        &minimal_png_bytes(),
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/images/upload")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body_text = body_to_string(resp.into_body()).await;
+    let json: serde_json::Value = serde_json::from_str(&body_text).unwrap();
+    let url = json["url"].as_str().expect("response must include url");
+    assert!(
+        url.ends_with(".png"),
+        "URL should keep the original extension: {url}"
+    );
+    // LocalFileStorage writes to ./test_uploads/<unique>.png — confirm.
+    let filename = url.rsplit('/').next().unwrap();
+    let path = std::path::Path::new("./test_uploads").join(filename);
+    assert!(
+        path.exists(),
+        "uploaded file should exist on disk at {path:?}"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
+async fn test_upload_image_jpg_succeeds() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let boundary = "JPGBOUNDARY";
+    // Real JPG SOI marker so the bytes look like a JPG.
+    let bytes = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
+    let body = multipart_image_body(boundary, "file", "pic.jpg", "image/jpeg", &bytes);
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/images/upload")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body_text = body_to_string(resp.into_body()).await;
+    let json: serde_json::Value = serde_json::from_str(&body_text).unwrap();
+    let url = json["url"].as_str().expect("response must include url");
+    assert!(url.ends_with(".jpg"));
+    let filename = url.rsplit('/').next().unwrap();
+    let path = std::path::Path::new("./test_uploads").join(filename);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
+async fn test_upload_image_wrong_content_type_rejected() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let boundary = "TXTBOUNDARY";
+    let body = multipart_image_body(boundary, "file", "doc.txt", "text/plain", b"hello world");
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/images/upload")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_upload_image_too_large_rejected() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let boundary = "BIGBOUNDARY";
+    // 1.5 MB to exceed the 1 MiB cap.
+    let big = vec![0u8; 1_572_864];
+    let body = multipart_image_body(boundary, "file", "huge.png", "image/png", &big);
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/images/upload")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_upload_image_no_file_field_rejected() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let boundary = "NOFILEBOUNDARY";
+    // Use a different field name; handler expects "file".
+    let body = multipart_image_body(
+        boundary,
+        "attachment",
+        "tiny.png",
+        "image/png",
+        &minimal_png_bytes(),
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/images/upload")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_delete_image_succeeds() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let boundary = "DELBOUNDARY";
+    // Upload first.
+    let body = multipart_image_body(
+        boundary,
+        "file",
+        "todelete.png",
+        "image/png",
+        &minimal_png_bytes(),
+    );
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/images/upload")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body_text = body_to_string(resp.into_body()).await;
+    let url = serde_json::from_str::<serde_json::Value>(&body_text).unwrap()["url"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let filename = url.rsplit('/').next().unwrap().to_string();
+    let path = std::path::Path::new("./test_uploads").join(&filename);
+    assert!(path.exists());
+
+    // Now delete via a fresh router.
+    let pool2 = setup_test_pool().await;
+    let app2 = backend::routes::create_router(pool2, test_storage());
+    let resp = app2
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/v1/images/{}", filename))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body_text = body_to_string(resp.into_body()).await;
+    let json: serde_json::Value = serde_json::from_str(&body_text).unwrap();
+    assert_eq!(json["status"], "deleted");
+    assert!(!path.exists(), "file should be gone after DELETE");
+}
+
+#[tokio::test]
+async fn test_delete_image_nonexistent_is_idempotent() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/api/v1/images/does-not-exist.png")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // LocalFileStorage::delete silently returns Ok for missing files.
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+// --- Admin endpoints (Issue #178 Task 3) ---
+
+#[tokio::test]
+async fn test_admin_get_user_details_returns_user() {
+    let pool = setup_test_pool().await;
+    let (user_id, _event_id) =
+        create_test_user_and_event(pool.clone(), "admin-getuser", "Admin GetUser Event").await;
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/admin/users/{}", user_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let user: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(user["id"], user_id);
+    assert!(user["username"].as_str().is_some());
+}
+
+#[tokio::test]
+async fn test_admin_get_user_details_nonexistent_returns_404() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/admin/users/999999")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_admin_update_user_role_invalid_role_rejected() {
+    let pool = setup_test_pool().await;
+    // Use an admin to make the role change.
+    let (admin_id, _eid) =
+        create_test_user_and_event(pool.clone(), "admin-role-admin", "Admin Role Event").await;
+    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
+        .bind(admin_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create a target user.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "admin-role-target"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let target_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target_id, admin_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "hacker"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_admin_update_user_role_moderator_forbidden() {
+    let pool = setup_test_pool().await;
+    // Create two users: a "moderator" trying to change roles, and a target.
+    let (mod_id, _eid) =
+        create_test_user_and_event(pool.clone(), "admin-role-mod", "Admin Mod Event").await;
+    sqlx::query("UPDATE users SET role = 'moderator' WHERE id = $1")
+        .bind(mod_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "admin-role-target-2"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let target_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target_id, mod_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "moderator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_admin_update_user_role_succeeds() {
+    let pool = setup_test_pool().await;
+    let (admin_id, _eid) =
+        create_test_user_and_event(pool.clone(), "admin-role-ok", "Admin Role Ok").await;
+    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
+        .bind(admin_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "admin-role-promote"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let target_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target_id, admin_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "moderator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify the role was actually changed in the DB.
+    let row: (String,) = sqlx::query_as("SELECT role FROM users WHERE id = $1")
+        .bind(target_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row.0, "moderator");
+}
+
+#[tokio::test]
+async fn test_admin_list_all_merch_returns_array() {
+    let pool = setup_test_pool().await;
+    let (_user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "admin-listmerch", "Admin ListMerch").await;
+    // Add one piece of merch so the list is non-empty.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"name": "Listed Merch", "group_name": "Group A"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/admin/merch")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let items: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    assert!(!items.is_empty(), "list should be non-empty");
+}
+
+#[tokio::test]
+async fn test_admin_list_all_matches_returns_array() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/admin/matches")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let items: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    // Just verify it returns a valid array (content may be empty or populated).
+    let _ = items.len();
+}
+
+#[tokio::test]
+async fn test_admin_delete_merch_succeeds() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "admin-deleterch", "Admin DeleteMerch").await;
+
+    // Create one piece of merch.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"name": "To Delete", "group_name": "Group A"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    // Promote user to admin for the delete.
+    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
+        .bind(user_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/merch/{}?user_id={}",
+                    merch_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify the merch row is gone.
+    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM merchandise WHERE id = $1")
+        .bind(merch_id as i32)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert!(row.is_none(), "merch should be deleted");
+}
+
 // --- Merchandise ---
 
 #[tokio::test]
