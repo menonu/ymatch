@@ -11,12 +11,19 @@
 //! wants batched, match_items batched. The in-memory join happens
 //! inside the repository.
 //!
-//! Transactions are **not** part of this trait. The lifecycle service
-//! opens its own `pool.begin()` blocks and calls multiple repository
-//! methods within them. Repositories stay single-statement.
+//! **Transactional writes** (`offer`, `change_status`,
+//! `apply_inventory`) are still inlined in the
+//! [`crate::services::match_lifecycle::MatchLifecycleService`].
+//! Issue #174 proposed adding `_in_tx` variants of the SQL to this
+//! trait, but the NLL borrow checker holds a future that captures
+//! `&mut Transaction` (which has a `Drop` impl) for the whole
+//! function scope, so the explicit `tx.commit()` afterwards is
+//! rejected. The trait methods were prototyped (see git history)
+//! but rolled back; the SQL stays in the service. Follow-up
+//! work to land #174 is tracked but unblocked.
 
 use crate::error::AppError;
-use crate::generated::ymatch::{MatchItem, NotificationCounts, TradeMatch, User};
+use crate::generated::ymatch::{MatchItem, NotificationCounts, OfferItem, TradeMatch, User};
 use crate::handlers::mappers::to_rfc3339;
 use crate::repositories::RepositoryFuture;
 use sqlx::{PgPool, Row};
@@ -36,13 +43,18 @@ pub struct MatchStatusSnapshot {
 
 /// Abstract match repository.
 ///
-/// The lifecycle service ([`crate::services::match_lifecycle`]) opens
-/// its own transactions and does **not** call into this trait for the
-/// transactional methods (lock_for_update, set_status, etc.) — those
-/// were removed when the service went transactional. The trait exposes
-/// only the **read** paths; transactional writes are inlined in the
-/// lifecycle service (see issue #174 for the follow-up to push them
-/// back into the repository with `&mut sqlx::Transaction` parameters).
+/// Methods come in two flavors:
+///
+/// - **Pool methods** (no suffix): own their own connection from the
+///   pool. Used by HTTP handlers for one-shot reads.
+/// - **`_conn` methods**: take a `&mut PgConnection` so the caller
+///   can compose multiple repository calls into a single
+///   transaction by passing `&mut *tx`. Used by the lifecycle
+///   service. The standard pattern in sqlx: the service opens
+///   the transaction, the repo methods are executor-agnostic, and
+///   the same `tx` is reused across calls via short-lived reborrows.
+///
+/// Read methods (no suffix) run on the pool.
 pub trait MatchRepository: Send + Sync {
     /// List all matches in the system (admin).
     fn list_all<'a>(&'a self) -> RepositoryFuture<'a, Result<Vec<TradeMatch>, AppError>>;
@@ -74,6 +86,71 @@ pub trait MatchRepository: Send + Sync {
         &'a self,
         user_id: i32,
     ) -> RepositoryFuture<'a, Result<NotificationCounts, AppError>>;
+
+    // ---- `_conn` methods: take a `&mut PgConnection` so the caller
+    // ---- controls the transaction. Pass `&mut *tx` from inside a
+    // ---- `pool.begin()` block.
+
+    /// `SELECT ... FOR UPDATE` on a match row. Returns the snapshot if
+    /// the row exists, `None` otherwise. The row lock is held until
+    /// the surrounding transaction ends.
+    fn lock_for_update_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+    ) -> RepositoryFuture<'a, Result<Option<MatchStatusSnapshot>, AppError>>;
+
+    /// Set the match's `status` column.
+    fn set_status_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        new_status: &'a str,
+    ) -> RepositoryFuture<'a, Result<(), AppError>>;
+
+    /// Set the match's `offered_by` column.
+    fn set_offered_by_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        user_id: i32,
+    ) -> RepositoryFuture<'a, Result<(), AppError>>;
+
+    /// Bulk-insert match_items rows for an offer.
+    fn insert_match_items_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        owner_id: i32,
+        items: &'a [OfferItem],
+    ) -> RepositoryFuture<'a, Result<(), AppError>>;
+
+    /// Delete all match_items rows for a match. Used when a match is
+    /// rejected.
+    fn delete_match_items_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+    ) -> RepositoryFuture<'a, Result<(), AppError>>;
+
+    /// Delete all other PENDING matches between the same pair of
+    /// users. Used when a match is accepted.
+    fn purge_other_pending_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        skip_match_id: i32,
+        user1_id: i32,
+        user2_id: i32,
+    ) -> RepositoryFuture<'a, Result<(), AppError>>;
+
+    /// Set the per-user inventory-applied timestamp. `is_user1` picks
+    /// which column to write.
+    fn mark_inventory_applied_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        is_user1: bool,
+    ) -> RepositoryFuture<'a, Result<(), AppError>>;
 }
 
 const MATCH_COLUMNS: &str = "id, user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at, created_at";
@@ -106,6 +183,14 @@ fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
     }
 }
 
+// We use `fn ... -> impl Future` instead of `async fn` here
+// because the trait method's return type is `impl Future + 'b`
+// (single lifetime, tied to the tx borrow, not the trait's `'a`).
+// `async fn` in an impl block can introduce its own lifetime
+// parameters and the resulting signature does not always match
+// the trait's. The explicit `impl Future` is the simpler, more
+// predictable form for this use case.
+#[allow(clippy::manual_async_fn)]
 impl MatchRepository for PgMatchRepository {
     fn list_all<'a>(&'a self) -> RepositoryFuture<'a, Result<Vec<TradeMatch>, AppError>> {
         Box::pin(async move {
@@ -405,6 +490,152 @@ impl MatchRepository for PgMatchRepository {
                     .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
                     .is_some(),
             }))
+        })
+    }
+
+    fn lock_for_update_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+    ) -> RepositoryFuture<'a, Result<Option<MatchStatusSnapshot>, AppError>> {
+        Box::pin(async move {
+            let row = sqlx::query(
+                "SELECT user1_id, user2_id, status, offered_by,
+                        user1_inventory_applied_at, user2_inventory_applied_at
+                 FROM matches WHERE id = $1 FOR UPDATE",
+            )
+            .bind(match_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+            Ok(row.map(|r| MatchStatusSnapshot {
+                user1_id: r.get("user1_id"),
+                user2_id: r.get("user2_id"),
+                status: r.get("status"),
+                offered_by: r.get("offered_by"),
+                user1_applied: r
+                    .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
+                    .is_some(),
+                user2_applied: r
+                    .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
+                    .is_some(),
+            }))
+        })
+    }
+
+    fn set_status_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        new_status: &'a str,
+    ) -> RepositoryFuture<'a, Result<(), AppError>> {
+        Box::pin(async move {
+            sqlx::query("UPDATE matches SET status = $1 WHERE id = $2")
+                .bind(new_status)
+                .bind(match_id)
+                .execute(&mut *conn)
+                .await?;
+            Ok(())
+        })
+    }
+
+    fn set_offered_by_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        user_id: i32,
+    ) -> RepositoryFuture<'a, Result<(), AppError>> {
+        Box::pin(async move {
+            sqlx::query("UPDATE matches SET offered_by = $1 WHERE id = $2")
+                .bind(user_id)
+                .bind(match_id)
+                .execute(&mut *conn)
+                .await?;
+            Ok(())
+        })
+    }
+
+    fn insert_match_items_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        owner_id: i32,
+        items: &'a [OfferItem],
+    ) -> RepositoryFuture<'a, Result<(), AppError>> {
+        Box::pin(async move {
+            for item in items {
+                sqlx::query(
+                    "INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity)
+                     VALUES ($1, $2, $3, $4, $5)",
+                )
+                .bind(match_id)
+                .bind(item.merch_id)
+                .bind(owner_id)
+                .bind(&item.direction)
+                .bind(item.quantity)
+                .execute(&mut *conn)
+                .await?;
+            }
+            Ok(())
+        })
+    }
+
+    fn delete_match_items_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+    ) -> RepositoryFuture<'a, Result<(), AppError>> {
+        Box::pin(async move {
+            sqlx::query("DELETE FROM match_items WHERE match_id = $1")
+                .bind(match_id)
+                .execute(&mut *conn)
+                .await?;
+            Ok(())
+        })
+    }
+
+    fn purge_other_pending_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        skip_match_id: i32,
+        user1_id: i32,
+        user2_id: i32,
+    ) -> RepositoryFuture<'a, Result<(), AppError>> {
+        Box::pin(async move {
+            sqlx::query(
+                "DELETE FROM matches WHERE status = 'PENDING' AND id != $1
+                 AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))",
+            )
+            .bind(skip_match_id)
+            .bind(user1_id)
+            .bind(user2_id)
+            .execute(&mut *conn)
+            .await?;
+            Ok(())
+        })
+    }
+
+    fn mark_inventory_applied_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        match_id: i32,
+        is_user1: bool,
+    ) -> RepositoryFuture<'a, Result<(), AppError>> {
+        Box::pin(async move {
+            let col = if is_user1 {
+                "user1_inventory_applied_at"
+            } else {
+                "user2_inventory_applied_at"
+            };
+            let sql = format!("UPDATE matches SET {} = NOW() WHERE id = $1", col);
+            let affected = sqlx::query(&sql)
+                .bind(match_id)
+                .execute(&mut *conn)
+                .await?
+                .rows_affected();
+            if affected == 0 {
+                return Err(AppError::not_found("Match disappeared mid-apply"));
+            }
+            Ok(())
         })
     }
 }
