@@ -8,7 +8,7 @@ use axum::{
 use std::sync::Arc;
 
 pub async fn update_inventory(
-    State(inventory): State<Arc<dyn InventoryRepository>>,
+    State(inventory): State<Arc<InventoryRepository>>,
     Json(payload): Json<UpdateInventoryRequest>,
 ) -> Result<Json<InventoryItem>, AppError> {
     let item = inventory
@@ -23,7 +23,7 @@ pub async fn update_inventory(
 }
 
 pub async fn get_user_inventory(
-    State(inventory): State<Arc<dyn InventoryRepository>>,
+    State(inventory): State<Arc<InventoryRepository>>,
     Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<InventoryItem>>, AppError> {
     let items = inventory.list_for_user(user_id).await?;
