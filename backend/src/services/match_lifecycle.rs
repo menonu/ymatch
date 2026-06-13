@@ -20,8 +20,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::OfferTradeRequest;
-use crate::repositories::inventory::InventoryRepository as _InventoryTrait;
-use crate::repositories::inventory::PgInventoryRepository;
+use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::{MatchRepository as _MatchTrait, PgMatchRepository};
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -35,7 +34,7 @@ const STATUS_REJECTED: &str = "REJECTED";
 /// Service for the match state machine.
 ///
 /// Holds concrete `Arc<PgMatchRepository>` and
-/// `Arc<PgInventoryRepository>` (not `dyn`). The repository
+/// `Arc<InventoryRepository>` (not `dyn`). The repository
 /// `_conn` methods take a `&mut PgConnection` so we can reuse one
 /// transaction across multiple repository calls by passing
 /// `&mut *tx` (the standard sqlx pattern).
@@ -43,14 +42,14 @@ const STATUS_REJECTED: &str = "REJECTED";
 pub struct MatchLifecycleService {
     pool: PgPool,
     matches: Arc<PgMatchRepository>,
-    inventory: Arc<PgInventoryRepository>,
+    inventory: Arc<InventoryRepository>,
 }
 
 impl MatchLifecycleService {
     pub fn new(
         pool: PgPool,
         matches: Arc<PgMatchRepository>,
-        inventory: Arc<PgInventoryRepository>,
+        inventory: Arc<InventoryRepository>,
     ) -> Self {
         Self {
             pool,
