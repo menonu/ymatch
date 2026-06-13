@@ -328,6 +328,620 @@ async fn test_create_and_list_events() {
     assert!(events.iter().any(|e| e["name"] == "Test Event"));
 }
 
+// --- Phase 5 favorites / views / event publishing (Issue #178 Task 2) ---
+
+#[tokio::test]
+async fn test_event_favorite_toggle_inserts_when_absent() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "fav-toggle-user", "Fav Toggle Event").await;
+
+    // No row initially.
+    let row = sqlx::query(
+        "SELECT 1 as present FROM event_favorites WHERE user_id = $1 AND event_id = $2",
+    )
+    .bind(user_id as i32)
+    .bind(event_id as i32)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    assert!(row.is_none(), "no event_favorites row should exist yet");
+
+    // POST toggle → row is inserted.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/favorite", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "is_favorite": true}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row = sqlx::query(
+        "SELECT 1 as present FROM event_favorites WHERE user_id = $1 AND event_id = $2",
+    )
+    .bind(user_id as i32)
+    .bind(event_id as i32)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    assert!(row.is_some(), "row should exist after first toggle");
+}
+
+#[tokio::test]
+async fn test_event_favorite_toggle_removes_when_present() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "fav-remove-user", "Fav Remove Event").await;
+
+    // First toggle → row inserted.
+    for _ in 0..2 {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/events/{}/favorite", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"user_id": {}, "is_favorite": true}}"#,
+                        user_id
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // After two toggles, row should be gone (insert → delete).
+    let row = sqlx::query(
+        "SELECT 1 as present FROM event_favorites WHERE user_id = $1 AND event_id = $2",
+    )
+    .bind(user_id as i32)
+    .bind(event_id as i32)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    assert!(row.is_none(), "row should be removed after second toggle");
+}
+
+#[tokio::test]
+async fn test_event_favorite_per_user_independence() {
+    let pool = setup_test_pool().await;
+    let (user_a, event_id) =
+        create_test_user_and_event(pool.clone(), "fav-iso-a", "Fav Iso Event").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "fav-iso-b"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user_b_json: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user_b = user_b_json["id"].as_i64().unwrap();
+
+    // User A favorites the event.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/favorite", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "is_favorite": true}}"#,
+                    user_a
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // User B should have no row.
+    let row = sqlx::query(
+        "SELECT 1 as present FROM event_favorites WHERE user_id = $1 AND event_id = $2",
+    )
+    .bind(user_b as i32)
+    .bind(event_id as i32)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    assert!(
+        row.is_none(),
+        "user B's favorite should be independent of user A's"
+    );
+
+    // User A's row should still be there.
+    let row = sqlx::query(
+        "SELECT 1 as present FROM event_favorites WHERE user_id = $1 AND event_id = $2",
+    )
+    .bind(user_a as i32)
+    .bind(event_id as i32)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    assert!(row.is_some(), "user A's row should still be present");
+}
+
+#[tokio::test]
+async fn test_group_favorite_toggle_and_list() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "gfav-toggle-user", "Group Fav Event").await;
+
+    // Favorite a group in the event.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/favorite_group", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "group_name": "Books", "is_favorite": true}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // List should include it with the event name joined.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/user/{}/favorite_groups", user_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let groups: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    assert_eq!(groups.len(), 1, "exactly one favorite group expected");
+    assert_eq!(groups[0]["group_name"], "Books");
+    assert_eq!(groups[0]["event_id"], event_id);
+    assert_eq!(groups[0]["event_name"], "Group Fav Event");
+}
+
+#[tokio::test]
+async fn test_group_favorite_toggle_removes() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "gfav-remove-user", "Group Fav Remove Event")
+            .await;
+
+    // Toggle twice (insert, then delete).
+    for _ in 0..2 {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/events/{}/favorite_group", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"user_id": {}, "group_name": "Music", "is_favorite": true}}"#,
+                        user_id
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // List should be empty.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/user/{}/favorite_groups", user_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let groups: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    assert!(groups.is_empty(), "list should be empty after toggle-off");
+}
+
+#[tokio::test]
+async fn test_event_view_register_inserts() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "view-register-user", "View Register Event").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/view", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row =
+        sqlx::query("SELECT 1 as present FROM event_views WHERE user_id = $1 AND event_id = $2")
+            .bind(user_id as i32)
+            .bind(event_id as i32)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+    assert!(
+        row.is_some(),
+        "event_view row should exist after first view"
+    );
+}
+
+#[tokio::test]
+async fn test_event_view_register_is_idempotent() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "view-idem-user", "View Idem Event").await;
+
+    // Call the view endpoint three times.
+    for _ in 0..3 {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/events/{}/view", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // Should still be exactly one row (UNIQUE constraint on (event_id, user_id)).
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM event_views WHERE user_id = $1 AND event_id = $2")
+            .bind(user_id as i32)
+            .bind(event_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 1, "duplicate views must collapse to one row");
+}
+
+#[tokio::test]
+async fn test_event_view_per_user_and_per_event() {
+    let pool = setup_test_pool().await;
+    let (user_a, event_a) =
+        create_test_user_and_event(pool.clone(), "view-iso-a", "View Iso A").await;
+
+    // Create a second user and a second event.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "view-iso-b"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user_b: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "View Iso B", "creator_id": {}}}"#,
+                    user_b
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let event_b: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    // User A views event A.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/view", event_a))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_a)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // User B views event B.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/view", event_b))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_b)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Two distinct rows.
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM event_views")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 2, "two distinct views must produce two rows");
+}
+
+#[tokio::test]
+async fn test_update_event_owner_succeeds() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "update-event-owner", "Update Event").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "name": "Updated Name"}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let event: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(event["name"], "Updated Name");
+}
+
+#[tokio::test]
+async fn test_update_event_non_owner_forbidden() {
+    let pool = setup_test_pool().await;
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "update-event-creator", "Locked Event").await;
+
+    // Create a different user.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "update-event-intruder"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let intruder_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+    assert_ne!(intruder_id, creator_id);
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"user_id": {}, "name": "Pwned"}}"#,
+                    intruder_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_publish_event_owner_succeeds() {
+    let pool = setup_test_pool().await;
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "publish-event-owner", "Publish Event").await;
+
+    // Initial status is 'published' (default; the helper does not pass status).
+    let row: (String,) = sqlx::query_as("SELECT status FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row.0, "published");
+
+    // The publish endpoint is idempotent: calling it on an already-published
+    // event still returns 200 and the status stays 'published'.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/publish", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row: (String,) = sqlx::query_as("SELECT status FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row.0, "published");
+}
+
+#[tokio::test]
+async fn test_publish_draft_event_transitions_to_published() {
+    let pool = setup_test_pool().await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "publish-draft-creator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let user_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    // Create a DRAFT event explicitly.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Draft Publish Event", "creator_id": {}, "status": "draft"}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+    assert_eq!(event["status"], "draft");
+
+    // Owner publishes it.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/publish", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row: (String,) = sqlx::query_as("SELECT status FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row.0, "published");
+}
+
+#[tokio::test]
+async fn test_publish_event_non_owner_forbidden() {
+    let pool = setup_test_pool().await;
+    let (_creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "publish-event-creator", "Locked Publish").await;
+
+    // Different user attempts publish.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "publish-event-intruder"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let intruder_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/publish", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"user_id": {}}}"#, intruder_id)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Status should be unchanged.
+    let row: (String,) = sqlx::query_as("SELECT status FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row.0, "published");
+}
+
 // --- Merchandise ---
 
 #[tokio::test]
