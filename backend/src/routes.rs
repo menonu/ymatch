@@ -19,7 +19,7 @@ use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupR
 use crate::repositories::group_favorites::{GroupFavoritesRepository, PgGroupFavoritesRepository};
 use crate::repositories::inventory::{InventoryRepository, PgInventoryRepository};
 use crate::repositories::match_::{MatchRepository, PgMatchRepository};
-use crate::repositories::merch::{MerchandiseRepository, PgMerchandiseRepository};
+use crate::repositories::merch::MerchandiseRepository;
 use crate::repositories::message::{MessageRepository, PgMessageRepository};
 use crate::repositories::user::{PgUserRepository, UserRepository};
 use crate::services::match_lifecycle::MatchLifecycleService;
@@ -61,7 +61,7 @@ pub struct AppState {
     pub pool: PgPool,
     pub storage: Arc<dyn ImageStorage>,
     pub users: Arc<dyn UserRepository>,
-    pub merch: Arc<dyn MerchandiseRepository>,
+    pub merch: Arc<MerchandiseRepository>,
     pub groups: Arc<dyn MerchandiseGroupRepository>,
     pub matches: Arc<dyn MatchRepository>,
     /// Concrete `PgMatchRepository` for the lifecycle service.
@@ -100,7 +100,7 @@ impl FromRef<AppState> for Arc<dyn UserRepository> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn MerchandiseRepository> {
+impl FromRef<AppState> for Arc<MerchandiseRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.merch.clone()
     }
@@ -175,8 +175,7 @@ impl FromRef<AppState> for Arc<dyn GroupFavoritesRepository> {
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
-    let merch: Arc<dyn MerchandiseRepository> =
-        Arc::new(PgMerchandiseRepository::new(pool.clone()));
+    let merch: Arc<MerchandiseRepository> = Arc::new(MerchandiseRepository::new(pool.clone()));
     let groups: Arc<dyn MerchandiseGroupRepository> =
         Arc::new(PgMerchandiseGroupRepository::new(pool.clone()));
     let matches_concrete: Arc<PgMatchRepository> = Arc::new(PgMatchRepository::new(pool.clone()));
