@@ -10,13 +10,10 @@ on:
 
 jobs:
   coverage:
-    name: Generate coverage report
+    name: Coverage summary
     runs-on: ubuntu-latest
-    # Grant the minimum permissions needed: read checkout, read repo
-    # metadata, and write PR comments (for the sticky comment step).
     permissions:
       contents: read
-      pull-requests: write
     defaults:
       run:
         working-directory: ./backend
@@ -38,37 +35,27 @@ jobs:
 
     env:
       DATABASE_URL: postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test
-      CARGO_INCREMENTAL: 0
-      RUSTFLAGS: "-Cinstrument-coverage"
-      LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
+      # cargo-llvm-cov reads these to know which crates to instrument
+      # (all of them, in this single-crate workspace).
+      CARGO_LLVM_COV_TARGET_DIR: target/llvm-cov
+      LLVM_PROFILE_FILE: "target/llvm-cov/cargo-test-%p-%m.profraw"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # cargo-llvm-cov needs the llvm-tools rustup component and a
+      # recent stable rustc. Pinning stable is fine.
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: llvm-tools
 
-      # grcov invokes `llvm-profdata` (provided by the `llvm-tools`
-      # rustup component) under the hood. The binary lives in
-      #   $RUSTUP_HOME/toolchains/<toolchain>/lib/rustlib/<host>/bin/
-      # which is not on $PATH. Add it so grcov can find it.
-      - name: Add llvm-tools to PATH
+      - name: Install cargo-llvm-cov
         run: |
-          HOST=$(rustc -vV | sed -n 's|host: ||p')
-          TOOLCHAIN=$(rustup show active-toolchain | awk '{print $1}')
-          LLDBIN="$HOME/.rustup/toolchains/$TOOLCHAIN/lib/rustlib/$HOST/bin"
-          echo "$LLDBIN" >> "$GITHUB_PATH"
-          echo "llvm-profdata path: $LLDBIN/llvm-profdata"
-          "$LLDBIN/llvm-profdata" --version
-
-      - name: Install grcov
-        run: |
-          cargo install grcov --locked
-          grcov --version
+          cargo install cargo-llvm-cov --locked
+          cargo llvm-cov --version
 
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config zlib1g-dev
@@ -77,168 +64,54 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend -> target
-          shared-key: backend-coverage
+          shared-key: backend-llvm-cov
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cache-on-failure: true
 
+      # `cargo llvm-cov test` does the equivalent of:
+      #   - RUSTFLAGS=-Cinstrument-coverage cargo test
+      #   - LLVM_PROFILE_FILE=... (to capture coverage from test setup)
+      # all in one. The `--no-cfg-coverage` / `--no-report` flags skip
+      # default reporting; we collect a single lcov + summary below.
       - name: Run tests with coverage
         run: |
-          # Unit tests (lib) + integration tests (api_tests). The
-          # LLVM_PROFILE_FILE env var makes libtest emit .profraw for
-          # the test binary too, so we can cover test setup code.
-          cargo test --verbose -- --test-threads=1
-        env:
-          RUSTFLAGS: "-Cinstrument-coverage"
-          LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
+          cargo llvm-cov test --no-report -- --test-threads=1
 
-      - name: Collect coverage data
+      # Produce an lcov.info for local inspection (not gated on; never
+      # fails the build). Also write a one-line text summary to stdout
+      # and the $GITHUB_STEP_SUMMARY markdown box.
+      - name: Coverage summary
         run: |
           mkdir -p coverage
-          # Demangle Rust symbols so the lcov report is human-readable.
-          # Filters: dependencies (.cargo/registry), build artifacts,
-          # generated proto code, and migrations.
-          grcov . \
-            --binary-path target/debug/deps/ \
-            --source-dir . \
-            --output-file coverage/lcov.info \
-            --branch \
-            --ignore "target/*" \
-            --ignore "tests/*" \
-            --ignore "generated/*" \
-            --ignore "migrations/*" \
-            --ignore "../frontend/*" \
-            --ignore ".cargo/*" \
-            --ignore "**/.cargo/registry/**"
-          ls -la coverage/
+          # lcov for local consumption / future badge generation.
+          cargo llvm-cov report --lcov --output-path coverage/lcov.info
+          # Text summary in stdout + GITHUB_STEP_SUMMARY (rendered
+          # as a markdown box on the workflow run page).
+          cargo llvm-cov report --summary-only > coverage/summary.txt
+          cat coverage/summary.txt
 
-      - name: Generate HTML report
-        run: |
-          # grcov renders HTML via -t html, --output-path must be a
-          # directory when multiple output types are requested.
-          grcov . \
-            --binary-path target/debug/deps/ \
-            --source-dir . \
-            --output-path coverage/html \
-            -t html \
-            --branch \
-            --ignore "target/*" \
-            --ignore "tests/*" \
-            --ignore "generated/*" \
-            --ignore "migrations/*" \
-            --ignore "../frontend/*" \
-            --ignore ".cargo/*" \
-            --ignore "**/.cargo/registry/**"
-          echo "HTML report at coverage/html/index.html"
+          # Write the same numbers to the step-summary in a small
+          # markdown table so PRs show a coverage badge-style header.
+          LINE=$(awk '/^Filename/ {flag=1; next} flag && /TOTAL/ {print; exit}' coverage/summary.txt)
+          {
+            echo "## Backend coverage"
+            echo
+            echo '```'
+            cat coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Compute summary metrics
-        id: summary
-        run: |
-          # Parse lcov.info to extract a percentage summary, write to
-          # $GITHUB_STEP_SUMMARY for visibility in the PR / workflow
-          # run view.
-          python3 - <<'PY'
-          import re, sys
-          with open('coverage/lcov.info') as f:
-              text = f.read()
-          # Parse: SF:<file>\n... LF:<lines> LH:<hit>
-          files = {}
-          cur = None
-          for line in text.splitlines():
-              if line.startswith('SF:'):
-                  cur = line[3:].strip()
-                  files[cur] = {'LF': 0, 'LH': 0, 'FNF': 0, 'FNH': 0}
-              elif line.startswith('LF:') and cur:
-                  files[cur]['LF'] = int(line[3:])
-              elif line.startswith('LH:') and cur:
-                  files[cur]['LH'] = int(line[3:])
-              elif line.startswith('FNF:') and cur:
-                  files[cur]['FNF'] = int(line[4:])
-              elif line.startswith('FNH:') and cur:
-                  files[cur]['FNH'] = int(line[4:])
-
-          def pct(n, d): return (100.0 * n / d) if d else 0.0
-
-          # Aggregate: line coverage = sum(LH) / sum(LF); function
-          # coverage = sum(FNF - FNH) / sum(FNF).
-          total_lf = sum(f['LF'] for f in files.values())
-          total_lh = sum(f['LH'] for f in files.values())
-          total_fnf = sum(f['FNF'] for f in files.values())
-          total_fnh = sum(f['FNH'] for f in files.values())
-
-          line_pct = pct(total_lh, total_lf)
-          func_pct = pct(total_fnf - total_fnh, total_fnf)
-
-          print(f"Line coverage:  {line_pct:.2f}%  ({total_lh}/{total_lf} lines)")
-          print(f"Function coverage: {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf} functions)")
-
-          # Write a markdown summary for the workflow summary view.
-          with open('coverage/summary.md', 'w') as out:
-              out.write("## Coverage\n\n")
-              out.write(f"- **Lines:** {line_pct:.2f}%  ({total_lh}/{total_lf})\n")
-              out.write(f"- **Functions:** {func_pct:.2f}%  ({total_fnf - total_fnh}/{total_fnf})\n\n")
-              out.write("### Per-file coverage (lowest first)\n\n")
-              out.write("| File | Line % | LH/LF | Func % | FNH/FNF |\n")
-              out.write("|------|-------:|------:|-------:|--------:|\n")
-              rows = []
-              for path, metrics in files.items():
-                  lp = pct(metrics['LH'], metrics['LF'])
-                  fp = pct(metrics['FNF'] - metrics['FNH'], metrics['FNF'])
-                  rows.append((lp, path, metrics))
-              for lp, path, metrics in sorted(rows):
-                  fp = pct(metrics['FNF'] - metrics['FNH'], metrics['FNF'])
-                  out.write(f"| `{path}` | {lp:.1f}% | {metrics['LH']}/{metrics['LF']} | "
-                            f"{fp:.1f}% | {metrics['FNH']}/{metrics['FNF']} |\n")
-          PY
-
-      - name: Print coverage summary
-        run: cat coverage/summary.md
-
-      - name: Comment on PR (if applicable)
-        if: github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: coverage
-          # Use an absolute path to the summary file. The marocchino
-          # action runs in $GITHUB_WORKSPACE, not in the job's
-          # `defaults.run.working-directory`, so a relative path would
-          # not resolve. ${{ github.workspace }} is the same as
-          # $GITHUB_WORKSPACE — the repo root.
-          path: ${{ github.workspace }}/backend/coverage/summary.md
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          # upload-artifact resolves paths against the workspace
-          # root, NOT the job's `defaults.run.working-directory`,
-          # so we need the `backend/` prefix here even though the
-          # other steps (run: ...) inherit ./backend.
-          path: |
-            backend/coverage/lcov.info
-            backend/coverage/html/
-            backend/coverage/summary.md
-          retention-days: 14
-
-      - name: Fail if coverage drops below threshold
-        run: |
-          # Extract line coverage from summary.md and check threshold.
-          # Adjust this number as the project grows; 40% is a starting
-          # point for a backend that just completed a major refactor
-          # (#163) and has historically been light on unit tests.
+          # Threshold gate. Parse the TOTAL row from the text
+          # summary. cargo-llvm-cov's --summary-only emits 13 fields
+          # per row:
+          #   1 Filename  2 Regions  3 Missed  4 % (regions)
+          #   5 Functions  6 Missed  7 % (functions)  8 Lines
+          #   9 Missed  10 % (lines)  11 Branches  12 Missed  13 % (branches)
+          # We want the line-coverage percentage at field 10.
           THRESHOLD=40
-          COVERAGE=$(python3 -c "
-          import re
-          with open('coverage/summary.md') as f:
-              m = re.search(r'Lines:\*\* (\d+\.\d+)%', f.read())
-              print(m.group(1) if m else '0')
-          ")
-          echo "Coverage: $COVERAGE% (threshold: $THRESHOLD%)"
-          python3 -c "
-          import sys
-          c = float('$COVERAGE')
-          t = float('$THRESHOLD')
-          if c < t:
-              print(f'::error::Coverage {c:.2f}% is below threshold {t}%')
-              sys.exit(1)
-          print('OK')
-          "
+          COVERAGE=$(awk '/TOTAL/ {gsub("%","",$10); print $10; exit}' coverage/summary.txt)
+          echo "Threshold: $THRESHOLD%  Line coverage: $COVERAGE%"
+          awk -v c="$COVERAGE" -v t="$THRESHOLD" 'BEGIN {
+              if (c+0 < t+0) { print "::error::Coverage " c "% is below threshold " t "%"; exit 1 }
+              print "OK"
+          }'
