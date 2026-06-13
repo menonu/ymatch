@@ -14,7 +14,7 @@ use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 use crate::handlers;
 use crate::repositories::event::{EventRepository, PgEventRepository};
 use crate::repositories::event_favorites::EventFavoritesRepository;
-use crate::repositories::event_views::{EventViewsRepository, PgEventViewsRepository};
+use crate::repositories::event_views::EventViewsRepository;
 use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupRepository};
 use crate::repositories::group_favorites::{GroupFavoritesRepository, PgGroupFavoritesRepository};
 use crate::repositories::inventory::{InventoryRepository, PgInventoryRepository};
@@ -75,7 +75,7 @@ pub struct AppState {
     pub messages: Arc<dyn MessageRepository>,
     pub events: Arc<dyn EventRepository>,
     pub event_favorites: Arc<EventFavoritesRepository>,
-    pub event_views: Arc<dyn EventViewsRepository>,
+    pub event_views: Arc<EventViewsRepository>,
     pub group_favorites: Arc<dyn GroupFavoritesRepository>,
     pub policy: Arc<PermissionPolicy>,
     pub merch_policy: Arc<MerchPermissionPolicy>,
@@ -160,7 +160,7 @@ impl FromRef<AppState> for Arc<EventFavoritesRepository> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn EventViewsRepository> {
+impl FromRef<AppState> for Arc<EventViewsRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.event_views.clone()
     }
@@ -187,8 +187,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let events: Arc<dyn EventRepository> = Arc::new(PgEventRepository::new(pool.clone()));
     let event_favorites: Arc<EventFavoritesRepository> =
         Arc::new(EventFavoritesRepository::new(pool.clone()));
-    let event_views: Arc<dyn EventViewsRepository> =
-        Arc::new(PgEventViewsRepository::new(pool.clone()));
+    let event_views: Arc<EventViewsRepository> = Arc::new(EventViewsRepository::new(pool.clone()));
     let group_favorites: Arc<dyn GroupFavoritesRepository> =
         Arc::new(PgGroupFavoritesRepository::new(pool.clone()));
     let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));

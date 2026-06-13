@@ -1,49 +1,37 @@
 //! EventViews aggregate repository.
 //!
-//! [`EventViewsRepository`] is the abstract interface for the
-//! `event_views` table. Used by the per-event view endpoint and the
-//! `unique_views` subquery in the events-with-stats SQL.
+//! [`EventViewsRepository`] owns the `event_views` table operations. The
+//! struct holds a `PgPool` and exposes a plain `async fn` method (no
+//! `RepositoryFuture` boxing, no trait) so it can be stored in
+//! `Arc<EventViewsRepository>` in `AppState` and called from handlers.
+//!
+//! Phase B-1 of #191: migrated from the previous `trait EventViewsRepository +
+//! PgEventViewsRepository` two-type pattern to a single concrete struct,
+//! matching the Phase A shape on `MerchandiseRepository`.
 
 use crate::error::AppError;
-use crate::repositories::RepositoryFuture;
 use sqlx::PgPool;
 
-pub trait EventViewsRepository: Send + Sync {
-    /// Register a unique view (idempotent via the table's UNIQUE
-    /// constraint on (event_id, user_id)).
-    fn register_view<'a>(
-        &'a self,
-        event_id: i32,
-        user_id: i32,
-    ) -> RepositoryFuture<'a, Result<(), AppError>>;
-}
-
-pub struct PgEventViewsRepository {
+pub struct EventViewsRepository {
     pool: PgPool,
 }
 
-impl PgEventViewsRepository {
+impl EventViewsRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
-}
 
-impl EventViewsRepository for PgEventViewsRepository {
-    fn register_view<'a>(
-        &'a self,
-        event_id: i32,
-        user_id: i32,
-    ) -> RepositoryFuture<'a, Result<(), AppError>> {
-        Box::pin(async move {
-            sqlx::query(
-                "INSERT INTO event_views (event_id, user_id) VALUES ($1, $2)
-                 ON CONFLICT DO NOTHING",
-            )
-            .bind(event_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?;
-            Ok(())
-        })
+    /// Register a unique view (idempotent via the table's UNIQUE
+    /// constraint on (event_id, user_id)).
+    pub async fn register_view(&self, event_id: i32, user_id: i32) -> Result<(), AppError> {
+        sqlx::query(
+            "INSERT INTO event_views (event_id, user_id) VALUES ($1, $2)
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(event_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }
