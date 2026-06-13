@@ -18,7 +18,7 @@ use crate::repositories::event_views::EventViewsRepository;
 use crate::repositories::group::MerchandiseGroupRepository;
 use crate::repositories::group_favorites::GroupFavoritesRepository;
 use crate::repositories::inventory::InventoryRepository;
-use crate::repositories::match_::{MatchRepository, PgMatchRepository};
+use crate::repositories::match_::MatchRepository;
 use crate::repositories::merch::MerchandiseRepository;
 use crate::repositories::message::MessageRepository;
 use crate::repositories::user::UserRepository;
@@ -63,12 +63,7 @@ pub struct AppState {
     pub users: Arc<UserRepository>,
     pub merch: Arc<MerchandiseRepository>,
     pub groups: Arc<MerchandiseGroupRepository>,
-    pub matches: Arc<dyn MatchRepository>,
-    /// Concrete `PgMatchRepository` for the lifecycle service.
-    /// The `_conn` methods return `RepositoryFuture<'a, T>` (boxed
-    /// for dyn-compat with the read methods) which is fine here
-    /// because we hold a concrete type.
-    pub matches_concrete: Arc<PgMatchRepository>,
+    pub matches: Arc<MatchRepository>,
     pub inventory: Arc<InventoryRepository>,
     pub messages: Arc<MessageRepository>,
     pub events: Arc<EventRepository>,
@@ -122,7 +117,7 @@ impl FromRef<AppState> for Arc<MerchPermissionPolicy> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn MatchRepository> {
+impl FromRef<AppState> for Arc<MatchRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.matches.clone()
     }
@@ -176,8 +171,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let merch: Arc<MerchandiseRepository> = Arc::new(MerchandiseRepository::new(pool.clone()));
     let groups: Arc<MerchandiseGroupRepository> =
         Arc::new(MerchandiseGroupRepository::new(pool.clone()));
-    let matches_concrete: Arc<PgMatchRepository> = Arc::new(PgMatchRepository::new(pool.clone()));
-    let matches: Arc<dyn MatchRepository> = matches_concrete.clone();
+    let matches: Arc<MatchRepository> = Arc::new(MatchRepository::new(pool.clone()));
     let inventory: Arc<InventoryRepository> = Arc::new(InventoryRepository::new(pool.clone()));
     let messages: Arc<MessageRepository> = Arc::new(MessageRepository::new(pool.clone()));
     let events: Arc<EventRepository> = Arc::new(EventRepository::new(pool.clone()));
@@ -189,7 +183,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
     let match_lifecycle = Arc::new(MatchLifecycleService::new(
         pool.clone(),
-        matches_concrete.clone(),
+        matches.clone(),
         inventory.clone(),
     ));
     let state = AppState {
@@ -199,7 +193,6 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         merch,
         groups,
         matches,
-        matches_concrete,
         inventory,
         messages,
         events,
