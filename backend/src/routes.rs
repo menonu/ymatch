@@ -21,7 +21,7 @@ use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::{MatchRepository, PgMatchRepository};
 use crate::repositories::merch::MerchandiseRepository;
 use crate::repositories::message::MessageRepository;
-use crate::repositories::user::{PgUserRepository, UserRepository};
+use crate::repositories::user::UserRepository;
 use crate::services::match_lifecycle::MatchLifecycleService;
 use crate::services::merch_permissions::MerchPermissionPolicy;
 use crate::services::permissions::PermissionPolicy;
@@ -60,7 +60,7 @@ async fn rate_limit(req: Request<Body>, next: Next, limiter: Arc<IpLimiter>) -> 
 pub struct AppState {
     pub pool: PgPool,
     pub storage: Arc<dyn ImageStorage>,
-    pub users: Arc<dyn UserRepository>,
+    pub users: Arc<UserRepository>,
     pub merch: Arc<MerchandiseRepository>,
     pub groups: Arc<MerchandiseGroupRepository>,
     pub matches: Arc<dyn MatchRepository>,
@@ -92,7 +92,7 @@ impl FromRef<AppState> for Arc<dyn ImageStorage> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn UserRepository> {
+impl FromRef<AppState> for Arc<UserRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.users.clone()
     }
@@ -171,7 +171,7 @@ impl FromRef<AppState> for Arc<GroupFavoritesRepository> {
 }
 
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
-    let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
+    let users: Arc<UserRepository> = Arc::new(UserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
     let merch: Arc<MerchandiseRepository> = Arc::new(MerchandiseRepository::new(pool.clone()));
     let groups: Arc<MerchandiseGroupRepository> =
