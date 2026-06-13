@@ -15,7 +15,7 @@ use crate::handlers;
 use crate::repositories::event::{EventRepository, PgEventRepository};
 use crate::repositories::event_favorites::{EventFavoritesRepository, PgEventFavoritesRepository};
 use crate::repositories::event_views::EventViewsRepository;
-use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupRepository};
+use crate::repositories::group::MerchandiseGroupRepository;
 use crate::repositories::group_favorites::{GroupFavoritesRepository, PgGroupFavoritesRepository};
 use crate::repositories::inventory::{InventoryRepository, PgInventoryRepository};
 use crate::repositories::match_::{MatchRepository, PgMatchRepository};
@@ -62,7 +62,7 @@ pub struct AppState {
     pub storage: Arc<dyn ImageStorage>,
     pub users: Arc<dyn UserRepository>,
     pub merch: Arc<MerchandiseRepository>,
-    pub groups: Arc<dyn MerchandiseGroupRepository>,
+    pub groups: Arc<MerchandiseGroupRepository>,
     pub matches: Arc<dyn MatchRepository>,
     /// Concrete `PgMatchRepository` for the lifecycle service.
     /// The `_conn` methods return `RepositoryFuture<'a, T>` (boxed
@@ -106,7 +106,7 @@ impl FromRef<AppState> for Arc<MerchandiseRepository> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn MerchandiseGroupRepository> {
+impl FromRef<AppState> for Arc<MerchandiseGroupRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.groups.clone()
     }
@@ -176,8 +176,8 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let users: Arc<dyn UserRepository> = Arc::new(PgUserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
     let merch: Arc<MerchandiseRepository> = Arc::new(MerchandiseRepository::new(pool.clone()));
-    let groups: Arc<dyn MerchandiseGroupRepository> =
-        Arc::new(PgMerchandiseGroupRepository::new(pool.clone()));
+    let groups: Arc<MerchandiseGroupRepository> =
+        Arc::new(MerchandiseGroupRepository::new(pool.clone()));
     let matches_concrete: Arc<PgMatchRepository> = Arc::new(PgMatchRepository::new(pool.clone()));
     let matches: Arc<dyn MatchRepository> = matches_concrete.clone();
     let inventory_concrete: Arc<PgInventoryRepository> =
