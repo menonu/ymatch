@@ -209,10 +209,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
+          # upload-artifact resolves paths against the workspace
+          # root, NOT the job's `defaults.run.working-directory`,
+          # so we need the `backend/` prefix here even though the
+          # other steps (run: ...) inherit ./backend.
           path: |
-            coverage/lcov.info
-            coverage/html/
-            coverage/summary.md
+            backend/coverage/lcov.info
+            backend/coverage/html/
+            backend/coverage/summary.md
           retention-days: 14
 
       - name: Fail if coverage drops below threshold
