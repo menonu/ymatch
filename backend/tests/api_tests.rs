@@ -3141,7 +3141,7 @@ async fn test_inventory_apply_trade_delta_conn_decrement_only() {
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let inv = backend::repositories::inventory::PgInventoryRepository::new(pool.clone());
+    let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
     inv.apply_trade_delta_conn(&mut *tx, u1 as i32, merch_for_u1, 2, 0)
         .await
         .unwrap();
@@ -3172,7 +3172,7 @@ async fn test_inventory_apply_trade_delta_conn_increment_only() {
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let inv = backend::repositories::inventory::PgInventoryRepository::new(pool.clone());
+    let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
     inv.apply_trade_delta_conn(&mut *tx, u1 as i32, merch_for_u1, 0, 4)
         .await
         .unwrap();
