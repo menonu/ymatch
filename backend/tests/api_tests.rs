@@ -2802,12 +2802,11 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
         )
         .await
         .unwrap();
-    let u1: i64 = serde_json::from_str::<serde_json::Value>(
-        &body_to_string(resp.into_body()).await,
-    )
-    .unwrap()["id"]
-    .as_i64()
-    .unwrap();
+    let u1: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2821,12 +2820,11 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
         )
         .await
         .unwrap();
-    let u2: i64 = serde_json::from_str::<serde_json::Value>(
-        &body_to_string(resp.into_body()).await,
-    )
-    .unwrap()["id"]
-    .as_i64()
-    .unwrap();
+    let u2: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2843,12 +2841,11 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
         )
         .await
         .unwrap();
-    let event_id: i64 = serde_json::from_str::<serde_json::Value>(
-        &body_to_string(resp.into_body()).await,
-    )
-    .unwrap()["id"]
-    .as_i64()
-    .unwrap();
+    let event_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
 
     // One merch per user + a TRADE inventory row of qty 5.
     let mut merch_ids = Vec::new();
@@ -2868,12 +2865,11 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let merch_id: i64 = serde_json::from_str::<serde_json::Value>(
-            &body_to_string(resp.into_body()).await,
-        )
-        .unwrap()["id"]
-        .as_i64()
-        .unwrap();
+        let merch_id: i64 =
+            serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await)
+                .unwrap()["id"]
+                .as_i64()
+                .unwrap();
         sqlx::query(
             "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'TRADE', 5)",
         )
@@ -3054,12 +3050,11 @@ async fn test_match_purge_other_pending_conn_keeps_unrelated() {
         )
         .await
         .unwrap();
-    let u_a: i32 = serde_json::from_str::<serde_json::Value>(
-        &body_to_string(resp.into_body()).await,
-    )
-    .unwrap()["id"]
-    .as_i64()
-    .unwrap() as i32;
+    let u_a: i32 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap() as i32;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3072,12 +3067,11 @@ async fn test_match_purge_other_pending_conn_keeps_unrelated() {
         )
         .await
         .unwrap();
-    let u_b: i32 = serde_json::from_str::<serde_json::Value>(
-        &body_to_string(resp.into_body()).await,
-    )
-    .unwrap()["id"]
-    .as_i64()
-    .unwrap() as i32;
+    let u_b: i32 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap() as i32;
     sqlx::query("INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING')")
         .bind(u_a)
         .bind(u_b)
@@ -3236,7 +3230,9 @@ async fn test_multiple_conn_calls_share_one_transaction() {
     // The call above would have failed to compile if the
     // `_conn` methods held the borrow past their `await` —
     // `&mut *tx` would be unusable for the next call.
-    tx.commit().await.expect("commit must succeed; if it doesn't, the future's borrow leaked");
+    tx.commit()
+        .await
+        .expect("commit must succeed; if it doesn't, the future's borrow leaked");
 
     // Verify the post-state.
     let row: (String, Option<i32>) =
