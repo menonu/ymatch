@@ -13,7 +13,7 @@ use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
 use crate::repositories::event::{EventRepository, PgEventRepository};
-use crate::repositories::event_favorites::{EventFavoritesRepository, PgEventFavoritesRepository};
+use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::{EventViewsRepository, PgEventViewsRepository};
 use crate::repositories::group::{MerchandiseGroupRepository, PgMerchandiseGroupRepository};
 use crate::repositories::group_favorites::{GroupFavoritesRepository, PgGroupFavoritesRepository};
@@ -74,7 +74,7 @@ pub struct AppState {
     pub inventory_concrete: Arc<PgInventoryRepository>,
     pub messages: Arc<dyn MessageRepository>,
     pub events: Arc<dyn EventRepository>,
-    pub event_favorites: Arc<dyn EventFavoritesRepository>,
+    pub event_favorites: Arc<EventFavoritesRepository>,
     pub event_views: Arc<dyn EventViewsRepository>,
     pub group_favorites: Arc<dyn GroupFavoritesRepository>,
     pub policy: Arc<PermissionPolicy>,
@@ -154,7 +154,7 @@ impl FromRef<AppState> for Arc<dyn EventRepository> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn EventFavoritesRepository> {
+impl FromRef<AppState> for Arc<EventFavoritesRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.event_favorites.clone()
     }
@@ -185,8 +185,8 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let inventory: Arc<dyn InventoryRepository> = inventory_concrete.clone();
     let messages: Arc<dyn MessageRepository> = Arc::new(PgMessageRepository::new(pool.clone()));
     let events: Arc<dyn EventRepository> = Arc::new(PgEventRepository::new(pool.clone()));
-    let event_favorites: Arc<dyn EventFavoritesRepository> =
-        Arc::new(PgEventFavoritesRepository::new(pool.clone()));
+    let event_favorites: Arc<EventFavoritesRepository> =
+        Arc::new(EventFavoritesRepository::new(pool.clone()));
     let event_views: Arc<dyn EventViewsRepository> =
         Arc::new(PgEventViewsRepository::new(pool.clone()));
     let group_favorites: Arc<dyn GroupFavoritesRepository> =
