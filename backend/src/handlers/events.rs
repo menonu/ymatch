@@ -62,7 +62,7 @@ pub async fn list_events(
 }
 
 pub async fn toggle_favorite_group(
-    State(groups): State<Arc<dyn GroupFavoritesRepository>>,
+    State(groups): State<Arc<GroupFavoritesRepository>>,
     Path(event_id): Path<i32>,
     Json(payload): Json<ToggleFavoriteGroupRequest>,
 ) -> Result<StatusCode, AppError> {
@@ -78,7 +78,7 @@ pub async fn toggle_favorite_group(
 }
 
 pub async fn list_favorite_groups(
-    State(groups): State<Arc<dyn GroupFavoritesRepository>>,
+    State(groups): State<Arc<GroupFavoritesRepository>>,
     Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<FavoriteGroup>>, AppError> {
     let items = groups.list_for_user(user_id).await?;
