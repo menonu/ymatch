@@ -45,7 +45,7 @@ pub struct ToggleFavoriteGroupRequest {
 }
 
 pub async fn register_event_view(
-    State(views): State<Arc<dyn EventViewsRepository>>,
+    State(views): State<Arc<EventViewsRepository>>,
     Path(event_id): Path<i32>,
     Json(payload): Json<RegisterViewRequest>,
 ) -> Result<StatusCode, AppError> {
