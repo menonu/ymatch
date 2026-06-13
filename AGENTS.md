@@ -55,10 +55,23 @@ See [Documentation Index](./docs/README.md) for the full file listing.
 
 **Trunk-Based Development**: All work goes through PRs targeting `main`. Never push directly to `main`.
 
+**Test-Driven Development (TDD)**: Follow the **Red → Green → Refactor** cycle for any non-trivial change.
+
+1. **Red** — Write a failing test (unit or integration) that describes the desired behavior. Confirm it actually fails for the right reason.
+2. **Green** — Implement the minimum code to make the test pass. No more.
+3. **Refactor** — Clean up the implementation while keeping the test green. Re-run the test after each refactor step.
+
+Where tests live:
+- **Backend unit tests** — `#[cfg(test)] mod tests` inside the source file under test (e.g. `src/services/match_lifecycle.rs`).
+- **Backend integration tests** — `backend/tests/api_tests.rs` (HTTP + DB end-to-end).
+- **Frontend unit / widget tests** — `frontend/test/` (collocated by feature).
+
+Exceptions: pure doc / config changes, generated code, and trivial typo fixes do not need new tests, but existing tests must still pass.
+
 1. Create a GitHub Issue (`gh issue create`)
 2. Create a feature branch (`feat/xxx` or `fix/xxx`)
 3. If protobuf changes needed: edit `proto/models.proto` first, then run `./scripts/generate_protos.sh`
-4. Implement changes
+4. Apply the TDD cycle above
 5. Run lints and tests: `task test`, `cargo fmt -- --check && cargo clippy -- -D warnings`, `flutter analyze`
 6. Commit and push
 7. Create PR via `gh pr create`
@@ -80,6 +93,7 @@ See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full
 task test                    # Run all tests
 task backend:test            # Backend integration tests
 task frontend:test           # Flutter unit/widget tests
+task backend:coverage        # Backend tests + coverage (HTML + lcov.info)
 cd backend && cargo fmt -- --check && cargo clippy -- -D warnings
 cd frontend && flutter analyze
 ```
