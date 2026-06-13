@@ -64,7 +64,14 @@ pub struct AppState {
     pub merch: Arc<dyn MerchandiseRepository>,
     pub groups: Arc<dyn MerchandiseGroupRepository>,
     pub matches: Arc<dyn MatchRepository>,
+    /// Concrete `PgMatchRepository` for the lifecycle service.
+    /// The `_conn` methods return `RepositoryFuture<'a, T>` (boxed
+    /// for dyn-compat with the read methods) which is fine here
+    /// because we hold a concrete type.
+    pub matches_concrete: Arc<PgMatchRepository>,
     pub inventory: Arc<dyn InventoryRepository>,
+    /// Concrete `PgInventoryRepository` for the lifecycle service.
+    pub inventory_concrete: Arc<PgInventoryRepository>,
     pub messages: Arc<dyn MessageRepository>,
     pub events: Arc<dyn EventRepository>,
     pub event_favorites: Arc<dyn EventFavoritesRepository>,
@@ -172,9 +179,11 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         Arc::new(PgMerchandiseRepository::new(pool.clone()));
     let groups: Arc<dyn MerchandiseGroupRepository> =
         Arc::new(PgMerchandiseGroupRepository::new(pool.clone()));
-    let matches: Arc<dyn MatchRepository> = Arc::new(PgMatchRepository::new(pool.clone()));
-    let inventory: Arc<dyn InventoryRepository> =
+    let matches_concrete: Arc<PgMatchRepository> = Arc::new(PgMatchRepository::new(pool.clone()));
+    let matches: Arc<dyn MatchRepository> = matches_concrete.clone();
+    let inventory_concrete: Arc<PgInventoryRepository> =
         Arc::new(PgInventoryRepository::new(pool.clone()));
+    let inventory: Arc<dyn InventoryRepository> = inventory_concrete.clone();
     let messages: Arc<dyn MessageRepository> = Arc::new(PgMessageRepository::new(pool.clone()));
     let events: Arc<dyn EventRepository> = Arc::new(PgEventRepository::new(pool.clone()));
     let event_favorites: Arc<dyn EventFavoritesRepository> =
@@ -184,7 +193,11 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let group_favorites: Arc<dyn GroupFavoritesRepository> =
         Arc::new(PgGroupFavoritesRepository::new(pool.clone()));
     let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
-    let match_lifecycle = Arc::new(MatchLifecycleService::new(pool.clone(), matches.clone()));
+    let match_lifecycle = Arc::new(MatchLifecycleService::new(
+        pool.clone(),
+        matches_concrete.clone(),
+        inventory_concrete.clone(),
+    ));
     let state = AppState {
         pool,
         storage,
@@ -192,7 +205,9 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         merch,
         groups,
         matches,
+        matches_concrete,
         inventory,
+        inventory_concrete,
         messages,
         events,
         event_favorites,

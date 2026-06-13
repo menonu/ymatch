@@ -20,8 +20,10 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::OfferTradeRequest;
-use crate::repositories::match_::MatchRepository;
-use sqlx::{PgPool, Row};
+use crate::repositories::inventory::InventoryRepository as _InventoryTrait;
+use crate::repositories::inventory::PgInventoryRepository;
+use crate::repositories::match_::{MatchRepository as _MatchTrait, PgMatchRepository};
+use sqlx::PgPool;
 use std::sync::Arc;
 
 const STATUS_PENDING: &str = "PENDING";
@@ -31,15 +33,30 @@ const STATUS_COMPLETED: &str = "COMPLETED";
 const STATUS_REJECTED: &str = "REJECTED";
 
 /// Service for the match state machine.
+///
+/// Holds concrete `Arc<PgMatchRepository>` and
+/// `Arc<PgInventoryRepository>` (not `dyn`). The repository
+/// `_conn` methods take a `&mut PgConnection` so we can reuse one
+/// transaction across multiple repository calls by passing
+/// `&mut *tx` (the standard sqlx pattern).
 #[derive(Clone)]
 pub struct MatchLifecycleService {
     pool: PgPool,
-    matches: Arc<dyn MatchRepository>,
+    matches: Arc<PgMatchRepository>,
+    inventory: Arc<PgInventoryRepository>,
 }
 
 impl MatchLifecycleService {
-    pub fn new(pool: PgPool, matches: Arc<dyn MatchRepository>) -> Self {
-        Self { pool, matches }
+    pub fn new(
+        pool: PgPool,
+        matches: Arc<PgMatchRepository>,
+        inventory: Arc<PgInventoryRepository>,
+    ) -> Self {
+        Self {
+            pool,
+            matches,
+            inventory,
+        }
     }
 
     /// Transition PENDING -> OFFERED.
@@ -48,6 +65,12 @@ impl MatchLifecycleService {
     /// participants, payload contains at least one item. Inserts each
     /// `match_items` row, sets `offered_by` and `status='OFFERED'`.
     /// Atomic.
+    ///
+    /// The SQL lives in `MatchRepository` (the `_conn` methods) so the
+    /// repository owns the `matches` and `match_items` tables. This
+    /// service is the orchestrator: open a tx, call the repo
+    /// methods with `&mut *tx`, commit. Drop the `tx` and the
+    /// rollback happens automatically.
     pub async fn offer(&self, match_id: i32, offer: OfferTradeRequest) -> Result<(), AppError> {
         if offer.items.is_empty() {
             return Err(AppError::bad_request("Must select at least one item"));
@@ -55,42 +78,27 @@ impl MatchLifecycleService {
 
         let mut tx = self.pool.begin().await?;
 
-        // Lock the match row for update so the status check + status set
-        // are serialized across concurrent offers.
-        let locked =
-            sqlx::query("SELECT user1_id, user2_id, status FROM matches WHERE id = $1 FOR UPDATE")
-                .bind(match_id)
-                .fetch_optional(&mut *tx)
-                .await?
-                .ok_or_else(|| AppError::not_found("Match not found"))?;
+        let locked = self
+            .matches
+            .lock_for_update_conn(&mut tx, match_id)
+            .await?
+            .ok_or_else(|| AppError::not_found("Match not found"))?;
 
-        let u1: i32 = locked.get("user1_id");
-        let u2: i32 = locked.get("user2_id");
-        let status: String = locked.get("status");
-        if status != STATUS_PENDING {
+        if locked.status != STATUS_PENDING {
             return Err(AppError::bad_request("Can only offer on PENDING matches"));
         }
-        if offer.user_id != u1 && offer.user_id != u2 {
+        if offer.user_id != locked.user1_id && offer.user_id != locked.user2_id {
             return Err(AppError::forbidden("Not part of this match"));
         }
 
-        for item in &offer.items {
-            sqlx::query(
-                "INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity) VALUES ($1, $2, $3, $4, $5)",
-            )
-            .bind(match_id)
-            .bind(item.merch_id)
-            .bind(offer.user_id)
-            .bind(&item.direction)
-            .bind(item.quantity)
-            .execute(&mut *tx)
+        self.matches
+            .insert_match_items_conn(&mut tx, match_id, offer.user_id, &offer.items)
             .await?;
-        }
-
-        sqlx::query("UPDATE matches SET status = 'OFFERED', offered_by = $1 WHERE id = $2")
-            .bind(offer.user_id)
-            .bind(match_id)
-            .execute(&mut *tx)
+        self.matches
+            .set_status_conn(&mut tx, match_id, STATUS_OFFERED)
+            .await?;
+        self.matches
+            .set_offered_by_conn(&mut tx, match_id, offer.user_id)
             .await?;
 
         tx.commit().await?;
@@ -110,20 +118,13 @@ impl MatchLifecycleService {
 
         let mut tx = self.pool.begin().await?;
 
-        let locked = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by FROM matches WHERE id = $1 FOR UPDATE",
-        )
-        .bind(match_id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::not_found("Match not found"))?;
+        let locked = self
+            .matches
+            .lock_for_update_conn(&mut tx, match_id)
+            .await?
+            .ok_or_else(|| AppError::not_found("Match not found"))?;
 
-        let u1: i32 = locked.get("user1_id");
-        let u2: i32 = locked.get("user2_id");
-        let current: String = locked.get("status");
-        let _offered_by: Option<i32> = locked.get("offered_by");
-
-        match (new_status, current.as_str()) {
+        match (new_status, locked.status.as_str()) {
             ("ACCEPTED", s) if s != STATUS_OFFERED => {
                 return Err(AppError::bad_request("Can only accept OFFERED matches"));
             }
@@ -138,29 +139,25 @@ impl MatchLifecycleService {
             _ => {}
         }
 
-        sqlx::query("UPDATE matches SET status = $1 WHERE id = $2")
-            .bind(new_status)
-            .bind(match_id)
-            .execute(&mut *tx)
+        self.matches
+            .set_status_conn(&mut tx, match_id, new_status)
             .await?;
 
         if new_status == STATUS_ACCEPTED {
             // Purge other PENDING matches between the same pair.
-            sqlx::query(
-                "DELETE FROM matches WHERE status = 'PENDING' AND id != $1
-                 AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))",
-            )
-            .bind(match_id)
-            .bind(u1)
-            .bind(u2)
-            .execute(&mut *tx)
-            .await?;
+            self.matches
+                .purge_other_pending_conn(
+                    &mut tx,
+                    match_id,
+                    locked.user1_id,
+                    locked.user2_id,
+                )
+                .await?;
         }
 
         if new_status == STATUS_REJECTED {
-            sqlx::query("DELETE FROM match_items WHERE match_id = $1")
-                .bind(match_id)
-                .execute(&mut *tx)
+            self.matches
+                .delete_match_items_conn(&mut tx, match_id)
                 .await?;
         }
 
@@ -172,11 +169,11 @@ impl MatchLifecycleService {
     /// match. Each side applies independently; the per-user flag
     /// (`user{1,2}_inventory_applied_at`) prevents double-application.
     ///
-    /// The 4-branch logic from the old `apply_trade_inventory` is now
-    /// folded into a single transaction here (inventory delta + applied
-    /// flag are written atomically). The SQL is inlined rather than
-    /// going through the [`InventoryRepository`] trait so the same
-    /// `&mut *tx` can be threaded through all writes.
+    /// The state machine logic for `apply_inventory` is small and
+    /// pure enough to unit test in isolation
+    /// (`apply_inventory_delta`); the transaction-bearing part is
+    /// covered by the integration test
+    /// `test_trade_lifecycle_offer_accept_complete_apply`.
     pub async fn apply_inventory(&self, match_id: i32, user_id: i32) -> Result<(), AppError> {
         let snapshot = self
             .matches
@@ -214,7 +211,7 @@ impl MatchLifecycleService {
         // per-user applied flag are atomic. If we crash between the
         // deltas and the flag, the next retry sees
         // `user{1,2}_inventory_applied_at IS NOT NULL` and refuses to
-        // re-apply. The old handler did this same wrap.
+        // re-apply.
         let mut tx = self.pool.begin().await?;
 
         for item in &items {
@@ -234,48 +231,20 @@ impl MatchLifecycleService {
             if delta_trade == 0 && delta_have == 0 {
                 continue;
             }
-            if delta_trade != 0 {
-                sqlx::query(
-                    "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0)
-                     WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
+            self.inventory
+                .apply_trade_delta_conn(
+                    &mut tx,
+                    user_id,
+                    item.merch_id,
+                    delta_trade,
+                    delta_have,
                 )
-                .bind(delta_trade)
-                .bind(user_id)
-                .bind(item.merch_id)
-                .execute(&mut *tx)
                 .await?;
-            }
-            if delta_have != 0 {
-                sqlx::query(
-                    r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
-                       VALUES ($1, $2, 'HAVE', $3)
-                       ON CONFLICT (user_id, merch_id, status)
-                       DO UPDATE SET quantity = inventory.quantity + $3"#,
-                )
-                .bind(user_id)
-                .bind(item.merch_id)
-                .bind(delta_have)
-                .execute(&mut *tx)
-                .await?;
-            }
         }
 
-        let applied_col = if is_user1 {
-            "user1_inventory_applied_at"
-        } else {
-            "user2_inventory_applied_at"
-        };
-        let affected = sqlx::query(&format!(
-            "UPDATE matches SET {} = NOW() WHERE id = $1",
-            applied_col
-        ))
-        .bind(match_id)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        if affected == 0 {
-            return Err(AppError::not_found("Match disappeared mid-apply"));
-        }
+        self.matches
+            .mark_inventory_applied_conn(&mut tx, match_id, is_user1)
+            .await?;
 
         tx.commit().await?;
         Ok(())
