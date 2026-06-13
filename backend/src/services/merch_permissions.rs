@@ -19,11 +19,11 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct MerchPermissionPolicy {
     users: Arc<PermissionPolicy>,
-    merch: Arc<dyn MerchandiseRepository>,
+    merch: Arc<MerchandiseRepository>,
 }
 
 impl MerchPermissionPolicy {
-    pub fn new(users: Arc<PermissionPolicy>, merch: Arc<dyn MerchandiseRepository>) -> Self {
+    pub fn new(users: Arc<PermissionPolicy>, merch: Arc<MerchandiseRepository>) -> Self {
         Self { users, merch }
     }
 
