@@ -86,7 +86,7 @@ pub async fn list_favorite_groups(
 }
 
 pub async fn toggle_favorite(
-    State(favs): State<Arc<dyn EventFavoritesRepository>>,
+    State(favs): State<Arc<EventFavoritesRepository>>,
     Path(event_id): Path<i32>,
     Json(payload): Json<ToggleFavoriteRequest>,
 ) -> Result<StatusCode, AppError> {
