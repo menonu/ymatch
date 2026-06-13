@@ -54,7 +54,7 @@ pub async fn register_event_view(
 }
 
 pub async fn list_events(
-    State(events): State<Arc<dyn EventRepository>>,
+    State(events): State<Arc<EventRepository>>,
     axum::extract::Query(query): axum::extract::Query<ListEventsQuery>,
 ) -> Result<Json<Vec<Event>>, AppError> {
     let items = events.list_with_stats(query.user_id).await?;
