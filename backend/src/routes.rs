@@ -12,7 +12,7 @@ use sqlx::PgPool;
 use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
-use crate::repositories::event::{EventRepository, PgEventRepository};
+use crate::repositories::event::EventRepository;
 use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
 use crate::repositories::group::MerchandiseGroupRepository;
@@ -73,7 +73,7 @@ pub struct AppState {
     /// Concrete `PgInventoryRepository` for the lifecycle service.
     pub inventory_concrete: Arc<PgInventoryRepository>,
     pub messages: Arc<MessageRepository>,
-    pub events: Arc<dyn EventRepository>,
+    pub events: Arc<EventRepository>,
     pub event_favorites: Arc<EventFavoritesRepository>,
     pub event_views: Arc<EventViewsRepository>,
     pub group_favorites: Arc<GroupFavoritesRepository>,
@@ -148,7 +148,7 @@ impl FromRef<AppState> for Arc<MatchLifecycleService> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn EventRepository> {
+impl FromRef<AppState> for Arc<EventRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.events.clone()
     }
@@ -184,7 +184,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         Arc::new(PgInventoryRepository::new(pool.clone()));
     let inventory: Arc<dyn InventoryRepository> = inventory_concrete.clone();
     let messages: Arc<MessageRepository> = Arc::new(MessageRepository::new(pool.clone()));
-    let events: Arc<dyn EventRepository> = Arc::new(PgEventRepository::new(pool.clone()));
+    let events: Arc<EventRepository> = Arc::new(EventRepository::new(pool.clone()));
     let event_favorites: Arc<EventFavoritesRepository> =
         Arc::new(EventFavoritesRepository::new(pool.clone()));
     let event_views: Arc<EventViewsRepository> = Arc::new(EventViewsRepository::new(pool.clone()));
