@@ -193,7 +193,12 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: coverage
-          path: coverage/summary.md
+          # Use an absolute path to the summary file. The marocchino
+          # action runs in $GITHUB_WORKSPACE, not in the job's
+          # `defaults.run.working-directory`, so a relative path would
+          # not resolve. ${{ github.workspace }} is the same as
+          # $GITHUB_WORKSPACE — the repo root.
+          path: ${{ github.workspace }}/backend/coverage/summary.md
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
