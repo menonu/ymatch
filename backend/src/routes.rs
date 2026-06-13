@@ -20,7 +20,7 @@ use crate::repositories::group_favorites::{GroupFavoritesRepository, PgGroupFavo
 use crate::repositories::inventory::{InventoryRepository, PgInventoryRepository};
 use crate::repositories::match_::{MatchRepository, PgMatchRepository};
 use crate::repositories::merch::MerchandiseRepository;
-use crate::repositories::message::{MessageRepository, PgMessageRepository};
+use crate::repositories::message::MessageRepository;
 use crate::repositories::user::{PgUserRepository, UserRepository};
 use crate::services::match_lifecycle::MatchLifecycleService;
 use crate::services::merch_permissions::MerchPermissionPolicy;
@@ -72,7 +72,7 @@ pub struct AppState {
     pub inventory: Arc<dyn InventoryRepository>,
     /// Concrete `PgInventoryRepository` for the lifecycle service.
     pub inventory_concrete: Arc<PgInventoryRepository>,
-    pub messages: Arc<dyn MessageRepository>,
+    pub messages: Arc<MessageRepository>,
     pub events: Arc<dyn EventRepository>,
     pub event_favorites: Arc<dyn EventFavoritesRepository>,
     pub event_views: Arc<dyn EventViewsRepository>,
@@ -136,7 +136,7 @@ impl FromRef<AppState> for Arc<dyn InventoryRepository> {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn MessageRepository> {
+impl FromRef<AppState> for Arc<MessageRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.messages.clone()
     }
@@ -183,7 +183,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let inventory_concrete: Arc<PgInventoryRepository> =
         Arc::new(PgInventoryRepository::new(pool.clone()));
     let inventory: Arc<dyn InventoryRepository> = inventory_concrete.clone();
-    let messages: Arc<dyn MessageRepository> = Arc::new(PgMessageRepository::new(pool.clone()));
+    let messages: Arc<MessageRepository> = Arc::new(MessageRepository::new(pool.clone()));
     let events: Arc<dyn EventRepository> = Arc::new(PgEventRepository::new(pool.clone()));
     let event_favorites: Arc<dyn EventFavoritesRepository> =
         Arc::new(PgEventFavoritesRepository::new(pool.clone()));
