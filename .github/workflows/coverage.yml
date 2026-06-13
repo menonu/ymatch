@@ -1,0 +1,117 @@
+name: Backend Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  coverage:
+    name: Coverage summary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ymatch_user
+          POSTGRES_PASSWORD: secure_dev_password
+          POSTGRES_DB: ymatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ymatch_user -d ymatch_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test
+      # cargo-llvm-cov reads these to know which crates to instrument
+      # (all of them, in this single-crate workspace).
+      CARGO_LLVM_COV_TARGET_DIR: target/llvm-cov
+      LLVM_PROFILE_FILE: "target/llvm-cov/cargo-test-%p-%m.profraw"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # cargo-llvm-cov needs the llvm-tools rustup component and a
+      # recent stable rustc. Pinning stable is fine.
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: llvm-tools
+
+      - name: Install cargo-llvm-cov
+        run: |
+          cargo install cargo-llvm-cov --locked
+          cargo llvm-cov --version
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config zlib1g-dev
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend -> target
+          shared-key: backend-llvm-cov
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
+
+      # `cargo llvm-cov test` does the equivalent of:
+      #   - RUSTFLAGS=-Cinstrument-coverage cargo test
+      #   - LLVM_PROFILE_FILE=... (to capture coverage from test setup)
+      # all in one. The `--no-cfg-coverage` / `--no-report` flags skip
+      # default reporting; we collect a single lcov + summary below.
+      - name: Run tests with coverage
+        run: |
+          cargo llvm-cov test --no-report -- --test-threads=1
+
+      # Produce an lcov.info for local inspection (not gated on; never
+      # fails the build). Also write a one-line text summary to stdout
+      # and the $GITHUB_STEP_SUMMARY markdown box.
+      - name: Coverage summary
+        run: |
+          mkdir -p coverage
+          # lcov for local consumption / future badge generation.
+          cargo llvm-cov report --lcov --output-path coverage/lcov.info
+          # Text summary in stdout + GITHUB_STEP_SUMMARY (rendered
+          # as a markdown box on the workflow run page).
+          cargo llvm-cov report --summary-only > coverage/summary.txt
+          cat coverage/summary.txt
+
+          # Write the same numbers to the step-summary in a small
+          # markdown table so PRs show a coverage badge-style header.
+          LINE=$(awk '/^Filename/ {flag=1; next} flag && /TOTAL/ {print; exit}' coverage/summary.txt)
+          {
+            echo "## Backend coverage"
+            echo
+            echo '```'
+            cat coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Threshold gate. Parse the TOTAL row from the text
+          # summary. cargo-llvm-cov's --summary-only emits 13 fields
+          # per row:
+          #   1 Filename  2 Regions  3 Missed  4 % (regions)
+          #   5 Functions  6 Missed  7 % (functions)  8 Lines
+          #   9 Missed  10 % (lines)  11 Branches  12 Missed  13 % (branches)
+          # We want the line-coverage percentage at field 10.
+          THRESHOLD=40
+          COVERAGE=$(awk '/TOTAL/ {gsub("%","",$10); print $10; exit}' coverage/summary.txt)
+          echo "Threshold: $THRESHOLD%  Line coverage: $COVERAGE%"
+          awk -v c="$COVERAGE" -v t="$THRESHOLD" 'BEGIN {
+              if (c+0 < t+0) { print "::error::Coverage " c "% is below threshold " t "%"; exit 1 }
+              print "OK"
+          }'

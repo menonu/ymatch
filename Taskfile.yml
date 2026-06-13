@@ -66,3 +66,17 @@ tasks:
     cmds:
       - task: backend:test
       - task: frontend:test
+
+  # ─── Coverage ───────────────────────────────────────────────────────
+  backend:coverage:
+    desc: Generate backend coverage report (HTML + lcov.info)
+    dir: backend
+    deps: [db:ensure-test]
+    cmds:
+      - cargo llvm-cov test --no-report -- --test-threads=1
+      - mkdir -p coverage
+      - cargo llvm-cov report --html --output-dir coverage/html
+      - cargo llvm-cov report --lcov --output-path coverage/lcov.info
+      - cargo llvm-cov report --summary-only
+      - echo "HTML:  backend/coverage/html/index.html"
+      - echo "lcov:  backend/coverage/lcov.info"
