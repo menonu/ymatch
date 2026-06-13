@@ -24,11 +24,11 @@ use std::sync::Arc;
 /// underlying repository and the policy rules.
 #[derive(Clone)]
 pub struct PermissionPolicy {
-    users: Arc<dyn UserRepository>,
+    users: Arc<UserRepository>,
 }
 
 impl PermissionPolicy {
-    pub fn new(users: Arc<dyn UserRepository>) -> Self {
+    pub fn new(users: Arc<UserRepository>) -> Self {
         Self { users }
     }
 
@@ -95,7 +95,8 @@ impl PermissionPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::user::mock::MockUserRepository;
+    use sqlx::PgPool;
+    use std::sync::Arc;
 
     fn user(id: i32, role: &str, is_banned: bool) -> VerifiedUser {
         VerifiedUser {
@@ -105,18 +106,29 @@ mod tests {
         }
     }
 
+    /// Build a `PermissionPolicy` backed by a lazy `PgPool` for tests
+    /// that never call into the repository (the `require_*` methods are
+    /// pure). `connect_lazy` does not open a connection, so the URL just
+    /// has to be syntactically valid.
+    fn policy_lazy() -> PermissionPolicy {
+        let pool = PgPool::connect_lazy("postgres://localhost/dummy").unwrap();
+        PermissionPolicy::new(Arc::new(UserRepository::new(pool)))
+    }
+
+    // --- pure-logic tests (no DB access) ---
+
     #[tokio::test]
     async fn require_not_banned_allows_active() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
-        assert!(policy.require_not_banned(&user(1, "user", false)).is_ok());
+        assert!(
+            policy_lazy()
+                .require_not_banned(&user(1, "user", false))
+                .is_ok()
+        );
     }
 
     #[tokio::test]
     async fn require_not_banned_rejects_banned() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
-        let err = policy
+        let err = policy_lazy()
             .require_not_banned(&user(1, "user", true))
             .unwrap_err();
         assert_eq!(err, AppError::forbidden("User is banned"));
@@ -124,10 +136,8 @@ mod tests {
 
     #[tokio::test]
     async fn require_role_passes_for_allowed() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
         assert!(
-            policy
+            policy_lazy()
                 .require_role(&user(1, "admin", false), &["admin", "moderator"])
                 .is_ok()
         );
@@ -135,9 +145,7 @@ mod tests {
 
     #[tokio::test]
     async fn require_role_rejects_for_other() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
-        let err = policy
+        let err = policy_lazy()
             .require_role(&user(1, "user", false), &["admin"])
             .unwrap_err();
         match err {
@@ -148,11 +156,9 @@ mod tests {
 
     #[tokio::test]
     async fn require_owner_or_role_owner_passes() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
         // Same user id
         assert!(
-            policy
+            policy_lazy()
                 .require_owner_or_role(&user(1, "user", false), 1, &["admin"])
                 .is_ok()
         );
@@ -160,11 +166,9 @@ mod tests {
 
     #[tokio::test]
     async fn require_owner_or_role_elevated_passes() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
         // Different user, but admin
         assert!(
-            policy
+            policy_lazy()
                 .require_owner_or_role(&user(1, "admin", false), 99, &["admin"])
                 .is_ok()
         );
@@ -172,45 +176,59 @@ mod tests {
 
     #[tokio::test]
     async fn require_owner_or_role_other_user_rejected() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
         // Different user, role not in allowed list
         assert!(
-            policy
+            policy_lazy()
                 .require_owner_or_role(&user(1, "user", false), 99, &["admin"])
                 .is_err()
         );
     }
 
-    #[tokio::test]
-    async fn verify_returns_not_found_for_missing_user() {
-        let repo = Arc::new(MockUserRepository::new());
-        let policy = PermissionPolicy::new(repo);
+    // --- DB-backed tests (`#[sqlx::test]` provisions a fresh DB per test) ---
+
+    #[sqlx::test]
+    async fn verify_returns_not_found_for_missing_user(pool: PgPool) {
+        let users = Arc::new(UserRepository::new(pool));
+        let policy = PermissionPolicy::new(users);
         let err = policy.verify(42).await.unwrap_err();
         assert_eq!(err, AppError::not_found("User not found"));
     }
 
-    #[tokio::test]
-    async fn verify_returns_user_when_present() {
-        let repo = Arc::new(MockUserRepository::new().with_user(1, "admin", false));
-        let policy = PermissionPolicy::new(repo);
+    #[sqlx::test]
+    async fn verify_returns_user_when_present(pool: PgPool) {
+        sqlx::query("INSERT INTO users (id, username, role) VALUES (1, 'test', 'admin')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let users = Arc::new(UserRepository::new(pool));
+        let policy = PermissionPolicy::new(users);
         let u = policy.verify(1).await.unwrap();
         assert_eq!(u.id, 1);
         assert_eq!(u.role, "admin");
     }
 
-    #[tokio::test]
-    async fn verify_active_rejects_banned() {
-        let repo = Arc::new(MockUserRepository::new().with_user(1, "user", true));
-        let policy = PermissionPolicy::new(repo);
+    #[sqlx::test]
+    async fn verify_active_rejects_banned(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO users (id, username, role, is_banned) VALUES (1, 'test', 'user', true)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let users = Arc::new(UserRepository::new(pool));
+        let policy = PermissionPolicy::new(users);
         let err = policy.verify_active(1).await.unwrap_err();
         assert_eq!(err, AppError::forbidden("User is banned"));
     }
 
-    #[tokio::test]
-    async fn verify_active_passes_for_active() {
-        let repo = Arc::new(MockUserRepository::new().with_user(1, "user", false));
-        let policy = PermissionPolicy::new(repo);
+    #[sqlx::test]
+    async fn verify_active_passes_for_active(pool: PgPool) {
+        sqlx::query("INSERT INTO users (id, username, role) VALUES (1, 'test', 'user')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let users = Arc::new(UserRepository::new(pool));
+        let policy = PermissionPolicy::new(users);
         let u = policy.verify_active(1).await.unwrap();
         assert_eq!(u.id, 1);
     }
