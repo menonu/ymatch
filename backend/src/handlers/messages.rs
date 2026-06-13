@@ -8,7 +8,7 @@ use axum::{
 use std::sync::Arc;
 
 pub async fn list_messages(
-    State(messages): State<Arc<dyn MessageRepository>>,
+    State(messages): State<Arc<MessageRepository>>,
     Path(match_id): Path<i32>,
 ) -> Result<Json<Vec<Message>>, AppError> {
     let items = messages.list_for_match(match_id).await?;
@@ -16,7 +16,7 @@ pub async fn list_messages(
 }
 
 pub async fn send_message(
-    State(messages): State<Arc<dyn MessageRepository>>,
+    State(messages): State<Arc<MessageRepository>>,
     Path(match_id): Path<i32>,
     Json(payload): Json<SendMessageRequest>,
 ) -> Result<Json<Message>, AppError> {
