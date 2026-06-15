@@ -48,19 +48,14 @@ The frontend is mostly UI + state. The Testing Trophy emphasizes **integration t
 
 For the **current** data behind these gaps (which tests exist today, current coverage %), see the data snapshot on issue #185.
 
-## 4. Open questions for Phase 2
-
-1. **#213 implementation order:** Should the frontend E2E (#213) be set up before or after the provider tests (#4)? The E2E requires a running backend in CI (#213 acceptance criteria), which is a non-trivial infra change. Starting #213 first means the infrastructure is ready for provider tests too.
-2. **Frontend coverage threshold (#184):** Once coverage is wired up, what % should the gate be set to? The strategy says we want to push toward the trophy shape (~50% integration), so starting low (~30%) to avoid blocking the existing scenario tests, then ratcheting up, is a reasonable path.
-3. **Test data setup for #213:** Should the E2E tests use a separate database with seeded data, or reset between tests with `TRUNCATE`? Current backend integration tests use the latter.
-
-## 5. Process
+## 4. Process
 
 - **Live data (test counts, coverage %) lives on the issue (#185).** A snapshot is posted as a Phase 1 deliverable comment. As test additions land, the snapshot is regenerated; the issue, not this doc, gets the update.
-- **Strategy lives here.** Framework, target proportions, gap list, rationale, open questions. Update only when the strategy changes (e.g., a new framework is adopted, a gap is re-prioritized, a target is revised).
+- **Open questions / implementation planning also lives on the issue.** This doc is for stable strategy; open questions change weekly as the work progresses.
+- **Strategy lives here.** Framework, target proportions, gap list, rationale. Update only when the strategy changes (e.g., a new framework is adopted, a gap is re-prioritized, a target is revised).
 - **Each gap becomes its own issue or PR.** Gap #1 → unit tests for `MatchLifecycleService`. Gap #3 → #213 (already filed). Gaps #4-6 → future issues.
 
-## 6. References
+## 5. References
 
 - Mike Cohn, *Succeeding with Agile* (2009).
 - Kent C. Dodds, [The Testing Trophy and Testing Classifications](https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications).
