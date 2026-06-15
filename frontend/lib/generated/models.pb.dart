@@ -413,7 +413,6 @@ class Merchandise extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? photoUrl,
     $core.String? groupName,
-    $core.int? sortOrder,
     $core.String? status,
     $core.bool? isDeleted,
     $core.bool? tradeEnabled,
@@ -426,7 +425,6 @@ class Merchandise extends $pb.GeneratedMessage {
     if (name != null) result.name = name;
     if (photoUrl != null) result.photoUrl = photoUrl;
     if (groupName != null) result.groupName = groupName;
-    if (sortOrder != null) result.sortOrder = sortOrder;
     if (status != null) result.status = status;
     if (isDeleted != null) result.isDeleted = isDeleted;
     if (tradeEnabled != null) result.tradeEnabled = tradeEnabled;
@@ -453,7 +451,6 @@ class Merchandise extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'name')
     ..aOS(4, _omitFieldNames ? '' : 'photoUrl')
     ..aOS(5, _omitFieldNames ? '' : 'groupName')
-    ..aI(6, _omitFieldNames ? '' : 'sortOrder')
     ..aOS(7, _omitFieldNames ? '' : 'status')
     ..aOB(8, _omitFieldNames ? '' : 'isDeleted')
     ..aOB(9, _omitFieldNames ? '' : 'tradeEnabled')
@@ -525,57 +522,48 @@ class Merchandise extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearGroupName() => $_clearField(5);
 
-  @$pb.TagNumber(6)
-  $core.int get sortOrder => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set sortOrder($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasSortOrder() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearSortOrder() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  $core.String get status => $_getSZ(6);
+  $core.String get status => $_getSZ(5);
   @$pb.TagNumber(7)
-  set status($core.String value) => $_setString(6, value);
+  set status($core.String value) => $_setString(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasStatus() => $_has(6);
+  $core.bool hasStatus() => $_has(5);
   @$pb.TagNumber(7)
   void clearStatus() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.bool get isDeleted => $_getBF(7);
+  $core.bool get isDeleted => $_getBF(6);
   @$pb.TagNumber(8)
-  set isDeleted($core.bool value) => $_setBool(7, value);
+  set isDeleted($core.bool value) => $_setBool(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasIsDeleted() => $_has(7);
+  $core.bool hasIsDeleted() => $_has(6);
   @$pb.TagNumber(8)
   void clearIsDeleted() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.bool get tradeEnabled => $_getBF(8);
+  $core.bool get tradeEnabled => $_getBF(7);
   @$pb.TagNumber(9)
-  set tradeEnabled($core.bool value) => $_setBool(8, value);
+  set tradeEnabled($core.bool value) => $_setBool(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasTradeEnabled() => $_has(8);
+  $core.bool hasTradeEnabled() => $_has(7);
   @$pb.TagNumber(9)
   void clearTradeEnabled() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.int get creatorId => $_getIZ(9);
+  $core.int get creatorId => $_getIZ(8);
   @$pb.TagNumber(10)
-  set creatorId($core.int value) => $_setSignedInt32(9, value);
+  set creatorId($core.int value) => $_setSignedInt32(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasCreatorId() => $_has(9);
+  $core.bool hasCreatorId() => $_has(8);
   @$pb.TagNumber(10)
   void clearCreatorId() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.String get groupDescription => $_getSZ(10);
+  $core.String get groupDescription => $_getSZ(9);
   @$pb.TagNumber(11)
-  set groupDescription($core.String value) => $_setString(10, value);
+  set groupDescription($core.String value) => $_setString(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasGroupDescription() => $_has(10);
+  $core.bool hasGroupDescription() => $_has(9);
   @$pb.TagNumber(11)
   void clearGroupDescription() => $_clearField(11);
 }
@@ -1585,73 +1573,6 @@ class UpdateInventoryRequest extends $pb.GeneratedMessage {
   $core.bool hasQuantity() => $_has(3);
   @$pb.TagNumber(4)
   void clearQuantity() => $_clearField(4);
-}
-
-class UpdateMerchSortOrderRequest extends $pb.GeneratedMessage {
-  factory UpdateMerchSortOrderRequest({
-    $core.int? eventId,
-    $core.Iterable<$core.MapEntry<$core.int, $core.int>>? sortOrders,
-  }) {
-    final result = create();
-    if (eventId != null) result.eventId = eventId;
-    if (sortOrders != null) result.sortOrders.addEntries(sortOrders);
-    return result;
-  }
-
-  UpdateMerchSortOrderRequest._();
-
-  factory UpdateMerchSortOrderRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory UpdateMerchSortOrderRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'UpdateMerchSortOrderRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
-      createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'eventId')
-    ..m<$core.int, $core.int>(2, _omitFieldNames ? '' : 'sortOrders',
-        entryClassName: 'UpdateMerchSortOrderRequest.SortOrdersEntry',
-        keyFieldType: $pb.PbFieldType.O3,
-        valueFieldType: $pb.PbFieldType.O3,
-        packageName: const $pb.PackageName('ymatch'))
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  UpdateMerchSortOrderRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  UpdateMerchSortOrderRequest copyWith(
-          void Function(UpdateMerchSortOrderRequest) updates) =>
-      super.copyWith(
-              (message) => updates(message as UpdateMerchSortOrderRequest))
-          as UpdateMerchSortOrderRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static UpdateMerchSortOrderRequest create() =>
-      UpdateMerchSortOrderRequest._();
-  @$core.override
-  UpdateMerchSortOrderRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static UpdateMerchSortOrderRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<UpdateMerchSortOrderRequest>(create);
-  static UpdateMerchSortOrderRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.int get eventId => $_getIZ(0);
-  @$pb.TagNumber(1)
-  set eventId($core.int value) => $_setSignedInt32(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasEventId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearEventId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $pb.PbMap<$core.int, $core.int> get sortOrders => $_getMap(1);
 }
 
 class CreateMerchRequest extends $pb.GeneratedMessage {

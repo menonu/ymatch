@@ -1938,9 +1938,6 @@ impl serde::Serialize for Merchandise {
         if self.group_name.is_some() {
             len += 1;
         }
-        if self.sort_order.is_some() {
-            len += 1;
-        }
         if self.status.is_some() {
             len += 1;
         }
@@ -1971,9 +1968,6 @@ impl serde::Serialize for Merchandise {
         }
         if let Some(v) = self.group_name.as_ref() {
             struct_ser.serialize_field("groupName", v)?;
-        }
-        if let Some(v) = self.sort_order.as_ref() {
-            struct_ser.serialize_field("sortOrder", v)?;
         }
         if let Some(v) = self.status.as_ref() {
             struct_ser.serialize_field("status", v)?;
@@ -2008,8 +2002,6 @@ impl<'de> serde::Deserialize<'de> for Merchandise {
             "photoUrl",
             "group_name",
             "groupName",
-            "sort_order",
-            "sortOrder",
             "status",
             "is_deleted",
             "isDeleted",
@@ -2028,7 +2020,6 @@ impl<'de> serde::Deserialize<'de> for Merchandise {
             Name,
             PhotoUrl,
             GroupName,
-            SortOrder,
             Status,
             IsDeleted,
             TradeEnabled,
@@ -2060,7 +2051,6 @@ impl<'de> serde::Deserialize<'de> for Merchandise {
                             "name" => Ok(GeneratedField::Name),
                             "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
-                            "sortOrder" | "sort_order" => Ok(GeneratedField::SortOrder),
                             "status" => Ok(GeneratedField::Status),
                             "isDeleted" | "is_deleted" => Ok(GeneratedField::IsDeleted),
                             "tradeEnabled" | "trade_enabled" => Ok(GeneratedField::TradeEnabled),
@@ -2090,7 +2080,6 @@ impl<'de> serde::Deserialize<'de> for Merchandise {
                 let mut name__ = None;
                 let mut photo_url__ = None;
                 let mut group_name__ = None;
-                let mut sort_order__ = None;
                 let mut status__ = None;
                 let mut is_deleted__ = None;
                 let mut trade_enabled__ = None;
@@ -2132,14 +2121,6 @@ impl<'de> serde::Deserialize<'de> for Merchandise {
                             }
                             group_name__ = map_.next_value()?;
                         }
-                        GeneratedField::SortOrder => {
-                            if sort_order__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("sortOrder"));
-                            }
-                            sort_order__ = 
-                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
-                            ;
-                        }
                         GeneratedField::Status => {
                             if status__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("status"));
@@ -2180,7 +2161,6 @@ impl<'de> serde::Deserialize<'de> for Merchandise {
                     name: name__.unwrap_or_default(),
                     photo_url: photo_url__,
                     group_name: group_name__,
-                    sort_order: sort_order__,
                     status: status__,
                     is_deleted: is_deleted__,
                     trade_enabled: trade_enabled__,
@@ -4326,121 +4306,6 @@ impl<'de> serde::Deserialize<'de> for UpdateMerchRequest {
             }
         }
         deserializer.deserialize_struct("ymatch.UpdateMerchRequest", FIELDS, GeneratedVisitor)
-    }
-}
-impl serde::Serialize for UpdateMerchSortOrderRequest {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if self.event_id != 0 {
-            len += 1;
-        }
-        if !self.sort_orders.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser = serializer.serialize_struct("ymatch.UpdateMerchSortOrderRequest", len)?;
-        if self.event_id != 0 {
-            struct_ser.serialize_field("eventId", &self.event_id)?;
-        }
-        if !self.sort_orders.is_empty() {
-            struct_ser.serialize_field("sortOrders", &self.sort_orders)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for UpdateMerchSortOrderRequest {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &[
-            "event_id",
-            "eventId",
-            "sort_orders",
-            "sortOrders",
-        ];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            EventId,
-            SortOrders,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "eventId" | "event_id" => Ok(GeneratedField::EventId),
-                            "sortOrders" | "sort_orders" => Ok(GeneratedField::SortOrders),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = UpdateMerchSortOrderRequest;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct ymatch.UpdateMerchSortOrderRequest")
-            }
-
-            fn visit_map<V>(self, mut map_: V) -> std::result::Result<UpdateMerchSortOrderRequest, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
-            {
-                let mut event_id__ = None;
-                let mut sort_orders__ = None;
-                while let Some(k) = map_.next_key()? {
-                    match k {
-                        GeneratedField::EventId => {
-                            if event_id__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("eventId"));
-                            }
-                            event_id__ = 
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
-                        }
-                        GeneratedField::SortOrders => {
-                            if sort_orders__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("sortOrders"));
-                            }
-                            sort_orders__ = Some(
-                                map_.next_value::<std::collections::HashMap<::pbjson::private::NumberDeserialize<i32>, ::pbjson::private::NumberDeserialize<i32>>>()?
-                                    .into_iter().map(|(k,v)| (k.0, v.0)).collect()
-                            );
-                        }
-                    }
-                }
-                Ok(UpdateMerchSortOrderRequest {
-                    event_id: event_id__.unwrap_or_default(),
-                    sort_orders: sort_orders__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct("ymatch.UpdateMerchSortOrderRequest", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for UpdateUserRoleRequest {
