@@ -521,8 +521,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         ),
                                   );
                                 } else {
-                                  return ReorderableListView.builder(
-                                    buildDefaultDragHandles: false,
+                                  // #203: removed ReorderableListView +
+                                  // updateSortOrder; manual item sorting
+                                  // conflicted with the inventory steppers.
+                                  return ListView.builder(
                                     padding: const EdgeInsets.only(
                                       top: 16,
                                       bottom: 80,
@@ -530,38 +532,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                       right: 16,
                                     ),
                                     itemCount: items.length,
-                                    onReorder: (oldIndex, newIndex) {
-                                      if (oldIndex < newIndex) newIndex -= 1;
-                                      final item = items.removeAt(oldIndex);
-                                      items.insert(newIndex, item);
-
-                                      final Map<int, int> newSortOrders = {};
-                                      for (int i = 0; i < items.length; i++) {
-                                        newSortOrders[items[i].id] = i;
-                                      }
-
-                                      ref
-                                          .read(
-                                            merchControllerProvider.notifier,
-                                          )
-                                          .updateSortOrder(
-                                            widget.eventId,
-                                            newSortOrders,
-                                          );
-                                    },
                                     itemBuilder: (context, index) {
                                       final item = items[index];
-                                      return Container(
-                                        key: ValueKey(item.id),
-                                        child: _buildDetailedListItem(
-                                          context,
-                                          ref,
-                                          user,
-                                          item,
-                                          inventoryLookup,
-                                          displayMode,
-                                          reorderIndex: index,
-                                        ),
+                                      return _buildDetailedListItem(
+                                        context,
+                                        ref,
+                                        user,
+                                        item,
+                                        inventoryLookup,
+                                        displayMode,
                                       );
                                     },
                                   );
@@ -920,9 +899,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     User? user,
     Merchandise item,
     Map<int, Map<String, int>> lookup,
-    InventoryDisplayMode displayMode, {
-    int reorderIndex = 0,
-  }) {
+    InventoryDisplayMode displayMode,
+  ) {
     final merchInv = lookup[item.id] ?? {};
     final haveQty = merchInv['HAVE'] ?? 0;
     final wantQty = merchInv['WANT'] ?? 0;
@@ -951,19 +929,20 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ReorderableDragStartListener(
-                index: reorderIndex,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
+              // #203: removed ReorderableDragStartListener wrapper; the
+              // image is no longer a drag handle. Long-press on the
+              // card (handled by the outer GestureDetector) is now the
+              // only way to trigger the owner's edit/delete menu.
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: buildImage(
+                    item.hasPhotoUrl() ? item.photoUrl : null,
                     width: 72,
                     height: 72,
-                    child: buildImage(
-                      item.hasPhotoUrl() ? item.photoUrl : null,
-                      width: 72,
-                      height: 72,
-                      fit: BoxFit.cover,
-                    ),
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),

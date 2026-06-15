@@ -72,8 +72,6 @@ pub struct Merchandise {
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "5")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(int32, optional, tag = "6")]
-    pub sort_order: ::core::option::Option<i32>,
     /// "draft", "published"
     #[prost(string, optional, tag = "7")]
     pub status: ::core::option::Option<::prost::alloc::string::String>,
@@ -235,15 +233,6 @@ pub struct UpdateInventoryRequest {
     pub status: ::prost::alloc::string::String,
     #[prost(int32, tag = "4")]
     pub quantity: i32,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UpdateMerchSortOrderRequest {
-    #[prost(int32, tag = "1")]
-    pub event_id: i32,
-    /// merch_id -> sort_order
-    #[prost(map = "int32, int32", tag = "2")]
-    pub sort_orders: ::std::collections::HashMap<i32, i32>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

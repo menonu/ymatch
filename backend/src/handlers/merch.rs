@@ -120,18 +120,3 @@ pub async fn delete_merch_by_creator(
     state.merch.delete_merch(event_id, merch_id).await?;
     Ok(StatusCode::OK)
 }
-
-pub async fn update_merch_sort_order(
-    State(state): State<AppState>,
-    Path(event_id): Path<i32>,
-    Json(payload): Json<UpdateMerchSortOrderRequest>,
-) -> Result<StatusCode, AppError> {
-    if payload.event_id != event_id {
-        return Err(AppError::bad_request("Event ID mismatch"));
-    }
-    state
-        .merch
-        .update_sort_orders(event_id, payload.sort_orders)
-        .await?;
-    Ok(StatusCode::OK)
-}
