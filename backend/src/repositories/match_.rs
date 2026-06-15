@@ -166,7 +166,11 @@ impl MatchRepository {
                     status: r.get("status"),
                     quantity: r.get("quantity"),
                     merch_name: Some(r.get("merch_name")),
-                    photo_url: r.get("photo_url"),
+                    // Decode as Option<String> so NULL photo_url is preserved
+                    // as None instead of panicking with UnexpectedNullError
+                    // (issue #224). The proto field is `optional string`, so
+                    // this matches the wire format.
+                    photo_url: r.get::<Option<String>, _>("photo_url"),
                     group_name: None,
                 });
         }
@@ -184,7 +188,8 @@ impl MatchRepository {
                     status: r.get("status"),
                     quantity: r.get("quantity"),
                     merch_name: Some(r.get("merch_name")),
-                    photo_url: r.get("photo_url"),
+                    // See #224. Decode as Option<String>.
+                    photo_url: r.get::<Option<String>, _>("photo_url"),
                     group_name: None,
                 });
         }
@@ -199,7 +204,8 @@ impl MatchRepository {
                 direction: r.get("direction"),
                 quantity: r.get("quantity"),
                 merch_name: Some(r.get("merch_name")),
-                photo_url: r.get("photo_url"),
+                // See #224. Decode as Option<String>.
+                photo_url: r.get::<Option<String>, _>("photo_url"),
             });
         }
 
@@ -285,7 +291,11 @@ impl MatchRepository {
                 direction: r.get("direction"),
                 quantity: r.get("quantity"),
                 merch_name: Some(r.get("merch_name")),
-                photo_url: Some(r.get("photo_url")),
+                // See #224. Decode as Option<String> directly; no
+                // Some(...) wrapper needed (the previous code decoded
+                // as String and wrapped in Some, which panicked on
+                // NULL photo_url).
+                photo_url: r.get::<Option<String>, _>("photo_url"),
             })
             .collect())
     }
