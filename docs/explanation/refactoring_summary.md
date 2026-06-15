@@ -15,6 +15,18 @@ traits + their sqlx implementations, all authorization logic lives in 3
 service-layer policies, and the `src/handlers/*.rs` files are pure
 parse-and-delegate.
 
+> **Post-#163 follow-up (Issue #191, also closed)**: the
+> `trait + Pg*Repository + Arc<dyn ...>` shape that #163 produced was
+> refined into a single **concrete struct + generic Executor** form
+> via PRs #192 - #210. The `dyn` indirection, the
+> `RepositoryFuture<'a, T> = Pin<Box<dyn Future + Send + 'a>>` boxed
+> future type alias, and the `_conn` suffix on the 8 transactional
+> methods were all removed. The SQL ownership and the
+> `MatchLifecycleService` orchestration are unchanged from the
+> #163-era design. See
+> [`refactoring_post_191.md`](./refactoring_post_191.md) for the
+> current shape.
+
 ## Phase Recap
 
 | Phase | PR | LoC (handler → repo+service) | Key Wins |

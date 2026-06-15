@@ -6,6 +6,14 @@ Tracked by GitHub Issue [#163](https://github.com/menonu/ymatch/issues/163) (par
 
 Last updated: 2026-06-09.
 
+> **Status update (2026-06)**: all 5 planned phases (#164-#168) landed via
+> PRs #169-#175. Issue #191 (closed) then refined the resulting
+> `trait + dyn` shape into the current **concrete struct + generic
+> Executor** form. See
+> [`refactoring_post_191.md`](./refactoring_post_191.md) for the
+> current shape and the PR series (#192-#210) that landed it.
+> This document is kept as the historical plan-of-record.
+
 ## Why
 
 The ymatch Rust backend started as a single-developer prototype and has accreted responsibilities onto its HTTP handlers. As of 2026-06-09, the audit shows:
