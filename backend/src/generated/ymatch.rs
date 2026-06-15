@@ -11,17 +11,22 @@ pub struct User {
     pub username: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "3")]
     pub uuid: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "deviceToken")]
     #[prost(string, optional, tag = "4")]
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "createdAt")]
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
     /// "user", "moderator", "admin"
     #[prost(string, optional, tag = "6")]
     pub role: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "isBanned")]
     #[prost(bool, optional, tag = "7")]
     pub is_banned: ::core::option::Option<bool>,
+    #[serde(alias = "banReason")]
     #[prost(string, optional, tag = "8")]
     pub ban_reason: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "bannedUntil")]
     #[prost(string, optional, tag = "9")]
     pub banned_until: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -34,16 +39,22 @@ pub struct Event {
     pub id: i32,
     #[prost(string, tag = "2")]
     pub name: ::prost::alloc::string::String,
+    #[serde(alias = "creatorId")]
     #[prost(int32, optional, tag = "3")]
     pub creator_id: ::core::option::Option<i32>,
+    #[serde(alias = "createdAt")]
     #[prost(string, optional, tag = "4")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "uniqueViews")]
     #[prost(int32, optional, tag = "5")]
     pub unique_views: ::core::option::Option<i32>,
+    #[serde(alias = "activeParticipants")]
     #[prost(int32, optional, tag = "6")]
     pub active_participants: ::core::option::Option<i32>,
+    #[serde(alias = "isFavorite")]
     #[prost(bool, optional, tag = "7")]
     pub is_favorite: ::core::option::Option<bool>,
+    #[serde(alias = "isJoined")]
     #[prost(bool, optional, tag = "8")]
     pub is_joined: ::core::option::Option<bool>,
     /// "draft", "published"
@@ -55,13 +66,17 @@ pub struct Event {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FavoriteGroup {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "2")]
     pub event_id: i32,
+    #[serde(alias = "groupName")]
     #[prost(string, tag = "3")]
     pub group_name: ::prost::alloc::string::String,
     /// Helpful for rendering the shortcut
+    #[serde(alias = "eventName")]
     #[prost(string, optional, tag = "4")]
     pub event_name: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -72,26 +87,34 @@ pub struct FavoriteGroup {
 pub struct Merchandise {
     #[prost(int32, tag = "1")]
     pub id: i32,
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "2")]
     pub event_id: i32,
     #[prost(string, tag = "3")]
     pub name: ::prost::alloc::string::String,
+    #[serde(alias = "photoUrl")]
     #[prost(string, optional, tag = "4")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "groupName")]
     #[prost(string, optional, tag = "5")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "sortOrder")]
     #[prost(int32, optional, tag = "6")]
     pub sort_order: ::core::option::Option<i32>,
     /// "draft", "published"
     #[prost(string, optional, tag = "7")]
     pub status: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "isDeleted")]
     #[prost(bool, optional, tag = "8")]
     pub is_deleted: ::core::option::Option<bool>,
+    #[serde(alias = "tradeEnabled")]
     #[prost(bool, optional, tag = "9")]
     pub trade_enabled: ::core::option::Option<bool>,
+    #[serde(alias = "creatorId")]
     #[prost(int32, optional, tag = "10")]
     pub creator_id: ::core::option::Option<i32>,
     /// mirrored from merchandise_groups; empty if unset
+    #[serde(alias = "groupDescription")]
     #[prost(string, optional, tag = "11")]
     pub group_description: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -102,16 +125,21 @@ pub struct Merchandise {
 pub struct MerchandiseGroup {
     #[prost(int32, tag = "1")]
     pub id: i32,
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "2")]
     pub event_id: i32,
+    #[serde(alias = "groupName")]
     #[prost(string, tag = "3")]
     pub group_name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "4")]
     pub description: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "createdBy")]
     #[prost(int32, optional, tag = "5")]
     pub created_by: ::core::option::Option<i32>,
+    #[serde(alias = "createdAt")]
     #[prost(string, optional, tag = "6")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "updatedAt")]
     #[prost(string, optional, tag = "7")]
     pub updated_at: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -122,8 +150,10 @@ pub struct MerchandiseGroup {
 pub struct InventoryItem {
     #[prost(int32, tag = "1")]
     pub id: i32,
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "2")]
     pub user_id: i32,
+    #[serde(alias = "merchId")]
     #[prost(int32, tag = "3")]
     pub merch_id: i32,
     /// "HAVE" or "WANT"
@@ -131,10 +161,13 @@ pub struct InventoryItem {
     pub status: ::prost::alloc::string::String,
     #[prost(int32, tag = "5")]
     pub quantity: i32,
+    #[serde(alias = "merchName")]
     #[prost(string, optional, tag = "6")]
     pub merch_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "photoUrl")]
     #[prost(string, optional, tag = "7")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "groupName")]
     #[prost(string, optional, tag = "8")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -145,29 +178,38 @@ pub struct InventoryItem {
 pub struct TradeMatch {
     #[prost(int32, tag = "1")]
     pub id: i32,
+    #[serde(alias = "user1Id")]
     #[prost(int32, tag = "2")]
     pub user1_id: i32,
+    #[serde(alias = "user2Id")]
     #[prost(int32, tag = "3")]
     pub user2_id: i32,
     /// "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED"
     #[prost(string, tag = "4")]
     pub status: ::prost::alloc::string::String,
+    #[serde(alias = "createdAt")]
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "otherUser")]
     #[prost(message, optional, tag = "6")]
     pub other_user: ::core::option::Option<User>,
     /// potential items to give
+    #[serde(alias = "userHaves")]
     #[prost(message, repeated, tag = "7")]
     pub user_haves: ::prost::alloc::vec::Vec<InventoryItem>,
     /// potential items to receive
+    #[serde(alias = "userWants")]
     #[prost(message, repeated, tag = "8")]
     pub user_wants: ::prost::alloc::vec::Vec<InventoryItem>,
+    #[serde(alias = "offeredBy")]
     #[prost(int32, optional, tag = "9")]
     pub offered_by: ::core::option::Option<i32>,
     /// items selected in offer/accept
+    #[serde(alias = "selectedItems")]
     #[prost(message, repeated, tag = "10")]
     pub selected_items: ::prost::alloc::vec::Vec<MatchItem>,
     /// true if inventory update already executed
+    #[serde(alias = "inventoryApplied")]
     #[prost(bool, tag = "11")]
     pub inventory_applied: bool,
 }
@@ -178,10 +220,13 @@ pub struct TradeMatch {
 pub struct MatchItem {
     #[prost(int32, tag = "1")]
     pub id: i32,
+    #[serde(alias = "matchId")]
     #[prost(int32, tag = "2")]
     pub match_id: i32,
+    #[serde(alias = "merchId")]
     #[prost(int32, tag = "3")]
     pub merch_id: i32,
+    #[serde(alias = "ownerId")]
     #[prost(int32, tag = "4")]
     pub owner_id: i32,
     /// "GIVE" or "RECEIVE"
@@ -189,8 +234,10 @@ pub struct MatchItem {
     pub direction: ::prost::alloc::string::String,
     #[prost(int32, tag = "6")]
     pub quantity: i32,
+    #[serde(alias = "merchName")]
     #[prost(string, optional, tag = "7")]
     pub merch_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "photoUrl")]
     #[prost(string, optional, tag = "8")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -202,6 +249,7 @@ pub struct MatchItem {
 pub struct GuestLoginRequest {
     #[prost(string, tag = "1")]
     pub uuid: ::prost::alloc::string::String,
+    #[serde(alias = "deviceToken")]
     #[prost(string, optional, tag = "2")]
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -224,6 +272,7 @@ pub struct CreateUserRequest {
     pub username: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub password: ::prost::alloc::string::String,
+    #[serde(alias = "deviceToken")]
     #[prost(string, optional, tag = "3")]
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -234,6 +283,7 @@ pub struct CreateUserRequest {
 pub struct CreateEventRequest {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
+    #[serde(alias = "creatorId")]
     #[prost(int32, tag = "2")]
     pub creator_id: i32,
     /// "draft" or "published" (default: "published")
@@ -245,6 +295,7 @@ pub struct CreateEventRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateEventRequest {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
     #[prost(string, optional, tag = "2")]
@@ -255,8 +306,10 @@ pub struct UpdateEventRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInventoryRequest {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
+    #[serde(alias = "merchId")]
     #[prost(int32, tag = "2")]
     pub merch_id: i32,
     #[prost(string, tag = "3")]
@@ -269,9 +322,11 @@ pub struct UpdateInventoryRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateMerchSortOrderRequest {
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "1")]
     pub event_id: i32,
     /// merch_id -> sort_order
+    #[serde(alias = "sortOrders")]
     #[prost(map = "int32, int32", tag = "2")]
     pub sort_orders: ::std::collections::HashMap<i32, i32>,
 }
@@ -282,10 +337,13 @@ pub struct UpdateMerchSortOrderRequest {
 pub struct CreateMerchRequest {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
+    #[serde(alias = "photoUrl")]
     #[prost(string, optional, tag = "2")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "groupName")]
     #[prost(string, optional, tag = "3")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "creatorId")]
     #[prost(int32, optional, tag = "4")]
     pub creator_id: ::core::option::Option<i32>,
     /// "draft" or "published" (default: "published")
@@ -297,12 +355,15 @@ pub struct CreateMerchRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateMerchRequest {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
     #[prost(string, optional, tag = "2")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "photoUrl")]
     #[prost(string, optional, tag = "3")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "groupName")]
     #[prost(string, optional, tag = "4")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -320,6 +381,7 @@ pub struct UpdateMatchStatusRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OfferTradeRequest {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
     #[prost(message, repeated, tag = "2")]
@@ -330,6 +392,7 @@ pub struct OfferTradeRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OfferItem {
+    #[serde(alias = "merchId")]
     #[prost(int32, tag = "1")]
     pub merch_id: i32,
     /// "GIVE" or "RECEIVE"
@@ -343,6 +406,7 @@ pub struct OfferItem {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ApplyInventoryRequest {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
 }
@@ -351,12 +415,15 @@ pub struct ApplyInventoryRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NotificationCounts {
+    #[serde(alias = "pendingMatches")]
     #[prost(int32, tag = "1")]
     pub pending_matches: i32,
+    #[serde(alias = "offersIn")]
     #[prost(int32, tag = "2")]
     pub offers_in: i32,
     #[prost(int32, tag = "3")]
     pub accepted: i32,
+    #[serde(alias = "unreadMessages")]
     #[prost(int32, tag = "4")]
     pub unread_messages: i32,
     #[prost(int32, tag = "5")]
@@ -369,15 +436,19 @@ pub struct NotificationCounts {
 pub struct Message {
     #[prost(int32, tag = "1")]
     pub id: i32,
+    #[serde(alias = "matchId")]
     #[prost(int32, tag = "2")]
     pub match_id: i32,
+    #[serde(alias = "senderId")]
     #[prost(int32, tag = "3")]
     pub sender_id: i32,
     #[prost(string, tag = "4")]
     pub content: ::prost::alloc::string::String,
+    #[serde(alias = "createdAt")]
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
     /// "TEXT", "LOCATION"
+    #[serde(alias = "messageType")]
     #[prost(string, optional, tag = "6")]
     pub message_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(double, optional, tag = "7")]
@@ -390,12 +461,15 @@ pub struct Message {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SendMessageRequest {
+    #[serde(alias = "matchId")]
     #[prost(int32, tag = "1")]
     pub match_id: i32,
+    #[serde(alias = "senderId")]
     #[prost(int32, tag = "2")]
     pub sender_id: i32,
     #[prost(string, tag = "3")]
     pub content: ::prost::alloc::string::String,
+    #[serde(alias = "messageType")]
     #[prost(string, optional, tag = "4")]
     pub message_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(double, optional, tag = "5")]
@@ -419,9 +493,11 @@ pub struct SearchResult {
     /// event name or group name context
     #[prost(string, optional, tag = "4")]
     pub subtitle: ::core::option::Option<::prost::alloc::string::String>,
+    #[serde(alias = "photoUrl")]
     #[prost(string, optional, tag = "5")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
     /// To allow navigation to the parent event
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "6")]
     pub event_id: i32,
 }
@@ -434,6 +510,7 @@ pub struct BanUserRequest {
     #[prost(string, optional, tag = "1")]
     pub reason: ::core::option::Option<::prost::alloc::string::String>,
     /// ISO 8601 datetime
+    #[serde(alias = "bannedUntil")]
     #[prost(string, optional, tag = "2")]
     pub banned_until: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -452,6 +529,7 @@ pub struct UpdateUserRoleRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserActionRequest {
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "1")]
     pub user_id: i32,
 }
@@ -460,10 +538,13 @@ pub struct UserActionRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreateGroupRequest {
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "1")]
     pub event_id: i32,
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "2")]
     pub user_id: i32,
+    #[serde(alias = "groupName")]
     #[prost(string, tag = "3")]
     pub group_name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "4")]
@@ -474,10 +555,13 @@ pub struct CreateGroupRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateGroupRequest {
+    #[serde(alias = "eventId")]
     #[prost(int32, tag = "1")]
     pub event_id: i32,
+    #[serde(alias = "userId")]
     #[prost(int32, tag = "2")]
     pub user_id: i32,
+    #[serde(alias = "groupName")]
     #[prost(string, tag = "3")]
     pub group_name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "4")]

@@ -3688,6 +3688,185 @@ async fn test_offer_on_non_pending_match_rejected() {
     assert_ne!(resp.status(), StatusCode::OK);
 }
 
+/// Create two users, an event, two merch items, matching inventory, and run the
+/// matcher so the users have a PENDING match. Returns
+/// (match_id, user1_id, user2_id, merch_a_id, merch_b_id).
+async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"uuid": "user1-camelcase-test", "device_token": "tok1"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user1: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user1_id = user1["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"uuid": "user2-camelcase-test", "device_token": "tok2"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user2: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user2_id = user2["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "CamelCase Trade Event", "creator_id": {}}}"#,
+                    user1_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+
+    async fn create_merch(pool: &PgPool, event_id: i64, name: &str) -> i64 {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(&format!("/api/v1/events/{}/merch", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"event_id": {}, "name": "{}", "photo_url": "", "group_name": "Cards"}}"#,
+                        event_id, name
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let merch: serde_json::Value =
+            serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+        merch["id"].as_i64().unwrap()
+    }
+
+    let merch_a_id = create_merch(&pool, event_id, "Card A").await;
+    let merch_b_id = create_merch(&pool, event_id, "Card B").await;
+
+    for (uid, mid, status) in [
+        (user1_id, merch_a_id, "TRADE"),
+        (user1_id, merch_b_id, "WANT"),
+        (user2_id, merch_b_id, "TRADE"),
+        (user2_id, merch_a_id, "WANT"),
+    ] {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/user/inventory")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"user_id": {}, "merch_id": {}, "status": "{}", "quantity": 1}}"#,
+                        uid, mid, status
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    let matches_created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("Matching algorithm failed");
+    assert!(matches_created >= 1, "Should create at least 1 match");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!matches.is_empty());
+    let match_id = matches[0]["id"].as_i64().unwrap();
+    assert_eq!(matches[0]["status"], "PENDING");
+
+    (match_id, user1_id, user2_id, merch_a_id, merch_b_id)
+}
+
+#[tokio::test]
+async fn test_offer_with_frontend_proto3_json() {
+    let pool = setup_test_pool().await;
+    let (match_id, user1_id, _user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    // Frontend sends proto3 JSON (camelCase) from OfferTradeRequest.toProto3Json().
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
+                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
+                    ]}}"#,
+                    user1_id, merch_a_id, merch_b_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(matches[0]["status"], "OFFERED");
+    assert_eq!(matches[0]["offered_by"], user1_id);
+}
+
 #[tokio::test]
 async fn test_apply_inventory_on_non_completed_rejected() {
     let pool = setup_test_pool().await;

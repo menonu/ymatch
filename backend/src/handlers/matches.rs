@@ -77,3 +77,21 @@ pub async fn match_notification_counts(
     let counts = matches.notification_counts(user_id).await?;
     Ok(Json(counts))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::generated::ymatch::OfferTradeRequest;
+
+    #[test]
+    fn offer_trade_request_deserializes_from_proto3_json() {
+        let json =
+            r#"{"userId": 42, "items": [{"merchId": 7, "direction": "GIVE", "quantity": 3}]}"#;
+        let req: OfferTradeRequest =
+            serde_json::from_str(json).expect("camelCase proto3 JSON should deserialize");
+        assert_eq!(req.user_id, 42);
+        assert_eq!(req.items.len(), 1);
+        assert_eq!(req.items[0].merch_id, 7);
+        assert_eq!(req.items[0].direction, "GIVE");
+        assert_eq!(req.items[0].quantity, 3);
+    }
+}
