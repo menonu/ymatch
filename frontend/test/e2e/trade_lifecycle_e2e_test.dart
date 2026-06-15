@@ -228,8 +228,18 @@ void main() {
       name: 'E2E event ${DateTime.now().millisecondsSinceEpoch}',
       creatorId: u1Id,
     );
-    final cardA = await _createMerch(api, eventId: eventId, name: 'Card A');
-    final cardB = await _createMerch(api, eventId: eventId, name: 'Card B');
+    final cardA = await _createMerch(
+      api,
+      eventId: eventId,
+      name: 'Card A',
+      groupName: 'e2e-cards',
+    );
+    final cardB = await _createMerch(
+      api,
+      eventId: eventId,
+      name: 'Card B',
+      groupName: 'e2e-cards',
+    );
 
     // 4. Set up the cross-trade inventory:
     //    user1 HAS Card A and WANTS Card B.
