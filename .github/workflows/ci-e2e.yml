@@ -1,0 +1,98 @@
+name: Frontend E2E
+
+# Frontend-driven end-to-end tests (#213).
+#
+# Spins up the backend + PostgreSQL via docker-compose.e2e.yml, runs
+# the Flutter E2E test that drives the real ApiClient, and tears down
+# the stack. Slow (image build + trade-lifecycle test), so this is a
+# separate workflow from `ci.yml` and runs only on PR + main.
+#
+# The E2E test exercises the wire contract that #202 broke: a real
+# OfferTradeRequest is serialized with toProto3Json() (camelCase) and
+# POSTed to /api/v1/matches/:id/offer. A 422 there means the
+# regression has returned.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  e2e:
+    name: Frontend E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache backend build (registry buildkit cache)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: buildx-${{ runner.os }}-e2e-backend-${{ hashFiles('backend/Cargo.lock', 'backend.Dockerfile.prod') }}
+          restore-keys: |
+            buildx-${{ runner.os }}-e2e-backend-
+
+      - name: Build and start e2e stack
+        run: |
+          docker compose -f docker-compose.e2e.yml build backend
+          docker compose -f docker-compose.e2e.yml up -d db backend
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/v1/system/status > /dev/null; then
+              echo "Backend up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend did not come up in 60s"
+          docker compose -f docker-compose.e2e.yml logs backend
+          exit 1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PUB_CACHE }}
+            frontend/.dart_tool
+          key: flutter-pub-e2e-${{ hashFiles('frontend/pubspec.lock') }}
+          restore-keys: flutter-pub-e2e-
+
+      - name: Get dependencies
+        working-directory: ./frontend
+        run: flutter pub get
+
+      - name: Run E2E test
+        working-directory: ./frontend
+        env:
+          E2E_API_URL: http://localhost:3000
+        run: flutter test test/e2e/
+
+      - name: Dump backend logs on failure
+        if: failure()
+        run: |
+          echo "=== Backend logs ==="
+          docker compose -f docker-compose.e2e.yml logs backend || true
+          echo "=== DB logs ==="
+          docker compose -f docker-compose.e2e.yml logs db || true
+
+      - name: Tear down stack
+        if: always()
+        run: |
+          docker compose -f docker-compose.e2e.yml down -v

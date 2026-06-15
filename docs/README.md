@@ -41,6 +41,7 @@ Direct, action-oriented instructions to solve specific problems or accomplish ke
 * [OCI Credentials Management](file:///home/menonu/ws/ymatch/docs/how_to/oci_credentials.md): API key generation, rotation, and loss-recovery procedure for the RSA 2048 key used by Terraform and the OCI CLI.
 * [Monitoring Setup Guide](file:///home/menonu/ws/ymatch/docs/how_to/monitoring_setup.md): Setup and queries for New Relic application/infrastructure alerts and monitoring.
 * [GCP Historical Deployment](file:///home/menonu/ws/ymatch/docs/how_to/cloud_deployment.md): Historical GCP backup & deployment strategy (GCP services are currently stopped except for backup bucket storage).
+* [Frontend-Driven E2E Tests](file:///home/menonu/ws/ymatch/docs/how_to/e2e_tests.md): How to run the wire-contract E2E test suite introduced in #213 (drives the real `ApiClient` + proto3 JSON against a docker-compose stack).
 
 ---
 
