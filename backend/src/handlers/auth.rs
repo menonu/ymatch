@@ -84,6 +84,7 @@ pub async fn list_users(State(state): State<AppState>) -> Result<Json<Vec<User>>
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateUsernameRequest {
     pub user_id: i32,
     pub username: String,
