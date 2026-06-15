@@ -79,7 +79,7 @@ impl MatchLifecycleService {
 
         let locked = self
             .matches
-            .lock_for_update(&mut tx, match_id)
+            .lock_for_update(&mut *tx, match_id)
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
@@ -91,13 +91,13 @@ impl MatchLifecycleService {
         }
 
         self.matches
-            .insert_match_items(&mut tx, match_id, offer.user_id, &offer.items)
+            .insert_match_items(&mut *tx, match_id, offer.user_id, &offer.items)
             .await?;
         self.matches
-            .set_status(&mut tx, match_id, STATUS_OFFERED)
+            .set_status(&mut *tx, match_id, STATUS_OFFERED)
             .await?;
         self.matches
-            .set_offered_by(&mut tx, match_id, offer.user_id)
+            .set_offered_by(&mut *tx, match_id, offer.user_id)
             .await?;
 
         tx.commit().await?;
@@ -119,7 +119,7 @@ impl MatchLifecycleService {
 
         let locked = self
             .matches
-            .lock_for_update(&mut tx, match_id)
+            .lock_for_update(&mut *tx, match_id)
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
@@ -139,18 +139,18 @@ impl MatchLifecycleService {
         }
 
         self.matches
-            .set_status(&mut tx, match_id, new_status)
+            .set_status(&mut *tx, match_id, new_status)
             .await?;
 
         if new_status == STATUS_ACCEPTED {
             // Purge other PENDING matches between the same pair.
             self.matches
-                .purge_other_pending(&mut tx, match_id, locked.user1_id, locked.user2_id)
+                .purge_other_pending(&mut *tx, match_id, locked.user1_id, locked.user2_id)
                 .await?;
         }
 
         if new_status == STATUS_REJECTED {
-            self.matches.delete_match_items(&mut tx, match_id).await?;
+            self.matches.delete_match_items(&mut *tx, match_id).await?;
         }
 
         tx.commit().await?;
@@ -224,12 +224,12 @@ impl MatchLifecycleService {
                 continue;
             }
             self.inventory
-                .apply_trade_delta_conn(tx.as_mut(), user_id, item.merch_id, delta_trade, delta_have)
+                .apply_trade_delta(&mut *tx, user_id, item.merch_id, delta_trade, delta_have)
                 .await?;
         }
 
         self.matches
-            .mark_inventory_applied(&mut tx, match_id, is_user1)
+            .mark_inventory_applied(&mut *tx, match_id, is_user1)
             .await?;
 
         tx.commit().await?;
