@@ -27,17 +27,20 @@ pub struct ListEventsQuery {
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RegisterViewRequest {
     pub user_id: i32,
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ToggleFavoriteRequest {
     pub user_id: i32,
     pub is_favorite: bool,
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ToggleFavoriteGroupRequest {
     pub user_id: i32,
     pub group_name: String,
