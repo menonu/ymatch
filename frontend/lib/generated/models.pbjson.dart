@@ -227,22 +227,13 @@ const Merchandise$json = {
       '10': 'groupName',
       '17': true
     },
-    {
-      '1': 'sort_order',
-      '3': 6,
-      '4': 1,
-      '5': 5,
-      '9': 2,
-      '10': 'sortOrder',
-      '17': true
-    },
-    {'1': 'status', '3': 7, '4': 1, '5': 9, '9': 3, '10': 'status', '17': true},
+    {'1': 'status', '3': 7, '4': 1, '5': 9, '9': 2, '10': 'status', '17': true},
     {
       '1': 'is_deleted',
       '3': 8,
       '4': 1,
       '5': 8,
-      '9': 4,
+      '9': 3,
       '10': 'isDeleted',
       '17': true
     },
@@ -251,7 +242,7 @@ const Merchandise$json = {
       '3': 9,
       '4': 1,
       '5': 8,
-      '9': 5,
+      '9': 4,
       '10': 'tradeEnabled',
       '17': true
     },
@@ -260,7 +251,7 @@ const Merchandise$json = {
       '3': 10,
       '4': 1,
       '5': 5,
-      '9': 6,
+      '9': 5,
       '10': 'creatorId',
       '17': true
     },
@@ -269,7 +260,7 @@ const Merchandise$json = {
       '3': 11,
       '4': 1,
       '5': 9,
-      '9': 7,
+      '9': 6,
       '10': 'groupDescription',
       '17': true
     },
@@ -277,7 +268,6 @@ const Merchandise$json = {
   '8': [
     {'1': '_photo_url'},
     {'1': '_group_name'},
-    {'1': '_sort_order'},
     {'1': '_status'},
     {'1': '_is_deleted'},
     {'1': '_trade_enabled'},
@@ -290,14 +280,13 @@ const Merchandise$json = {
 final $typed_data.Uint8List merchandiseDescriptor = $convert.base64Decode(
     'CgtNZXJjaGFuZGlzZRIOCgJpZBgBIAEoBVICaWQSGQoIZXZlbnRfaWQYAiABKAVSB2V2ZW50SW'
     'QSEgoEbmFtZRgDIAEoCVIEbmFtZRIgCglwaG90b191cmwYBCABKAlIAFIIcGhvdG9VcmyIAQES'
-    'IgoKZ3JvdXBfbmFtZRgFIAEoCUgBUglncm91cE5hbWWIAQESIgoKc29ydF9vcmRlchgGIAEoBU'
-    'gCUglzb3J0T3JkZXKIAQESGwoGc3RhdHVzGAcgASgJSANSBnN0YXR1c4gBARIiCgppc19kZWxl'
-    'dGVkGAggASgISARSCWlzRGVsZXRlZIgBARIoCg10cmFkZV9lbmFibGVkGAkgASgISAVSDHRyYW'
-    'RlRW5hYmxlZIgBARIiCgpjcmVhdG9yX2lkGAogASgFSAZSCWNyZWF0b3JJZIgBARIwChFncm91'
-    'cF9kZXNjcmlwdGlvbhgLIAEoCUgHUhBncm91cERlc2NyaXB0aW9uiAEBQgwKCl9waG90b191cm'
-    'xCDQoLX2dyb3VwX25hbWVCDQoLX3NvcnRfb3JkZXJCCQoHX3N0YXR1c0INCgtfaXNfZGVsZXRl'
-    'ZEIQCg5fdHJhZGVfZW5hYmxlZEINCgtfY3JlYXRvcl9pZEIUChJfZ3JvdXBfZGVzY3JpcHRpb2'
-    '4=');
+    'IgoKZ3JvdXBfbmFtZRgFIAEoCUgBUglncm91cE5hbWWIAQESGwoGc3RhdHVzGAcgASgJSAJSBn'
+    'N0YXR1c4gBARIiCgppc19kZWxldGVkGAggASgISANSCWlzRGVsZXRlZIgBARIoCg10cmFkZV9l'
+    'bmFibGVkGAkgASgISARSDHRyYWRlRW5hYmxlZIgBARIiCgpjcmVhdG9yX2lkGAogASgFSAVSCW'
+    'NyZWF0b3JJZIgBARIwChFncm91cF9kZXNjcmlwdGlvbhgLIAEoCUgGUhBncm91cERlc2NyaXB0'
+    'aW9uiAEBQgwKCl9waG90b191cmxCDQoLX2dyb3VwX25hbWVCCQoHX3N0YXR1c0INCgtfaXNfZG'
+    'VsZXRlZEIQCg5fdHJhZGVfZW5hYmxlZEINCgtfY3JlYXRvcl9pZEIUChJfZ3JvdXBfZGVzY3Jp'
+    'cHRpb24=');
 
 @$core.Deprecated('Use merchandiseGroupDescriptor instead')
 const MerchandiseGroup$json = {
@@ -660,40 +649,6 @@ final $typed_data.Uint8List updateInventoryRequestDescriptor = $convert.base64De
     'ChZVcGRhdGVJbnZlbnRvcnlSZXF1ZXN0EhcKB3VzZXJfaWQYASABKAVSBnVzZXJJZBIZCghtZX'
     'JjaF9pZBgCIAEoBVIHbWVyY2hJZBIWCgZzdGF0dXMYAyABKAlSBnN0YXR1cxIaCghxdWFudGl0'
     'eRgEIAEoBVIIcXVhbnRpdHk=');
-
-@$core.Deprecated('Use updateMerchSortOrderRequestDescriptor instead')
-const UpdateMerchSortOrderRequest$json = {
-  '1': 'UpdateMerchSortOrderRequest',
-  '2': [
-    {'1': 'event_id', '3': 1, '4': 1, '5': 5, '10': 'eventId'},
-    {
-      '1': 'sort_orders',
-      '3': 2,
-      '4': 3,
-      '5': 11,
-      '6': '.ymatch.UpdateMerchSortOrderRequest.SortOrdersEntry',
-      '10': 'sortOrders'
-    },
-  ],
-  '3': [UpdateMerchSortOrderRequest_SortOrdersEntry$json],
-};
-
-@$core.Deprecated('Use updateMerchSortOrderRequestDescriptor instead')
-const UpdateMerchSortOrderRequest_SortOrdersEntry$json = {
-  '1': 'SortOrdersEntry',
-  '2': [
-    {'1': 'key', '3': 1, '4': 1, '5': 5, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 5, '10': 'value'},
-  ],
-  '7': {'7': true},
-};
-
-/// Descriptor for `UpdateMerchSortOrderRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List updateMerchSortOrderRequestDescriptor = $convert.base64Decode(
-    'ChtVcGRhdGVNZXJjaFNvcnRPcmRlclJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SW'
-    'QSVAoLc29ydF9vcmRlcnMYAiADKAsyMy55bWF0Y2guVXBkYXRlTWVyY2hTb3J0T3JkZXJSZXF1'
-    'ZXN0LlNvcnRPcmRlcnNFbnRyeVIKc29ydE9yZGVycxo9Cg9Tb3J0T3JkZXJzRW50cnkSEAoDa2'
-    'V5GAEgASgFUgNrZXkSFAoFdmFsdWUYAiABKAVSBXZhbHVlOgI4AQ==');
 
 @$core.Deprecated('Use createMerchRequestDescriptor instead')
 const CreateMerchRequest$json = {
