@@ -4609,12 +4609,11 @@ async fn test_apply_inventory_handles_null_photo_url() {
     let card_b = create_merch(&pool, event_id, "Card B", "photo-null-group").await;
 
     // Sanity check: photo_url is NULL.
-    let row: (Option<String>,) =
-        sqlx::query_as("SELECT photo_url FROM merchandise WHERE id = $1")
-            .bind(card_a)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let row: (Option<String>,) = sqlx::query_as("SELECT photo_url FROM merchandise WHERE id = $1")
+        .bind(card_a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert!(
         row.0.is_none(),
         "test setup: card_a.photo_url should be NULL, got {:?}",
@@ -4716,7 +4715,10 @@ async fn test_apply_inventory_handles_null_photo_url() {
 // --- Test helpers used by `test_apply_inventory_handles_null_photo_url` ---
 
 async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
-    let body = format!(r#"{{"uuid": "{}", "deviceToken": "{}"}}"#, uuid, device_token);
+    let body = format!(
+        r#"{{"uuid": "{}", "deviceToken": "{}"}}"#,
+        uuid, device_token
+    );
     let resp = post_json(pool, "/api/v1/auth/guest", &body).await;
     assert_eq!(resp.status(), StatusCode::OK, "guest login failed");
     let v: serde_json::Value =
@@ -4733,18 +4735,10 @@ async fn create_event(pool: &PgPool, name: &str, creator_id: i64) -> i64 {
     v["id"].as_i64().unwrap()
 }
 
-async fn create_merch(
-    pool: &PgPool,
-    event_id: i64,
-    name: &str,
-    group_name: &str,
-) -> i64 {
+async fn create_merch(pool: &PgPool, event_id: i64, name: &str, group_name: &str) -> i64 {
     // Note: NO photoUrl, so photo_url stays NULL — this is the
     // exact scenario that triggered the #224 panic.
-    let body = format!(
-        r#"{{"name": "{}", "groupName": "{}"}}"#,
-        name, group_name
-    );
+    let body = format!(r#"{{"name": "{}", "groupName": "{}"}}"#, name, group_name);
     let resp = post_json(pool, &format!("/api/v1/events/{}/merch", event_id), &body).await;
     assert_eq!(resp.status(), StatusCode::OK, "create merch failed");
     let v: serde_json::Value =
@@ -4752,13 +4746,7 @@ async fn create_merch(
     v["id"].as_i64().unwrap()
 }
 
-async fn set_inventory(
-    pool: &PgPool,
-    user_id: i64,
-    merch_id: i64,
-    status: &str,
-    quantity: i32,
-) {
+async fn set_inventory(pool: &PgPool, user_id: i64, merch_id: i64, status: &str, quantity: i32) {
     let body = format!(
         r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": {}}}"#,
         user_id, merch_id, status, quantity
