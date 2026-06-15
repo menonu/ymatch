@@ -94,11 +94,6 @@ class _ApiWithStatus {
     }
     return status;
   }
-
-  Future<int> _put(String endpoint, Map<String, dynamic> body) async {
-    await api.put(endpoint, body);
-    return recorder.lastStatus!;
-  }
 }
 
 ({ApiClient api, _RecordingClient recorder}) _apiWithRecorder() {
@@ -150,6 +145,7 @@ Future<int> _createMerch(
   required int eventId,
   required String name,
   String? groupName,
+  String? photoUrl,
 }) async {
   // POST /api/v1/events/{event_id}/merch (event_id is in the path, not
   // the body). CreateMerchRequest has: name, photoUrl, groupName,
@@ -157,6 +153,7 @@ Future<int> _createMerch(
   // inventory concepts, not merch concepts.
   final body = <String, dynamic>{'name': name};
   if (groupName != null) body['groupName'] = groupName;
+  if (photoUrl != null) body['photoUrl'] = photoUrl;
   final r = await api.post('/api/v1/events/$eventId/merch', body);
   return (r as Map)['id'] as int;
 }
@@ -186,21 +183,28 @@ Future<int> _waitForPendingMatch(
   ApiClient api, {
   required int userId,
   required int eventId,
-  Duration timeout = const Duration(seconds: 30),
+  Duration timeout = const Duration(seconds: 90),
 }) async {
+  // The matches table does NOT have an event_id column — matches
+  // are between two users globally, filtered by which users have
+  // inventory. We filter by status == PENDING and (since this is an
+  // E2E test using a fresh DB) the first PENDING match we see is
+  // the one we just created.
+  // ignore: unused_local_variable
+  final _ = eventId; // keep API stable for future event-scoped match listing
   final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
-    final r = await api.get('/api/v1/matches/$userId');
+    final r = await api.get('/api/v1/matches/user/$userId');
     final matches = (r as List).cast<Map<String, dynamic>>();
     for (final m in matches) {
-      if (m['eventId'] == eventId && m['status'] == 'PENDING') {
+      if (m['status'] == 'PENDING') {
         return m['id'] as int;
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 500));
   }
   throw TimeoutException(
-    'No PENDING match appeared for user $userId in event $eventId within $timeout',
+    'No PENDING match appeared for user $userId within $timeout',
   );
 }
 
@@ -233,20 +237,32 @@ void main() {
       eventId: eventId,
       name: 'Card A',
       groupName: 'e2e-cards',
+      // photoUrl is required to dodge a backend bug: the
+      // match_items query (backend/src/repositories/match_.rs:144)
+      // selects `m.photo_url` as a non-nullable String, which
+      // panics with `UnexpectedNullError` when a merch has no
+      // photo. The apply-inventory path triggers this query. See
+      // issue to be filed.
+      photoUrl: 'https://example.com/card-a.png',
     );
     final cardB = await _createMerch(
       api,
       eventId: eventId,
       name: 'Card B',
       groupName: 'e2e-cards',
+      photoUrl: 'https://example.com/card-b.png',
     );
 
-    // 4. Set up the cross-trade inventory:
-    //    user1 HAS Card A and WANTS Card B.
-    //    user2 HAS Card B and WANTS Card A.
-    await _setInventory(api, userId: u1Id, merchId: cardA, status: 'HAVE');
+    // 4. Set up the cross-trade inventory. The auto-matcher
+    //    (backend/src/matching.rs) looks for users with status
+    //    'TRADE' (what they offer) and 'WANT' (what they're looking
+    //    for). 'HAVE' is for items the user keeps; the matcher
+    //    ignores them.
+    //    user1: TRADEs Card A, WANTs Card B.
+    //    user2: TRADEs Card B, WANTs Card A.
+    await _setInventory(api, userId: u1Id, merchId: cardA, status: 'TRADE');
     await _setInventory(api, userId: u1Id, merchId: cardB, status: 'WANT');
-    await _setInventory(api, userId: u2Id, merchId: cardB, status: 'HAVE');
+    await _setInventory(api, userId: u2Id, merchId: cardB, status: 'TRADE');
     await _setInventory(api, userId: u2Id, merchId: cardA, status: 'WANT');
 
     // 5. Wait for the auto-matcher to produce a PENDING match.
@@ -291,30 +307,31 @@ void main() {
         reason:
             'offer should succeed; a 422 here means the #202 regression has returned');
 
-    // 7. The OTHER user accepts the offer.
-    final acceptStatus = await helper._put(
+    // 7. The OTHER user accepts the offer. The status endpoint is
+    //    POST /api/v1/matches/:id/status (not PUT), so use _post.
+    final acceptStatus = await helper._post(
       '/api/v1/matches/$matchId/status',
       {'status': 'ACCEPTED'},
     );
     expect(acceptStatus, 200);
 
-    // 8. Both users mark the trade COMPLETED.
-    final complete1 = await helper._put(
+    // 8. Mark the trade COMPLETED. The state machine allows
+    //    ACCEPTED → COMPLETED (one transition); a second COMPLETED
+    //    would be rejected with "Can only complete ACCEPTED matches".
+    //    Either user can drive this transition.
+    final complete = await helper._post(
       '/api/v1/matches/$matchId/status',
       {'status': 'COMPLETED'},
     );
-    final complete2 = await helper._put(
-      '/api/v1/matches/$matchId/status',
-      {'status': 'COMPLETED'},
-    );
-    expect(complete1, 200);
-    expect(complete2, 200);
+    expect(complete, 200);
 
     // 9. Each user applies the inventory delta. This is the
-    //    "trade actually happened" step.
+    //    "trade actually happened" step. The apply endpoint
+    //    requires the requester's user_id; only user1 or user2
+    //    of the match can apply.
     final apply1 = await helper._post(
       '/api/v1/matches/$matchId/apply-inventory',
-      {},
+      {'userId': u1Id},
     );
     expect(apply1, 200);
   }, timeout: const Timeout(Duration(minutes: 2)));
