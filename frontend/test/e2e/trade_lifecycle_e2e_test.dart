@@ -1,3 +1,12 @@
+// Marked `e2e` (not `integration`) for two reasons:
+//   1. `frontend/dart_test.yaml` unconditionally skips the `integration`
+//      tag, which would also skip this test in the dedicated
+//      ci-e2e.yml workflow where a live backend is up.
+//   2. The regular CI workflow (ci.yml) excludes `--exclude-tags=e2e`
+//      so this test does not run where there is no backend.
+@Tags(['e2e'])
+library;
+
 // Frontend-driven end-to-end test for the trade lifecycle (#213).
 //
 // Drives the real `ApiClient` + protobuf-generated types against a
@@ -189,8 +198,8 @@ Future<int> _waitForPendingMatch(
 
 void main() {
   test(
-      'end-to-end: full trade lifecycle through real ApiClient (#202 regression)',
-      () async {
+    'end-to-end: full trade lifecycle through real ApiClient (#202 regression)',
+    () async {
     final made = _apiWithRecorder();
     final api = made.api;
     final recorder = made.recorder;
