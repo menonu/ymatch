@@ -21,7 +21,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::OfferTradeRequest;
 use crate::repositories::inventory::InventoryRepository;
-use crate::repositories::match_::{MatchRepository as _MatchTrait, PgMatchRepository};
+use crate::repositories::match_::MatchRepository;
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -33,22 +33,22 @@ const STATUS_REJECTED: &str = "REJECTED";
 
 /// Service for the match state machine.
 ///
-/// Holds concrete `Arc<PgMatchRepository>` and
+/// Holds concrete `Arc<MatchRepository>` and
 /// `Arc<InventoryRepository>` (not `dyn`). The repository
-/// `_conn` methods take a `&mut PgConnection` so we can reuse one
-/// transaction across multiple repository calls by passing
-/// `&mut *tx` (the standard sqlx pattern).
+/// transactional methods take a `&mut PgConnection` so we can
+/// reuse one transaction across multiple repository calls by
+/// passing `&mut *tx` (the standard sqlx pattern).
 #[derive(Clone)]
 pub struct MatchLifecycleService {
     pool: PgPool,
-    matches: Arc<PgMatchRepository>,
+    matches: Arc<MatchRepository>,
     inventory: Arc<InventoryRepository>,
 }
 
 impl MatchLifecycleService {
     pub fn new(
         pool: PgPool,
-        matches: Arc<PgMatchRepository>,
+        matches: Arc<MatchRepository>,
         inventory: Arc<InventoryRepository>,
     ) -> Self {
         Self {
@@ -79,7 +79,7 @@ impl MatchLifecycleService {
 
         let locked = self
             .matches
-            .lock_for_update_conn(&mut tx, match_id)
+            .lock_for_update(&mut *tx, match_id)
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
@@ -91,13 +91,13 @@ impl MatchLifecycleService {
         }
 
         self.matches
-            .insert_match_items_conn(&mut tx, match_id, offer.user_id, &offer.items)
+            .insert_match_items(&mut *tx, match_id, offer.user_id, &offer.items)
             .await?;
         self.matches
-            .set_status_conn(&mut tx, match_id, STATUS_OFFERED)
+            .set_status(&mut *tx, match_id, STATUS_OFFERED)
             .await?;
         self.matches
-            .set_offered_by_conn(&mut tx, match_id, offer.user_id)
+            .set_offered_by(&mut *tx, match_id, offer.user_id)
             .await?;
 
         tx.commit().await?;
@@ -119,7 +119,7 @@ impl MatchLifecycleService {
 
         let locked = self
             .matches
-            .lock_for_update_conn(&mut tx, match_id)
+            .lock_for_update(&mut *tx, match_id)
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
@@ -139,20 +139,18 @@ impl MatchLifecycleService {
         }
 
         self.matches
-            .set_status_conn(&mut tx, match_id, new_status)
+            .set_status(&mut *tx, match_id, new_status)
             .await?;
 
         if new_status == STATUS_ACCEPTED {
             // Purge other PENDING matches between the same pair.
             self.matches
-                .purge_other_pending_conn(&mut tx, match_id, locked.user1_id, locked.user2_id)
+                .purge_other_pending(&mut *tx, match_id, locked.user1_id, locked.user2_id)
                 .await?;
         }
 
         if new_status == STATUS_REJECTED {
-            self.matches
-                .delete_match_items_conn(&mut tx, match_id)
-                .await?;
+            self.matches.delete_match_items(&mut *tx, match_id).await?;
         }
 
         tx.commit().await?;
@@ -226,12 +224,12 @@ impl MatchLifecycleService {
                 continue;
             }
             self.inventory
-                .apply_trade_delta_conn(&mut tx, user_id, item.merch_id, delta_trade, delta_have)
+                .apply_trade_delta(&mut *tx, user_id, item.merch_id, delta_trade, delta_have)
                 .await?;
         }
 
         self.matches
-            .mark_inventory_applied_conn(&mut tx, match_id, is_user1)
+            .mark_inventory_applied(&mut *tx, match_id, is_user1)
             .await?;
 
         tx.commit().await?;
