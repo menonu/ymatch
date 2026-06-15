@@ -2,7 +2,7 @@
 //!
 //! [`MerchandiseRepository`] owns all `merchandise` table operations. The
 //! struct holds a `PgPool` and exposes plain `async fn` methods (no
-//! `RepositoryFuture` boxing, no trait) so it can be stored in
+//! boxed-future return, no trait) so it can be stored in
 //! `Arc<MerchandiseRepository>` in `AppState` and called from handlers
 //! and services alike.
 //!
@@ -45,7 +45,7 @@ impl DeleteOutcome {
 /// Concrete PostgreSQL-backed repository for the `merchandise` table.
 ///
 /// All methods are plain `async fn` and return `Result<T, AppError>` directly
-/// (no `BoxFuture`, no `RepositoryFuture`). The struct is `Send + Sync` via
+/// (no boxed-future return). The struct is `Send + Sync` via
 /// the inner `PgPool` so it can be wrapped in `Arc` and shared across
 /// handlers and services.
 pub struct MerchandiseRepository {
