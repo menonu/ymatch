@@ -61,6 +61,36 @@ tasks:
     cmds:
       - flutter test --tags=integration
 
+  e2e:up:
+    desc: Start the E2E stack (db + backend, no Caddy)
+    cmds:
+      - docker compose -f docker-compose.e2e.yml up -d --build
+      - |
+        for i in $(seq 1 60); do
+          if curl -sf http://localhost:3000/api/v1/system/status > /dev/null; then
+            echo "E2E backend up after ${i}s"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "E2E backend did not come up in 60s"
+        exit 1
+
+  e2e:down:
+    desc: Tear down the E2E stack and wipe its volume
+    cmds:
+      - docker compose -f docker-compose.e2e.yml down -v
+
+  e2e:test:
+    desc: Run the frontend-driven E2E test (#213)
+    dir: frontend
+    deps: [e2e:up]
+    cmds:
+      - flutter pub get
+      - cmd: 'flutter test test/e2e/'
+    env:
+      E2E_API_URL: http://localhost:3000
+
   test:
     desc: Run all tests (backend + frontend)
     cmds:

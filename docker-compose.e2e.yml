@@ -1,0 +1,59 @@
+# Minimal stack for frontend-driven end-to-end tests (#213).
+# Brings up a fresh PostgreSQL + a freshly-built Rust backend, both
+# reachable on localhost. No Caddy, no frontend container — the test
+# driver is a Dart test that talks HTTP to localhost:3000.
+#
+# Usage (local dev):
+#   docker compose -f docker-compose.e2e.yml up -d --build
+#   flutter test test/e2e/
+#   docker compose -f docker-compose.e2e.yml down -v
+#
+# Usage (CI):
+#   The .github/workflows/ci-e2e.yml workflow wraps these commands.
+#
+# Data is wiped on `down -v`. This file is intentionally separate from
+# docker-compose.oci.yml (production) and docker-compose.yml (local
+# dev-only postgres) so a test run can never clobber the dev DB.
+
+services:
+  e2e_db:
+    image: public.ecr.aws/docker/library/postgres:16-alpine
+    container_name: ymatch_e2e_db
+    environment:
+      POSTGRES_USER: ymatch_user
+      POSTGRES_PASSWORD: e2e_test_password
+      POSTGRES_DB: ymatch_e2e
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ymatch_user -d ymatch_e2e"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    tmpfs:
+      # Run the DB on tmpfs for fast E2E. Trade-off: no persistence
+      # between `up` runs, which is exactly what E2E tests want.
+      - /var/lib/postgresql/data
+
+  e2e_backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile.prod
+      args:
+        GIT_HASH: e2e
+    container_name: ymatch_e2e_backend
+    environment:
+      DATABASE_URL: "postgres://ymatch_user:e2e_test_password@e2e_db:5432/ymatch_e2e"
+      RUST_LOG: info
+      PORT: "3000"
+      IMAGE_STORAGE: local
+    ports:
+      - "3000:3000"
+    volumes:
+      - e2e_uploads:/app/uploads
+    depends_on:
+      e2e_db:
+        condition: service_healthy
+
+volumes:
+  e2e_uploads:
