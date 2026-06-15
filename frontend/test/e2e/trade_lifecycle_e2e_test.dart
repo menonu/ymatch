@@ -237,20 +237,12 @@ void main() {
       eventId: eventId,
       name: 'Card A',
       groupName: 'e2e-cards',
-      // photoUrl is required to dodge a backend bug: the
-      // match_items query (backend/src/repositories/match_.rs:144)
-      // selects `m.photo_url` as a non-nullable String, which
-      // panics with `UnexpectedNullError` when a merch has no
-      // photo. The apply-inventory path triggers this query. See
-      // issue to be filed.
-      photoUrl: 'https://example.com/card-a.png',
     );
     final cardB = await _createMerch(
       api,
       eventId: eventId,
       name: 'Card B',
       groupName: 'e2e-cards',
-      photoUrl: 'https://example.com/card-b.png',
     );
 
     // 4. Set up the cross-trade inventory. The auto-matcher
