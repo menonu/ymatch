@@ -14,33 +14,29 @@
 //! wants batched, match_items batched. The in-memory join happens
 //! inside the repository.
 //!
-//! ## Transactional writes
+//! ## Transactional writes (Phase B-9 of #191)
 //!
-//! Methods that participate in a transaction take `&mut PgConnection`
-//! from the caller. This is the standard sqlx pattern: the service
-//! opens a transaction (`let mut tx = self.pool.begin().await?;`) and
-//! the repository methods are passed `&mut *tx` (re-borrowed from
-//! `tx: Transaction`). The method re-borrows the connection on each
-//! internal `.execute()` call (NLL releases the reborrow at the end of
-//! each `await`).
+//! All 7 methods that participate in a transaction take a generic
+//! `E: Executor<'c, Database = Postgres>` parameter. The caller passes
+//! either `&self.pool` (a `&PgPool`, which is `Executor`), `&mut *tx`
+//! from a `pool.begin()` block (a `&mut PgConnection`, also `Executor`),
+//! or any other sqlx Executor.
 //!
-//! Phase B-9 of #191: migrated from the previous
-//! `trait MatchRepository + PgMatchRepository` two-type pattern to a
-//! single concrete struct. The `_conn` suffix on the transactional
-//! methods was dropped — the `&mut PgConnection` parameter is the
-//! signal that the method needs a connection / tx from the caller.
+//! The Executor is consumed by `.execute()` so the method body must
+//! use it exactly once. For [`insert_match_items`] the previous
+//! N-statement loop is refactored into a single `INSERT ... SELECT
+//! FROM UNNEST(...)` so the bulk insert runs as one statement.
 //!
-//! (We explored a generic `Executor<'c, Database = Postgres>` parameter
-//! form to drop the `&mut PgConnection` concrete dependency, but it
-//! doesn't compose with the loop inside `insert_match_items` because
-//! sqlx 0.7 has no blanket `&mut E: Executor` impl — `Executor` is
-//! consumed by `.execute()`. For multi-statement methods the
-//! concrete `&mut PgConnection` form remains the natural pattern.)
+//! Standard pattern in sqlx: the service opens the transaction
+//! (`let mut tx = self.pool.begin().await?;`) and the repo methods are
+//! passed `&mut *tx` (a fresh `&mut PgConnection` re-borrow each call).
+//! NLL releases the reborrow at the end of each `await`, so the next
+//! call (or `tx.commit()`) works cleanly.
 
 use crate::error::AppError;
 use crate::generated::ymatch::{MatchItem, NotificationCounts, OfferItem, TradeMatch, User};
 use crate::handlers::mappers::to_rfc3339;
-use sqlx::{PgConnection, PgPool, Row};
+use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 
 /// Read-only snapshot of a match's status fields. Used by the lifecycle
@@ -335,23 +331,26 @@ impl MatchRepository {
         })
     }
 
-    // ---- Transactional methods (take &mut PgConnection) ----
+    // ---- Transactional methods (take a generic Executor) ----
 
     /// `SELECT ... FOR UPDATE` on a match row. Returns the snapshot if
     /// the row exists, `None` otherwise. The row lock is held until
     /// the surrounding transaction ends.
-    pub async fn lock_for_update(
+    pub async fn lock_for_update<'c, E>(
         &self,
-        conn: &mut PgConnection,
+        exec: E,
         match_id: i32,
-    ) -> Result<Option<MatchStatusSnapshot>, AppError> {
+    ) -> Result<Option<MatchStatusSnapshot>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let row = sqlx::query(
             "SELECT user1_id, user2_id, status, offered_by,
                     user1_inventory_applied_at, user2_inventory_applied_at
              FROM matches WHERE id = $1 FOR UPDATE",
         )
         .bind(match_id)
-        .fetch_optional(&mut *conn)
+        .fetch_optional(exec)
         .await?;
         Ok(row.map(|r| MatchStatusSnapshot {
             user1_id: r.get("user1_id"),
@@ -368,82 +367,104 @@ impl MatchRepository {
     }
 
     /// Set the match's `status` column.
-    pub async fn set_status(
+    pub async fn set_status<'c, E>(
         &self,
-        conn: &mut PgConnection,
+        exec: E,
         match_id: i32,
         new_status: &str,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         sqlx::query("UPDATE matches SET status = $1 WHERE id = $2")
             .bind(new_status)
             .bind(match_id)
-            .execute(&mut *conn)
+            .execute(exec)
             .await?;
         Ok(())
     }
 
     /// Set the match's `offered_by` column.
-    pub async fn set_offered_by(
+    pub async fn set_offered_by<'c, E>(
         &self,
-        conn: &mut PgConnection,
+        exec: E,
         match_id: i32,
         user_id: i32,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         sqlx::query("UPDATE matches SET offered_by = $1 WHERE id = $2")
             .bind(user_id)
             .bind(match_id)
-            .execute(&mut *conn)
+            .execute(exec)
             .await?;
         Ok(())
     }
 
     /// Bulk-insert match_items rows for an offer.
-    pub async fn insert_match_items(
+    ///
+    /// Implemented as a single `INSERT ... SELECT FROM UNNEST(...)` so
+    /// the generic `Executor` parameter (consumed by `.execute()`) is
+    /// used exactly once per call. Empty `items` is a no-op (the
+    /// `UNNEST` of empty arrays produces zero rows).
+    pub async fn insert_match_items<'c, E>(
         &self,
-        conn: &mut PgConnection,
+        exec: E,
         match_id: i32,
         owner_id: i32,
         items: &[OfferItem],
-    ) -> Result<(), AppError> {
-        for item in items {
-            sqlx::query(
-                "INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity)
-                 VALUES ($1, $2, $3, $4, $5)",
-            )
-            .bind(match_id)
-            .bind(item.merch_id)
-            .bind(owner_id)
-            .bind(&item.direction)
-            .bind(item.quantity)
-            .execute(&mut *conn)
-            .await?;
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        if items.is_empty() {
+            return Ok(());
         }
+        let merch_ids: Vec<i32> = items.iter().map(|i| i.merch_id).collect();
+        let directions: Vec<String> = items.iter().map(|i| i.direction.clone()).collect();
+        let quantities: Vec<i32> = items.iter().map(|i| i.quantity).collect();
+        sqlx::query(
+            r#"INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity)
+               SELECT $1, merch_id, $3, direction, quantity
+               FROM UNNEST($2::int[], $4::text[], $5::int[])
+                 AS t(merch_id, direction, quantity)"#,
+        )
+        .bind(match_id)
+        .bind(&merch_ids)
+        .bind(owner_id)
+        .bind(&directions)
+        .bind(&quantities)
+        .execute(exec)
+        .await?;
         Ok(())
     }
 
     /// Delete all match_items rows for a match. Used when a match is
     /// rejected.
-    pub async fn delete_match_items(
-        &self,
-        conn: &mut PgConnection,
-        match_id: i32,
-    ) -> Result<(), AppError> {
+    pub async fn delete_match_items<'c, E>(&self, exec: E, match_id: i32) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         sqlx::query("DELETE FROM match_items WHERE match_id = $1")
             .bind(match_id)
-            .execute(&mut *conn)
+            .execute(exec)
             .await?;
         Ok(())
     }
 
     /// Delete all other PENDING matches between the same pair of
     /// users. Used when a match is accepted.
-    pub async fn purge_other_pending(
+    pub async fn purge_other_pending<'c, E>(
         &self,
-        conn: &mut PgConnection,
+        exec: E,
         skip_match_id: i32,
         user1_id: i32,
         user2_id: i32,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         sqlx::query(
             "DELETE FROM matches WHERE status = 'PENDING' AND id != $1
              AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))",
@@ -451,19 +472,22 @@ impl MatchRepository {
         .bind(skip_match_id)
         .bind(user1_id)
         .bind(user2_id)
-        .execute(&mut *conn)
+        .execute(exec)
         .await?;
         Ok(())
     }
 
     /// Set the per-user inventory-applied timestamp. `is_user1` picks
     /// which column to write.
-    pub async fn mark_inventory_applied(
+    pub async fn mark_inventory_applied<'c, E>(
         &self,
-        conn: &mut PgConnection,
+        exec: E,
         match_id: i32,
         is_user1: bool,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let col = if is_user1 {
             "user1_inventory_applied_at"
         } else {
@@ -472,7 +496,7 @@ impl MatchRepository {
         let sql = format!("UPDATE matches SET {} = NOW() WHERE id = $1", col);
         let affected = sqlx::query(&sql)
             .bind(match_id)
-            .execute(&mut *conn)
+            .execute(exec)
             .await?
             .rows_affected();
         if affected == 0 {

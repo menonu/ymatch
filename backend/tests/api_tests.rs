@@ -2917,10 +2917,7 @@ async fn test_match_lock_for_update_returns_none_for_missing() {
     let pool = setup_test_pool().await;
     let mut tx = pool.begin().await.unwrap();
     let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
-    let snap = matches
-        .lock_for_update(&mut *tx, 999_999)
-        .await
-        .unwrap();
+    let snap = matches.lock_for_update(&mut *tx, 999_999).await.unwrap();
     assert!(snap.is_none());
 }
 
@@ -3136,13 +3133,13 @@ async fn test_match_mark_inventory_applied_errors_if_match_vanished() {
 }
 
 #[tokio::test]
-async fn test_inventory_apply_trade_delta_conn_decrement_only() {
+async fn test_inventory_apply_trade_delta_decrement_only() {
     let pool = setup_test_pool().await;
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta_conn(&mut *tx, u1 as i32, merch_for_u1, 2, 0)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 2, 0)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -3167,13 +3164,13 @@ async fn test_inventory_apply_trade_delta_conn_decrement_only() {
 }
 
 #[tokio::test]
-async fn test_inventory_apply_trade_delta_conn_increment_only() {
+async fn test_inventory_apply_trade_delta_increment_only() {
     let pool = setup_test_pool().await;
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta_conn(&mut *tx, u1 as i32, merch_for_u1, 0, 4)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, 4)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
