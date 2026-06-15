@@ -7,9 +7,14 @@
 //! - the trade-apply endpoint via
 //!   [`crate::services::match_lifecycle::MatchLifecycleService`]
 //!
-//! Phase B-6 of #191: migrated from the previous
-//! `trait InventoryRepository + PgInventoryRepository` two-type pattern to
-//! a single concrete struct, matching the Phase A shape.
+//! Phase B-6 + B-9 of #191: migrated from the previous
+//! `trait InventoryRepository + PgInventoryRepository` two-type pattern
+//! to a single concrete struct, and lifted the `apply_trade_delta`
+//! transaction parameter from `&mut PgConnection` to a generic
+//! `E: Executor<'c, Database = Postgres>`. The two conditional
+//! statements are collapsed into a single CTE so the generic
+//! executor (consumed by `.execute()`) can satisfy the method
+//! signature without a loop.
 
 use crate::error::AppError;
 use crate::generated::ymatch::InventoryItem;
@@ -99,42 +104,47 @@ impl InventoryRepository {
     /// `delta_trade` (clamped at 0) and upserts the HAVE row by
     /// `delta_have`. Either delta may be 0 to skip that side.
     ///
-    /// The `_conn` suffix is preserved on the method name to signal
-    /// "this takes a connection / tx from the caller" — Phase B-9
-    /// (match.rs) will lift this suffix and switch the parameter to
-    /// a generic `Executor` once the lifecycle service is updated.
-    pub async fn apply_trade_delta_conn(
+    /// Implemented as a single CTE so the generic `Executor` parameter
+    /// (consumed by `.execute()`) is used exactly once per call. The
+    /// `WHERE $1 > 0` / `WHERE $4 > 0` clauses short-circuit the
+    /// affected CTE branch when a delta is 0 — semantically identical
+    /// to the previous if-guarded two-query version.
+    pub async fn apply_trade_delta<'c, E>(
         &self,
-        conn: &mut sqlx::PgConnection,
+        exec: E,
         user_id: i32,
         merch_id: i32,
         delta_trade: i32,
         delta_have: i32,
-    ) -> Result<(), AppError> {
-        if delta_trade != 0 {
-            sqlx::query(
-                "UPDATE inventory SET quantity = GREATEST(quantity - $1, 0)
-                 WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'",
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        sqlx::query(
+            r#"
+            WITH trade_update AS (
+                UPDATE inventory
+                SET quantity = GREATEST(quantity - $1, 0)
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE' AND $1 > 0
+                RETURNING 1
+            ),
+            have_update AS (
+                INSERT INTO inventory (user_id, merch_id, status, quantity)
+                SELECT $2, $3, 'HAVE', $4
+                WHERE $4 > 0
+                ON CONFLICT (user_id, merch_id, status)
+                DO UPDATE SET quantity = inventory.quantity + $4
+                RETURNING 1
             )
-            .bind(delta_trade)
-            .bind(user_id)
-            .bind(merch_id)
-            .execute(&mut *conn)
-            .await?;
-        }
-        if delta_have != 0 {
-            sqlx::query(
-                r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
-                   VALUES ($1, $2, 'HAVE', $3)
-                   ON CONFLICT (user_id, merch_id, status)
-                   DO UPDATE SET quantity = inventory.quantity + $3"#,
-            )
-            .bind(user_id)
-            .bind(merch_id)
-            .bind(delta_have)
-            .execute(&mut *conn)
-            .await?;
-        }
+            SELECT 1
+            "#,
+        )
+        .bind(delta_trade)
+        .bind(user_id)
+        .bind(merch_id)
+        .bind(delta_have)
+        .execute(exec)
+        .await?;
         Ok(())
     }
 }

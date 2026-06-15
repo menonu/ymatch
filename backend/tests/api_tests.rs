@@ -2895,14 +2895,14 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
 }
 
 #[tokio::test]
-async fn test_match_lock_for_update_conn_returns_snapshot() {
+async fn test_match_lock_for_update_returns_snapshot() {
     let pool = setup_test_pool().await;
     let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     let snap = matches
-        .lock_for_update_conn(&mut *tx, match_id as i32)
+        .lock_for_update(&mut *tx, match_id as i32)
         .await
         .unwrap()
         .expect("snapshot should exist for the seeded match");
@@ -2913,26 +2913,23 @@ async fn test_match_lock_for_update_conn_returns_snapshot() {
 }
 
 #[tokio::test]
-async fn test_match_lock_for_update_conn_returns_none_for_missing() {
+async fn test_match_lock_for_update_returns_none_for_missing() {
     let pool = setup_test_pool().await;
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
-    let snap = matches
-        .lock_for_update_conn(&mut *tx, 999_999)
-        .await
-        .unwrap();
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
+    let snap = matches.lock_for_update(&mut *tx, 999_999).await.unwrap();
     assert!(snap.is_none());
 }
 
 #[tokio::test]
-async fn test_match_set_status_conn_writes_status() {
+async fn test_match_set_status_writes_status() {
     let pool = setup_test_pool().await;
     let (_, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     matches
-        .set_status_conn(&mut *tx, match_id as i32, "OFFERED")
+        .set_status(&mut *tx, match_id as i32, "OFFERED")
         .await
         .unwrap();
     let row: (String,) = sqlx::query_as("SELECT status FROM matches WHERE id = $1")
@@ -2944,14 +2941,14 @@ async fn test_match_set_status_conn_writes_status() {
 }
 
 #[tokio::test]
-async fn test_match_set_offered_by_conn_writes_column() {
+async fn test_match_set_offered_by_writes_column() {
     let pool = setup_test_pool().await;
     let (u1, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     matches
-        .set_offered_by_conn(&mut *tx, match_id as i32, u1 as i32)
+        .set_offered_by(&mut *tx, match_id as i32, u1 as i32)
         .await
         .unwrap();
     let row: (Option<i32>,) = sqlx::query_as("SELECT offered_by FROM matches WHERE id = $1")
@@ -2963,14 +2960,14 @@ async fn test_match_set_offered_by_conn_writes_column() {
 }
 
 #[tokio::test]
-async fn test_match_insert_match_items_conn_inserts_rows() {
+async fn test_match_insert_match_items_inserts_rows() {
     use backend::generated::ymatch::OfferItem;
 
     let pool = setup_test_pool().await;
     let (u1, _, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     let items = vec![
         OfferItem {
             merch_id: merch_for_u1,
@@ -2984,7 +2981,7 @@ async fn test_match_insert_match_items_conn_inserts_rows() {
         },
     ];
     matches
-        .insert_match_items_conn(&mut *tx, match_id as i32, u1 as i32, &items)
+        .insert_match_items(&mut *tx, match_id as i32, u1 as i32, &items)
         .await
         .unwrap();
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM match_items WHERE match_id = $1")
@@ -2996,7 +2993,7 @@ async fn test_match_insert_match_items_conn_inserts_rows() {
 }
 
 #[tokio::test]
-async fn test_match_delete_match_items_conn_removes_all() {
+async fn test_match_delete_match_items_removes_all() {
     let pool = setup_test_pool().await;
     let (u1, _, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
@@ -3010,9 +3007,9 @@ async fn test_match_delete_match_items_conn_removes_all() {
         .unwrap();
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     matches
-        .delete_match_items_conn(&mut *tx, match_id as i32)
+        .delete_match_items(&mut *tx, match_id as i32)
         .await
         .unwrap();
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM match_items WHERE match_id = $1")
@@ -3024,7 +3021,7 @@ async fn test_match_delete_match_items_conn_removes_all() {
 }
 
 #[tokio::test]
-async fn test_match_purge_other_pending_conn_keeps_unrelated() {
+async fn test_match_purge_other_pending_keeps_unrelated() {
     let pool = setup_test_pool().await;
     let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
@@ -3080,9 +3077,9 @@ async fn test_match_purge_other_pending_conn_keeps_unrelated() {
         .unwrap();
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     matches
-        .purge_other_pending_conn(&mut *tx, match_id as i32, u1 as i32, u2 as i32)
+        .purge_other_pending(&mut *tx, match_id as i32, u1 as i32, u2 as i32)
         .await
         .unwrap();
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM matches WHERE status = 'PENDING'")
@@ -3096,14 +3093,14 @@ async fn test_match_purge_other_pending_conn_keeps_unrelated() {
 }
 
 #[tokio::test]
-async fn test_match_mark_inventory_applied_conn_sets_user1_column() {
+async fn test_match_mark_inventory_applied_sets_user1_column() {
     let pool = setup_test_pool().await;
     let (_, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     matches
-        .mark_inventory_applied_conn(&mut *tx, match_id as i32, true)
+        .mark_inventory_applied(&mut *tx, match_id as i32, true)
         .await
         .unwrap();
     let row: (Option<chrono::DateTime<chrono::Utc>>,) =
@@ -3123,26 +3120,26 @@ async fn test_match_mark_inventory_applied_conn_sets_user1_column() {
 }
 
 #[tokio::test]
-async fn test_match_mark_inventory_applied_conn_errors_if_match_vanished() {
+async fn test_match_mark_inventory_applied_errors_if_match_vanished() {
     let pool = setup_test_pool().await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     let result = matches
-        .mark_inventory_applied_conn(&mut *tx, 999_999, true)
+        .mark_inventory_applied(&mut *tx, 999_999, true)
         .await;
     assert!(result.is_err(), "mark should fail if match_id is missing");
     // tx will be rolled back when it drops.
 }
 
 #[tokio::test]
-async fn test_inventory_apply_trade_delta_conn_decrement_only() {
+async fn test_inventory_apply_trade_delta_decrement_only() {
     let pool = setup_test_pool().await;
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta_conn(&mut *tx, u1 as i32, merch_for_u1, 2, 0)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 2, 0)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -3167,13 +3164,13 @@ async fn test_inventory_apply_trade_delta_conn_decrement_only() {
 }
 
 #[tokio::test]
-async fn test_inventory_apply_trade_delta_conn_increment_only() {
+async fn test_inventory_apply_trade_delta_increment_only() {
     let pool = setup_test_pool().await;
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta_conn(&mut *tx, u1 as i32, merch_for_u1, 0, 4)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, 4)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -3208,22 +3205,22 @@ async fn test_multiple_conn_calls_share_one_transaction() {
     let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::PgMatchRepository::new(pool.clone());
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
 
     matches
-        .set_status_conn(&mut *tx, match_id as i32, "OFFERED")
+        .set_status(&mut *tx, match_id as i32, "OFFERED")
         .await
         .unwrap();
     matches
-        .set_offered_by_conn(&mut *tx, match_id as i32, u1 as i32)
+        .set_offered_by(&mut *tx, match_id as i32, u1 as i32)
         .await
         .unwrap();
     matches
-        .set_status_conn(&mut *tx, match_id as i32, "ACCEPTED")
+        .set_status(&mut *tx, match_id as i32, "ACCEPTED")
         .await
         .unwrap();
     matches
-        .purge_other_pending_conn(&mut *tx, match_id as i32, u1 as i32, u2 as i32)
+        .purge_other_pending(&mut *tx, match_id as i32, u1 as i32, u2 as i32)
         .await
         .unwrap();
 

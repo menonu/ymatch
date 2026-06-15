@@ -21,14 +21,14 @@ use axum::{
 use std::sync::Arc;
 
 pub async fn list_all_matches(
-    State(matches): State<Arc<dyn MatchRepository>>,
+    State(matches): State<Arc<MatchRepository>>,
 ) -> Result<Json<Vec<TradeMatch>>, AppError> {
     let items = matches.list_all().await?;
     Ok(Json(items))
 }
 
 pub async fn list_matches(
-    State(matches): State<Arc<dyn MatchRepository>>,
+    State(matches): State<Arc<MatchRepository>>,
     Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<TradeMatch>>, AppError> {
     let items = matches.list_for_user(user_id).await?;
@@ -71,7 +71,7 @@ pub async fn apply_trade_inventory(
 }
 
 pub async fn match_notification_counts(
-    State(matches): State<Arc<dyn MatchRepository>>,
+    State(matches): State<Arc<MatchRepository>>,
     Path(user_id): Path<i32>,
 ) -> Result<Json<NotificationCounts>, AppError> {
     let counts = matches.notification_counts(user_id).await?;
