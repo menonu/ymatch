@@ -6,6 +6,12 @@ use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tower::ServiceExt;
 
+/// Helper to read an integer from a JSON object, treating a missing
+/// proto3-default-zero field as 0.
+fn json_i64(value: &serde_json::Value, key: &str) -> i64 {
+    value.get(key).and_then(|v| v.as_i64()).unwrap_or(0)
+}
+
 async fn setup_test_pool() -> PgPool {
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test".to_string()
@@ -121,7 +127,7 @@ async fn test_guest_login_creates_user() {
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"uuid": "test-uuid-1234", "device_token": "tok123"}"#,
+                    r#"{"uuid": "test-uuid-1234", "deviceToken": "tok123"}"#,
                 ))
                 .unwrap(),
         )
@@ -298,7 +304,7 @@ async fn test_create_and_list_events() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Test Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Test Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -309,7 +315,7 @@ async fn test_create_and_list_events() {
     let body = body_to_string(resp.into_body()).await;
     let event: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(event["name"].as_str().unwrap(), "Test Event");
-    assert_eq!(event["active_participants"].as_i64().unwrap(), 0);
+    assert_eq!(event["activeParticipants"].as_i64().unwrap(), 0);
 
     // List events
     let app = backend::routes::create_router(pool, test_storage());
@@ -356,7 +362,7 @@ async fn test_event_favorite_toggle_inserts_when_absent() {
                 .uri(format!("/api/v1/events/{}/favorite", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "is_favorite": true}}"#,
+                    r#"{{"userId": {}, "isFavorite": true}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -392,7 +398,7 @@ async fn test_event_favorite_toggle_removes_when_present() {
                     .uri(format!("/api/v1/events/{}/favorite", event_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"user_id": {}, "is_favorite": true}}"#,
+                        r#"{{"userId": {}, "isFavorite": true}}"#,
                         user_id
                     )))
                     .unwrap(),
@@ -444,7 +450,7 @@ async fn test_event_favorite_per_user_independence() {
                 .uri(format!("/api/v1/events/{}/favorite", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "is_favorite": true}}"#,
+                    r#"{{"userId": {}, "isFavorite": true}}"#,
                     user_a
                 )))
                 .unwrap(),
@@ -494,7 +500,7 @@ async fn test_group_favorite_toggle_and_list() {
                 .uri(format!("/api/v1/events/{}/favorite_group", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "group_name": "Books", "is_favorite": true}}"#,
+                    r#"{{"userId": {}, "groupName": "Books", "isFavorite": true}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -519,9 +525,9 @@ async fn test_group_favorite_toggle_and_list() {
     let body = body_to_string(resp.into_body()).await;
     let groups: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
     assert_eq!(groups.len(), 1, "exactly one favorite group expected");
-    assert_eq!(groups[0]["group_name"], "Books");
-    assert_eq!(groups[0]["event_id"], event_id);
-    assert_eq!(groups[0]["event_name"], "Group Fav Event");
+    assert_eq!(groups[0]["groupName"], "Books");
+    assert_eq!(groups[0]["eventId"], event_id);
+    assert_eq!(groups[0]["eventName"], "Group Fav Event");
 }
 
 #[tokio::test]
@@ -541,7 +547,7 @@ async fn test_group_favorite_toggle_removes() {
                     .uri(format!("/api/v1/events/{}/favorite_group", event_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"user_id": {}, "group_name": "Music", "is_favorite": true}}"#,
+                        r#"{{"userId": {}, "groupName": "Music", "isFavorite": true}}"#,
                         user_id
                     )))
                     .unwrap(),
@@ -582,7 +588,7 @@ async fn test_event_view_register_inserts() {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/view", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user_id)))
                 .unwrap(),
         )
         .await
@@ -617,7 +623,7 @@ async fn test_event_view_register_is_idempotent() {
                     .method("POST")
                     .uri(format!("/api/v1/events/{}/view", event_id))
                     .header("content-type", "application/json")
-                    .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                    .body(Body::from(format!(r#"{{"userId": {}}}"#, user_id)))
                     .unwrap(),
             )
             .await
@@ -669,7 +675,7 @@ async fn test_event_view_per_user_and_per_event() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "View Iso B", "creator_id": {}}}"#,
+                    r#"{{"name": "View Iso B", "creatorId": {}}}"#,
                     user_b
                 )))
                 .unwrap(),
@@ -690,7 +696,7 @@ async fn test_event_view_per_user_and_per_event() {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/view", event_a))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_a)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user_a)))
                 .unwrap(),
         )
         .await
@@ -705,7 +711,7 @@ async fn test_event_view_per_user_and_per_event() {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/view", event_b))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_b)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user_b)))
                 .unwrap(),
         )
         .await
@@ -734,7 +740,7 @@ async fn test_update_event_owner_succeeds() {
                 .uri(format!("/api/v1/events/{}", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "name": "Updated Name"}}"#,
+                    r#"{{"userId": {}, "name": "Updated Name"}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -781,7 +787,7 @@ async fn test_update_event_non_owner_forbidden() {
                 .uri(format!("/api/v1/events/{}", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "name": "Pwned"}}"#,
+                    r#"{{"userId": {}, "name": "Pwned"}}"#,
                     intruder_id
                 )))
                 .unwrap(),
@@ -814,7 +820,7 @@ async fn test_publish_event_owner_succeeds() {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/publish", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user_id)))
                 .unwrap(),
         )
         .await
@@ -859,7 +865,7 @@ async fn test_publish_draft_event_transitions_to_published() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Draft Publish Event", "creator_id": {}, "status": "draft"}}"#,
+                    r#"{{"name": "Draft Publish Event", "creatorId": {}, "status": "draft"}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -879,7 +885,7 @@ async fn test_publish_draft_event_transitions_to_published() {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/publish", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user_id)))
                 .unwrap(),
         )
         .await
@@ -926,7 +932,7 @@ async fn test_publish_event_non_owner_forbidden() {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/publish", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, intruder_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, intruder_id)))
                 .unwrap(),
         )
         .await
@@ -1421,7 +1427,7 @@ async fn test_admin_list_all_merch_returns_array() {
                 .uri(format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"name": "Listed Merch", "group_name": "Group A"}"#,
+                    r#"{"name": "Listed Merch", "groupName": "Group A"}"#,
                 ))
                 .unwrap(),
         )
@@ -1482,7 +1488,7 @@ async fn test_admin_delete_merch_succeeds() {
                 .uri(format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"name": "To Delete", "group_name": "Group A"}"#,
+                    r#"{"name": "To Delete", "groupName": "Group A"}"#,
                 ))
                 .unwrap(),
         )
@@ -1558,7 +1564,7 @@ async fn test_create_and_list_merch() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Merch Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Merch Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1578,7 +1584,7 @@ async fn test_create_and_list_merch() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"name": "Test Item", "group_name": "Group A"}"#,
+                    r#"{"name": "Test Item", "groupName": "Group A"}"#,
                 ))
                 .unwrap(),
         )
@@ -1588,7 +1594,7 @@ async fn test_create_and_list_merch() {
     let merch: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(merch["name"].as_str().unwrap(), "Test Item");
-    assert_eq!(merch["event_id"].as_i64().unwrap(), event_id);
+    assert_eq!(merch["eventId"].as_i64().unwrap(), event_id);
 
     // List merchandise
     let app = backend::routes::create_router(pool, test_storage());
@@ -1640,7 +1646,7 @@ async fn test_inventory_upsert() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Inv Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Inv Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1658,7 +1664,7 @@ async fn test_inventory_upsert() {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"name": "Inv Item", "group_name": "Test"}"#))
+                .body(Body::from(r#"{"name": "Inv Item", "groupName": "Test"}"#))
                 .unwrap(),
         )
         .await
@@ -1676,7 +1682,7 @@ async fn test_inventory_upsert() {
                 .uri("/api/v1/user/inventory")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "merch_id": {}, "status": "HAVE", "quantity": 2}}"#,
+                    r#"{{"userId": {}, "merchId": {}, "status": "HAVE", "quantity": 2}}"#,
                     user_id, merch_id
                 )))
                 .unwrap(),
@@ -1698,7 +1704,7 @@ async fn test_inventory_upsert() {
                 .uri("/api/v1/user/inventory")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "merch_id": {}, "status": "HAVE", "quantity": 5}}"#,
+                    r#"{{"userId": {}, "merchId": {}, "status": "HAVE", "quantity": 5}}"#,
                     user_id, merch_id
                 )))
                 .unwrap(),
@@ -1779,7 +1785,7 @@ async fn test_search_returns_results() {
             .uri("/api/v1/events")
             .header("content-type", "application/json")
             .body(Body::from(format!(
-                r#"{{"name": "Searchable Convention", "creator_id": {}}}"#,
+                r#"{{"name": "Searchable Convention", "creatorId": {}}}"#,
                 user_id
             )))
             .unwrap(),
@@ -1837,7 +1843,7 @@ async fn test_search_excludes_draft_events() {
             .uri("/api/v1/events")
             .header("content-type", "application/json")
             .body(Body::from(format!(
-                r#"{{"name": "DraftSearchTest Event", "creator_id": {}, "status": "draft"}}"#,
+                r#"{{"name": "DraftSearchTest Event", "creatorId": {}, "status": "draft"}}"#,
                 user_id
             )))
             .unwrap(),
@@ -1905,7 +1911,7 @@ async fn test_admin_delete_event() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Delete Me", "creator_id": {}}}"#,
+                    r#"{{"name": "Delete Me", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -1993,7 +1999,7 @@ async fn test_messages_empty_list() {
                 .uri(&format!("/api/v1/matches/{}/messages", match_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"match_id": {}, "sender_id": {}, "content": "Hello!"}}"#,
+                    r#"{{"matchId": {}, "senderId": {}, "content": "Hello!"}}"#,
                     match_id, u1_id
                 )))
                 .unwrap(),
@@ -2320,7 +2326,7 @@ async fn test_draft_event_visibility() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Draft Event", "creator_id": {}, "status": "draft"}}"#,
+                    r#"{{"name": "Draft Event", "creatorId": {}, "status": "draft"}}"#,
                     creator_id
                 )))
                 .unwrap(),
@@ -2371,7 +2377,7 @@ async fn test_draft_event_visibility() {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/publish", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, creator_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, creator_id)))
                 .unwrap(),
         )
         .await
@@ -2424,7 +2430,7 @@ async fn test_draft_merch_visibility() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Merch Draft Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Merch Draft Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2444,7 +2450,7 @@ async fn test_draft_merch_visibility() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Draft Item", "group_name": "Test", "creator_id": {}, "status": "draft"}}"#,
+                    r#"{{"name": "Draft Item", "groupName": "Test", "creatorId": {}, "status": "draft"}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2486,7 +2492,7 @@ async fn test_draft_merch_visibility() {
                     event_id, merch_id
                 ))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user_id)))
                 .unwrap(),
         )
         .await
@@ -2526,7 +2532,7 @@ async fn test_soft_delete_merch_with_inventory() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "SoftDel Event", "creator_id": {}}}"#,
+                    r#"{{"name": "SoftDel Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2545,7 +2551,7 @@ async fn test_soft_delete_merch_with_inventory() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "SoftDel Item", "group_name": "Test", "creator_id": {}}}"#,
+                    r#"{{"name": "SoftDel Item", "groupName": "Test", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2564,7 +2570,7 @@ async fn test_soft_delete_merch_with_inventory() {
             .uri("/api/v1/user/inventory")
             .header("content-type", "application/json")
             .body(Body::from(format!(
-                r#"{{"user_id": {}, "merch_id": {}, "status": "HAVE", "quantity": 3}}"#,
+                r#"{{"userId": {}, "merchId": {}, "status": "HAVE", "quantity": 3}}"#,
                 user_id, merch_id
             )))
             .unwrap(),
@@ -2644,7 +2650,7 @@ async fn test_hard_delete_merch_without_inventory() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "HardDel Event", "creator_id": {}}}"#,
+                    r#"{{"name": "HardDel Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2663,7 +2669,7 @@ async fn test_hard_delete_merch_without_inventory() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "HardDel Item", "group_name": "Test", "creator_id": {}}}"#,
+                    r#"{{"name": "HardDel Item", "groupName": "Test", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2720,7 +2726,7 @@ async fn test_user_response_includes_role() {
     let user: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(user["role"].as_str().unwrap(), "user");
-    assert_eq!(user["is_banned"].as_bool().unwrap(), false);
+    assert_eq!(user["isBanned"].as_bool().unwrap(), false);
 }
 
 #[tokio::test]
@@ -2760,7 +2766,7 @@ async fn test_banned_user_cannot_create_event() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Banned Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Banned Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -2780,9 +2786,6 @@ async fn test_banned_user_cannot_create_event() {
 // PgConnection`); each future captures the reborrow, drops at end
 // of await, and the next `&mut *tx` reborrow works cleanly. This
 // is the standard sqlx pattern (see the issue's reference impl).
-
-use backend::repositories::inventory::InventoryRepository as _InventoryRepoTrait;
-use backend::repositories::match_::MatchRepository as _MatchRepoTrait;
 
 /// Build a 2-user, 1-event, 1-PENDING-match setup. Returns
 /// (user1_id, user2_id, match_id, merch_id_for_u1,
@@ -2834,7 +2837,7 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Conn Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Conn Event", "creatorId": {}}}"#,
                     u1
                 )))
                 .unwrap(),
@@ -2858,7 +2861,7 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
                     .uri(format!("/api/v1/events/{}/merch", event_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"name": "M{creator}", "group_name": "G"}}"#
+                        r#"{{"name": "M{creator}", "groupName": "G"}}"#
                     )))
                     .unwrap(),
             )
@@ -3270,7 +3273,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"uuid": "user1-lifecycle-test", "device_token": "tok1"}"#,
+                    r#"{"uuid": "user1-lifecycle-test", "deviceToken": "tok1"}"#,
                 ))
                 .unwrap(),
         )
@@ -3289,7 +3292,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"uuid": "user2-lifecycle-test", "device_token": "tok2"}"#,
+                    r#"{"uuid": "user2-lifecycle-test", "deviceToken": "tok2"}"#,
                 ))
                 .unwrap(),
         )
@@ -3309,7 +3312,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Trade Test Event", "creator_id": {}}}"#,
+                    r#"{{"name": "Trade Test Event", "creatorId": {}}}"#,
                     user1_id
                 )))
                 .unwrap(),
@@ -3328,10 +3331,9 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(
-                    r#"{{"event_id": {}, "name": "Card A", "photo_url": "", "group_name": "Cards"}}"#,
-                    event_id
-                )))
+                .body(Body::from(
+                    r#"{"name": "Card A", "photoUrl": "", "groupName": "Cards"}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -3348,10 +3350,9 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(
-                    r#"{{"event_id": {}, "name": "Card B", "photo_url": "", "group_name": "Cards"}}"#,
-                    event_id
-                )))
+                .body(Body::from(
+                    r#"{"name": "Card B", "photoUrl": "", "groupName": "Cards"}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -3376,7 +3377,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                     .uri("/api/v1/user/inventory")
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"user_id": {}, "merch_id": {}, "status": "{}", "quantity": 1}}"#,
+                        r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": 1}}"#,
                         uid, mid, status
                     )))
                     .unwrap(),
@@ -3411,7 +3412,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
     assert_eq!(matches[0]["status"], "PENDING");
     // inventory_applied defaults to false; prost may omit it (null) or emit false
     assert!(
-        matches[0]["inventory_applied"].is_null() || matches[0]["inventory_applied"] == false,
+        matches[0]["inventoryApplied"].is_null() || matches[0]["inventoryApplied"] == false,
         "inventory_applied should be false/null for new match"
     );
 
@@ -3424,9 +3425,9 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .uri(&format!("/api/v1/matches/{}/offer", match_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "items": [
-                        {{"merch_id": {}, "direction": "GIVE", "quantity": 1}},
-                        {{"merch_id": {}, "direction": "RECEIVE", "quantity": 1}}
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
+                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
                     ]}}"#,
                     user1_id, merch_a_id, merch_b_id
                 )))
@@ -3450,7 +3451,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
     let matches: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(matches[0]["status"], "OFFERED");
-    assert_eq!(matches[0]["offered_by"], user1_id);
+    assert_eq!(matches[0]["offeredBy"], user1_id);
 
     // 7. User2 accepts
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -3490,7 +3491,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user1_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user1_id)))
                 .unwrap(),
         )
         .await
@@ -3513,14 +3514,18 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let u1_trade_a = inv1
         .iter()
-        .find(|i| i["merch_id"] == merch_a_id && i["status"] == "TRADE");
+        .find(|i| i["merchId"] == merch_a_id && i["status"] == "TRADE");
     assert!(
-        u1_trade_a.is_none() || u1_trade_a.unwrap()["quantity"].as_i64().unwrap() == 0,
+        u1_trade_a
+            .as_ref()
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0)
+            == 0,
         "User1 TRADE Card A should be 0"
     );
     let u1_have_b = inv1
         .iter()
-        .find(|i| i["merch_id"] == merch_b_id && i["status"] == "HAVE");
+        .find(|i| i["merchId"] == merch_b_id && i["status"] == "HAVE");
     assert!(u1_have_b.is_some(), "User1 should HAVE Card B");
     assert_eq!(u1_have_b.unwrap()["quantity"].as_i64().unwrap(), 1);
 
@@ -3540,7 +3545,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let u2_trade_b_before = inv2_before
         .iter()
-        .find(|i| i["merch_id"] == merch_b_id && i["status"] == "TRADE");
+        .find(|i| i["merchId"] == merch_b_id && i["status"] == "TRADE");
     assert!(
         u2_trade_b_before.is_some()
             && u2_trade_b_before.unwrap()["quantity"].as_i64().unwrap() == 1,
@@ -3560,7 +3565,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
         .unwrap();
     let matches: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(matches[0]["inventory_applied"], true);
+    assert_eq!(matches[0]["inventoryApplied"], true);
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -3575,7 +3580,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
     let matches2: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert!(
-        matches2[0]["inventory_applied"].is_null() || matches2[0]["inventory_applied"] == false,
+        matches2[0]["inventoryApplied"].is_null() || matches2[0]["inventoryApplied"] == false,
         "User2 inventory_applied should still be false"
     );
 
@@ -3587,7 +3592,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user1_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user1_id)))
                 .unwrap(),
         )
         .await
@@ -3602,7 +3607,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user2_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user2_id)))
                 .unwrap(),
         )
         .await
@@ -3625,14 +3630,18 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let u2_trade_b = inv2
         .iter()
-        .find(|i| i["merch_id"] == merch_b_id && i["status"] == "TRADE");
+        .find(|i| i["merchId"] == merch_b_id && i["status"] == "TRADE");
     assert!(
-        u2_trade_b.is_none() || u2_trade_b.unwrap()["quantity"].as_i64().unwrap() == 0,
+        u2_trade_b
+            .as_ref()
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0)
+            == 0,
         "User2 TRADE Card B should be 0"
     );
     let u2_have_a = inv2
         .iter()
-        .find(|i| i["merch_id"] == merch_a_id && i["status"] == "HAVE");
+        .find(|i| i["merchId"] == merch_a_id && i["status"] == "HAVE");
     assert!(u2_have_a.is_some(), "User2 should HAVE Card A");
     assert_eq!(u2_have_a.unwrap()["quantity"].as_i64().unwrap(), 1);
 
@@ -3644,7 +3653,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/apply-inventory", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"user_id": {}}}"#, user2_id)))
+                .body(Body::from(format!(r#"{{"userId": {}}}"#, user2_id)))
                 .unwrap(),
         )
         .await
@@ -3677,7 +3686,7 @@ async fn test_offer_on_non_pending_match_rejected() {
                 .uri("/api/v1/matches/99999/offer")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"user_id": 1, "items": [{"merch_id": 1, "direction": "GIVE", "quantity": 1}]}"#,
+                    r#"{"userId": 1, "items": [{"merchId": 1, "direction": "GIVE", "quantity": 1}]}"#,
                 ))
                 .unwrap(),
         )
@@ -3686,6 +3695,185 @@ async fn test_offer_on_non_pending_match_rejected() {
     // 422 because JSON parsing precedes the route match for typed extractors,
     // or 404 if the route doesn't match - either way, not 200
     assert_ne!(resp.status(), StatusCode::OK);
+}
+
+/// Create two users, an event, two merch items, matching inventory, and run the
+/// matcher so the users have a PENDING match. Returns
+/// (match_id, user1_id, user2_id, merch_a_id, merch_b_id).
+async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"uuid": "user1-camelcase-test", "deviceToken": "tok1"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user1: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user1_id = user1["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"uuid": "user2-camelcase-test", "deviceToken": "tok2"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user2: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user2_id = user2["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "CamelCase Trade Event", "creatorId": {}}}"#,
+                    user1_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+
+    async fn create_merch(pool: &PgPool, event_id: i64, name: &str) -> i64 {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(&format!("/api/v1/events/{}/merch", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"name": "{}", "photoUrl": "", "groupName": "Cards"}}"#,
+                        name
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let merch: serde_json::Value =
+            serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+        merch["id"].as_i64().unwrap()
+    }
+
+    let merch_a_id = create_merch(&pool, event_id, "Card A").await;
+    let merch_b_id = create_merch(&pool, event_id, "Card B").await;
+
+    for (uid, mid, status) in [
+        (user1_id, merch_a_id, "TRADE"),
+        (user1_id, merch_b_id, "WANT"),
+        (user2_id, merch_b_id, "TRADE"),
+        (user2_id, merch_a_id, "WANT"),
+    ] {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/user/inventory")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": 1}}"#,
+                        uid, mid, status
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    let matches_created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("Matching algorithm failed");
+    assert!(matches_created >= 1, "Should create at least 1 match");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!matches.is_empty());
+    let match_id = matches[0]["id"].as_i64().unwrap();
+    assert_eq!(matches[0]["status"], "PENDING");
+
+    (match_id, user1_id, user2_id, merch_a_id, merch_b_id)
+}
+
+#[tokio::test]
+async fn test_offer_with_frontend_proto3_json() {
+    let pool = setup_test_pool().await;
+    let (match_id, user1_id, _user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    // Frontend sends proto3 JSON (camelCase) from OfferTradeRequest.toProto3Json().
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
+                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
+                    ]}}"#,
+                    user1_id, merch_a_id, merch_b_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(matches[0]["status"], "OFFERED");
+    assert_eq!(matches[0]["offeredBy"], user1_id);
 }
 
 #[tokio::test]
@@ -3699,7 +3887,7 @@ async fn test_apply_inventory_on_non_completed_rejected() {
                 .method("POST")
                 .uri("/api/v1/matches/99999/apply-inventory")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"user_id": 1}"#))
+                .body(Body::from(r#"{"userId": 1}"#))
                 .unwrap(),
         )
         .await
@@ -3734,7 +3922,7 @@ async fn create_test_user_and_event(pool: PgPool, uuid: &str, event_name: &str) 
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "{}", "creator_id": {}}}"#,
+                    r#"{{"name": "{}", "creatorId": {}}}"#,
                     event_name, user_id
                 )))
                 .unwrap(),
@@ -3762,7 +3950,7 @@ async fn test_create_group_via_dialog() {
                 .uri(&format!("/api/v1/events/{}/groups", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Keychains", "description": "Handmade keychains only"}}"#,
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Keychains", "description": "Handmade keychains only"}}"#,
                     event_id, user_id
                 )))
                 .unwrap(),
@@ -3772,12 +3960,12 @@ async fn test_create_group_via_dialog() {
     assert_eq!(resp.status(), StatusCode::OK);
     let group: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(group["group_name"].as_str().unwrap(), "Keychains");
+    assert_eq!(group["groupName"].as_str().unwrap(), "Keychains");
     assert_eq!(
         group["description"].as_str().unwrap(),
         "Handmade keychains only"
     );
-    assert_eq!(group["created_by"].as_i64().unwrap(), user_id);
+    assert_eq!(group["createdBy"].as_i64().unwrap(), user_id);
     assert!(group["id"].as_i64().is_some());
 
     // Re-creating same group is idempotent (upsert); description can be updated.
@@ -3789,7 +3977,7 @@ async fn test_create_group_via_dialog() {
                 .uri(&format!("/api/v1/events/{}/groups", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Keychains", "description": "Updated"}}"#,
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Keychains", "description": "Updated"}}"#,
                     event_id, user_id
                 )))
                 .unwrap(),
@@ -3800,7 +3988,7 @@ async fn test_create_group_via_dialog() {
     let group: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(group["description"].as_str().unwrap(), "Updated");
-    assert_eq!(group["created_by"].as_i64().unwrap(), user_id);
+    assert_eq!(group["createdBy"].as_i64().unwrap(), user_id);
 
     // List groups for event
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -3819,7 +4007,7 @@ async fn test_create_group_via_dialog() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let groups = body["groups"].as_array().unwrap();
     assert_eq!(groups.len(), 1);
-    assert_eq!(groups[0]["group_name"].as_str().unwrap(), "Keychains");
+    assert_eq!(groups[0]["groupName"].as_str().unwrap(), "Keychains");
 }
 
 #[tokio::test]
@@ -3837,7 +4025,7 @@ async fn test_update_group_description() {
                 .uri(&format!("/api/v1/events/{}/groups", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Pins", "description": "original"}}"#,
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "original"}}"#,
                     event_id, creator_id
                 )))
                 .unwrap(),
@@ -3855,7 +4043,7 @@ async fn test_update_group_description() {
                 .uri(&format!("/api/v1/events/{}/groups/Pins", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Pins", "description": "updated by creator"}}"#,
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "updated by creator"}}"#,
                     event_id, creator_id
                 )))
                 .unwrap(),
@@ -3878,7 +4066,7 @@ async fn test_update_group_description() {
                 .uri(&format!("/api/v1/events/{}/groups/Pins", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Pins", "description": "hostile update"}}"#,
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "hostile update"}}"#,
                     event_id, other_id
                 )))
                 .unwrap(),
@@ -3909,7 +4097,12 @@ async fn test_implicit_group_via_first_merch() {
         .unwrap();
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["groups"].as_array().unwrap().len(), 0);
+    assert_eq!(
+        body.get("groups")
+            .and_then(|v| v.as_array())
+            .map_or(0, |g| g.len()),
+        0
+    );
 
     // Create first merch in a new group — should auto-create the group row
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -3920,7 +4113,7 @@ async fn test_implicit_group_via_first_merch() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "First item", "group_name": "Auto Group", "creator_id": {}}}"#,
+                    r#"{{"name": "First item", "groupName": "Auto Group", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -3931,7 +4124,7 @@ async fn test_implicit_group_via_first_merch() {
     let merch: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     // No description set yet
-    assert!(merch["group_description"].is_null());
+    assert!(merch["groupDescription"].is_null());
 
     // List groups — should now show "Auto Group" with this user as creator
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -3949,8 +4142,8 @@ async fn test_implicit_group_via_first_merch() {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let groups = body["groups"].as_array().unwrap();
     assert_eq!(groups.len(), 1);
-    assert_eq!(groups[0]["group_name"].as_str().unwrap(), "Auto Group");
-    assert_eq!(groups[0]["created_by"].as_i64().unwrap(), user_id);
+    assert_eq!(groups[0]["groupName"].as_str().unwrap(), "Auto Group");
+    assert_eq!(groups[0]["createdBy"].as_i64().unwrap(), user_id);
 }
 
 #[tokio::test]
@@ -3968,7 +4161,7 @@ async fn test_merch_includes_group_description() {
                 .uri(&format!("/api/v1/events/{}/groups", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"event_id": {}, "user_id": {}, "group_name": "Stickers", "description": "Vinyl stickers"}}"#,
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Stickers", "description": "Vinyl stickers"}}"#,
                     event_id, creator_id
                 )))
                 .unwrap(),
@@ -3986,7 +4179,7 @@ async fn test_merch_includes_group_description() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Cat sticker", "group_name": "Stickers", "creator_id": {}}}"#,
+                    r#"{{"name": "Cat sticker", "groupName": "Stickers", "creatorId": {}}}"#,
                     creator_id
                 )))
                 .unwrap(),
@@ -3997,7 +4190,7 @@ async fn test_merch_includes_group_description() {
     let merch: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(
-        merch["group_description"].as_str().unwrap(),
+        merch["groupDescription"].as_str().unwrap(),
         "Vinyl stickers"
     );
 
@@ -4018,7 +4211,7 @@ async fn test_merch_includes_group_description() {
     let items = body.as_array().unwrap();
     assert_eq!(items.len(), 1);
     assert_eq!(
-        items[0]["group_description"].as_str().unwrap(),
+        items[0]["groupDescription"].as_str().unwrap(),
         "Vinyl stickers"
     );
 }
@@ -4044,7 +4237,7 @@ async fn test_notification_counts_values() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Card A", "group_name": "cards", "creator_id": {}}}"#,
+                    r#"{{"name": "Card A", "groupName": "cards", "creatorId": {}}}"#,
                     u1
                 )))
                 .unwrap(),
@@ -4063,7 +4256,7 @@ async fn test_notification_counts_values() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Card B", "group_name": "cards", "creator_id": {}}}"#,
+                    r#"{{"name": "Card B", "groupName": "cards", "creatorId": {}}}"#,
                     u2
                 )))
                 .unwrap(),
@@ -4084,7 +4277,7 @@ async fn test_notification_counts_values() {
                     .uri(&format!("/api/v1/user/{}/inventory", user_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"user_id": {}, "merch_id": {}, "status": "WANT", "quantity": 1}}"#,
+                        r#"{{"userId": {}, "merchId": {}, "status": "WANT", "quantity": 1}}"#,
                         user_id, merch_id
                     )))
                     .unwrap(),
@@ -4099,7 +4292,7 @@ async fn test_notification_counts_values() {
                     .uri(&format!("/api/v1/user/{}/inventory", user_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"user_id": {}, "merch_id": {}, "status": "TRADE", "quantity": 1}}"#,
+                        r#"{{"userId": {}, "merchId": {}, "status": "TRADE", "quantity": 1}}"#,
                         user_id,
                         if user_id == u1 { m_a_id } else { m_b_id }
                     )))
@@ -4135,11 +4328,11 @@ async fn test_notification_counts_values() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["pending_matches"].as_i64().unwrap(), 1);
-    assert_eq!(body["offers_in"].as_i64().unwrap(), 0);
-    assert_eq!(body["accepted"].as_i64().unwrap(), 0);
-    assert_eq!(body["unread_messages"].as_i64().unwrap(), 0);
-    assert_eq!(body["total"].as_i64().unwrap(), 1);
+    assert_eq!(json_i64(&body, "pendingMatches"), 1);
+    assert_eq!(json_i64(&body, "offersIn"), 0);
+    assert_eq!(json_i64(&body, "accepted"), 0);
+    assert_eq!(json_i64(&body, "unreadMessages"), 0);
+    assert_eq!(json_i64(&body, "total"), 1);
 
     // User2 should also see pending=1 (they are a participant)
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -4155,7 +4348,7 @@ async fn test_notification_counts_values() {
         .unwrap();
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["pending_matches"].as_i64().unwrap(), 1);
+    assert_eq!(json_i64(&body, "pendingMatches"), 1);
 
     // ---- Transition to OFFERED via u1; send a message from u2 (unread for u1) ----
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -4166,7 +4359,7 @@ async fn test_notification_counts_values() {
                 .uri(&format!("/api/v1/matches/{}/offer", match_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "items": [{{"merch_id": {}, "direction": "GIVE", "quantity": 1}}]}}"#,
+                    r#"{{"userId": {}, "items": [{{"merchId": {}, "direction": "GIVE", "quantity": 1}}]}}"#,
                     u1, m_a_id
                 )))
                 .unwrap(),
@@ -4184,7 +4377,7 @@ async fn test_notification_counts_values() {
                 .uri(&format!("/api/v1/matches/{}/messages", match_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"match_id": {}, "sender_id": {}, "content": "hi", "message_type": "TEXT"}}"#,
+                    r#"{{"matchId": {}, "senderId": {}, "content": "hi", "messageType": "TEXT"}}"#,
                     match_id, u2
                 )))
                 .unwrap(),
@@ -4209,11 +4402,11 @@ async fn test_notification_counts_values() {
         .unwrap();
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["pending_matches"].as_i64().unwrap(), 0);
-    assert_eq!(body["offers_in"].as_i64().unwrap(), 0);
-    assert_eq!(body["accepted"].as_i64().unwrap(), 0);
-    assert_eq!(body["unread_messages"].as_i64().unwrap(), 1);
-    assert_eq!(body["total"].as_i64().unwrap(), 1);
+    assert_eq!(json_i64(&body, "pendingMatches"), 0);
+    assert_eq!(json_i64(&body, "offersIn"), 0);
+    assert_eq!(json_i64(&body, "accepted"), 0);
+    assert_eq!(json_i64(&body, "unreadMessages"), 1);
+    assert_eq!(json_i64(&body, "total"), 1);
 
     // Query counts for u2 (the non-offerer): pending=0, offers_in=1 (u2 sees
     // u1's offer as an incoming offer), unread=0 (u2 sent the message; doesn't
@@ -4231,11 +4424,11 @@ async fn test_notification_counts_values() {
         .unwrap();
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["pending_matches"].as_i64().unwrap(), 0);
-    assert_eq!(body["offers_in"].as_i64().unwrap(), 1);
-    assert_eq!(body["accepted"].as_i64().unwrap(), 0);
-    assert_eq!(body["unread_messages"].as_i64().unwrap(), 0);
-    assert_eq!(body["total"].as_i64().unwrap(), 1);
+    assert_eq!(json_i64(&body, "pendingMatches"), 0);
+    assert_eq!(json_i64(&body, "offersIn"), 1);
+    assert_eq!(json_i64(&body, "accepted"), 0);
+    assert_eq!(json_i64(&body, "unreadMessages"), 0);
+    assert_eq!(json_i64(&body, "total"), 1);
 
     // ---- u1 marks their matches_read_at = NOW; unread should drop to 0 ----
     let _ = sqlx::query("UPDATE users SET matches_read_at = NOW() WHERE id = $1")
@@ -4257,8 +4450,8 @@ async fn test_notification_counts_values() {
         .unwrap();
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["unread_messages"].as_i64().unwrap(), 0);
-    assert_eq!(body["total"].as_i64().unwrap(), 0); // all zeros for u1 now
+    assert_eq!(json_i64(&body, "unreadMessages"), 0);
+    assert_eq!(json_i64(&body, "total"), 0); // all zeros for u1 now
 
     // ---- Transition OFFERED -> ACCEPTED: counts should change again ----
     // Note: the offer's "offeree" is u2; for ACCEPTED, the user_id in
@@ -4289,10 +4482,10 @@ async fn test_notification_counts_values() {
         .unwrap();
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    assert_eq!(body["pending_matches"].as_i64().unwrap(), 0);
-    assert_eq!(body["offers_in"].as_i64().unwrap(), 0);
-    assert_eq!(body["accepted"].as_i64().unwrap(), 1);
-    assert_eq!(body["total"].as_i64().unwrap(), 1);
+    assert_eq!(json_i64(&body, "pendingMatches"), 0);
+    assert_eq!(json_i64(&body, "offersIn"), 0);
+    assert_eq!(json_i64(&body, "accepted"), 1);
+    assert_eq!(json_i64(&body, "total"), 1);
 }
 
 #[tokio::test]
@@ -4315,7 +4508,7 @@ async fn test_upsert_response_shape_preserved() {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "Sticker", "group_name": "stickers", "creator_id": {}}}"#,
+                    r#"{{"name": "Sticker", "groupName": "stickers", "creatorId": {}}}"#,
                     creator_id
                 )))
                 .unwrap(),
@@ -4336,7 +4529,7 @@ async fn test_upsert_response_shape_preserved() {
                 .uri("/api/v1/user/inventory")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"user_id": {}, "merch_id": {}, "status": "HAVE", "quantity": 2}}"#,
+                    r#"{{"userId": {}, "merchId": {}, "status": "HAVE", "quantity": 2}}"#,
                     creator_id, merch_id
                 )))
                 .unwrap(),
@@ -4354,24 +4547,24 @@ async fn test_upsert_response_shape_preserved() {
     // - merch_name must be present and equal to "" (not null, not missing)
     // - photo_url and group_name are optional fields; when None, the proto3
     //   JSON encoding omits them from the response body (not serialized as
-    //   null). So `body.get("photo_url")` returns Value::Null and the key
+    //   null). So `body.get("photoUrl")` returns Value::Null and the key
     //   is absent — both shapes are acceptable per the test.
     assert!(
-        body.get("merch_name").is_some(),
+        body.get("merchName").is_some(),
         "merch_name must be present"
     );
     assert_eq!(
-        body["merch_name"].as_str().unwrap(),
+        body["merchName"].as_str().unwrap(),
         "",
         "merch_name must be Some(\"\") not null"
     );
-    let photo_url = body.get("photo_url");
+    let photo_url = body.get("photoUrl");
     assert!(
         photo_url.is_none() || photo_url.and_then(|v| v.as_str()).is_none(),
         "photo_url must be absent or null, got: {:?}",
         photo_url
     );
-    let group_name = body.get("group_name");
+    let group_name = body.get("groupName");
     assert!(
         group_name.is_none() || group_name.and_then(|v| v.as_str()).is_none(),
         "group_name must be absent or null, got: {:?}",
@@ -4380,8 +4573,8 @@ async fn test_upsert_response_shape_preserved() {
     // After the TRUNCATE ... RESTART IDENTITY in setup_test_pool, the
     // first inserted inventory row gets id=1.
     assert_eq!(body["id"].as_i64().unwrap(), 1);
-    assert_eq!(body["user_id"].as_i64().unwrap(), creator_id);
-    assert_eq!(body["merch_id"].as_i64().unwrap(), merch_id);
+    assert_eq!(body["userId"].as_i64().unwrap(), creator_id);
+    assert_eq!(body["merchId"].as_i64().unwrap(), merch_id);
     assert_eq!(body["status"].as_str().unwrap(), "HAVE");
     assert_eq!(body["quantity"].as_i64().unwrap(), 2);
 }

@@ -19,6 +19,7 @@ tower-http = { version = "0.6.8", features = ["cors", "fs"] }
 governor = "0.10"
 prost = "0.12"
 prost-types = "0.12"
+pbjson = "0.6.0"
 sysinfo = "0.38.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 urlencoding = "2"

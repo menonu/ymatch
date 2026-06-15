@@ -75,8 +75,8 @@ tasks:
     cmds:
       - cargo llvm-cov test --no-report -- --test-threads=1
       - mkdir -p coverage
-      - cargo llvm-cov report --html --output-dir coverage/html
-      - cargo llvm-cov report --lcov --output-path coverage/lcov.info
-      - cargo llvm-cov report --summary-only
+      - cargo llvm-cov report --html --output-dir coverage/html --ignore-filename-regex 'generated/'
+      - cargo llvm-cov report --lcov --output-path coverage/lcov.info --ignore-filename-regex 'generated/'
+      - cargo llvm-cov report --summary-only --ignore-filename-regex 'generated/'
       - cmd: 'echo "HTML:  backend/coverage/html/index.html"'
       - cmd: 'echo "lcov:  backend/coverage/lcov.info"'
