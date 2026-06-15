@@ -327,7 +327,8 @@ impl MerchandiseRepository {
 
 /// SELECT list for the merch columns in isolation. Use this for INSERT/UPDATE
 /// RETURNING paths that don't join to merchandise_groups.
-const MERCH_COLUMNS: &str = "id, event_id, name, photo_url, group_name, status, is_deleted, trade_enabled, creator_id";
+const MERCH_COLUMNS: &str =
+    "id, event_id, name, photo_url, group_name, status, is_deleted, trade_enabled, creator_id";
 
 /// SELECT list joined to `merchandise_groups` so each row carries the
 /// `group_description` (Issue #128).
