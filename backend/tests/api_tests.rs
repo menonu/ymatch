@@ -4578,3 +4578,205 @@ async fn test_upsert_response_shape_preserved() {
     assert_eq!(body["status"].as_str().unwrap(), "HAVE");
     assert_eq!(body["quantity"].as_i64().unwrap(), 2);
 }
+
+// Regression test for #224: apply_inventory panicked with
+// `UnexpectedNullError` when a match contained merch with a NULL
+// `photo_url`. The match_items SQL in `backend/src/repositories/match_.rs`
+// decoded `m.photo_url` as a non-nullable `String`, which cannot
+// accept NULL. The fix decodes as `Option<String>` (matching the
+// proto's `optional string photo_url`).
+//
+// This test walks the full lifecycle (PENDING -> OFFERED -> ACCEPTED
+// -> COMPLETED -> apply-inventory) for two users whose merch has no
+// photo_url, and asserts that apply-inventory returns 200 (i.e. does
+// not panic the worker thread, which previously would have produced
+// an empty 502/503 response).
+#[tokio::test]
+async fn test_apply_inventory_handles_null_photo_url() {
+    let pool = setup_test_pool().await;
+
+    // 1. Create two users
+    let user1_id = login_guest(&pool, "u1-photo-null", "tok1").await;
+    let user2_id = login_guest(&pool, "u2-photo-null", "tok2").await;
+
+    // 2. Create event
+    let event_id = create_event(&pool, "Photo Null Event", user1_id).await;
+
+    // 3. Create merch WITHOUT a photo_url. This is the trigger for
+    //    #224 — the panic only happens when photo_url IS NULL.
+    //    Both items share a group so the auto-matcher pairs them.
+    let card_a = create_merch(&pool, event_id, "Card A", "photo-null-group").await;
+    let card_b = create_merch(&pool, event_id, "Card B", "photo-null-group").await;
+
+    // Sanity check: photo_url is NULL.
+    let row: (Option<String>,) =
+        sqlx::query_as("SELECT photo_url FROM merchandise WHERE id = $1")
+            .bind(card_a)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        row.0.is_none(),
+        "test setup: card_a.photo_url should be NULL, got {:?}",
+        row.0
+    );
+
+    // 4. Set cross-trade inventory: user1 TRADES Card A + WANTs Card B;
+    //    user2 TRADES Card B + WANTs Card A.
+    set_inventory(&pool, user1_id, card_a, "TRADE", 1).await;
+    set_inventory(&pool, user1_id, card_b, "WANT", 1).await;
+    set_inventory(&pool, user2_id, card_b, "TRADE", 1).await;
+    set_inventory(&pool, user2_id, card_a, "WANT", 1).await;
+
+    // 5. Run the matcher directly (don't wait 60s for the periodic run).
+    backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher should run");
+
+    // 6. Find the PENDING match
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let matches = body.as_array().expect("matches is an array");
+    let match_id = matches
+        .iter()
+        .find(|m| m["status"].as_str() == Some("PENDING"))
+        .expect("at least one PENDING match should exist")["id"]
+        .as_i64()
+        .unwrap();
+
+    // 7. Walk the lifecycle
+    let offer_body = format!(
+        r#"{{"userId": {}, "items": [{{"merchId": {}, "direction": "GIVE", "quantity": 1}}, {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}]}}"#,
+        user1_id, card_a, card_b
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &offer_body
+        )
+        .await
+        .status(),
+        StatusCode::OK,
+        "offer should succeed"
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            r#"{"status": "ACCEPTED"}"#
+        )
+        .await
+        .status(),
+        StatusCode::OK,
+        "accept should succeed"
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            r#"{"status": "COMPLETED"}"#
+        )
+        .await
+        .status(),
+        StatusCode::OK,
+        "complete should succeed"
+    );
+
+    // 8. THE REGRESSION CHECK: apply-inventory used to panic with
+    //    `UnexpectedNullError` (the match_items query decoded
+    //    `m.photo_url` as a non-nullable `String`). After the fix
+    //    (decoding as `Option<String>`), this returns 200.
+    let apply_body = format!(r#"{{"userId": {}}}"#, user1_id);
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/apply-inventory", match_id),
+        &apply_body,
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "apply-inventory must not panic on NULL photo_url (issue #224)"
+    );
+}
+
+// --- Test helpers used by `test_apply_inventory_handles_null_photo_url` ---
+
+async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
+    let body = format!(r#"{{"uuid": "{}", "deviceToken": "{}"}}"#, uuid, device_token);
+    let resp = post_json(pool, "/api/v1/auth/guest", &body).await;
+    assert_eq!(resp.status(), StatusCode::OK, "guest login failed");
+    let v: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    v["id"].as_i64().unwrap()
+}
+
+async fn create_event(pool: &PgPool, name: &str, creator_id: i64) -> i64 {
+    let body = format!(r#"{{"name": "{}", "creatorId": {}}}"#, name, creator_id);
+    let resp = post_json(pool, "/api/v1/events", &body).await;
+    assert_eq!(resp.status(), StatusCode::OK, "create event failed");
+    let v: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    v["id"].as_i64().unwrap()
+}
+
+async fn create_merch(
+    pool: &PgPool,
+    event_id: i64,
+    name: &str,
+    group_name: &str,
+) -> i64 {
+    // Note: NO photoUrl, so photo_url stays NULL — this is the
+    // exact scenario that triggered the #224 panic.
+    let body = format!(
+        r#"{{"name": "{}", "groupName": "{}"}}"#,
+        name, group_name
+    );
+    let resp = post_json(pool, &format!("/api/v1/events/{}/merch", event_id), &body).await;
+    assert_eq!(resp.status(), StatusCode::OK, "create merch failed");
+    let v: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    v["id"].as_i64().unwrap()
+}
+
+async fn set_inventory(
+    pool: &PgPool,
+    user_id: i64,
+    merch_id: i64,
+    status: &str,
+    quantity: i32,
+) {
+    let body = format!(
+        r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": {}}}"#,
+        user_id, merch_id, status, quantity
+    );
+    let resp = post_json(pool, "/api/v1/user/inventory", &body).await;
+    assert_eq!(resp.status(), StatusCode::OK, "set inventory failed");
+}
+
+async fn post_json(pool: &PgPool, uri: &str, body: &str) -> axum::response::Response {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    app.oneshot(
+        Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
