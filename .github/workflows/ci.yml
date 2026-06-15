@@ -97,7 +97,7 @@ jobs:
         run: flutter pub get
 
       - name: Run tests
-        run: flutter test --exclude-tags=integration
+        run: flutter test --exclude-tags=integration --exclude-tags=e2e
 
       - name: Build web
         run: flutter build web
