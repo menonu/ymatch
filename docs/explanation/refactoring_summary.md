@@ -23,9 +23,9 @@ parse-and-delegate.
 > future type alias, and the `_conn` suffix on the 8 transactional
 > methods were all removed. The SQL ownership and the
 > `MatchLifecycleService` orchestration are unchanged from the
-> #163-era design. See
-> [`refactoring_post_191.md`](./refactoring_post_191.md) for the
-> current shape.
+> #163-era design. The post-#191 shape was documented on
+> [GitHub Issue #191](https://github.com/menonu/ymatch/issues/191)
+> (the closing comment).
 
 ## Phase Recap
 
