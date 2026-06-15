@@ -84,10 +84,10 @@ jobs:
         run: |
           mkdir -p coverage
           # lcov for local consumption / future badge generation.
-          cargo llvm-cov report --lcov --output-path coverage/lcov.info
+          cargo llvm-cov report --lcov --output-path coverage/lcov.info --ignore-filename-regex 'generated/'
           # Text summary in stdout + GITHUB_STEP_SUMMARY (rendered
           # as a markdown box on the workflow run page).
-          cargo llvm-cov report --summary-only > coverage/summary.txt
+          cargo llvm-cov report --summary-only --ignore-filename-regex 'generated/' > coverage/summary.txt
           cat coverage/summary.txt
 
           # Write the same numbers to the step-summary in a small
