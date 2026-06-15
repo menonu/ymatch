@@ -2,7 +2,7 @@
 //!
 //! [`EventViewsRepository`] owns the `event_views` table operations. The
 //! struct holds a `PgPool` and exposes a plain `async fn` method (no
-//! `RepositoryFuture` boxing, no trait) so it can be stored in
+//! boxed-future return, no trait) so it can be stored in
 //! `Arc<EventViewsRepository>` in `AppState` and called from handlers.
 //!
 //! Phase B-1 of #191: migrated from the previous `trait EventViewsRepository +
