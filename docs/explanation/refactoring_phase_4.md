@@ -21,9 +21,9 @@ Last updated: 2026-06-10.
 > boxed-future type alias was deleted, and the 8 `_conn` transactional
 > methods were lifted to take a generic
 > `E: Executor<'c, Database = Postgres>` parameter (with bulk-INSERT
-> and CTE refactors for the two multi-statement methods). See
-> [`refactoring_post_191.md`](./refactoring_post_191.md) for the
-> current shape.
+> and CTE refactors for the two multi-statement methods). The post-#191
+> shape was documented on [GitHub Issue #191](https://github.com/menonu/ymatch/issues/191)
+> (the closing comment).
 
 ## Scope
 
