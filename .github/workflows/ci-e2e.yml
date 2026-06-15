@@ -43,8 +43,8 @@ jobs:
 
       - name: Build and start e2e stack
         run: |
-          docker compose -f docker-compose.e2e.yml build backend
-          docker compose -f docker-compose.e2e.yml up -d db backend
+          docker compose -f docker-compose.e2e.yml build e2e_backend
+          docker compose -f docker-compose.e2e.yml up -d e2e_db e2e_backend
 
       - name: Wait for backend health
         run: |
@@ -56,7 +56,7 @@ jobs:
             sleep 1
           done
           echo "Backend did not come up in 60s"
-          docker compose -f docker-compose.e2e.yml logs backend
+          docker compose -f docker-compose.e2e.yml logs e2e_backend
           exit 1
 
       - name: Setup Flutter
