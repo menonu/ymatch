@@ -64,7 +64,6 @@ pub fn merch_from_row(row: &sqlx::postgres::PgRow) -> Merchandise {
         name: row.get("name"),
         photo_url: row.get("photo_url"),
         group_name: row.get("group_name"),
-        sort_order: row.get::<Option<i32>, _>("sort_order"),
         status: Some(row.get("status")),
         is_deleted: Some(row.get("is_deleted")),
         trade_enabled: row.get("trade_enabled"),

@@ -21,7 +21,6 @@ use crate::error::AppError;
 use crate::generated::ymatch::{CreateMerchRequest, Merchandise, UpdateMerchRequest};
 use crate::handlers::mappers::merch_from_row;
 use sqlx::{PgPool, Row};
-use std::collections::HashMap;
 
 /// Outcome of [`MerchandiseRepository::delete_merch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,7 +79,7 @@ impl MerchandiseRepository {
             LEFT JOIN merchandise_groups g ON g.event_id = m.event_id AND g.group_name = m.group_name
             WHERE m.event_id = $1 AND m.is_deleted = false
             AND (m.status = 'published' OR m.creator_id = $2)
-            ORDER BY m.sort_order ASC, m.id ASC"#,
+            ORDER BY m.id ASC"#,
             MERCH_SELECT
         );
         let rows = sqlx::query(&sql)
@@ -324,32 +323,12 @@ impl MerchandiseRepository {
             .await?;
         Ok(row.map(|r| r.get::<Option<i32>, _>("creator_id")))
     }
-
-    /// Update the `sort_order` of multiple merch rows in a single
-    /// transaction. Used by `merch::update_merch_sort_order`.
-    pub async fn update_sort_orders(
-        &self,
-        event_id: i32,
-        orders: HashMap<i32, i32>,
-    ) -> Result<(), AppError> {
-        let mut tx = self.pool.begin().await?;
-        for (merch_id, sort_order) in orders {
-            sqlx::query("UPDATE merchandise SET sort_order = $1 WHERE id = $2 AND event_id = $3")
-                .bind(sort_order)
-                .bind(merch_id)
-                .bind(event_id)
-                .execute(&mut *tx)
-                .await?;
-        }
-        tx.commit().await?;
-        Ok(())
-    }
 }
 
 /// SELECT list for the merch columns in isolation. Use this for INSERT/UPDATE
 /// RETURNING paths that don't join to merchandise_groups.
-const MERCH_COLUMNS: &str = "id, event_id, name, photo_url, group_name, sort_order, status, is_deleted, trade_enabled, creator_id";
+const MERCH_COLUMNS: &str = "id, event_id, name, photo_url, group_name, status, is_deleted, trade_enabled, creator_id";
 
 /// SELECT list joined to `merchandise_groups` so each row carries the
 /// `group_description` (Issue #128).
-const MERCH_SELECT: &str = "m.id, m.event_id, m.name, m.photo_url, m.group_name, m.sort_order, m.status, m.is_deleted, m.trade_enabled, m.creator_id, COALESCE(g.description, '') AS group_description";
+const MERCH_SELECT: &str = "m.id, m.event_id, m.name, m.photo_url, m.group_name, m.status, m.is_deleted, m.trade_enabled, m.creator_id, COALESCE(g.description, '') AS group_description";
