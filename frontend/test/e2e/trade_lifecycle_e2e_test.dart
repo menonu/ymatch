@@ -131,10 +131,16 @@ Future<int> _guestLogin(ApiClient api) async {
   return (r as Map)['id'] as int;
 }
 
-Future<int> _createEvent(ApiClient api, String name) async {
+Future<int> _createEvent(
+  ApiClient api, {
+  required String name,
+  required int creatorId,
+}) async {
+  // CreateEventRequest has only: name, creatorId, status (optional).
+  // No `description` field — that was my mistake.
   final r = await api.post('/api/v1/events', {
     'name': name,
-    'description': 'E2E test event',
+    'creatorId': creatorId,
   });
   return (r as Map)['id'] as int;
 }
@@ -143,31 +149,33 @@ Future<int> _createMerch(
   ApiClient api, {
   required int eventId,
   required String name,
-  required int quantity,
+  String? groupName,
 }) async {
-  final r = await api.post('/api/v1/merchandise', {
-    'eventId': eventId,
-    'name': name,
-    'quantity': quantity,
-    'isTradeable': true,
-  });
+  // POST /api/v1/events/{event_id}/merch (event_id is in the path, not
+  // the body). CreateMerchRequest has: name, photoUrl, groupName,
+  // creatorId, status. No `quantity` or `isTradeable` — those are
+  // inventory concepts, not merch concepts.
+  final body = <String, dynamic>{'name': name};
+  if (groupName != null) body['groupName'] = groupName;
+  final r = await api.post('/api/v1/events/$eventId/merch', body);
   return (r as Map)['id'] as int;
 }
 
 Future<void> _setInventory(
   ApiClient api, {
   required int userId,
-  required int eventId,
   required int merchId,
   required String status,
   int quantity = 1,
 }) async {
+  // POST /api/v1/user/inventory. UpdateInventoryRequest has:
+  // userId, merchId, status, quantity. No `eventId` — merchId
+  // already determines the event.
   // Backend auth model: user_id is passed in the body. The ApiClient
   // does not track the current user — that is the provider's job in
   // the real app. For E2E we pass user_id explicitly.
-  await api.post('/api/v1/inventory', {
+  await api.post('/api/v1/user/inventory', {
     'userId': userId,
-    'eventId': eventId,
     'merchId': merchId,
     'status': status,
     'quantity': quantity,
@@ -215,18 +223,21 @@ void main() {
     expect(u1Id, isNot(u2Id));
 
     // 3. Create one event, then two pieces of merch in it.
-    final eventId =
-        await _createEvent(api, 'E2E event ${DateTime.now().millisecondsSinceEpoch}');
-    final cardA = await _createMerch(api, eventId: eventId, name: 'Card A', quantity: 5);
-    final cardB = await _createMerch(api, eventId: eventId, name: 'Card B', quantity: 5);
+    final eventId = await _createEvent(
+      api,
+      name: 'E2E event ${DateTime.now().millisecondsSinceEpoch}',
+      creatorId: u1Id,
+    );
+    final cardA = await _createMerch(api, eventId: eventId, name: 'Card A');
+    final cardB = await _createMerch(api, eventId: eventId, name: 'Card B');
 
     // 4. Set up the cross-trade inventory:
     //    user1 HAS Card A and WANTS Card B.
     //    user2 HAS Card B and WANTS Card A.
-    await _setInventory(api, userId: u1Id, eventId: eventId, merchId: cardA, status: 'HAVE');
-    await _setInventory(api, userId: u1Id, eventId: eventId, merchId: cardB, status: 'WANT');
-    await _setInventory(api, userId: u2Id, eventId: eventId, merchId: cardB, status: 'HAVE');
-    await _setInventory(api, userId: u2Id, eventId: eventId, merchId: cardA, status: 'WANT');
+    await _setInventory(api, userId: u1Id, merchId: cardA, status: 'HAVE');
+    await _setInventory(api, userId: u1Id, merchId: cardB, status: 'WANT');
+    await _setInventory(api, userId: u2Id, merchId: cardB, status: 'HAVE');
+    await _setInventory(api, userId: u2Id, merchId: cardA, status: 'WANT');
 
     // 5. Wait for the auto-matcher to produce a PENDING match.
     final matchId = await _waitForPendingMatch(
