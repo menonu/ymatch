@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ---------------------------------------------------
 # Stage 1: Build Environment
 # ---------------------------------------------------
@@ -8,17 +9,25 @@ RUN apt-get update && apt-get install -y curl git unzip xz-utils zip libglu1-mes
 
 # Set up Flutter
 WORKDIR /opt
-RUN git clone https://github.com/flutter/flutter.git -b stable
+# Cache the Flutter SDK checkout and pub-cache so `flutter pub get` and
+# subsequent builds reuse downloaded artifacts across `docker compose build`
+# runs. Requires BuildKit (default in Docker 23+).
+RUN --mount=type=cache,target=/opt/flutter \
+    git clone https://github.com/flutter/flutter.git -b stable
 ENV PATH="/opt/flutter/bin:${PATH}"
 
 # Pre-cache Flutter artifacts
-RUN flutter precache --web
+RUN --mount=type=cache,target=/opt/flutter \
+    --mount=type=cache,target=/root/.pub-cache \
+    flutter precache --web
 
 WORKDIR /app
 
 # Copy dependency files first
 COPY frontend/pubspec.yaml frontend/pubspec.lock ./
-RUN flutter pub get
+RUN --mount=type=cache,target=/opt/flutter \
+    --mount=type=cache,target=/root/.pub-cache \
+    flutter pub get
 
 # Copy source code and proto files
 COPY frontend ./
@@ -28,7 +37,9 @@ COPY proto /proto
 # API_BASE_URL can be set at build time (e.g., for OCI deployment behind reverse proxy)
 ARG API_BASE_URL=""
 ARG GIT_HASH=""
-RUN if [ -n "$API_BASE_URL" ]; then \
+RUN --mount=type=cache,target=/opt/flutter \
+    --mount=type=cache,target=/root/.pub-cache \
+    if [ -n "$API_BASE_URL" ]; then \
       flutter build web --release --dart-define=API_BASE_URL=$API_BASE_URL --dart-define=GIT_HASH=$GIT_HASH; \
     else \
       flutter build web --release --dart-define=GIT_HASH=$GIT_HASH; \

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ---------------------------------------------------
 # Stage 1: Build Environment
 # ---------------------------------------------------
@@ -11,8 +12,14 @@ WORKDIR /usr/src/ymatch_backend
 # Cache dependencies by copying Cargo.toml and Cargo.lock first
 COPY backend/Cargo.toml backend/Cargo.lock ./
 
-# Create dummy source files to build dependencies
-RUN mkdir src && \
+# Create dummy source files to build dependencies.
+# Use BuildKit cache mounts for /usr/local/cargo (registry + git deps)
+# and the target dir so they persist across `docker compose build` runs.
+# Requires BuildKit (default in Docker 23+).
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/usr/src/ymatch_backend/target,sharing=locked \
+    mkdir src && \
     echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs && \
     cargo build --release && \
     rm -rf src
@@ -25,10 +32,14 @@ COPY backend/migrations ./migrations
 # We need the proto definitions to generate Rust code
 COPY proto /usr/src/proto
 
-# Build the real application
+# Build the real application. Reuses the same cache mounts, so
+# unchanged crates do not recompile.
 ARG GIT_HASH=unknown
 ENV GIT_HASH=$GIT_HASH
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/usr/src/ymatch_backend/target,sharing=locked \
+    cargo build --release
 
 # ---------------------------------------------------
 # Stage 2: Runtime Environment
