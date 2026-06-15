@@ -5,6 +5,26 @@
 Tracked by GitHub Issues #163 (parent), #167 (Phase 4 sub-issue).
 Last updated: 2026-06-10.
 
+> **Post-#191 evolution (supersedes this doc for the trait/dyn shape)**
+>
+> This document describes the **initial Phase 4 shape** where each
+> repository was a `trait XxxRepository + struct PgXxxRepository`
+> pair with `Arc<dyn XxxRepository>` in `AppState`. The
+> `MatchLifecycleService` ownership of the multi-statement
+> transactions and the SQL ownership (all SQL for a table lives in
+> its repository file) **are still current** and remain the
+> architectural backbone.
+>
+> What changed in the post-#191 era (PRs #192 through #210) is the
+> **trait/dyn indirection**: the trait was removed, the `dyn`
+> variant was removed from `AppState`, the `RepositoryFuture`
+> boxed-future type alias was deleted, and the 8 `_conn` transactional
+> methods were lifted to take a generic
+> `E: Executor<'c, Database = Postgres>` parameter (with bulk-INSERT
+> and CTE refactors for the two multi-statement methods). See
+> [`refactoring_post_191.md`](./refactoring_post_191.md) for the
+> current shape.
+
 ## Scope
 
 Replace the 637 lines of handlers in `matches.rs` (507), `inventory.rs` (74),
