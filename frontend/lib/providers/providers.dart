@@ -85,7 +85,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
       final json = await client.post('/api/v1/auth/guest', {
         'uuid': uuid,
-        'device_token': mockDeviceToken,
+        'deviceToken': mockDeviceToken,
       });
       final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
@@ -123,7 +123,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       final json = await client.post('/api/v1/auth/signup', {
         'username': username,
         'password': password,
-        'device_token': 'web-v1',
+        'deviceToken': 'web-v1',
       });
       final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
@@ -143,7 +143,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> updateUsername(int userId, String newUsername) async {
     final data = await client.put('/api/v1/users/$userId', {
-      'user_id': userId,
+      'userId': userId,
       'username': newUsername,
     });
     final user = User()..mergeFromProto3Json(data);
@@ -213,7 +213,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     try {
       final body = <String, dynamic>{
         'name': name,
-        'creator_id': creatorId,
+        'creatorId': creatorId,
       };
       if (status != null) body['status'] = status;
       await client.post('/api/v1/events', body);
@@ -228,8 +228,8 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     // but we can just fire and forget, then invalidate the provider.
     try {
       await client.post('/api/v1/events/$eventId/favorite', {
-        'user_id': userId,
-        'is_favorite': isFavorite,
+        'userId': userId,
+        'isFavorite': isFavorite,
       });
     } catch (e) {
       // Handle error if needed
@@ -244,9 +244,9 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   ) async {
     try {
       await client.post('/api/v1/events/$eventId/favorite_group', {
-        'user_id': userId,
-        'group_name': groupName,
-        'is_favorite': isFavorite,
+        'userId': userId,
+        'groupName': groupName,
+        'isFavorite': isFavorite,
       });
     } catch (e) {
       // Handle error if needed
@@ -255,7 +255,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> registerView(int eventId, int userId) async {
     try {
-      await client.post('/api/v1/events/$eventId/view', {'user_id': userId});
+      await client.post('/api/v1/events/$eventId/view', {'userId': userId});
     } catch (e) {
       // Ignore errors for analytics
     }
@@ -265,7 +265,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await client.put('/api/v1/events/$eventId', {
-        'user_id': userId,
+        'userId': userId,
         'name': name,
       });
       state = const AsyncValue.data(null);
@@ -291,7 +291,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       final eventJson = await client.post('/api/v1/events', {
         'name':
             'Debug Event ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        'creator_id': creatorId,
+        'creatorId': creatorId,
       });
       final event = Event()..mergeFromProto3Json(eventJson);
 
@@ -315,10 +315,9 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
 
           futures.add(
             client.post('/api/v1/events/${event.id}/merch', {
-              'event_id': event.id,
               'name': '${groups[g]} #$i',
-              'photo_url': photoUrl,
-              'group_name': groups[g],
+              'photoUrl': photoUrl,
+              'groupName': groups[g],
             }),
           );
         }
@@ -369,20 +368,23 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       final payload = <String, dynamic>{
-        'event_id': eventId,
         'name': name,
-        'photo_url': photoUrl,
+        'photoUrl': photoUrl,
       };
       if (groupName != null && groupName.isNotEmpty) {
-        payload['group_name'] = groupName;
+        payload['groupName'] = groupName;
       }
-      if (creatorId != null) payload['creator_id'] = creatorId;
+      if (creatorId != null) payload['creatorId'] = creatorId;
       if (status != null) payload['status'] = status;
 
       await client.post('/api/v1/events/$eventId/merch', payload);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #227: rethrow so the caller can show a real error message.
+      // Without this, the add_merch_screen shows a misleading
+      // "Added successfully" SnackBar on 422.
+      rethrow;
     }
   }
 
@@ -396,10 +398,10 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      final payload = <String, dynamic>{'user_id': userId};
+      final payload = <String, dynamic>{'userId': userId};
       if (name != null) payload['name'] = name;
-      if (photoUrl != null) payload['photo_url'] = photoUrl;
-      if (groupName != null) payload['group_name'] = groupName;
+      if (photoUrl != null) payload['photoUrl'] = photoUrl;
+      if (groupName != null) payload['groupName'] = groupName;
       await client.put('/api/v1/events/$eventId/merch/$merchId', payload);
       state = const AsyncValue.data(null);
     } catch (e, st) {
@@ -484,8 +486,8 @@ class UserInventoryNotifier
     try {
       final client = ref.read(apiClientProvider);
       await client.post('/api/v1/user/inventory', {
-        'user_id': userId,
-        'merch_id': merchId,
+        'userId': userId,
+        'merchId': merchId,
         'status': status,
         'quantity': quantity,
       });
@@ -579,7 +581,7 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await client
-          .post('/api/v1/events/$eventId/publish', {'user_id': userId});
+          .post('/api/v1/events/$eventId/publish', {'userId': userId});
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -591,7 +593,7 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     try {
       await client.post(
           '/api/v1/events/$eventId/merch/$merchId/publish',
-          {'user_id': userId});
+          {'userId': userId});
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
