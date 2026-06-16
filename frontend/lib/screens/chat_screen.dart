@@ -56,8 +56,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       final client = ref.read(apiClientProvider);
       await client.post('/api/v1/matches/${widget.matchId}/messages', {
-        'match_id': widget.matchId,
-        'sender_id': currentUser.id,
+        'matchId': widget.matchId,
+        'senderId': currentUser.id,
         'content': text,
       });
       ref.invalidate(messagesProvider(widget.matchId));

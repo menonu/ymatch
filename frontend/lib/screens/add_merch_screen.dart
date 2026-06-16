@@ -150,6 +150,20 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
           ),
         );
       }
+    } catch (e) {
+      // #227: addMerch rethrows on failure. Show the real error so
+      // the user knows the merch was NOT added (instead of the
+      // previous "Added successfully" lie).
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add "$name": $e'),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isAdding = false);
