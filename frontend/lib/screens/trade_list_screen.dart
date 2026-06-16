@@ -102,7 +102,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     try {
       final client = ref.read(apiClientProvider);
       await client
-          .post('/api/v1/matches/$matchId/apply-inventory', {'user_id': userId});
+          .post('/api/v1/matches/$matchId/apply-inventory', {'userId': userId});
       ref.invalidate(matchesProvider(userId));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

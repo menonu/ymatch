@@ -182,12 +182,15 @@ void main() {
               return http.Response(jsonEncode(mockBackendState['merch']), 200);
             } else if (method == 'POST') {
               final body = jsonDecode(request.body);
+              // #227: request body now uses camelCase (proto3 JSON
+              // standard) since the frontend's MerchController was
+              // fixed. The mock has to match.
               final newMerch = {
                 'id': merchCounter++,
-                'event_id': body['event_id'],
+                'event_id': body['eventId'],
                 'name': body['name'],
-                'group_name': body['group_name'] ?? '',
-                'photo_url': body['photo_url'] ?? '',
+                'group_name': body['groupName'] ?? '',
+                'photo_url': body['photoUrl'] ?? '',
                 'status': 'published',
                 'is_deleted': false,
                 'trade_enabled': true,
@@ -215,16 +218,17 @@ void main() {
             final body = jsonDecode(request.body);
 
             // Update or add inventory
+            // #227: request body now uses camelCase.
             mockBackendState['inventory']!.removeWhere(
               (i) =>
-                  i['merch_id'] == body['merch_id'] &&
+                  i['merch_id'] == body['merchId'] &&
                   i['status'] == body['status'],
             );
             if (body['quantity'] > 0) {
               mockBackendState['inventory']!.add({
                 'id': 99,
-                'user_id': body['user_id'],
-                'merch_id': body['merch_id'],
+                'user_id': body['userId'],
+                'merch_id': body['merchId'],
                 'status': body['status'],
                 'quantity': body['quantity'],
                 'merch_name': 'mocked',
