@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=public.ecr.aws/docker/docker/dockerfile:1
 # ---------------------------------------------------
 # Stage 1: Build Environment
 # ---------------------------------------------------
