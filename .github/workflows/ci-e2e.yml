@@ -41,6 +41,19 @@ jobs:
           restore-keys: |
             buildx-${{ runner.os }}-e2e-backend-
 
+      - name: Pull E2E DB image with retry
+        run: |
+          IMAGE=public.ecr.aws/docker/library/postgres:16-alpine
+          for i in 1 2 3 4 5; do
+            echo "Pull attempt $i for $IMAGE..."
+            if docker pull "$IMAGE"; then
+              exit 0
+            fi
+            sleep $((2 ** (i - 1)))
+          done
+          echo "Failed to pull $IMAGE after 5 attempts"
+          exit 1
+
       - name: Build and start e2e stack
         run: |
           docker compose -f docker-compose.e2e.yml build e2e_backend
