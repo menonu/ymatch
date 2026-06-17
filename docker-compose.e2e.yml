@@ -47,6 +47,12 @@ services:
       RUST_LOG: info
       PORT: "3000"
       IMAGE_STORAGE: local
+      # E2E tests run many suites sequentially from the same IP; raise
+      # the per-IP limits so the test driver isn't throttled.
+      RATE_LIMIT_AUTH_PER_SECOND: "100"
+      RATE_LIMIT_AUTH_BURST: "200"
+      RATE_LIMIT_API_PER_SECOND: "1000"
+      RATE_LIMIT_API_BURST: "2000"
     ports:
       - "3000:3000"
     volumes:
