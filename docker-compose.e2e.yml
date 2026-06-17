@@ -53,6 +53,9 @@ services:
       RATE_LIMIT_AUTH_BURST: "200"
       RATE_LIMIT_API_PER_SECOND: "1000"
       RATE_LIMIT_API_BURST: "2000"
+      # Match-dependent E2E tests poll for a PENDING match. Lower the
+      # matcher interval so they don't wait a full minute for each one.
+      MATCHING_INTERVAL_SECONDS: "5"
     ports:
       - "3000:3000"
     volumes:
