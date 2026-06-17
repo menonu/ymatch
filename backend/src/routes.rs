@@ -13,6 +13,17 @@ use std::{net::IpAddr, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::handlers;
 use crate::repositories::event::EventRepository;
+
+/// Read a `NonZeroU32` rate-limit value from the environment, falling
+/// back to `default` when the variable is missing or invalid. Used to
+/// make the per-IP rate limiters configurable for load-testing and E2E.
+fn env_rate_limit(var: &str, default: u32) -> NonZeroU32 {
+    std::env::var(var)
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .and_then(NonZeroU32::new)
+        .unwrap_or_else(|| NonZeroU32::new(default).unwrap())
+}
 use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
 use crate::repositories::group::MerchandiseGroupRepository;
@@ -209,14 +220,18 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         .allow_methods(tower_http::cors::Any)
         .allow_headers(tower_http::cors::Any);
 
-    // Auth endpoints: strict — 3 req/s per IP, burst 5 (brute-force protection)
+    // Auth endpoints: strict — 3 req/s per IP, burst 5 (brute-force protection).
+    // Overridable via env vars so E2E tests don't trip the limiter.
     let auth_limiter = Arc::new(RateLimiter::keyed(
-        Quota::per_second(NonZeroU32::new(3).unwrap()).allow_burst(NonZeroU32::new(5).unwrap()),
+        Quota::per_second(env_rate_limit("RATE_LIMIT_AUTH_PER_SECOND", 3))
+            .allow_burst(env_rate_limit("RATE_LIMIT_AUTH_BURST", 5)),
     ));
 
-    // General API endpoints: relaxed — 30 req/s per IP, burst 60
+    // General API endpoints: relaxed — 30 req/s per IP, burst 60.
+    // Overridable via env vars so E2E tests don't trip the limiter.
     let api_limiter = Arc::new(RateLimiter::keyed(
-        Quota::per_second(NonZeroU32::new(30).unwrap()).allow_burst(NonZeroU32::new(60).unwrap()),
+        Quota::per_second(env_rate_limit("RATE_LIMIT_API_PER_SECOND", 30))
+            .allow_burst(env_rate_limit("RATE_LIMIT_API_BURST", 60)),
     ));
 
     // Periodic cleanup to prevent unbounded memory growth
