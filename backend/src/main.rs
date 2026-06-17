@@ -46,8 +46,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
     let matching_pool = pool.clone();
+    let matching_interval_secs: u64 = std::env::var("MATCHING_INTERVAL_SECONDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(60);
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(matching_interval_secs));
         loop {
             interval.tick().await;
             tracing::info!("Running periodic matching algorithm...");
