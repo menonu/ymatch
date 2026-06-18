@@ -79,6 +79,10 @@ Exceptions: pure doc / config changes, generated code, and trivial typo fixes do
 
 See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
 
+## Security
+
+The repository is operated as a **public repo with restrictive controls**, so anything committed (including history) is public. **Never commit secrets, credentials, host-specific absolute paths, personal identifiers, or terraform state.** Secrets come from GitHub Secrets / gitignored env files, not hardcoded defaults. See [Repository Security](./docs/explanation/security.md) for the full policy and pre-commit checklist.
+
 ## Quick Reference
 
 ### Ports
