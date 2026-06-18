@@ -118,13 +118,6 @@ USER root
 RUN echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/ubuntu && \
     chmod 0440 /etc/sudoers.d/ubuntu
 
-# Setup SSH key for ubuntu user
-RUN mkdir -p /home/ubuntu/.ssh && \
-    echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMG+LmtXe42CmQTL/dC4mUSQA1lLp7TskNuQZjFDrKDw ***REMOVED***" > /home/ubuntu/.ssh/authorized_keys && \
-    chown -R ubuntu:ubuntu /home/ubuntu/.ssh && \
-    chmod 700 /home/ubuntu/.ssh && \
-    chmod 600 /home/ubuntu/.ssh/authorized_keys
-
 # Set root password for SSH access
 RUN echo 'root:root' | chpasswd
 # Allow root login via SSH
