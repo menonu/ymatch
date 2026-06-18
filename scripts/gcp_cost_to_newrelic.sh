@@ -5,10 +5,14 @@ set -euo pipefail
 
 export PATH="/home/ubuntu/google-cloud-sdk/bin:$PATH"
 
-NR_LICENSE_KEY="${NR_LICENSE_KEY:-***REMOVED-NR-LICENSE-KEY***}"
-NR_ACCOUNT_ID="${NR_ACCOUNT_ID:-7906787}"
-GCP_PROJECT="${GCP_PROJECT:-tangential-map-491113-b4}"
-BILLING_ACCOUNT="${GCP_BILLING_ACCOUNT:-01C858-313A69-F19904}"
+# All values must be provided via environment (no hardcoded secrets/identifiers).
+# On the VM, source these from a root-owned env file before the cron runs.
+# In CI, they come from GitHub Secrets. The script fails fast if any are missing.
+: "${NR_LICENSE_KEY:?NR_LICENSE_KEY is required (set via env / GitHub Secret NEW_RELIC_LICENSE_KEY)}"
+: "${NR_ACCOUNT_ID:?NR_ACCOUNT_ID is required (set via env)}"
+: "${GCP_PROJECT:?GCP_PROJECT is required (set via env)}"
+: "${BILLING_ACCOUNT:?GCP_BILLING_ACCOUNT is required (set via env)}"
+BILLING_ACCOUNT="${GCP_BILLING_ACCOUNT}"
 
 MONTH_START=$(date -u +"%Y-%m-01")
 TODAY=$(date -u +"%Y-%m-%d")

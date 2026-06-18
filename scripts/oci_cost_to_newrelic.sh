@@ -5,9 +5,12 @@ set -euo pipefail
 
 export SUPPRESS_LABEL_WARNING=True
 
-NR_LICENSE_KEY="${NR_LICENSE_KEY:-***REMOVED-NR-LICENSE-KEY***}"
-NR_ACCOUNT_ID="${NR_ACCOUNT_ID:-7906787}"
-OCI_TENANCY="${OCI_TENANCY:-ocid1.tenancy.oc1..aaaaaaaaype2ykxjszsriibngzq4x7ot56sq62yyojs7edqkgffjgt2i7uua}"
+# All values must be provided via environment (no hardcoded secrets/identifiers).
+# On the VM, source these from a root-owned env file before the cron runs.
+# In CI, they come from GitHub Secrets. The script fails fast if any are missing.
+: "${NR_LICENSE_KEY:?NR_LICENSE_KEY is required (set via env / GitHub Secret NEW_RELIC_LICENSE_KEY)}"
+: "${NR_ACCOUNT_ID:?NR_ACCOUNT_ID is required (set via env)}"
+: "${OCI_TENANCY:?OCI_TENANCY is required (set via env)}"
 
 MONTH_START=$(date -u +"%Y-%m-01T00:00:00.000Z")
 TOMORROW=$(date -u -d "+1 day" +"%Y-%m-%dT00:00:00.000Z")
