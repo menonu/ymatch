@@ -63,9 +63,9 @@ The fingerprint will be displayed by the OCI Console after upload — **verify i
 
 ```ini
 [DEFAULT]
-user=ocid1.user.oc1..aaaaaaaa226jvpuuv3s7msedu65fzpvnh7e4jdg2xotaythpguowzfbp4yea
+user=ocid1.user.oc1..YOUR_USER_OCID
 fingerprint=<fingerprint from step 2/3>
-tenancy=ocid1.tenancy.oc1..aaaaaaaaype2ykxjszsriibngzq4x7ot56sq62yyojs7edqkgffjgt2i7uua
+tenancy=ocid1.tenancy.oc1..YOUR_TENANCY_OCID
 region=ap-osaka-1
 key_file=/home/<user>/.oci/oci_api_key.pem
 ```
@@ -77,7 +77,7 @@ chmod 600 ~/.oci/config
 ### Step 5: Verify
 
 ```bash
-oci iam user get --user-id ocid1.user.oc1..aaaaaaaa226jvpuuv3s7msedu65fzpvnh7e4jdg2xotaythpguowzfbp4yea
+oci iam user get --user-id ocid1.user.oc1..YOUR_USER_OCID
 ```
 
 A JSON object with your user details confirms the key is working.
