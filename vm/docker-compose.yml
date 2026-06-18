@@ -10,11 +10,12 @@ services:
       - "8443:443"
     volumes:
       - /home/menonu/ws:/home/ubuntu/ws
-      - gemini-data:/home/ubuntu/.gemini
+      - ./storage/gemini-data:/home/ubuntu/.gemini
       - docker-data:/var/lib/docker
-      - gh-config:/home/ubuntu/.config/gh
-      - copilot-home:/home/ubuntu/.copilot
-      - copilot-cache:/home/ubuntu/.cache/copilot
+      - ./storage/gh-config:/home/ubuntu/.config/gh
+      - ./storage/copilot-home:/home/ubuntu/.copilot
+      - ./storage/copilot-cache:/home/ubuntu/.cache/copilot
+      - ./storage/claude:/home/ubuntu/.claude
     # deploy:
     #   resources:
     #     reservations:
