@@ -47,20 +47,20 @@ All tasks and bug fixes must be associated with a GitHub Issue.
 
 ## Step 3: Protobuf Changes First (If applicable)
 If your task changes the API payload structure or shared data models:
-1. Edit the Protobuf definitions in [proto/models.proto](file:///home/menonu/ws/ymatch/proto/models.proto).
+1. Edit the Protobuf definitions in [proto/models.proto](../../proto/models.proto).
 2. Generate the updated Rust and Dart code:
    ```bash
    # Run the generation script (from root or scripts/ folder)
    ./scripts/generate_protos.sh
    ```
 3. Verify that the generated code is updated in:
-   - [backend/src/generated/ymatch.rs](file:///home/menonu/ws/ymatch/backend/src/generated/ymatch.rs)
+   - [backend/src/generated/ymatch.rs](../../backend/src/generated/ymatch.rs)
    - Frontend protobuf-generated files under `frontend/lib/generated/`.
 
 ---
 
 ## Step 4: Implement Code Changes
-Implement your changes in the [backend/](file:///home/menonu/ws/ymatch/backend) (Rust) and/or [frontend/](file:///home/menonu/ws/ymatch/frontend) (Flutter) codebases.
+Implement your changes in the [backend/](../../backend) (Rust) and/or [frontend/](../../frontend) (Flutter) codebases.
 - Maintain documentation integrity: do not delete existing docstrings or comments unless they are outdated or explicitly requested.
 
 ---
