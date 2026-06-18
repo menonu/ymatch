@@ -1,0 +1,5 @@
+# CODEOWNERS — every path is owned by the maintainer.
+# Branch protection uses this to request review on PRs.
+# Add collaborators on new lines (e.g. `backend/ @someone`) as the team grows.
+
+*       @menonu
