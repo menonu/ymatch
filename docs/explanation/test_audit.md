@@ -54,6 +54,7 @@ For the **current** data behind these gaps (which tests exist today, current cov
 - **Open questions / implementation planning also lives on the issue.** This doc is for stable strategy; open questions change weekly as the work progresses.
 - **Strategy lives here.** Framework, target proportions, gap list, rationale. Update only when the strategy changes (e.g., a new framework is adopted, a gap is re-prioritized, a target is revised).
 - **Each gap becomes its own issue or PR.** Gap #1 → unit tests for `MatchLifecycleService`. Gap #3 → #213 (already filed). Gaps #4-6 → future issues.
+- **Test-tag config is a single-source-of-truth concern.** Backend-dependent suites are marked with the `e2e` / `integration` tags and selected via `--exclude-tags`; that selection lives in three places (`ci.yml`, `ci-e2e.yml`, `Taskfile.yml`) and has already drifted once (the `e2e` tag wasn't excluded from local `frontend:test`, so `task test` ran e2e suites with no backend). Also: the `e2e` tag is used in suites but not declared in `dart_test.yaml` (produces a warning). Consolidating tag declaration/selection is tracked in #250.
 
 ## 5. References
 
