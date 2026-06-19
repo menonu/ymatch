@@ -1,33 +1,46 @@
+# Dev container for ymatch.
+#
+# The container runs Docker-in-Docker (dockerd starts via aidev's entrypoint),
+# so the project's own docker-compose files (PostgreSQL, pgAdmin, proto-gen)
+# run *inside* this container. Their published ports land on the container's
+# network namespace and are forwarded to the host via the `ports` mapping below.
+#
+# Usage:
+#   docker compose -f vm/docker-compose.yml up -d --build
+#   docker exec -it ymatch_dev bash
+#   # inside the container, from /home/ubuntu/ws/ymatch:
+#   task test
+
 services:
-  ubuntu:
+  dev:
     build: .
-    container_name: ubuntu_vm
+    image: ymatch-dev:26
+    container_name: ymatch_dev
+    # privileged is required for the nested dockerd.
     privileged: true
+    # aidev's entrypoint starts dockerd, then `exec`s this command.
+    # We also start Ollama in the background and keep the container alive.
+    command: >-
+      sh -c "sudo chown -R ubuntu:ubuntu /home/ubuntu/.ollama 2>/dev/null;
+             ollama serve > /tmp/ollama.log 2>&1 &
+             sleep infinity"
     ports:
-      - "2222:22"
-      - "8081:8081"
-      - "3000:3000"
-      - "8443:443"
+      - "3000:3000"     # backend API (Axum)
+      - "8081:8081"     # Flutter web server
+      - "5432:5432"     # PostgreSQL (project docker-compose)
+      - "5050:5050"     # pgAdmin (project docker-compose)
     volumes:
       - ${HOME}/ws:/home/ubuntu/ws
-      - ./storage/gemini-data:/home/ubuntu/.gemini
-      - docker-data:/var/lib/docker
-      - ./storage/gh-config:/home/ubuntu/.config/gh
-      - ./storage/copilot-home:/home/ubuntu/.copilot
-      - ./storage/copilot-cache:/home/ubuntu/.cache/copilot
+      - ./storage/.tmux.conf:/home/ubuntu/.tmux.conf
       - ./storage/claude:/home/ubuntu/.claude
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu, compute, video, utility]
+      - ./storage/gh:/home/ubuntu/.config/gh
+      - ./storage/ollama:/home/ubuntu/.ollama
+      - docker-data:/var/lib/docker
+      - cargo-cache:/home/ubuntu/.cargo/registry
+      - pub-cache:/home/ubuntu/.pub-cache
     restart: unless-stopped
 
 volumes:
   docker-data:
-  gemini-data:
-  gh-config:
-  copilot-home:
-  copilot-cache:
+  cargo-cache:
+  pub-cache:
