@@ -1,0 +1,82 @@
+name: Frontend Coverage
+
+# Mirrors the backend coverage workflow (coverage.yml) for the
+# Flutter frontend (#184). Runs `flutter test --coverage` (excluding
+# backend-dependent suites) and reports line coverage as a markdown
+# box in the PR's job summary. No threshold gate yet — frontend
+# coverage is currently low; a floor would block all PRs. Revisit
+# after #185 adds more unit/widget tests.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  coverage:
+    name: Coverage summary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PUB_CACHE }}
+            .dart_tool
+          key: flutter-pub-coverage-${{ hashFiles('pubspec.lock') }}
+          restore-keys: flutter-pub-coverage-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run tests with coverage
+        # Excludes backend-dependent suites (integration + e2e) — they
+        # need a live server. Once #254 lands, dart_test.yaml skips
+        # these at the suite level and the `--exclude-tags` flags become
+        # redundant (can drop them for plain `flutter test --coverage`).
+        run: flutter test --exclude-tags=integration --exclude-tags=e2e --coverage
+
+      # Parse coverage/lcov.info (standard LCOV format) directly with
+      # awk for a stable, dependency-free summary in the step output
+      # and the PR's GITHUB_STEP_SUMMARY. Dart's coverage emits line
+      # data (LF/LH) but no function/branch records, so only line
+      # coverage is reported.
+      - name: Coverage summary
+        run: |
+          lcov=coverage/lcov.info
+          if [ ! -s "$lcov" ]; then
+            echo "::error::coverage/lcov.info is missing or empty"
+            exit 1
+          fi
+          read lh lf <<< "$(awk '/^LF:/ { lf += substr($0,4) } /^LH:/ { lh += substr($0,4) } END { printf "%d %d", lh, lf }' "$lcov")"
+          if [ "$lf" -gt 0 ]; then
+            pct=$(awk -v lh="$lh" -v lf="$lf" 'BEGIN { printf "%.2f", lh*100/lf }')
+          else
+            pct="0.00"
+          fi
+          echo "Line coverage: ${lh}/${lf} (${pct}%)"
+          {
+            echo "## Frontend coverage"
+            echo
+            echo "| Metric | Covered | Total | % |"
+            echo "|---|---|---|---|"
+            echo "| Lines | ${lh} | ${lf} | ${pct}% |"
+          } >> "$GITHUB_STEP_SUMMARY"

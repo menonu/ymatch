@@ -110,3 +110,16 @@ tasks:
       - cargo llvm-cov report --summary-only --ignore-filename-regex 'generated/'
       - cmd: 'echo "HTML:  backend/coverage/html/index.html"'
       - cmd: 'echo "lcov:  backend/coverage/lcov.info"'
+
+  frontend:coverage:
+    desc: Generate frontend coverage report (HTML + lcov.info)
+    dir: frontend
+    cmds:
+      # Requires `lcov` locally for genhtml/summary
+      # (sudo apt-get install lcov). Mirrors backend:coverage.
+      - flutter pub get
+      - flutter test --exclude-tags=integration --exclude-tags=e2e --coverage
+      - genhtml coverage/lcov.info -o coverage/html
+      - lcov --summary coverage/lcov.info
+      - cmd: 'echo "HTML:  frontend/coverage/html/index.html"'
+      - cmd: 'echo "lcov:  frontend/coverage/lcov.info"'
