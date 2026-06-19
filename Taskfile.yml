@@ -49,11 +49,11 @@ tasks:
       - cargo test -- --test-threads=1
 
   frontend:test:
-    desc: Run frontend unit/widget tests (excludes integration)
+    desc: Run frontend unit/widget tests (excludes integration + e2e)
     dir: frontend
     cmds:
       - flutter pub get
-      - flutter test --exclude-tags=integration
+      - flutter test --exclude-tags=integration --exclude-tags=e2e
 
   frontend:integration:
     desc: Run frontend integration tests (needs running backend)
