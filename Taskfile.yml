@@ -49,17 +49,23 @@ tasks:
       - cargo test -- --test-threads=1
 
   frontend:test:
-    desc: Run frontend unit/widget tests (excludes integration + e2e)
+    desc: Run frontend unit/widget tests (integration/e2e auto-skipped via dart_test.yaml)
     dir: frontend
     cmds:
       - flutter pub get
-      - flutter test --exclude-tags=integration --exclude-tags=e2e
+      # Bare `flutter test` — backend-dependent suites (integration +
+      # e2e) are skipped at the suite level by dart_test.yaml, the
+      # single source of truth for "which tests need a backend".
+      - flutter test
 
   frontend:integration:
     desc: Run frontend integration tests (needs running backend)
     dir: frontend
     cmds:
-      - flutter test --tags=integration
+      # `--run-skipped` is required: the `integration` tag is declared
+      # with `skip` in dart_test.yaml, so without this flag the suites
+      # are skipped (not run) even when selected with `--tags`.
+      - flutter test --tags=integration --run-skipped
 
   e2e:up:
     desc: Start the E2E stack (db + backend, no Caddy)
@@ -87,7 +93,7 @@ tasks:
     deps: [e2e:up]
     cmds:
       - flutter pub get
-      - cmd: 'flutter test test/e2e/'
+      - cmd: 'flutter test test/e2e/ --run-skipped'
     env:
       E2E_API_URL: http://localhost:3000
 
