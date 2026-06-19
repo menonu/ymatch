@@ -43,17 +43,17 @@ impl MerchPermissionPolicy {
         let user = self.users.verify_active(user_id).await?;
 
         // Path 1: merch creator
-        if let Some(Some(creator_id)) = self.merch.get_creator(event_id, merch_id).await? {
-            if creator_id == user.id {
-                return Ok(());
-            }
+        if let Some(Some(creator_id)) = self.merch.get_creator(event_id, merch_id).await?
+            && creator_id == user.id
+        {
+            return Ok(());
         }
 
         // Path 2: event creator
-        if let Some(ec) = event_creator_id {
-            if ec == user.id {
-                return Ok(());
-            }
+        if let Some(ec) = event_creator_id
+            && ec == user.id
+        {
+            return Ok(());
         }
 
         // Path 3: elevated role
