@@ -17,7 +17,9 @@ on:
 
 jobs:
   coverage:
-    name: Coverage summary
+    # Distinct from the backend "Coverage summary" job (coverage.yml)
+    # so the two are unambiguous in the PR checks list.
+    name: Frontend coverage summary
     runs-on: ubuntu-latest
     permissions:
       contents: read
