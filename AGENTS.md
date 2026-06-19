@@ -68,7 +68,9 @@ Where tests live:
 
 Exceptions: pure doc / config changes, generated code, and trivial typo fixes do not need new tests, but existing tests must still pass.
 
-1. Create a GitHub Issue (`gh issue create`)
+**Issue-Driven**: Every change starts with a GitHub Issue — create it **first**, before any branch or code. The issue is the single source of truth for the goal and acceptance criteria; track its status throughout (assign it, treat it as in-progress while the PR is open, and close it automatically via `Closes #N` in the PR body once merged). Don't write code without an issue; if a change is genuinely too small to warrant one, say so explicitly.
+
+1. Create a GitHub Issue **first** (`gh issue create`) — before branching. This is step zero; no branch or code precedes it. Track the issue's status across the lifecycle below.
 2. Create a feature branch (`feat/xxx` or `fix/xxx`)
 3. If protobuf changes needed: edit `proto/models.proto` first, then run `./scripts/generate_protos.sh`
 4. Apply the TDD cycle above
