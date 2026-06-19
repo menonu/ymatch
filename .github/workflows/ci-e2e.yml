@@ -95,7 +95,11 @@ jobs:
         working-directory: ./frontend
         env:
           E2E_API_URL: http://localhost:3000
-        run: flutter test test/e2e/
+        # `--run-skipped` is required: the `e2e` tag is declared with
+        # `skip` in dart_test.yaml (single source of truth for "needs a
+        # backend"), so without this flag these suites would be skipped
+        # instead of executed against the live backend started above.
+        run: flutter test test/e2e/ --run-skipped
 
       - name: Dump backend logs on failure
         if: failure()
