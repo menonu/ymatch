@@ -43,15 +43,13 @@ type IpLimiter = DefaultKeyedRateLimiter<IpAddr>;
 /// Extract real client IP from X-Forwarded-For header (set by Cloud Run / proxies)
 /// or fall back to a zeroed address.
 fn extract_client_ip(req: &Request<Body>) -> IpAddr {
-    if let Some(forwarded_for) = req.headers().get("x-forwarded-for") {
-        if let Ok(value) = forwarded_for.to_str() {
-            // X-Forwarded-For may contain multiple IPs; the first is the client
-            if let Some(first) = value.split(',').next() {
-                if let Ok(ip) = first.trim().parse::<IpAddr>() {
-                    return ip;
-                }
-            }
-        }
+    if let Some(forwarded_for) = req.headers().get("x-forwarded-for")
+        && let Ok(value) = forwarded_for.to_str()
+        && let Some(first) = value.split(',').next()
+        && let Ok(ip) = first.trim().parse::<IpAddr>()
+    {
+        // X-Forwarded-For may contain multiple IPs; the first is the client
+        return ip;
     }
     IpAddr::from([0, 0, 0, 0])
 }

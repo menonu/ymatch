@@ -41,7 +41,10 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          # Pinned to a specific stable for reproducibility across
+          # contributors and CI. Bump deliberately. (Drops the false
+          # rust-version=1.85 MSRV pin — see #183.)
+          toolchain: 1.96.0
           components: clippy, rustfmt
 
       - name: Install dependencies
@@ -97,7 +100,10 @@ jobs:
         run: flutter pub get
 
       - name: Run tests
-        run: flutter test --exclude-tags=integration --exclude-tags=e2e
+        # Bare `flutter test` — backend-dependent suites (integration +
+        # e2e) are skipped at the suite level by dart_test.yaml, the
+        # single source of truth. No `--exclude-tags` enumeration here.
+        run: flutter test
 
       - name: Build web
         run: flutter build web
