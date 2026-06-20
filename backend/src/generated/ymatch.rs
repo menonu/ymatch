@@ -224,6 +224,24 @@ pub struct UpdateEventRequest {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ToggleFavoriteRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(bool, tag = "2")]
+    pub is_favorite: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ToggleFavoriteGroupRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(string, tag = "2")]
+    pub group_name: ::prost::alloc::string::String,
+    #[prost(bool, tag = "3")]
+    pub is_favorite: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInventoryRequest {
     #[prost(int32, tag = "1")]
     pub user_id: i32,
@@ -380,6 +398,14 @@ pub struct UpdateUserRoleRequest {
     /// "user", "moderator", "admin"
     #[prost(string, tag = "1")]
     pub role: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateUsernameRequest {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(string, tag = "2")]
+    pub username: ::prost::alloc::string::String,
 }
 /// Generic request with user_id for permission checks
 #[allow(clippy::derive_partial_eq_without_eq)]

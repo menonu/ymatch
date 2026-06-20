@@ -26,31 +26,10 @@ pub struct ListEventsQuery {
     pub user_id: Option<i32>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RegisterViewRequest {
-    pub user_id: i32,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToggleFavoriteRequest {
-    pub user_id: i32,
-    pub is_favorite: bool,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToggleFavoriteGroupRequest {
-    pub user_id: i32,
-    pub group_name: String,
-    pub is_favorite: bool,
-}
-
 pub async fn register_event_view(
     State(views): State<Arc<EventViewsRepository>>,
     Path(event_id): Path<i32>,
-    Json(payload): Json<RegisterViewRequest>,
+    Json(payload): Json<UserActionRequest>,
 ) -> Result<StatusCode, AppError> {
     views.register_view(event_id, payload.user_id).await?;
     Ok(StatusCode::OK)

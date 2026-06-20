@@ -63,9 +63,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
   ) async {
     try {
       final client = ref.read(apiClientProvider);
-      await client.post('/api/v1/matches/$matchId/status', {
-        'status': newStatus,
-      });
+      final payload = UpdateMatchStatusRequest()..status = newStatus;
+      await client.post('/api/v1/matches/$matchId/status',
+          payload.toProto3Json() as Map<String, dynamic>);
       ref.invalidate(matchesProvider(userId));
       ref.invalidate(notificationCountsProvider(userId));
     } catch (e) {
@@ -101,8 +101,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
   Future<void> _applyInventory(int userId, int matchId) async {
     try {
       final client = ref.read(apiClientProvider);
-      await client
-          .post('/api/v1/matches/$matchId/apply-inventory', {'userId': userId});
+      final payload = ApplyInventoryRequest()..userId = userId;
+      await client.post('/api/v1/matches/$matchId/apply-inventory',
+          payload.toProto3Json() as Map<String, dynamic>);
       ref.invalidate(matchesProvider(userId));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
