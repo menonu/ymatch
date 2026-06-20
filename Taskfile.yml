@@ -46,7 +46,7 @@ tasks:
     dir: backend
     deps: [db:ensure-test]
     cmds:
-      - cargo test -- --test-threads=1
+      - cargo test
 
   frontend:test:
     desc: Run frontend unit/widget tests (integration/e2e auto-skipped via dart_test.yaml)
@@ -109,7 +109,7 @@ tasks:
     dir: backend
     deps: [db:ensure-test]
     cmds:
-      - cargo llvm-cov test --no-report -- --test-threads=1
+      - cargo llvm-cov test --no-report
       - mkdir -p coverage
       - cargo llvm-cov report --html --output-dir coverage/html --ignore-filename-regex 'generated/'
       - cargo llvm-cov report --lcov --output-path coverage/lcov.info --ignore-filename-regex 'generated/'
