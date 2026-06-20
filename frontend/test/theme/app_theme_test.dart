@@ -3,10 +3,11 @@ import 'package:frontend/theme/app_theme.dart';
 
 /// Theme tests for the 中華フォント fix (#291).
 ///
-/// On Android devices without Japanese system fonts, kanji render with
+/// On Android browsers without a Japanese system font, kanji render with
 /// Chinese-style glyphs because Flutter falls back to a CJK-SC font.
-/// Bundling Noto Sans JP and setting it as the theme font family forces
-/// Japanese glyph variants regardless of the device's system fonts.
+/// Loading Noto Sans JP from Google Fonts CDN via <link> in web/index.html
+/// makes Japanese glyph variants available to Flutter Web's renderer, and
+/// setting it as the theme font family ensures it is used throughout the app.
 void main() {
   group('AppTheme font family (#291)', () {
     test('lightTheme sets a Japanese-capable font family', () {
@@ -32,9 +33,9 @@ void main() {
       final theme = AppTheme.lightTheme;
       final fallback = theme.textTheme.bodyLarge?.fontFamilyFallback;
 
-      // fontFamilyFallback ensures that if the primary Japanese font
-      // fails to load on some platform, the device still falls back to
-      // a Japanese-capable font before a generic CJK-SC font.
+      // fontFamilyFallback ensures that if the CDN font fails to load,
+      // the device falls back to a Japanese-capable system font before
+      // a generic sans-serif that may render CJK-SC glyphs.
       expect(
         fallback,
         isNotNull,
@@ -42,10 +43,19 @@ void main() {
       );
       expect(
         fallback,
-        contains('Noto Sans JP'),
-        reason: 'Fallback list should include "Noto Sans JP" '
-            '(the name registered in pubspec.yaml)',
+        contains('sans-serif'),
+        reason: 'Fallback list should end with generic sans-serif',
       );
+      // No entry should have leading/trailing whitespace — a space-prefixed
+      // generic like ' sans-serif' is a literal family name, not the keyword.
+      for (final family in fallback!) {
+        expect(
+          family,
+          family.trim(),
+          reason: 'fontFamilyFallback entry "$family" has leading/trailing '
+              'whitespace — this breaks CSS generic-family resolution',
+        );
+      }
     });
   });
 }
