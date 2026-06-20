@@ -80,11 +80,8 @@ task frontend:test           # Flutter unit/widget tests
 task backend:coverage        # Backend tests + coverage (HTML + lcov.info)
 cd backend && cargo fmt -- --check && cargo clippy -- -D warnings
 cd frontend && flutter analyze
+gh # for github related operation
 ```
 
 ### protobuf
 edit `proto/models.proto` first, then run `./scripts/generate_protos.sh`
-
-### Task Management
-- Use GitHub Issues as the primary task tracker
-- Use GitHub CLI (`gh`) for issue/PR management
