@@ -37,14 +37,16 @@ The frontend is mostly UI + state. The Testing Trophy emphasizes **integration t
 
 ## 3. Highest-leverage gaps
 
-| # | Gap | Codebase | Target layer | Why this first |
-|---|---|---|---|---|
-| 1 | State-machine unit tests for `MatchLifecycleService::offer` / `change_status` | Backend | Unit | Cheap to write, covers the highest-risk logic |
-| 2 | Rate-limiter test | Backend | Unit | One-time fix for 0% coverage of `routes.rs` |
-| 3 | Frontend E2E that exercises the real wire contract | Frontend | E2E | Closes the #202 gap permanently (#213) |
-| 4 | Provider tests for each `lib/providers/*.dart` | Frontend | Integration | Highest-leverage gap in the frontend |
-| 5 | Widget tests for the 5 most-used screens | Frontend | Integration | Catches render regressions |
-| 6 | Model / validation tests | Frontend | Unit | Cheap, catches a real class of bugs |
+| # | Gap | Codebase | Target layer | Status | Why this first |
+|---|---|---|---|---|---|
+| 1 | State-machine unit tests for `MatchLifecycleService::offer` / `change_status` | Backend | Unit | ✅ done (#267) | Cheap to write, covers the highest-risk logic |
+| 2 | Rate-limiter test | Backend | Unit | ✅ done (#267) | One-time fix for 0% coverage of `routes.rs` |
+| 3 | Frontend E2E that exercises the real wire contract | Frontend | E2E | ✅ done (#213, #230) | Closes the #202 gap permanently (#213) |
+| 4 | Provider tests for each `lib/providers/*.dart` | Frontend | Integration | 🚧 partial | Highest-leverage gap in the frontend |
+| 5 | Widget tests for the 5 most-used screens | Frontend | Integration | ☐ open | Catches render regressions |
+| 6 | Model / validation tests | Frontend | Unit | ⚠️ N/A | `lib/models/models.dart` is a generated-protobuf re-export with no hand-written validation; rescoped to wherever validation lives (TBD) |
+
+> **Note on Gap 1:** the service holds concrete `Arc<MatchRepository>`/`Arc<InventoryRepository>` and opens `pool.begin()` inside `offer`/`change_status`, so the methods can't be unit-tested directly. The decision logic was extracted into pure free functions (`validate_offer_transition`, `validate_transition_target`, `validate_status_transition`) and unit-tested, mirroring the existing `apply_inventory_delta` pattern. The transactional paths stay covered by the `test_trade_lifecycle_*` integration test.
 
 For the **current** data behind these gaps (which tests exist today, current coverage %), see the data snapshot on issue #185.
 
@@ -53,7 +55,7 @@ For the **current** data behind these gaps (which tests exist today, current cov
 - **Live data (test counts, coverage %) lives on the issue (#185).** A snapshot is posted as a Phase 1 deliverable comment. As test additions land, the snapshot is regenerated; the issue, not this doc, gets the update.
 - **Open questions / implementation planning also lives on the issue.** This doc is for stable strategy; open questions change weekly as the work progresses.
 - **Strategy lives here.** Framework, target proportions, gap list, rationale. Update only when the strategy changes (e.g., a new framework is adopted, a gap is re-prioritized, a target is revised).
-- **Each gap becomes its own issue or PR.** Gap #1 → unit tests for `MatchLifecycleService`. Gap #3 → #213 (already filed). Gaps #4-6 → future issues.
+- **Each gap becomes its own issue or PR.** Gap #1+#2 → #267 (done). Gap #3 → #213 / #230 (done). Gaps #4-5 → future issues. Gap #6 rescoped (see table).
 - **Test-tag config is a single-source-of-truth concern.** Backend-dependent suites are marked with the `e2e` / `integration` tags and selected via `--exclude-tags`; that selection lives in three places (`ci.yml`, `ci-e2e.yml`, `Taskfile.yml`) and has already drifted once (the `e2e` tag wasn't excluded from local `frontend:test`, so `task test` ran e2e suites with no backend). Also: the `e2e` tag is used in suites but not declared in `dart_test.yaml` (produces a warning). Consolidating tag declaration/selection is tracked in #250.
 
 ## 5. References
