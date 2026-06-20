@@ -495,5 +495,240 @@
   "invModeAll": "All",
   "@invModeAll": {
     "description": "Inventory display-mode option: show all inventory items"
+  },
+
+  "addMerch": "Add Merch",
+  "@addMerch": {
+    "description": "Floating action button label to add merchandise"
+  },
+  "otherItems": "Other Items",
+  "@otherItems": {
+    "description": "Fallback group name for items without a group"
+  },
+  "searchItemsHint": "Search items...",
+  "@searchItemsHint": {
+    "description": "Hint text in the event detail search bar"
+  },
+  "showControls": "Show Controls",
+  "@showControls": {
+    "description": "Tooltip for the inventory display-mode menu"
+  },
+  "changeViewMode": "Change View Mode",
+  "@changeViewMode": {
+    "description": "Tooltip for the view-mode menu"
+  },
+  "detailedView": "Detailed View",
+  "@detailedView": {
+    "description": "View-mode option: detailed list"
+  },
+  "gridView": "Grid View",
+  "@gridView": {
+    "description": "View-mode option: grid"
+  },
+  "compactList": "Compact List",
+  "@compactList": {
+    "description": "View-mode option: compact list"
+  },
+  "addedToWantPartial": "Added {added} to Wish; could not add {failed}",
+  "@addedToWantPartial": {
+    "description": "Snackbar when some missing items were added to Wish and some failed",
+    "placeholders": {
+      "added": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "addedMissingToWant": "Added {count} missing items to Wish",
+  "@addedMissingToWant": {
+    "description": "Snackbar when missing items were added to Wish",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "couldNotAddToWant": "Could not add some items to Wish",
+  "@couldNotAddToWant": {
+    "description": "Snackbar when adding missing items to Wish failed"
+  },
+  "noMissingItems": "No missing items found",
+  "@noMissingItems": {
+    "description": "Snackbar when there are no missing items to add"
+  },
+  "wantAllMissing": "Want All Missing",
+  "@wantAllMissing": {
+    "description": "Menu item to add all missing items to Wish"
+  },
+  "jumpToGroup": "Jump to group",
+  "@jumpToGroup": {
+    "description": "Tooltip for the group jump menu"
+  },
+  "noItemsMatchFilter": "No items match this filter.",
+  "@noItemsMatchFilter": {
+    "description": "Empty state when an item filter matches nothing"
+  },
+  "youCreatedThisItem": "You created this item",
+  "@youCreatedThisItem": {
+    "description": "Tooltip on the creator badge of an item"
+  },
+  "editItemName": "Edit Item Name",
+  "@editItemName": {
+    "description": "Dialog title for editing an item name"
+  },
+  "editItemNameHint": "Item name",
+  "@editItemNameHint": {
+    "description": "Hint text in the edit item name dialog"
+  },
+  "deleteItem": "Delete Item",
+  "@deleteItem": {
+    "description": "Dialog title for deleting an item"
+  },
+  "noMerchandiseYet": "No merchandise yet",
+  "@noMerchandiseYet": {
+    "description": "Empty state title when an event has no merchandise"
+  },
+  "buildInventoryPrompt": "Add items to start building your inventory.",
+  "@buildInventoryPrompt": {
+    "description": "Empty state subtitle prompting item creation"
+  },
+
+  "trades": "Trades",
+  "@trades": {
+    "description": "AppBar title of the trades screen"
+  },
+  "tabMatch": "Match",
+  "@tabMatch": {
+    "description": "Trades tab: pending matches"
+  },
+  "tabOfferOut": "Offer Out",
+  "@tabOfferOut": {
+    "description": "Trades tab: outgoing offers"
+  },
+  "tabOfferIn": "Offer In",
+  "@tabOfferIn": {
+    "description": "Trades tab: incoming offers"
+  },
+  "tabActive": "Active",
+  "@tabActive": {
+    "description": "Trades tab: active (accepted) trades"
+  },
+  "tabDone": "Done",
+  "@tabDone": {
+    "description": "Trades tab: completed trades"
+  },
+  "unknownUser": "???",
+  "@unknownUser": {
+    "description": "Placeholder shown when the other user's name is unknown"
+  },
+  "statusPending": "PENDING",
+  "@statusPending": {
+    "description": "Match status chip: pending"
+  },
+  "statusOffered": "OFFERED",
+  "@statusOffered": {
+    "description": "Match status chip: offered"
+  },
+  "statusAccepted": "ACCEPTED",
+  "@statusAccepted": {
+    "description": "Match status chip: accepted"
+  },
+  "statusCompleted": "COMPLETED",
+  "@statusCompleted": {
+    "description": "Match status chip: completed"
+  },
+  "youGive": "You give:",
+  "@youGive": {
+    "description": "Label above items the user would give (potential match)"
+  },
+  "youReceive": "You receive:",
+  "@youReceive": {
+    "description": "Label above items the user would receive (potential match)"
+  },
+  "giveLabel": "Give:",
+  "@giveLabel": {
+    "description": "Label above items given in a selected offer"
+  },
+  "receiveLabel": "Receive:",
+  "@receiveLabel": {
+    "description": "Label above items received in a selected offer"
+  },
+  "reject": "Reject",
+  "@reject": {
+    "description": "Reject offer button"
+  },
+  "makeOffer": "Make Offer",
+  "@makeOffer": {
+    "description": "Button to open the offer dialog"
+  },
+  "accept": "Accept",
+  "@accept": {
+    "description": "Accept offer button"
+  },
+  "cancelOffer": "Cancel Offer",
+  "@cancelOffer": {
+    "description": "Cancel outgoing offer button"
+  },
+  "waitingForResponse": "Waiting for response...",
+  "@waitingForResponse": {
+    "description": "Hint shown on an outgoing offer awaiting a reply"
+  },
+  "markComplete": "Mark Complete",
+  "@markComplete": {
+    "description": "Button to mark an active trade complete"
+  },
+  "updateInventory": "Update Inventory",
+  "@updateInventory": {
+    "description": "Button to apply a completed trade to inventory"
+  },
+  "inventoryUpdated": "Inventory Updated",
+  "@inventoryUpdated": {
+    "description": "Label shown when a trade's inventory was already applied"
+  },
+  "inventoryUpdatedSnack": "Inventory updated!",
+  "@inventoryUpdatedSnack": {
+    "description": "Snackbar after applying a completed trade to inventory"
+  },
+  "makeTradeOffer": "Make Trade Offer",
+  "@makeTradeOffer": {
+    "description": "Offer dialog title"
+  },
+  "itemsYouGive": "Items you give:",
+  "@itemsYouGive": {
+    "description": "Section header in the offer dialog for give items"
+  },
+  "itemsYouReceive": "Items you receive:",
+  "@itemsYouReceive": {
+    "description": "Section header in the offer dialog for receive items"
+  },
+  "qtyLabel": "Qty: {count}",
+  "@qtyLabel": {
+    "description": "Quantity label in the offer dialog",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "sendOfferItems": "Send Offer ({count} items)",
+  "@sendOfferItems": {
+    "description": "Submit button on the offer dialog with the selected item count",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "noPendingMatches": "No pending matches. Keep adding items!",
+  "@noPendingMatches": {
+    "description": "Empty state for the Match tab"
+  },
+  "noOutgoingOffers": "No outgoing offers.",
+  "@noOutgoingOffers": {
+    "description": "Empty state for the Offer Out tab"
+  },
+  "noIncomingOffers": "No incoming offers.",
+  "@noIncomingOffers": {
+    "description": "Empty state for the Offer In tab"
+  },
+  "noActiveTrades": "No active trades.",
+  "@noActiveTrades": {
+    "description": "Empty state for the Active tab"
+  },
+  "noCompletedTrades": "No completed trades yet.",
+  "@noCompletedTrades": {
+    "description": "Empty state for the Done tab"
   }
 }

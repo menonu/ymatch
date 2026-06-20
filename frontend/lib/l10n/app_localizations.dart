@@ -709,6 +709,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All'**
   String get invModeAll;
+
+  /// Floating action button label to add merchandise
+  ///
+  /// In en, this message translates to:
+  /// **'Add Merch'**
+  String get addMerch;
+
+  /// Fallback group name for items without a group
+  ///
+  /// In en, this message translates to:
+  /// **'Other Items'**
+  String get otherItems;
+
+  /// Hint text in the event detail search bar
+  ///
+  /// In en, this message translates to:
+  /// **'Search items...'**
+  String get searchItemsHint;
+
+  /// Tooltip for the inventory display-mode menu
+  ///
+  /// In en, this message translates to:
+  /// **'Show Controls'**
+  String get showControls;
+
+  /// Tooltip for the view-mode menu
+  ///
+  /// In en, this message translates to:
+  /// **'Change View Mode'**
+  String get changeViewMode;
+
+  /// View-mode option: detailed list
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed View'**
+  String get detailedView;
+
+  /// View-mode option: grid
+  ///
+  /// In en, this message translates to:
+  /// **'Grid View'**
+  String get gridView;
+
+  /// View-mode option: compact list
+  ///
+  /// In en, this message translates to:
+  /// **'Compact List'**
+  String get compactList;
+
+  /// Snackbar when some missing items were added to Wish and some failed
+  ///
+  /// In en, this message translates to:
+  /// **'Added {added} to Wish; could not add {failed}'**
+  String addedToWantPartial(int added, int failed);
+
+  /// Snackbar when missing items were added to Wish
+  ///
+  /// In en, this message translates to:
+  /// **'Added {count} missing items to Wish'**
+  String addedMissingToWant(int count);
+
+  /// Snackbar when adding missing items to Wish failed
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add some items to Wish'**
+  String get couldNotAddToWant;
+
+  /// Snackbar when there are no missing items to add
+  ///
+  /// In en, this message translates to:
+  /// **'No missing items found'**
+  String get noMissingItems;
+
+  /// Menu item to add all missing items to Wish
+  ///
+  /// In en, this message translates to:
+  /// **'Want All Missing'**
+  String get wantAllMissing;
+
+  /// Tooltip for the group jump menu
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to group'**
+  String get jumpToGroup;
+
+  /// Empty state when an item filter matches nothing
+  ///
+  /// In en, this message translates to:
+  /// **'No items match this filter.'**
+  String get noItemsMatchFilter;
+
+  /// Tooltip on the creator badge of an item
+  ///
+  /// In en, this message translates to:
+  /// **'You created this item'**
+  String get youCreatedThisItem;
+
+  /// Dialog title for editing an item name
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Item Name'**
+  String get editItemName;
+
+  /// Hint text in the edit item name dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Item name'**
+  String get editItemNameHint;
+
+  /// Dialog title for deleting an item
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Item'**
+  String get deleteItem;
+
+  /// Empty state title when an event has no merchandise
+  ///
+  /// In en, this message translates to:
+  /// **'No merchandise yet'**
+  String get noMerchandiseYet;
+
+  /// Empty state subtitle prompting item creation
+  ///
+  /// In en, this message translates to:
+  /// **'Add items to start building your inventory.'**
+  String get buildInventoryPrompt;
+
+  /// AppBar title of the trades screen
+  ///
+  /// In en, this message translates to:
+  /// **'Trades'**
+  String get trades;
+
+  /// Trades tab: pending matches
+  ///
+  /// In en, this message translates to:
+  /// **'Match'**
+  String get tabMatch;
+
+  /// Trades tab: outgoing offers
+  ///
+  /// In en, this message translates to:
+  /// **'Offer Out'**
+  String get tabOfferOut;
+
+  /// Trades tab: incoming offers
+  ///
+  /// In en, this message translates to:
+  /// **'Offer In'**
+  String get tabOfferIn;
+
+  /// Trades tab: active (accepted) trades
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get tabActive;
+
+  /// Trades tab: completed trades
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tabDone;
+
+  /// Placeholder shown when the other user's name is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'???'**
+  String get unknownUser;
+
+  /// Match status chip: pending
+  ///
+  /// In en, this message translates to:
+  /// **'PENDING'**
+  String get statusPending;
+
+  /// Match status chip: offered
+  ///
+  /// In en, this message translates to:
+  /// **'OFFERED'**
+  String get statusOffered;
+
+  /// Match status chip: accepted
+  ///
+  /// In en, this message translates to:
+  /// **'ACCEPTED'**
+  String get statusAccepted;
+
+  /// Match status chip: completed
+  ///
+  /// In en, this message translates to:
+  /// **'COMPLETED'**
+  String get statusCompleted;
+
+  /// Label above items the user would give (potential match)
+  ///
+  /// In en, this message translates to:
+  /// **'You give:'**
+  String get youGive;
+
+  /// Label above items the user would receive (potential match)
+  ///
+  /// In en, this message translates to:
+  /// **'You receive:'**
+  String get youReceive;
+
+  /// Label above items given in a selected offer
+  ///
+  /// In en, this message translates to:
+  /// **'Give:'**
+  String get giveLabel;
+
+  /// Label above items received in a selected offer
+  ///
+  /// In en, this message translates to:
+  /// **'Receive:'**
+  String get receiveLabel;
+
+  /// Reject offer button
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get reject;
+
+  /// Button to open the offer dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Make Offer'**
+  String get makeOffer;
+
+  /// Accept offer button
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get accept;
+
+  /// Cancel outgoing offer button
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Offer'**
+  String get cancelOffer;
+
+  /// Hint shown on an outgoing offer awaiting a reply
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for response...'**
+  String get waitingForResponse;
+
+  /// Button to mark an active trade complete
+  ///
+  /// In en, this message translates to:
+  /// **'Mark Complete'**
+  String get markComplete;
+
+  /// Button to apply a completed trade to inventory
+  ///
+  /// In en, this message translates to:
+  /// **'Update Inventory'**
+  String get updateInventory;
+
+  /// Label shown when a trade's inventory was already applied
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory Updated'**
+  String get inventoryUpdated;
+
+  /// Snackbar after applying a completed trade to inventory
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory updated!'**
+  String get inventoryUpdatedSnack;
+
+  /// Offer dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Make Trade Offer'**
+  String get makeTradeOffer;
+
+  /// Section header in the offer dialog for give items
+  ///
+  /// In en, this message translates to:
+  /// **'Items you give:'**
+  String get itemsYouGive;
+
+  /// Section header in the offer dialog for receive items
+  ///
+  /// In en, this message translates to:
+  /// **'Items you receive:'**
+  String get itemsYouReceive;
+
+  /// Quantity label in the offer dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Qty: {count}'**
+  String qtyLabel(int count);
+
+  /// Submit button on the offer dialog with the selected item count
+  ///
+  /// In en, this message translates to:
+  /// **'Send Offer ({count} items)'**
+  String sendOfferItems(int count);
+
+  /// Empty state for the Match tab
+  ///
+  /// In en, this message translates to:
+  /// **'No pending matches. Keep adding items!'**
+  String get noPendingMatches;
+
+  /// Empty state for the Offer Out tab
+  ///
+  /// In en, this message translates to:
+  /// **'No outgoing offers.'**
+  String get noOutgoingOffers;
+
+  /// Empty state for the Offer In tab
+  ///
+  /// In en, this message translates to:
+  /// **'No incoming offers.'**
+  String get noIncomingOffers;
+
+  /// Empty state for the Active tab
+  ///
+  /// In en, this message translates to:
+  /// **'No active trades.'**
+  String get noActiveTrades;
+
+  /// Empty state for the Done tab
+  ///
+  /// In en, this message translates to:
+  /// **'No completed trades yet.'**
+  String get noCompletedTrades;
 }
 
 class _AppLocalizationsDelegate
