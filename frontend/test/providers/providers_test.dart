@@ -130,4 +130,102 @@ void main() {
           .toggleFavoriteGroup(1, 1, 'default', true);
     });
   });
+
+  // #215: request payloads must be built from generated protobuf types and
+  // serialized via toProto3Json(), which emits camelCase keys. These tests
+  // pin that contract so the payloads can't silently regress to hand-written
+  // snake_case maps.
+  group('Proto3 JSON payloads (#215)', () {
+    test('addEvent sends camelCase proto3 JSON (creatorId, not creator_id)',
+        () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' && request.url.path == '/api/v1/events') {
+            capturedBody = request.body;
+            return http.Response(jsonEncode({'id': 1, 'name': 'n'}), 201);
+          }
+          return http.Response(jsonEncode([]), 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(eventsControllerProvider.notifier)
+          .addEvent('My Event', 5, status: 'draft');
+
+      final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(decoded, containsPair('name', 'My Event'));
+      expect(decoded, containsPair('creatorId', 5));
+      expect(decoded, containsPair('status', 'draft'));
+      // The whole point of #215: no snake_case keys leak into the wire body.
+      expect(decoded, isNot(contains('creator_id')));
+      expect(decoded, isNot(contains('user_id')));
+    });
+
+    test('banUser sends camelCase proto3 JSON (bannedUntil, not banned_until)',
+        () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' && request.url.path.endsWith('/ban')) {
+            capturedBody = request.body;
+            return http.Response('', 200);
+          }
+          return http.Response(jsonEncode([]), 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(adminControllerProvider.notifier).banUser(
+        2,
+        1,
+        reason: 'spam',
+        bannedUntil: '2026-12-31T00:00:00Z',
+      );
+
+      final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(decoded, containsPair('reason', 'spam'));
+      expect(decoded, containsPair('bannedUntil', '2026-12-31T00:00:00Z'));
+      expect(decoded, isNot(contains('banned_until')));
+    });
+
+    test('addMerch preserves an empty photoUrl on the wire (#215)', () async {
+      // photo_url is an `optional string`; setting it to '' must still emit
+      // "photoUrl": "" (presence-tracked), matching the old hand-written map
+      // and the generateDebugData path that uses '' for icon-less items.
+      // If this field ever becomes non-optional, toProto3Json() would omit it
+      // and the DB would flip from empty-string to NULL — pin the invariant.
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' && request.url.path.endsWith('/merch')) {
+            capturedBody = request.body;
+            return http.Response(jsonEncode({'id': 1}), 201);
+          }
+          return http.Response(jsonEncode([]), 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(merchControllerProvider.notifier)
+          .addMerch(1, 'Photo Card #1', '', 'Photo Cards');
+
+      final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(decoded, containsPair('name', 'Photo Card #1'));
+      expect(decoded, containsPair('photoUrl', ''));
+      expect(decoded, containsPair('groupName', 'Photo Cards'));
+      expect(decoded, isNot(contains('group_name')));
+    });
+  });
 }

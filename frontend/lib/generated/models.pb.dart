@@ -1484,6 +1484,153 @@ class UpdateEventRequest extends $pb.GeneratedMessage {
   void clearName() => $_clearField(2);
 }
 
+class ToggleFavoriteRequest extends $pb.GeneratedMessage {
+  factory ToggleFavoriteRequest({
+    $core.int? userId,
+    $core.bool? isFavorite,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (isFavorite != null) result.isFavorite = isFavorite;
+    return result;
+  }
+
+  ToggleFavoriteRequest._();
+
+  factory ToggleFavoriteRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToggleFavoriteRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToggleFavoriteRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOB(2, _omitFieldNames ? '' : 'isFavorite')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToggleFavoriteRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToggleFavoriteRequest copyWith(
+          void Function(ToggleFavoriteRequest) updates) =>
+      super.copyWith((message) => updates(message as ToggleFavoriteRequest))
+          as ToggleFavoriteRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToggleFavoriteRequest create() => ToggleFavoriteRequest._();
+  @$core.override
+  ToggleFavoriteRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToggleFavoriteRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ToggleFavoriteRequest>(create);
+  static ToggleFavoriteRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get isFavorite => $_getBF(1);
+  @$pb.TagNumber(2)
+  set isFavorite($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIsFavorite() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIsFavorite() => $_clearField(2);
+}
+
+class ToggleFavoriteGroupRequest extends $pb.GeneratedMessage {
+  factory ToggleFavoriteGroupRequest({
+    $core.int? userId,
+    $core.String? groupName,
+    $core.bool? isFavorite,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (groupName != null) result.groupName = groupName;
+    if (isFavorite != null) result.isFavorite = isFavorite;
+    return result;
+  }
+
+  ToggleFavoriteGroupRequest._();
+
+  factory ToggleFavoriteGroupRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToggleFavoriteGroupRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToggleFavoriteGroupRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'groupName')
+    ..aOB(3, _omitFieldNames ? '' : 'isFavorite')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToggleFavoriteGroupRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToggleFavoriteGroupRequest copyWith(
+          void Function(ToggleFavoriteGroupRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ToggleFavoriteGroupRequest))
+          as ToggleFavoriteGroupRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToggleFavoriteGroupRequest create() => ToggleFavoriteGroupRequest._();
+  @$core.override
+  ToggleFavoriteGroupRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToggleFavoriteGroupRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ToggleFavoriteGroupRequest>(create);
+  static ToggleFavoriteGroupRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get groupName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set groupName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGroupName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGroupName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get isFavorite => $_getBF(2);
+  @$pb.TagNumber(3)
+  set isFavorite($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasIsFavorite() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIsFavorite() => $_clearField(3);
+}
+
 class UpdateInventoryRequest extends $pb.GeneratedMessage {
   factory UpdateInventoryRequest({
     $core.int? userId,
@@ -2602,6 +2749,73 @@ class UpdateUserRoleRequest extends $pb.GeneratedMessage {
   $core.bool hasRole() => $_has(0);
   @$pb.TagNumber(1)
   void clearRole() => $_clearField(1);
+}
+
+class UpdateUsernameRequest extends $pb.GeneratedMessage {
+  factory UpdateUsernameRequest({
+    $core.int? userId,
+    $core.String? username,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (username != null) result.username = username;
+    return result;
+  }
+
+  UpdateUsernameRequest._();
+
+  factory UpdateUsernameRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UpdateUsernameRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateUsernameRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'username')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateUsernameRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateUsernameRequest copyWith(
+          void Function(UpdateUsernameRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateUsernameRequest))
+          as UpdateUsernameRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UpdateUsernameRequest create() => UpdateUsernameRequest._();
+  @$core.override
+  UpdateUsernameRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UpdateUsernameRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateUsernameRequest>(create);
+  static UpdateUsernameRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get username => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set username($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUsername() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUsername() => $_clearField(2);
 }
 
 /// Generic request with user_id for permission checks

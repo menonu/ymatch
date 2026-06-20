@@ -84,10 +84,13 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       // In a real app, this would come from a push notification plugin.
       final mockDeviceToken = 'mock-token-${uuid.substring(0, 8)}';
 
-      final json = await client.post('/api/v1/auth/guest', {
-        'uuid': uuid,
-        'deviceToken': mockDeviceToken,
-      });
+      final payload = GuestLoginRequest()
+        ..uuid = uuid
+        ..deviceToken = mockDeviceToken;
+      final json = await client.post(
+        '/api/v1/auth/guest',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
     } catch (e, st) {
@@ -105,10 +108,13 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   Future<void> login(String username, String password) async {
     state = const AsyncValue.loading();
     try {
-      final json = await client.post('/api/v1/auth/login', {
-        'username': username,
-        'password': password,
-      });
+      final payload = LoginRequest()
+        ..username = username
+        ..password = password;
+      final json = await client.post(
+        '/api/v1/auth/login',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       final user = User()..mergeFromProto3Json(json);
       // Also save UUID if this user has one? For now just session.
       state = AsyncValue.data(user);
@@ -121,11 +127,14 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     // ... legacy signup ...
     state = const AsyncValue.loading();
     try {
-      final json = await client.post('/api/v1/auth/signup', {
-        'username': username,
-        'password': password,
-        'deviceToken': 'web-v1',
-      });
+      final payload = CreateUserRequest()
+        ..username = username
+        ..password = password
+        ..deviceToken = 'web-v1';
+      final json = await client.post(
+        '/api/v1/auth/signup',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       final user = User()..mergeFromProto3Json(json);
       state = AsyncValue.data(user);
     } catch (e, st) {
@@ -143,10 +152,13 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   }
 
   Future<void> updateUsername(int userId, String newUsername) async {
-    final data = await client.put('/api/v1/users/$userId', {
-      'userId': userId,
-      'username': newUsername,
-    });
+    final payload = UpdateUsernameRequest()
+      ..userId = userId
+      ..username = newUsername;
+    final data = await client.put(
+      '/api/v1/users/$userId',
+      payload.toProto3Json() as Map<String, dynamic>,
+    );
     final user = User()..mergeFromProto3Json(data);
     state = AsyncValue.data(user);
   }
@@ -212,12 +224,14 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   Future<void> addEvent(String name, int creatorId, {String? status}) async {
     state = const AsyncValue.loading();
     try {
-      final body = <String, dynamic>{
-        'name': name,
-        'creatorId': creatorId,
-      };
-      if (status != null) body['status'] = status;
-      await client.post('/api/v1/events', body);
+      final payload = CreateEventRequest()
+        ..name = name
+        ..creatorId = creatorId;
+      if (status != null) payload.status = status;
+      await client.post(
+        '/api/v1/events',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -228,10 +242,13 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     // We don't necessarily need to set state to loading here if we do optimistic update,
     // but we can just fire and forget, then invalidate the provider.
     try {
-      await client.post('/api/v1/events/$eventId/favorite', {
-        'userId': userId,
-        'isFavorite': isFavorite,
-      });
+      final payload = ToggleFavoriteRequest()
+        ..userId = userId
+        ..isFavorite = isFavorite;
+      await client.post(
+        '/api/v1/events/$eventId/favorite',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
     } catch (e) {
       // Don't rethrow: the caller (home_screen) relies on this returning
       // normally so it can ref.invalidate(eventsProvider) to refresh the
@@ -247,11 +264,14 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     bool isFavorite,
   ) async {
     try {
-      await client.post('/api/v1/events/$eventId/favorite_group', {
-        'userId': userId,
-        'groupName': groupName,
-        'isFavorite': isFavorite,
-      });
+      final payload = ToggleFavoriteGroupRequest()
+        ..userId = userId
+        ..groupName = groupName
+        ..isFavorite = isFavorite;
+      await client.post(
+        '/api/v1/events/$eventId/favorite_group',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
     } catch (e) {
       // See toggleFavorite: log, don't rethrow (#239).
       debugPrint(
@@ -263,7 +283,11 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> registerView(int eventId, int userId) async {
     try {
-      await client.post('/api/v1/events/$eventId/view', {'userId': userId});
+      final payload = UserActionRequest()..userId = userId;
+      await client.post(
+        '/api/v1/events/$eventId/view',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
     } catch (e) {
       // Ignore errors for analytics
     }
@@ -272,10 +296,13 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   Future<void> updateEvent(int eventId, int userId, String name) async {
     state = const AsyncValue.loading();
     try {
-      await client.put('/api/v1/events/$eventId', {
-        'userId': userId,
-        'name': name,
-      });
+      final payload = UpdateEventRequest()
+        ..userId = userId
+        ..name = name;
+      await client.put(
+        '/api/v1/events/$eventId',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -296,11 +323,14 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       // 1. Create a debug event
-      final eventJson = await client.post('/api/v1/events', {
-        'name':
-            'Debug Event ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        'creatorId': creatorId,
-      });
+      final eventPayload = CreateEventRequest()
+        ..name =
+            'Debug Event ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
+        ..creatorId = creatorId;
+      final eventJson = await client.post(
+        '/api/v1/events',
+        eventPayload.toProto3Json() as Map<String, dynamic>,
+      );
       final event = Event()..mergeFromProto3Json(eventJson);
 
       // 2. Generate 50 items in parallel across 5 groups (10 items each)
@@ -321,12 +351,15 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
               ? 'https://picsum.photos/seed/${event.id}_$globalIndex/200'
               : '';
 
+          final merchPayload = CreateMerchRequest()
+            ..name = '${groups[g]} #$i'
+            ..photoUrl = photoUrl
+            ..groupName = groups[g];
           futures.add(
-            client.post('/api/v1/events/${event.id}/merch', {
-              'name': '${groups[g]} #$i',
-              'photoUrl': photoUrl,
-              'groupName': groups[g],
-            }),
+            client.post(
+              '/api/v1/events/${event.id}/merch',
+              merchPayload.toProto3Json() as Map<String, dynamic>,
+            ),
           );
         }
       }
@@ -375,17 +408,19 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
   ]) async {
     state = const AsyncValue.loading();
     try {
-      final payload = <String, dynamic>{
-        'name': name,
-        'photoUrl': photoUrl,
-      };
+      final payload = CreateMerchRequest()
+        ..name = name
+        ..photoUrl = photoUrl;
       if (groupName != null && groupName.isNotEmpty) {
-        payload['groupName'] = groupName;
+        payload.groupName = groupName;
       }
-      if (creatorId != null) payload['creatorId'] = creatorId;
-      if (status != null) payload['status'] = status;
+      if (creatorId != null) payload.creatorId = creatorId;
+      if (status != null) payload.status = status;
 
-      await client.post('/api/v1/events/$eventId/merch', payload);
+      await client.post(
+        '/api/v1/events/$eventId/merch',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -406,11 +441,14 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      final payload = <String, dynamic>{'userId': userId};
-      if (name != null) payload['name'] = name;
-      if (photoUrl != null) payload['photoUrl'] = photoUrl;
-      if (groupName != null) payload['groupName'] = groupName;
-      await client.put('/api/v1/events/$eventId/merch/$merchId', payload);
+      final payload = UpdateMerchRequest()..userId = userId;
+      if (name != null) payload.name = name;
+      if (photoUrl != null) payload.photoUrl = photoUrl;
+      if (groupName != null) payload.groupName = groupName;
+      await client.put(
+        '/api/v1/events/$eventId/merch/$merchId',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -493,12 +531,15 @@ class UserInventoryNotifier
     // 2. Network Call
     try {
       final client = ref.read(apiClientProvider);
-      await client.post('/api/v1/user/inventory', {
-        'userId': userId,
-        'merchId': merchId,
-        'status': status,
-        'quantity': quantity,
-      });
+      final payload = UpdateInventoryRequest()
+        ..userId = userId
+        ..merchId = merchId
+        ..status = status
+        ..quantity = quantity;
+      await client.post(
+        '/api/v1/user/inventory',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       // Do NOT invalidate yet, let the user keep clicking.
       // We can refresh later or on some other event if needed.
     } catch (e) {
@@ -556,11 +597,12 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       {String? reason, String? bannedUntil}) async {
     state = const AsyncValue.loading();
     try {
-      final body = <String, dynamic>{};
-      if (reason != null) body['reason'] = reason;
-      if (bannedUntil != null) body['banned_until'] = bannedUntil;
+      final payload = BanUserRequest();
+      if (reason != null) payload.reason = reason;
+      if (bannedUntil != null) payload.bannedUntil = bannedUntil;
       await client.post(
-          '/api/v1/admin/users/$targetUserId/ban?user_id=$adminUserId', body);
+          '/api/v1/admin/users/$targetUserId/ban?user_id=$adminUserId',
+          payload.toProto3Json() as Map<String, dynamic>);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -582,9 +624,10 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       int targetUserId, int adminUserId, String role) async {
     state = const AsyncValue.loading();
     try {
+      final payload = UpdateUserRoleRequest()..role = role;
       await client.post(
           '/api/v1/admin/users/$targetUserId/role?user_id=$adminUserId',
-          {'role': role});
+          payload.toProto3Json() as Map<String, dynamic>);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -594,8 +637,9 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
   Future<void> publishEvent(int eventId, int userId) async {
     state = const AsyncValue.loading();
     try {
-      await client
-          .post('/api/v1/events/$eventId/publish', {'userId': userId});
+      final payload = UserActionRequest()..userId = userId;
+      await client.post('/api/v1/events/$eventId/publish',
+          payload.toProto3Json() as Map<String, dynamic>);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -605,9 +649,10 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
   Future<void> publishMerch(int eventId, int merchId, int userId) async {
     state = const AsyncValue.loading();
     try {
+      final payload = UserActionRequest()..userId = userId;
       await client.post(
           '/api/v1/events/$eventId/merch/$merchId/publish',
-          {'userId': userId});
+          payload.toProto3Json() as Map<String, dynamic>);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

@@ -124,6 +124,17 @@ message UpdateEventRequest {
   optional string name = 2;
 }
 
+message ToggleFavoriteRequest {
+  int32 user_id = 1;
+  bool is_favorite = 2;
+}
+
+message ToggleFavoriteGroupRequest {
+  int32 user_id = 1;
+  string group_name = 2;
+  bool is_favorite = 3;
+}
+
 message UpdateInventoryRequest {
   int32 user_id = 1;
   int32 merch_id = 2;
@@ -210,6 +221,11 @@ message BanUserRequest {
 
 message UpdateUserRoleRequest {
   string role = 1; // "user", "moderator", "admin"
+}
+
+message UpdateUsernameRequest {
+  int32 user_id = 1;
+  string username = 2;
 }
 
 // Generic request with user_id for permission checks
