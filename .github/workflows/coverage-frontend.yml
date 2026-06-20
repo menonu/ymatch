@@ -3,17 +3,22 @@ name: Frontend Coverage
 # Mirrors the backend coverage workflow (coverage.yml) for the
 # Flutter frontend (#184). Runs `flutter test --coverage` (excluding
 # backend-dependent suites) and reports line coverage as a markdown
-# box in the PR's job summary. No threshold gate yet — frontend
-# coverage is currently low; a floor would block all PRs. Revisit
+# box in the run's job summary. No threshold gate yet — frontend
+# coverage is currently low; a floor would block all runs. Revisit
 # after #185 adds more unit/widget tests.
+#
+# Runs **post-merge on `main`** only (plus a manual `workflow_dispatch`)
+# to keep the PR feedback loop fast — see #279. PR validation is
+# handled by the lighter `ci.yml`.
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  # Manual trigger so a human can run frontend coverage on a PR branch
+  # before merge for risky changes without making it mandatory on every
+  # PR (#279).
+  workflow_dispatch:
 
 jobs:
   coverage:
