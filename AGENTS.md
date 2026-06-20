@@ -50,7 +50,7 @@ Where tests live:
 **Issue-Driven**: Every change starts with a GitHub Issue — create it **first**, before any branch or code. The issue is the single source of truth for the goal and acceptance criteria; track its status throughout
 
 1. **Issue**: `gh issue create` (Must be first)
-2. **Branch**: Create `feat/xxx` or `fix/xxx`
+2. **Branch**: Create a branch and worktree
 3. **TDD**: Follow Red -> Green -> Refactor
 4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `flutter analyze`
 5. **Push & PR**: Commit, push, and run `gh pr create`
@@ -59,7 +59,7 @@ Where tests live:
    * Fix or explain `[critical]` / `[major]` findings.
    * Resolve or accept `[minor]` / `[nit]` findings.
    * Re-run after changes.
-8. **Report & Wait**: Report the PR URL to the user and stop. **Do not merge.** Wait for human merge or explicit authorization.
+8. **Report & Wait**: Report the PR URL to the user and stop. **Do not merge.** Wait for human merge or explicit authorization. Cleanup worktree after merge
 
 See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
 
