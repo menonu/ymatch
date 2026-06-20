@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
@@ -36,28 +37,29 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   }
 
   Future<void> _pickImage() async {
+    final l10n = AppLocalizations.of(context)!;
     final source = await showDialog<ImageSource>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Select Image Source'),
+        title: Text(l10n.selectImageSource),
         children: [
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context, ImageSource.gallery),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.photo_library),
-                SizedBox(width: 12),
-                Text('Gallery'),
+                const Icon(Icons.photo_library),
+                const SizedBox(width: 12),
+                Text(l10n.gallery),
               ],
             ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context, ImageSource.camera),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.camera_alt),
-                SizedBox(width: 12),
-                Text('Camera'),
+                const Icon(Icons.camera_alt),
+                const SizedBox(width: 12),
+                Text(l10n.camera),
               ],
             ),
           ),
@@ -85,9 +87,9 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.failedToPickImage(e.toString()))),
+        );
       }
     }
   }
@@ -96,10 +98,12 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context)!;
+
     if (_selectedGroup == null || _selectedGroup!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select or create an item group first.'),
+        SnackBar(
+          content: Text(l10n.selectGroupFirst),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -122,12 +126,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
 
       await ref
           .read(merchControllerProvider.notifier)
-          .addMerch(
-            widget.eventId,
-            name,
-            photoUrl,
-            _selectedGroup,
-          );
+          .addMerch(widget.eventId, name, photoUrl, _selectedGroup);
 
       // Clear inputs for continuous adding, but KEEP the selected group!
       _nameController.clear();
@@ -144,7 +143,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added "$name" successfully.'),
+            content: Text(l10n.addedSuccessfully(name)),
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
           ),
@@ -157,7 +156,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add "$name": $e'),
+            content: Text(l10n.failedToAdd(name, e.toString())),
             duration: const Duration(seconds: 4),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).colorScheme.error,
@@ -174,6 +173,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   @override
   Widget build(BuildContext context) {
     final merchAsync = ref.watch(merchProvider(widget.eventId));
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -200,15 +200,12 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
           }
 
           // Filter existing items in the currently selected group to show as preview
-          final itemsInSelectedGroup =
-              merchList.where((item) {
-                final gName = item.hasGroupName() && item.groupName.isNotEmpty
-                    ? item.groupName
-                    : null;
-                return gName == _selectedGroup;
-              }).toList()..sort(
-                (a, b) => _naturalCompare(a.name, b.name),
-              );
+          final itemsInSelectedGroup = merchList.where((item) {
+            final gName = item.hasGroupName() && item.groupName.isNotEmpty
+                ? item.groupName
+                : null;
+            return gName == _selectedGroup;
+          }).toList()..sort((a, b) => _naturalCompare(a.name, b.name));
 
           return Column(
             children: [
@@ -221,7 +218,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                   children: [
                     // Group Selection (Chips)
                     Text(
-                      'Select Group',
+                      l10n.selectGroup,
                       style: Theme.of(
                         context,
                       ).textTheme.labelLarge?.copyWith(color: Colors.grey[700]),
@@ -251,7 +248,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                           ),
                           ActionChip(
                             avatar: const Icon(Icons.add, size: 16),
-                            label: const Text('New Group'),
+                            label: Text(l10n.newGroup),
                             onPressed: _showNewGroupDialog,
                           ),
                         ],
@@ -264,9 +261,9 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                     TextField(
                       controller: _nameController,
                       focusNode: _nameFocusNode,
-                      decoration: const InputDecoration(
-                        labelText: 'Item Name',
-                        hintText: 'e.g., Rare Holo Card #1',
+                      decoration: InputDecoration(
+                        labelText: l10n.itemName,
+                        hintText: l10n.itemNameHint,
                       ),
                       textInputAction: TextInputAction.next,
                       onSubmitted: (_) => _submit(),
@@ -297,18 +294,18 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                                       height: 80,
                                     ),
                                   )
-                                : const Column(
+                                : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(
+                                      const Icon(
                                         Icons.add_a_photo,
                                         color: Colors.grey,
                                         size: 28,
                                       ),
-                                      SizedBox(height: 4),
+                                      const SizedBox(height: 4),
                                       Text(
-                                        'Photo',
-                                        style: TextStyle(
+                                        l10n.photo,
+                                        style: const TextStyle(
                                           fontSize: 10,
                                           color: Colors.grey,
                                         ),
@@ -327,8 +324,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                                 icon: const Icon(Icons.image, size: 18),
                                 label: Text(
                                   _urlController.text.isNotEmpty
-                                      ? 'Change Image'
-                                      : 'Choose Image',
+                                      ? l10n.changeImage
+                                      : l10n.chooseImage,
                                 ),
                               ),
                               if (_urlController.text.isNotEmpty) ...[
@@ -339,9 +336,9 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                                       _urlController.clear();
                                     });
                                   },
-                                  child: const Text(
-                                    'Remove',
-                                    style: TextStyle(
+                                  child: Text(
+                                    l10n.remove,
+                                    style: const TextStyle(
                                       color: Colors.red,
                                       fontSize: 12,
                                     ),
@@ -367,7 +364,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                               ),
                             )
                           : const Icon(Icons.add),
-                      label: Text(_isAdding ? 'Adding...' : 'Add Item'),
+                      label: Text(_isAdding ? l10n.adding : l10n.addItem),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -386,7 +383,9 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                 ),
                 color: Colors.grey[100],
                 child: Text(
-                  'Existing items in "${_selectedGroup ?? 'Uncategorized'}"',
+                  l10n.existingItemsInGroup(
+                    _selectedGroup ?? l10n.uncategorized,
+                  ),
                   style: Theme.of(
                     context,
                   ).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
@@ -396,7 +395,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                 child: itemsInSelectedGroup.isEmpty
                     ? Center(
                         child: Text(
-                          'No items in this group yet.',
+                          l10n.noItemsInGroup,
                           style: TextStyle(color: Colors.grey[500]),
                         ),
                       )
@@ -429,26 +428,27 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(child: Text('Error: $e')),
+        error: (e, st) => Center(child: Text(l10n.errorPrefix(e.toString()))),
       ),
     );
   }
 
   void _showNewGroupDialog() {
     final ctrl = TextEditingController();
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New Group Name'),
+        title: Text(l10n.newGroupName),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'e.g., Keychains'),
+          decoration: InputDecoration(hintText: l10n.newGroupHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -461,7 +461,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
               }
               Navigator.pop(context);
             },
-            child: const Text('Set'),
+            child: Text(l10n.set),
           ),
         ],
       ),

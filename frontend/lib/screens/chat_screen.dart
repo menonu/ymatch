@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_client.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
@@ -59,14 +60,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ..matchId = widget.matchId
         ..senderId = currentUser.id
         ..content = text;
-      await client.post('/api/v1/matches/${widget.matchId}/messages',
-          payload.toProto3Json() as Map<String, dynamic>);
+      await client.post(
+        '/api/v1/matches/${widget.matchId}/messages',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       ref.invalidate(messagesProvider(widget.matchId));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.failedToSend(e.toString()),
+            ),
+          ),
+        );
       }
     }
   }
@@ -78,6 +85,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final messagesAsync = ref.watch(messagesProvider(widget.matchId));
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.white),
@@ -87,10 +95,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: messagesAsync.when(
               data: (messages) {
                 if (messages.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No messages yet. Say hello!',
-                      style: TextStyle(color: Colors.grey),
+                      l10n.noMessagesYet,
+                      style: const TextStyle(color: Colors.grey),
                     ),
                   );
                 }
@@ -124,14 +132,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             bottomLeft: !isMe ? const Radius.circular(0) : null,
                           ),
                         ),
-                        child: _buildMessageContent(msg.content, isMe),
+                        child: _buildMessageContent(msg.content, isMe, l10n),
                       ),
                     );
                   },
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => Center(child: Text('Error: $e')),
+              error: (e, st) =>
+                  Center(child: Text(l10n.errorPrefix(e.toString()))),
             ),
           ),
           Container(
@@ -165,12 +174,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
+                      decoration: InputDecoration(
+                        hintText: l10n.typeMessage,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                       ),
                       onSubmitted: (_) => _sendMessage(user),
                     ),
@@ -189,7 +200,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessageContent(String text, bool isMe) {
+  Widget _buildMessageContent(String text, bool isMe, AppLocalizations l10n) {
     final urlRegExp = RegExp(r'(https?://[^\s]+)');
     final matches = urlRegExp.allMatches(text);
 
@@ -253,7 +264,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
-                    isMapUrl ? 'Open in Maps' : 'Open Link',
+                    isMapUrl ? l10n.openInMaps : l10n.openLink,
                     style: TextStyle(
                       color: isMe ? Colors.white : AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,

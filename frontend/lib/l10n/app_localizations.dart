@@ -1,0 +1,680 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart' as intl;
+
+import 'app_localizations_en.dart';
+import 'app_localizations_ja.dart';
+
+// ignore_for_file: type=lint
+
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
+///
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
+///
+/// ```dart
+/// import 'l10n/app_localizations.dart';
+///
+/// return MaterialApp(
+///   localizationsDelegates: AppLocalizations.localizationsDelegates,
+///   supportedLocales: AppLocalizations.supportedLocales,
+///   home: MyApplicationHome(),
+/// );
+/// ```
+///
+/// ## Update pubspec.yaml
+///
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
+///
+/// ```yaml
+/// dependencies:
+///   # Internationalization support.
+///   flutter_localizations:
+///     sdk: flutter
+///   intl: any # Use the pinned version from flutter_localizations
+///
+///   # Rest of dependencies
+/// ```
+///
+/// ## iOS Applications
+///
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
+///
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
+///
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
+///
+/// Select and expand the newly-created Localizations item then, for each
+/// locale your application supports, add a new item and select the locale
+/// you wish to add from the pop-up menu in the Value field. This list should
+/// be consistent with the languages listed in the AppLocalizations.supportedLocales
+/// property.
+abstract class AppLocalizations {
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+
+  final String localeName;
+
+  static AppLocalizations? of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations);
+  }
+
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+
+  /// A list of this localizations delegate along with the default localizations
+  /// delegates.
+  ///
+  /// Returns a list of localizations delegates containing this delegate along with
+  /// GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate,
+  /// and GlobalWidgetsLocalizations.delegate.
+  ///
+  /// Additional delegates can be added by appending to this list in
+  /// MaterialApp. This list does not have to be used at all if a custom list
+  /// of delegates is preferred or required.
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
+
+  /// A list of this localizations delegate's supported locales.
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('en'),
+    Locale('ja'),
+  ];
+
+  /// App brand name shown on the login screen
+  ///
+  /// In en, this message translates to:
+  /// **'ymatch'**
+  String get appName;
+
+  /// Generic Cancel button label
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// Generic Delete button label
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// Generic Save button label
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// Generic Create button label
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// Generic Set/confirm button label
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get set;
+
+  /// Remove button label
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// Retry button label shown on backend errors
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// Refresh tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// Confirm button label
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
+
+  /// Label for the master key / UUID field
+  ///
+  /// In en, this message translates to:
+  /// **'Master Key (UUID)'**
+  String get masterKeyUuid;
+
+  /// Placeholder shown when a value is missing
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknown;
+
+  /// Generic error message with the underlying error text
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String errorPrefix(String error);
+
+  /// Tagline shown under the app name on the login screen
+  ///
+  /// In en, this message translates to:
+  /// **'Trade merch seamlessly.'**
+  String get loginTagline;
+
+  /// Title shown when the backend is unreachable
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot connect to backend'**
+  String get loginBackendErrorTitle;
+
+  /// Body text shown when the backend is unreachable
+  ///
+  /// In en, this message translates to:
+  /// **'The service may be temporarily down.\nPlease try again in a little while.'**
+  String get loginBackendErrorBody;
+
+  /// Loading text shown while logging in
+  ///
+  /// In en, this message translates to:
+  /// **'Logging in...'**
+  String get loggingIn;
+
+  /// Restore account title and button label
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Account'**
+  String get restoreAccount;
+
+  /// Button to start a new guest session
+  ///
+  /// In en, this message translates to:
+  /// **'Start as New User'**
+  String get startAsNewUser;
+
+  /// Button to reveal the account restore form
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Existing Account'**
+  String get restoreExistingAccount;
+
+  /// Bottom navigation bar label for the events/items tab
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get navItems;
+
+  /// Bottom navigation bar label for the matches tab
+  ///
+  /// In en, this message translates to:
+  /// **'Matches'**
+  String get navMatches;
+
+  /// Bottom navigation bar label for the profile tab
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get navProfile;
+
+  /// Bottom navigation bar label for the admin tab
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get navAdmin;
+
+  /// Banner text shown when the backend health check fails
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot connect to backend service'**
+  String get backendUnreachableBanner;
+
+  /// Hint text in the home screen search bar
+  ///
+  /// In en, this message translates to:
+  /// **'Search events, groups...'**
+  String get searchEventsHint;
+
+  /// Tooltip for the event sort menu
+  ///
+  /// In en, this message translates to:
+  /// **'Sort Events'**
+  String get sortEvents;
+
+  /// Sort option: newest events first
+  ///
+  /// In en, this message translates to:
+  /// **'Newest First'**
+  String get sortNewestFirst;
+
+  /// Sort option: most popular events first
+  ///
+  /// In en, this message translates to:
+  /// **'Most Popular'**
+  String get sortMostPopular;
+
+  /// Sort option: alphabetical order
+  ///
+  /// In en, this message translates to:
+  /// **'Alphabetical'**
+  String get sortAlphabetical;
+
+  /// Floating action button label to create a new event
+  ///
+  /// In en, this message translates to:
+  /// **'New Event'**
+  String get newEvent;
+
+  /// Filter segment label: all events
+  ///
+  /// In en, this message translates to:
+  /// **'All Events'**
+  String get filterAllEvents;
+
+  /// Filter segment label: favorite events
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get filterFavorites;
+
+  /// Filter segment label: events the user joined
+  ///
+  /// In en, this message translates to:
+  /// **'My Items'**
+  String get filterMyItems;
+
+  /// Empty state when a filter matches no events
+  ///
+  /// In en, this message translates to:
+  /// **'No events match this filter.'**
+  String get noEventsMatchFilter;
+
+  /// Number of active traders on an event
+  ///
+  /// In en, this message translates to:
+  /// **'{count} traders'**
+  String tradersCount(int count);
+
+  /// Number of unique views on an event
+  ///
+  /// In en, this message translates to:
+  /// **'{count} views'**
+  String viewsCount(int count);
+
+  /// Badge text shown on draft events
+  ///
+  /// In en, this message translates to:
+  /// **'DRAFT'**
+  String get draftBadge;
+
+  /// Fallback when an event date is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown date'**
+  String get unknownDate;
+
+  /// Fallback when an event date cannot be parsed
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid date'**
+  String get invalidDate;
+
+  /// Bottom sheet action to edit an event name
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Name'**
+  String get editName;
+
+  /// Dialog title for editing an event name
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Event Name'**
+  String get editEventName;
+
+  /// Hint text in the edit event name dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Event name'**
+  String get eventNameHint;
+
+  /// Dialog title for deleting an event
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Event'**
+  String get deleteEvent;
+
+  /// Confirmation message for deleting an event
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"?'**
+  String deleteEventConfirm(String name);
+
+  /// Empty state title when no events exist
+  ///
+  /// In en, this message translates to:
+  /// **'No events found'**
+  String get noEventsFound;
+
+  /// Empty state subtitle prompting event creation
+  ///
+  /// In en, this message translates to:
+  /// **'Create an event to start trading.'**
+  String get createEventPrompt;
+
+  /// Button label to create an event
+  ///
+  /// In en, this message translates to:
+  /// **'Create Event'**
+  String get createEvent;
+
+  /// Label for the event name field in the new event dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Event Name'**
+  String get eventNameLabel;
+
+  /// Hint text suggesting a default event name
+  ///
+  /// In en, this message translates to:
+  /// **'Event {number}'**
+  String newEventNameHint(int number);
+
+  /// Shortcut chip label for a favorite event
+  ///
+  /// In en, this message translates to:
+  /// **'Fav: {name}'**
+  String favPrefix(String name);
+
+  /// Fallback label when a group has no event name
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get groupFallback;
+
+  /// Shortcut chip label for a favorite group
+  ///
+  /// In en, this message translates to:
+  /// **'{event}: {group}'**
+  String groupChipLabel(String event, String group);
+
+  /// Label for the username field
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get username;
+
+  /// Tooltip for the edit username button
+  ///
+  /// In en, this message translates to:
+  /// **'Edit username'**
+  String get editUsername;
+
+  /// Snackbar message on successful username update
+  ///
+  /// In en, this message translates to:
+  /// **'Username updated'**
+  String get usernameUpdated;
+
+  /// Snackbar message when updating the username fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update username: {error}'**
+  String failedToUpdateUsername(String error);
+
+  /// Snackbar message after copying the master key
+  ///
+  /// In en, this message translates to:
+  /// **'Master Key copied to clipboard'**
+  String get masterKeyCopied;
+
+  /// Warning telling the user to save their master key
+  ///
+  /// In en, this message translates to:
+  /// **'Save this key to restore your account on another device!'**
+  String get saveKeyWarning;
+
+  /// Title of the how-to-trade instructions card
+  ///
+  /// In en, this message translates to:
+  /// **'How to Trade'**
+  String get howToTrade;
+
+  /// How-to-trade step 1
+  ///
+  /// In en, this message translates to:
+  /// **'Go to the Events tab and find your event.'**
+  String get tradeStep1;
+
+  /// How-to-trade step 2
+  ///
+  /// In en, this message translates to:
+  /// **'Use + and - to set your HAVE and WANT items.'**
+  String get tradeStep2;
+
+  /// How-to-trade step 3
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Matches to see who wants to trade with you.'**
+  String get tradeStep3;
+
+  /// Log out button label
+  ///
+  /// In en, this message translates to:
+  /// **'Log Out'**
+  String get logOut;
+
+  /// Footer showing frontend and backend revision hashes
+  ///
+  /// In en, this message translates to:
+  /// **'frontend: {frontend}  /  backend: {backend}'**
+  String revisionInfo(String frontend, String backend);
+
+  /// Dialog title for choosing image source
+  ///
+  /// In en, this message translates to:
+  /// **'Select Image Source'**
+  String get selectImageSource;
+
+  /// Image source option: gallery
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get gallery;
+
+  /// Image source option: camera
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get camera;
+
+  /// Snackbar message when picking an image fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to pick image: {error}'**
+  String failedToPickImage(String error);
+
+  /// Snackbar message when no group is selected
+  ///
+  /// In en, this message translates to:
+  /// **'Please select or create an item group first.'**
+  String get selectGroupFirst;
+
+  /// Snackbar message after an item is added
+  ///
+  /// In en, this message translates to:
+  /// **'Added \"{name}\" successfully.'**
+  String addedSuccessfully(String name);
+
+  /// Snackbar message when adding an item fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add \"{name}\": {error}'**
+  String failedToAdd(String name, String error);
+
+  /// Section title for group selection
+  ///
+  /// In en, this message translates to:
+  /// **'Select Group'**
+  String get selectGroup;
+
+  /// Action chip label to create a new group
+  ///
+  /// In en, this message translates to:
+  /// **'New Group'**
+  String get newGroup;
+
+  /// Label for the item name field
+  ///
+  /// In en, this message translates to:
+  /// **'Item Name'**
+  String get itemName;
+
+  /// Hint text for the item name field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g., Rare Holo Card #1'**
+  String get itemNameHint;
+
+  /// Caption under the photo placeholder
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get photo;
+
+  /// Button label to change the picked image
+  ///
+  /// In en, this message translates to:
+  /// **'Change Image'**
+  String get changeImage;
+
+  /// Button label to pick an image
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Image'**
+  String get chooseImage;
+
+  /// Button label while an item is being added
+  ///
+  /// In en, this message translates to:
+  /// **'Adding...'**
+  String get adding;
+
+  /// Button label to add an item
+  ///
+  /// In en, this message translates to:
+  /// **'Add Item'**
+  String get addItem;
+
+  /// Header above the list of existing items in a group
+  ///
+  /// In en, this message translates to:
+  /// **'Existing items in \"{group}\"'**
+  String existingItemsInGroup(String group);
+
+  /// Fallback group name when none is selected
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get uncategorized;
+
+  /// Empty state when a group has no items
+  ///
+  /// In en, this message translates to:
+  /// **'No items in this group yet.'**
+  String get noItemsInGroup;
+
+  /// Dialog title for creating a new group
+  ///
+  /// In en, this message translates to:
+  /// **'New Group Name'**
+  String get newGroupName;
+
+  /// Hint text for the new group name field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g., Keychains'**
+  String get newGroupHint;
+
+  /// Snackbar message when sending a chat message fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send: {error}'**
+  String failedToSend(String error);
+
+  /// Empty state when a chat has no messages
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet. Say hello!'**
+  String get noMessagesYet;
+
+  /// Hint text in the chat message input
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message...'**
+  String get typeMessage;
+
+  /// Link label for opening a map URL
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Maps'**
+  String get openInMaps;
+
+  /// Link label for opening a non-map URL
+  ///
+  /// In en, this message translates to:
+  /// **'Open Link'**
+  String get openLink;
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+
+  @override
+  Future<AppLocalizations> load(Locale locale) {
+    return SynchronousFuture<AppLocalizations>(lookupAppLocalizations(locale));
+  }
+
+  @override
+  bool isSupported(Locale locale) =>
+      <String>['en', 'ja'].contains(locale.languageCode);
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+
+AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when only language code is specified.
+  switch (locale.languageCode) {
+    case 'en':
+      return AppLocalizationsEn();
+    case 'ja':
+      return AppLocalizationsJa();
+  }
+
+  throw FlutterError(
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
+}

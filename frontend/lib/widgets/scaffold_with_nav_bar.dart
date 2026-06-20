@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 
 class ScaffoldWithNavBar extends ConsumerWidget {
@@ -20,12 +21,13 @@ class ScaffoldWithNavBar extends ConsumerWidget {
         ? ref.watch(notificationCountsProvider(user.id))
         : null;
     final badgeCount = notifAsync?.whenOrNull(data: (c) => c.total) ?? 0;
+    final l10n = AppLocalizations.of(context)!;
 
     final destinations = <NavigationDestination>[
-      const NavigationDestination(
-        icon: Icon(Icons.event_outlined),
-        selectedIcon: Icon(Icons.event),
-        label: 'Items',
+      NavigationDestination(
+        icon: const Icon(Icons.event_outlined),
+        selectedIcon: const Icon(Icons.event),
+        label: l10n.navItems,
       ),
       NavigationDestination(
         icon: badgeCount > 0
@@ -40,27 +42,28 @@ class ScaffoldWithNavBar extends ConsumerWidget {
                 child: const Icon(Icons.swap_horiz),
               )
             : const Icon(Icons.swap_horiz),
-        label: 'Matches',
+        label: l10n.navMatches,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.person_outline),
-        selectedIcon: Icon(Icons.person),
-        label: 'Profile',
+      NavigationDestination(
+        icon: const Icon(Icons.person_outline),
+        selectedIcon: const Icon(Icons.person),
+        label: l10n.navProfile,
       ),
     ];
 
     if (isAdminOrMod) {
       destinations.add(
-        const NavigationDestination(
-          icon: Icon(Icons.admin_panel_settings_outlined),
-          selectedIcon: Icon(Icons.admin_panel_settings),
-          label: 'Admin',
+        NavigationDestination(
+          icon: const Icon(Icons.admin_panel_settings_outlined),
+          selectedIcon: const Icon(Icons.admin_panel_settings),
+          label: l10n.navAdmin,
         ),
       );
     }
 
     // Show banner only when health check definitively returned false
-    final bool isUnreachable = backendHealth.whenOrNull(data: (v) => !v) ?? false;
+    final bool isUnreachable =
+        backendHealth.whenOrNull(data: (v) => !v) ?? false;
 
     return Scaffold(
       body: Column(
@@ -77,12 +80,19 @@ class ScaffoldWithNavBar extends ConsumerWidget {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.cloud_off, color: Colors.white, size: 18),
+                      const Icon(
+                        Icons.cloud_off,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'バックエンドサービスに接続できません',
-                          style: TextStyle(color: Colors.white, fontSize: 13),
+                          l10n.backendUnreachableBanner,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                       TextButton(
@@ -93,9 +103,9 @@ class ScaffoldWithNavBar extends ConsumerWidget {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         onPressed: () => ref.invalidate(backendHealthProvider),
-                        child: const Text(
-                          '再試行',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.retry,
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),

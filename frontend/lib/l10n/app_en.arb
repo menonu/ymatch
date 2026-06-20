@@ -1,0 +1,454 @@
+{
+  "@@locale": "en",
+
+  "appName": "ymatch",
+  "@appName": {
+    "description": "App brand name shown on the login screen"
+  },
+
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Generic Cancel button label"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Generic Delete button label"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Generic Save button label"
+  },
+  "create": "Create",
+  "@create": {
+    "description": "Generic Create button label"
+  },
+  "set": "Set",
+  "@set": {
+    "description": "Generic Set/confirm button label"
+  },
+  "remove": "Remove",
+  "@remove": {
+    "description": "Remove button label"
+  },
+  "retry": "Retry",
+  "@retry": {
+    "description": "Retry button label shown on backend errors"
+  },
+  "refresh": "Refresh",
+  "@refresh": {
+    "description": "Refresh tooltip"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Confirm button label"
+  },
+  "masterKeyUuid": "Master Key (UUID)",
+  "@masterKeyUuid": {
+    "description": "Label for the master key / UUID field"
+  },
+  "unknown": "Unknown",
+  "@unknown": {
+    "description": "Placeholder shown when a value is missing"
+  },
+  "errorPrefix": "Error: {error}",
+  "@errorPrefix": {
+    "description": "Generic error message with the underlying error text",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "loginTagline": "Trade merch seamlessly.",
+  "@loginTagline": {
+    "description": "Tagline shown under the app name on the login screen"
+  },
+  "loginBackendErrorTitle": "Cannot connect to backend",
+  "@loginBackendErrorTitle": {
+    "description": "Title shown when the backend is unreachable"
+  },
+  "loginBackendErrorBody": "The service may be temporarily down.\nPlease try again in a little while.",
+  "@loginBackendErrorBody": {
+    "description": "Body text shown when the backend is unreachable"
+  },
+  "loggingIn": "Logging in...",
+  "@loggingIn": {
+    "description": "Loading text shown while logging in"
+  },
+  "restoreAccount": "Restore Account",
+  "@restoreAccount": {
+    "description": "Restore account title and button label"
+  },
+  "startAsNewUser": "Start as New User",
+  "@startAsNewUser": {
+    "description": "Button to start a new guest session"
+  },
+  "restoreExistingAccount": "Restore Existing Account",
+  "@restoreExistingAccount": {
+    "description": "Button to reveal the account restore form"
+  },
+
+  "navItems": "Items",
+  "@navItems": {
+    "description": "Bottom navigation bar label for the events/items tab"
+  },
+  "navMatches": "Matches",
+  "@navMatches": {
+    "description": "Bottom navigation bar label for the matches tab"
+  },
+  "navProfile": "Profile",
+  "@navProfile": {
+    "description": "Bottom navigation bar label for the profile tab"
+  },
+  "navAdmin": "Admin",
+  "@navAdmin": {
+    "description": "Bottom navigation bar label for the admin tab"
+  },
+  "backendUnreachableBanner": "Cannot connect to backend service",
+  "@backendUnreachableBanner": {
+    "description": "Banner text shown when the backend health check fails"
+  },
+
+  "searchEventsHint": "Search events, groups...",
+  "@searchEventsHint": {
+    "description": "Hint text in the home screen search bar"
+  },
+  "sortEvents": "Sort Events",
+  "@sortEvents": {
+    "description": "Tooltip for the event sort menu"
+  },
+  "sortNewestFirst": "Newest First",
+  "@sortNewestFirst": {
+    "description": "Sort option: newest events first"
+  },
+  "sortMostPopular": "Most Popular",
+  "@sortMostPopular": {
+    "description": "Sort option: most popular events first"
+  },
+  "sortAlphabetical": "Alphabetical",
+  "@sortAlphabetical": {
+    "description": "Sort option: alphabetical order"
+  },
+  "newEvent": "New Event",
+  "@newEvent": {
+    "description": "Floating action button label to create a new event"
+  },
+  "filterAllEvents": "All Events",
+  "@filterAllEvents": {
+    "description": "Filter segment label: all events"
+  },
+  "filterFavorites": "Favorites",
+  "@filterFavorites": {
+    "description": "Filter segment label: favorite events"
+  },
+  "filterMyItems": "My Items",
+  "@filterMyItems": {
+    "description": "Filter segment label: events the user joined"
+  },
+  "noEventsMatchFilter": "No events match this filter.",
+  "@noEventsMatchFilter": {
+    "description": "Empty state when a filter matches no events"
+  },
+  "tradersCount": "{count} traders",
+  "@tradersCount": {
+    "description": "Number of active traders on an event",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewsCount": "{count} views",
+  "@viewsCount": {
+    "description": "Number of unique views on an event",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "draftBadge": "DRAFT",
+  "@draftBadge": {
+    "description": "Badge text shown on draft events"
+  },
+  "unknownDate": "Unknown date",
+  "@unknownDate": {
+    "description": "Fallback when an event date is empty"
+  },
+  "invalidDate": "Invalid date",
+  "@invalidDate": {
+    "description": "Fallback when an event date cannot be parsed"
+  },
+  "editName": "Edit Name",
+  "@editName": {
+    "description": "Bottom sheet action to edit an event name"
+  },
+  "editEventName": "Edit Event Name",
+  "@editEventName": {
+    "description": "Dialog title for editing an event name"
+  },
+  "eventNameHint": "Event name",
+  "@eventNameHint": {
+    "description": "Hint text in the edit event name dialog"
+  },
+  "deleteEvent": "Delete Event",
+  "@deleteEvent": {
+    "description": "Dialog title for deleting an event"
+  },
+  "deleteEventConfirm": "Are you sure you want to delete \"{name}\"?",
+  "@deleteEventConfirm": {
+    "description": "Confirmation message for deleting an event",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noEventsFound": "No events found",
+  "@noEventsFound": {
+    "description": "Empty state title when no events exist"
+  },
+  "createEventPrompt": "Create an event to start trading.",
+  "@createEventPrompt": {
+    "description": "Empty state subtitle prompting event creation"
+  },
+  "createEvent": "Create Event",
+  "@createEvent": {
+    "description": "Button label to create an event"
+  },
+  "eventNameLabel": "Event Name",
+  "@eventNameLabel": {
+    "description": "Label for the event name field in the new event dialog"
+  },
+  "newEventNameHint": "Event {number}",
+  "@newEventNameHint": {
+    "description": "Hint text suggesting a default event name",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "favPrefix": "Fav: {name}",
+  "@favPrefix": {
+    "description": "Shortcut chip label for a favorite event",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupFallback": "Group",
+  "@groupFallback": {
+    "description": "Fallback label when a group has no event name"
+  },
+  "groupChipLabel": "{event}: {group}",
+  "@groupChipLabel": {
+    "description": "Shortcut chip label for a favorite group",
+    "placeholders": {
+      "event": {
+        "type": "String"
+      },
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+
+  "username": "Username",
+  "@username": {
+    "description": "Label for the username field"
+  },
+  "editUsername": "Edit username",
+  "@editUsername": {
+    "description": "Tooltip for the edit username button"
+  },
+  "usernameUpdated": "Username updated",
+  "@usernameUpdated": {
+    "description": "Snackbar message on successful username update"
+  },
+  "failedToUpdateUsername": "Failed to update username: {error}",
+  "@failedToUpdateUsername": {
+    "description": "Snackbar message when updating the username fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "masterKeyCopied": "Master Key copied to clipboard",
+  "@masterKeyCopied": {
+    "description": "Snackbar message after copying the master key"
+  },
+  "saveKeyWarning": "Save this key to restore your account on another device!",
+  "@saveKeyWarning": {
+    "description": "Warning telling the user to save their master key"
+  },
+  "howToTrade": "How to Trade",
+  "@howToTrade": {
+    "description": "Title of the how-to-trade instructions card"
+  },
+  "tradeStep1": "Go to the Events tab and find your event.",
+  "@tradeStep1": {
+    "description": "How-to-trade step 1"
+  },
+  "tradeStep2": "Use + and - to set your HAVE and WANT items.",
+  "@tradeStep2": {
+    "description": "How-to-trade step 2"
+  },
+  "tradeStep3": "Go to Matches to see who wants to trade with you.",
+  "@tradeStep3": {
+    "description": "How-to-trade step 3"
+  },
+  "logOut": "Log Out",
+  "@logOut": {
+    "description": "Log out button label"
+  },
+  "revisionInfo": "frontend: {frontend}  /  backend: {backend}",
+  "@revisionInfo": {
+    "description": "Footer showing frontend and backend revision hashes",
+    "placeholders": {
+      "frontend": {
+        "type": "String"
+      },
+      "backend": {
+        "type": "String"
+      }
+    }
+  },
+
+  "selectImageSource": "Select Image Source",
+  "@selectImageSource": {
+    "description": "Dialog title for choosing image source"
+  },
+  "gallery": "Gallery",
+  "@gallery": {
+    "description": "Image source option: gallery"
+  },
+  "camera": "Camera",
+  "@camera": {
+    "description": "Image source option: camera"
+  },
+  "failedToPickImage": "Failed to pick image: {error}",
+  "@failedToPickImage": {
+    "description": "Snackbar message when picking an image fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "selectGroupFirst": "Please select or create an item group first.",
+  "@selectGroupFirst": {
+    "description": "Snackbar message when no group is selected"
+  },
+  "addedSuccessfully": "Added \"{name}\" successfully.",
+  "@addedSuccessfully": {
+    "description": "Snackbar message after an item is added",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToAdd": "Failed to add \"{name}\": {error}",
+  "@failedToAdd": {
+    "description": "Snackbar message when adding an item fails",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "selectGroup": "Select Group",
+  "@selectGroup": {
+    "description": "Section title for group selection"
+  },
+  "newGroup": "New Group",
+  "@newGroup": {
+    "description": "Action chip label to create a new group"
+  },
+  "itemName": "Item Name",
+  "@itemName": {
+    "description": "Label for the item name field"
+  },
+  "itemNameHint": "e.g., Rare Holo Card #1",
+  "@itemNameHint": {
+    "description": "Hint text for the item name field"
+  },
+  "photo": "Photo",
+  "@photo": {
+    "description": "Caption under the photo placeholder"
+  },
+  "changeImage": "Change Image",
+  "@changeImage": {
+    "description": "Button label to change the picked image"
+  },
+  "chooseImage": "Choose Image",
+  "@chooseImage": {
+    "description": "Button label to pick an image"
+  },
+  "adding": "Adding...",
+  "@adding": {
+    "description": "Button label while an item is being added"
+  },
+  "addItem": "Add Item",
+  "@addItem": {
+    "description": "Button label to add an item"
+  },
+  "existingItemsInGroup": "Existing items in \"{group}\"",
+  "@existingItemsInGroup": {
+    "description": "Header above the list of existing items in a group",
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "uncategorized": "Uncategorized",
+  "@uncategorized": {
+    "description": "Fallback group name when none is selected"
+  },
+  "noItemsInGroup": "No items in this group yet.",
+  "@noItemsInGroup": {
+    "description": "Empty state when a group has no items"
+  },
+  "newGroupName": "New Group Name",
+  "@newGroupName": {
+    "description": "Dialog title for creating a new group"
+  },
+  "newGroupHint": "e.g., Keychains",
+  "@newGroupHint": {
+    "description": "Hint text for the new group name field"
+  },
+
+  "failedToSend": "Failed to send: {error}",
+  "@failedToSend": {
+    "description": "Snackbar message when sending a chat message fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noMessagesYet": "No messages yet. Say hello!",
+  "@noMessagesYet": {
+    "description": "Empty state when a chat has no messages"
+  },
+  "typeMessage": "Type a message...",
+  "@typeMessage": {
+    "description": "Hint text in the chat message input"
+  },
+  "openInMaps": "Open in Maps",
+  "@openInMaps": {
+    "description": "Link label for opening a map URL"
+  },
+  "openLink": "Open Link",
+  "@openLink": {
+    "description": "Link label for opening a non-map URL"
+  }
+}

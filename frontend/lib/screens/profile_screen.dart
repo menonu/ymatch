@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -29,18 +30,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _saveUsername(int userId) async {
     final newName = _usernameController.text.trim();
     if (newName.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
     try {
       await ref.read(authProvider.notifier).updateUsername(userId, newName);
       if (mounted) {
         setState(() => _editingUsername = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Username updated')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.usernameUpdated)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update username: $e')),
+          SnackBar(content: Text(l10n.failedToUpdateUsername(e.toString()))),
         );
       }
     }
@@ -49,6 +51,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final l10n = AppLocalizations.of(context)!;
     if (user == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
@@ -86,8 +89,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             child: TextField(
                               controller: _usernameController,
                               autofocus: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Username',
+                              decoration: InputDecoration(
+                                labelText: l10n.username,
                                 isDense: true,
                               ),
                               textInputAction: TextInputAction.done,
@@ -118,7 +121,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           IconButton(
                             icon: const Icon(Icons.edit, size: 18),
                             color: Colors.grey,
-                            tooltip: 'Edit username',
+                            tooltip: l10n.editUsername,
                             onPressed: () {
                               _usernameController.text = user.username;
                               setState(() => _editingUsername = true);
@@ -140,9 +143,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'Master Key (UUID)',
-                                style: TextStyle(
+                              Text(
+                                l10n.masterKeyUuid,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   color: Colors.grey,
                                 ),
@@ -161,10 +164,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Master Key copied to clipboard',
-                                          ),
+                                        SnackBar(
+                                          content: Text(l10n.masterKeyCopied),
                                         ),
                                       );
                                     }
@@ -177,7 +178,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           SelectableText(
                             user.hasUuid() && user.uuid.isNotEmpty
                                 ? user.uuid
-                                : "Unknown",
+                                : l10n.unknown,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   fontFamily: 'monospace',
@@ -185,18 +186,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                           ),
                           const SizedBox(height: 12),
-                          const Row(
+                          Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.warning_amber_rounded,
                                 color: Colors.orange,
                                 size: 16,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Save this key to restore your account on another device!',
-                                  style: TextStyle(
+                                  l10n.saveKeyWarning,
+                                  style: const TextStyle(
                                     color: Colors.orange,
                                     fontSize: 12,
                                   ),
@@ -230,28 +231,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'How to Trade',
+                          l10n.howToTrade,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _buildInstructionStep(
-                      context,
-                      '1',
-                      'Go to the Events tab and find your event.',
-                    ),
-                    _buildInstructionStep(
-                      context,
-                      '2',
-                      'Use + and - to set your HAVE and WANT items.',
-                    ),
-                    _buildInstructionStep(
-                      context,
-                      '3',
-                      'Go to Matches to see who wants to trade with you.',
-                    ),
+                    _buildInstructionStep(context, '1', l10n.tradeStep1),
+                    _buildInstructionStep(context, '2', l10n.tradeStep2),
+                    _buildInstructionStep(context, '3', l10n.tradeStep3),
                   ],
                 ),
               ),
@@ -261,7 +250,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             OutlinedButton.icon(
               icon: const Icon(Icons.logout),
-              label: const Text('Log Out'),
+              label: Text(l10n.logOut),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.red),
@@ -270,7 +259,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onPressed: () => ref.read(authProvider.notifier).logout(),
             ),
             const SizedBox(height: 16),
-            _buildRevisionInfo(ref),
+            _buildRevisionInfo(context, ref),
             const SizedBox(height: 24),
           ],
         ),
@@ -312,7 +301,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildRevisionInfo(WidgetRef ref) {
+  Widget _buildRevisionInfo(BuildContext context, WidgetRef ref) {
     const frontendRev = String.fromEnvironment('GIT_HASH', defaultValue: 'dev');
     final statusAsync = ref.watch(backendSystemStatusProvider);
     final backendRev = statusAsync.when(
@@ -320,8 +309,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       loading: () => '...',
       error: (_, __) => 'error',
     );
+    final l10n = AppLocalizations.of(context)!;
     return Text(
-      'frontend: ${_shortHash(frontendRev)}  /  backend: ${_shortHash(backendRev)}',
+      l10n.revisionInfo(_shortHash(frontendRev), _shortHash(backendRev)),
       textAlign: TextAlign.center,
       style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
     );

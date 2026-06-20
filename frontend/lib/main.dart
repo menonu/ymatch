@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/profile_screen.dart';
@@ -157,6 +158,11 @@ class MyApp extends ConsumerWidget {
       scrollBehavior: CustomScrollBehavior(),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      // i18n (#207): resolve UI strings from lib/l10n/*.arb. The device
+      // locale is matched against supportedLocales; English is the
+      // fallback for any unsupported locale (it is listed first).
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
     );
   }
 }
