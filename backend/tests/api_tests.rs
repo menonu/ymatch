@@ -2,7 +2,6 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use sqlx::PgPool;
-use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tower::ServiceExt;
 
@@ -10,55 +9,6 @@ use tower::ServiceExt;
 /// proto3-default-zero field as 0.
 fn json_i64(value: &serde_json::Value, key: &str) -> i64 {
     value.get(key).and_then(|v| v.as_i64()).unwrap_or(0)
-}
-
-async fn setup_test_pool() -> PgPool {
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://ymatch_user:secure_dev_password@localhost:5432/ymatch_test".to_string()
-    });
-
-    let pool = PgPoolOptions::new()
-        .max_connections(2)
-        .connect(&db_url)
-        .await
-        .expect("Failed to connect to test database");
-
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
-
-    // Reset all tables to a known-empty state at the start of every
-    // test. `TRUNCATE ... RESTART IDENTITY CASCADE` is used in
-    // preference to `DELETE FROM ...` because it:
-    //   1. Resets SERIAL sequences (so id=1, id=2, ... are guaranteed
-    //      to be assigned to the first inserts, regardless of what
-    //      tests ran previously).
-    //   2. CASCADE handles the dependency ordering automatically
-    //      (children → parents) so we don't have to maintain a
-    //      manual list.
-    //   3. Performs better than per-table DELETE (single statement,
-    //      smaller WAL traffic).
-    sqlx::query(
-        "TRUNCATE TABLE
-             messages,
-             match_items,
-             matches,
-             inventory,
-             group_favorites,
-             merchandise_groups,
-             event_favorites,
-             event_views,
-             merchandise,
-             events,
-             users
-         RESTART IDENTITY CASCADE",
-    )
-    .execute(&pool)
-    .await
-    .expect("Failed to TRUNCATE test tables");
-
-    pool
 }
 
 fn test_storage() -> Arc<dyn backend::storage::ImageStorage> {
@@ -74,9 +24,8 @@ async fn body_to_string(body: Body) -> String {
 
 // --- Root ---
 
-#[tokio::test]
-async fn test_root_endpoint() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_root_endpoint(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
 
     let response = app
@@ -91,9 +40,8 @@ async fn test_root_endpoint() {
 
 // --- System ---
 
-#[tokio::test]
-async fn test_system_status() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_system_status(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
 
     let response = app
@@ -115,9 +63,8 @@ async fn test_system_status() {
 
 // --- Auth ---
 
-#[tokio::test]
-async fn test_guest_login_creates_user() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_guest_login_creates_user(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
 
     let response = app
@@ -142,9 +89,8 @@ async fn test_guest_login_creates_user() {
     assert_eq!(json["uuid"].as_str().unwrap(), "test-uuid-1234");
 }
 
-#[tokio::test]
-async fn test_guest_login_returns_existing_user() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_guest_login_returns_existing_user(pool: PgPool) {
     let app1 = backend::routes::create_router(pool.clone(), test_storage());
 
     let resp1 = app1
@@ -180,10 +126,8 @@ async fn test_guest_login_returns_existing_user() {
     assert_eq!(user1["username"], user2["username"]);
 }
 
-#[tokio::test]
-async fn test_signup_and_login() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_signup_and_login(pool: PgPool) {
     // Signup
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let response = app
@@ -239,10 +183,8 @@ async fn test_signup_and_login() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
-#[tokio::test]
-async fn test_list_users() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_list_users(pool: PgPool) {
     // Create a user first
     let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
@@ -274,10 +216,8 @@ async fn test_list_users() {
 
 // --- Events ---
 
-#[tokio::test]
-async fn test_create_and_list_events() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_create_and_list_events(pool: PgPool) {
     // Create a user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -336,9 +276,8 @@ async fn test_create_and_list_events() {
 
 // --- Phase 5 favorites / views / event publishing (Issue #178 Task 2) ---
 
-#[tokio::test]
-async fn test_event_favorite_toggle_inserts_when_absent() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_event_favorite_toggle_inserts_when_absent(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "fav-toggle-user", "Fav Toggle Event").await;
 
@@ -382,9 +321,8 @@ async fn test_event_favorite_toggle_inserts_when_absent() {
     assert!(row.is_some(), "row should exist after first toggle");
 }
 
-#[tokio::test]
-async fn test_event_favorite_toggle_removes_when_present() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_event_favorite_toggle_removes_when_present(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "fav-remove-user", "Fav Remove Event").await;
 
@@ -420,9 +358,8 @@ async fn test_event_favorite_toggle_removes_when_present() {
     assert!(row.is_none(), "row should be removed after second toggle");
 }
 
-#[tokio::test]
-async fn test_event_favorite_per_user_independence() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_event_favorite_per_user_independence(pool: PgPool) {
     let (user_a, event_id) =
         create_test_user_and_event(pool.clone(), "fav-iso-a", "Fav Iso Event").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -485,9 +422,8 @@ async fn test_event_favorite_per_user_independence() {
     assert!(row.is_some(), "user A's row should still be present");
 }
 
-#[tokio::test]
-async fn test_group_favorite_toggle_and_list() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_group_favorite_toggle_and_list(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "gfav-toggle-user", "Group Fav Event").await;
 
@@ -530,9 +466,8 @@ async fn test_group_favorite_toggle_and_list() {
     assert_eq!(groups[0]["eventName"], "Group Fav Event");
 }
 
-#[tokio::test]
-async fn test_group_favorite_toggle_removes() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_group_favorite_toggle_removes(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "gfav-remove-user", "Group Fav Remove Event")
             .await;
@@ -575,9 +510,8 @@ async fn test_group_favorite_toggle_removes() {
     assert!(groups.is_empty(), "list should be empty after toggle-off");
 }
 
-#[tokio::test]
-async fn test_event_view_register_inserts() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_event_view_register_inserts(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "view-register-user", "View Register Event").await;
 
@@ -608,9 +542,8 @@ async fn test_event_view_register_inserts() {
     );
 }
 
-#[tokio::test]
-async fn test_event_view_register_is_idempotent() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_event_view_register_is_idempotent(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "view-idem-user", "View Idem Event").await;
 
@@ -642,9 +575,8 @@ async fn test_event_view_register_is_idempotent() {
     assert_eq!(count, 1, "duplicate views must collapse to one row");
 }
 
-#[tokio::test]
-async fn test_event_view_per_user_and_per_event() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_event_view_per_user_and_per_event(pool: PgPool) {
     let (user_a, event_a) =
         create_test_user_and_event(pool.clone(), "view-iso-a", "View Iso A").await;
 
@@ -726,9 +658,8 @@ async fn test_event_view_per_user_and_per_event() {
     assert_eq!(count, 2, "two distinct views must produce two rows");
 }
 
-#[tokio::test]
-async fn test_update_event_owner_succeeds() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_update_event_owner_succeeds(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "update-event-owner", "Update Event").await;
 
@@ -753,9 +684,8 @@ async fn test_update_event_owner_succeeds() {
     assert_eq!(event["name"], "Updated Name");
 }
 
-#[tokio::test]
-async fn test_update_event_non_owner_forbidden() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_update_event_non_owner_forbidden(pool: PgPool) {
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "update-event-creator", "Locked Event").await;
 
@@ -797,9 +727,8 @@ async fn test_update_event_non_owner_forbidden() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
-async fn test_publish_event_owner_succeeds() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_publish_event_owner_succeeds(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "publish-event-owner", "Publish Event").await;
 
@@ -835,9 +764,8 @@ async fn test_publish_event_owner_succeeds() {
     assert_eq!(row.0, "published");
 }
 
-#[tokio::test]
-async fn test_publish_draft_event_transitions_to_published() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_publish_draft_event_transitions_to_published(pool: PgPool) {
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -900,9 +828,8 @@ async fn test_publish_draft_event_transitions_to_published() {
     assert_eq!(row.0, "published");
 }
 
-#[tokio::test]
-async fn test_publish_event_non_owner_forbidden() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_publish_event_non_owner_forbidden(pool: PgPool) {
     let (_creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "publish-event-creator", "Locked Publish").await;
 
@@ -983,9 +910,8 @@ fn minimal_png_bytes() -> Vec<u8> {
     ]
 }
 
-#[tokio::test]
-async fn test_upload_image_png_succeeds() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_upload_image_png_succeeds(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let boundary = "TESTBOUNDARY";
     let body = multipart_image_body(
@@ -1028,9 +954,8 @@ async fn test_upload_image_png_succeeds() {
     let _ = std::fs::remove_file(&path);
 }
 
-#[tokio::test]
-async fn test_upload_image_jpg_succeeds() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_upload_image_jpg_succeeds(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let boundary = "JPGBOUNDARY";
     // Real JPG SOI marker so the bytes look like a JPG.
@@ -1061,9 +986,8 @@ async fn test_upload_image_jpg_succeeds() {
     let _ = std::fs::remove_file(&path);
 }
 
-#[tokio::test]
-async fn test_upload_image_wrong_content_type_rejected() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_upload_image_wrong_content_type_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let boundary = "TXTBOUNDARY";
     let body = multipart_image_body(boundary, "file", "doc.txt", "text/plain", b"hello world");
@@ -1085,9 +1009,8 @@ async fn test_upload_image_wrong_content_type_rejected() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
-async fn test_upload_image_too_large_rejected() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_upload_image_too_large_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let boundary = "BIGBOUNDARY";
     // 1.5 MB to exceed the 1 MiB cap.
@@ -1111,9 +1034,8 @@ async fn test_upload_image_too_large_rejected() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
-async fn test_upload_image_no_file_field_rejected() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_upload_image_no_file_field_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let boundary = "NOFILEBOUNDARY";
     // Use a different field name; handler expects "file".
@@ -1142,10 +1064,9 @@ async fn test_upload_image_no_file_field_rejected() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
-async fn test_delete_image_succeeds() {
-    let pool = setup_test_pool().await;
-    let app = backend::routes::create_router(pool, test_storage());
+#[sqlx::test]
+async fn test_delete_image_succeeds(pool: PgPool) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let boundary = "DELBOUNDARY";
     // Upload first.
     let body = multipart_image_body(
@@ -1180,7 +1101,7 @@ async fn test_delete_image_succeeds() {
     assert!(path.exists());
 
     // Now delete via a fresh router.
-    let pool2 = setup_test_pool().await;
+    let pool2 = pool.clone();
     let app2 = backend::routes::create_router(pool2, test_storage());
     let resp = app2
         .oneshot(
@@ -1199,9 +1120,8 @@ async fn test_delete_image_succeeds() {
     assert!(!path.exists(), "file should be gone after DELETE");
 }
 
-#[tokio::test]
-async fn test_delete_image_nonexistent_is_idempotent() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_delete_image_nonexistent_is_idempotent(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
 
     let resp = app
@@ -1220,9 +1140,8 @@ async fn test_delete_image_nonexistent_is_idempotent() {
 
 // --- Admin endpoints (Issue #178 Task 3) ---
 
-#[tokio::test]
-async fn test_admin_get_user_details_returns_user() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_get_user_details_returns_user(pool: PgPool) {
     let (user_id, _event_id) =
         create_test_user_and_event(pool.clone(), "admin-getuser", "Admin GetUser Event").await;
 
@@ -1244,9 +1163,8 @@ async fn test_admin_get_user_details_returns_user() {
     assert!(user["username"].as_str().is_some());
 }
 
-#[tokio::test]
-async fn test_admin_get_user_details_nonexistent_returns_404() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_get_user_details_nonexistent_returns_404(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
@@ -1261,9 +1179,8 @@ async fn test_admin_get_user_details_nonexistent_returns_404() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
-#[tokio::test]
-async fn test_admin_update_user_role_invalid_role_rejected() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_update_user_role_invalid_role_rejected(pool: PgPool) {
     // Use an admin to make the role change.
     let (admin_id, _eid) =
         create_test_user_and_event(pool.clone(), "admin-role-admin", "Admin Role Event").await;
@@ -1310,9 +1227,8 @@ async fn test_admin_update_user_role_invalid_role_rejected() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
-async fn test_admin_update_user_role_moderator_forbidden() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_update_user_role_moderator_forbidden(pool: PgPool) {
     // Create two users: a "moderator" trying to change roles, and a target.
     let (mod_id, _eid) =
         create_test_user_and_event(pool.clone(), "admin-role-mod", "Admin Mod Event").await;
@@ -1358,9 +1274,8 @@ async fn test_admin_update_user_role_moderator_forbidden() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
-async fn test_admin_update_user_role_succeeds() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_update_user_role_succeeds(pool: PgPool) {
     let (admin_id, _eid) =
         create_test_user_and_event(pool.clone(), "admin-role-ok", "Admin Role Ok").await;
     sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
@@ -1413,9 +1328,8 @@ async fn test_admin_update_user_role_succeeds() {
     assert_eq!(row.0, "moderator");
 }
 
-#[tokio::test]
-async fn test_admin_list_all_merch_returns_array() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_list_all_merch_returns_array(pool: PgPool) {
     let (_user_id, event_id) =
         create_test_user_and_event(pool.clone(), "admin-listmerch", "Admin ListMerch").await;
     // Add one piece of merch so the list is non-empty.
@@ -1452,9 +1366,8 @@ async fn test_admin_list_all_merch_returns_array() {
     assert!(!items.is_empty(), "list should be non-empty");
 }
 
-#[tokio::test]
-async fn test_admin_list_all_matches_returns_array() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_list_all_matches_returns_array(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
@@ -1473,9 +1386,8 @@ async fn test_admin_list_all_matches_returns_array() {
     let _ = items.len();
 }
 
-#[tokio::test]
-async fn test_admin_delete_merch_succeeds() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_admin_delete_merch_succeeds(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "admin-deleterch", "Admin DeleteMerch").await;
 
@@ -1535,10 +1447,8 @@ async fn test_admin_delete_merch_succeeds() {
 
 // --- Merchandise ---
 
-#[tokio::test]
-async fn test_create_and_list_merch() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_create_and_list_merch(pool: PgPool) {
     // Create user + event
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1616,10 +1526,8 @@ async fn test_create_and_list_merch() {
 
 // --- Inventory ---
 
-#[tokio::test]
-async fn test_inventory_upsert() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_inventory_upsert(pool: PgPool) {
     // Create user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1736,9 +1644,8 @@ async fn test_inventory_upsert() {
 
 // --- Matches ---
 
-#[tokio::test]
-async fn test_update_match_status_validation() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_update_match_status_validation(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
 
     let resp = app
@@ -1757,10 +1664,8 @@ async fn test_update_match_status_validation() {
 
 // --- Search ---
 
-#[tokio::test]
-async fn test_search_returns_results() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_search_returns_results(pool: PgPool) {
     // Create user + event
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1814,10 +1719,8 @@ async fn test_search_returns_results() {
     );
 }
 
-#[tokio::test]
-async fn test_search_excludes_draft_events() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_search_excludes_draft_events(pool: PgPool) {
     // Create user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1875,10 +1778,8 @@ async fn test_search_excludes_draft_events() {
 
 // --- Admin ---
 
-#[tokio::test]
-async fn test_admin_delete_event() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_admin_delete_event(pool: PgPool) {
     // Create user + event
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1942,10 +1843,8 @@ async fn test_admin_delete_event() {
 
 // --- Messages ---
 
-#[tokio::test]
-async fn test_messages_empty_list() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_messages_empty_list(pool: PgPool) {
     // Create two users and a match
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2028,10 +1927,8 @@ async fn test_messages_empty_list() {
 
 // --- Permission System Tests ---
 
-#[tokio::test]
-async fn test_banned_user_cannot_login() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_banned_user_cannot_login(pool: PgPool) {
     // Create user via guest login
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2072,10 +1969,8 @@ async fn test_banned_user_cannot_login() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
-async fn test_admin_ban_unban_user() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_admin_ban_unban_user(pool: PgPool) {
     // Create admin user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2172,10 +2067,8 @@ async fn test_admin_ban_unban_user() {
     assert!(!sqlx::Row::get::<bool, _>(&row, "is_banned"));
 }
 
-#[tokio::test]
-async fn test_non_admin_cannot_ban() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_non_admin_cannot_ban(pool: PgPool) {
     // Create regular user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2209,10 +2102,8 @@ async fn test_non_admin_cannot_ban() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
-async fn test_update_user_role() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_update_user_role(pool: PgPool) {
     // Create admin
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2280,10 +2171,8 @@ async fn test_update_user_role() {
 
 // --- Draft/Publish Tests ---
 
-#[tokio::test]
-async fn test_draft_event_visibility() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_draft_event_visibility(pool: PgPool) {
     // Create two users
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2400,10 +2289,8 @@ async fn test_draft_event_visibility() {
     assert!(events.iter().any(|e| e["name"] == "Draft Event"));
 }
 
-#[tokio::test]
-async fn test_draft_merch_visibility() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_draft_merch_visibility(pool: PgPool) {
     // Create user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2502,10 +2389,8 @@ async fn test_draft_merch_visibility() {
 
 // --- Soft Delete Tests ---
 
-#[tokio::test]
-async fn test_soft_delete_merch_with_inventory() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_soft_delete_merch_with_inventory(pool: PgPool) {
     // Create user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2621,10 +2506,8 @@ async fn test_soft_delete_merch_with_inventory() {
     assert!(!items.is_empty());
 }
 
-#[tokio::test]
-async fn test_hard_delete_merch_without_inventory() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
     // Create user + event + merch
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2706,10 +2589,8 @@ async fn test_hard_delete_merch_without_inventory() {
     assert!(row.is_none());
 }
 
-#[tokio::test]
-async fn test_user_response_includes_role() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_user_response_includes_role(pool: PgPool) {
     let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
@@ -2729,10 +2610,8 @@ async fn test_user_response_includes_role() {
     assert_eq!(user["isBanned"].as_bool().unwrap(), false);
 }
 
-#[tokio::test]
-async fn test_banned_user_cannot_create_event() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_banned_user_cannot_create_event(pool: PgPool) {
     // Create user
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2897,9 +2776,8 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
     (u1, u2, row.0 as i64, merch_ids[0], merch_ids[1])
 }
 
-#[tokio::test]
-async fn test_match_lock_for_update_returns_snapshot() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_lock_for_update_returns_snapshot(pool: PgPool) {
     let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -2915,18 +2793,16 @@ async fn test_match_lock_for_update_returns_snapshot() {
     // tx.rollback() is called implicitly when `tx` drops.
 }
 
-#[tokio::test]
-async fn test_match_lock_for_update_returns_none_for_missing() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_lock_for_update_returns_none_for_missing(pool: PgPool) {
     let mut tx = pool.begin().await.unwrap();
     let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     let snap = matches.lock_for_update(&mut *tx, 999_999).await.unwrap();
     assert!(snap.is_none());
 }
 
-#[tokio::test]
-async fn test_match_set_status_writes_status() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_set_status_writes_status(pool: PgPool) {
     let (_, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -2943,9 +2819,8 @@ async fn test_match_set_status_writes_status() {
     assert_eq!(row.0, "OFFERED");
 }
 
-#[tokio::test]
-async fn test_match_set_offered_by_writes_column() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_set_offered_by_writes_column(pool: PgPool) {
     let (u1, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -2962,11 +2837,10 @@ async fn test_match_set_offered_by_writes_column() {
     assert_eq!(row.0, Some(u1 as i32));
 }
 
-#[tokio::test]
-async fn test_match_insert_match_items_inserts_rows() {
+#[sqlx::test]
+async fn test_match_insert_match_items_inserts_rows(pool: PgPool) {
     use backend::generated::ymatch::OfferItem;
 
-    let pool = setup_test_pool().await;
     let (u1, _, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -2995,9 +2869,8 @@ async fn test_match_insert_match_items_inserts_rows() {
     assert_eq!(count.0, 2);
 }
 
-#[tokio::test]
-async fn test_match_delete_match_items_removes_all() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_delete_match_items_removes_all(pool: PgPool) {
     let (u1, _, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     // Pre-seed two match_items rows.
@@ -3023,9 +2896,8 @@ async fn test_match_delete_match_items_removes_all() {
     assert_eq!(count.0, 0);
 }
 
-#[tokio::test]
-async fn test_match_purge_other_pending_keeps_unrelated() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_purge_other_pending_keeps_unrelated(pool: PgPool) {
     let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     // Seed two extra PENDING matches between the same pair.
@@ -3095,9 +2967,8 @@ async fn test_match_purge_other_pending_keeps_unrelated() {
     assert_eq!(count.0, 2);
 }
 
-#[tokio::test]
-async fn test_match_mark_inventory_applied_sets_user1_column() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_match_mark_inventory_applied_sets_user1_column(pool: PgPool) {
     let (_, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -3122,10 +2993,8 @@ async fn test_match_mark_inventory_applied_sets_user1_column() {
     assert!(row.0.is_none());
 }
 
-#[tokio::test]
-async fn test_match_mark_inventory_applied_errors_if_match_vanished() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_match_mark_inventory_applied_errors_if_match_vanished(pool: PgPool) {
     let mut tx = pool.begin().await.unwrap();
     let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
     let result = matches
@@ -3135,9 +3004,8 @@ async fn test_match_mark_inventory_applied_errors_if_match_vanished() {
     // tx will be rolled back when it drops.
 }
 
-#[tokio::test]
-async fn test_inventory_apply_trade_delta_decrement_only() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_inventory_apply_trade_delta_decrement_only(pool: PgPool) {
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -3166,9 +3034,8 @@ async fn test_inventory_apply_trade_delta_decrement_only() {
     assert_eq!(count.0, 0);
 }
 
-#[tokio::test]
-async fn test_inventory_apply_trade_delta_increment_only() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_inventory_apply_trade_delta_increment_only(pool: PgPool) {
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -3197,14 +3064,13 @@ async fn test_inventory_apply_trade_delta_increment_only() {
     assert_eq!(qty.0, 5);
 }
 
-#[tokio::test]
-async fn test_multiple_conn_calls_share_one_transaction() {
+#[sqlx::test]
+async fn test_multiple_conn_calls_share_one_transaction(pool: PgPool) {
     // This is the key test for the `&mut PgConnection` pattern:
     // several repo calls sharing one `tx` must each release their
     // borrow before the next call, and `tx.commit()` must work at
     // the end. If the future's borrow leaked past the call (the
     // NLL/Drop issue we hit earlier), this test would fail.
-    let pool = setup_test_pool().await;
     let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
@@ -3260,10 +3126,8 @@ async fn test_multiple_conn_calls_share_one_transaction() {
 // (either by a stable `AsyncFnOnce` or a boxed-future pattern that
 // cooperates with `Drop` types).
 
-#[tokio::test]
-async fn test_trade_lifecycle_offer_accept_complete_apply() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
     // 1. Create two users
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -3674,10 +3538,8 @@ async fn test_trade_lifecycle_offer_accept_complete_apply() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
-async fn test_offer_on_non_pending_match_rejected() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_offer_on_non_pending_match_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3833,9 +3695,8 @@ async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
     (match_id, user1_id, user2_id, merch_a_id, merch_b_id)
 }
 
-#[tokio::test]
-async fn test_offer_with_frontend_proto3_json() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_offer_with_frontend_proto3_json(pool: PgPool) {
     let (match_id, user1_id, _user2_id, merch_a_id, merch_b_id) =
         setup_pending_trade_match(pool.clone()).await;
 
@@ -3876,10 +3737,8 @@ async fn test_offer_with_frontend_proto3_json() {
     assert_eq!(matches[0]["offeredBy"], user1_id);
 }
 
-#[tokio::test]
-async fn test_apply_inventory_on_non_completed_rejected() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_apply_inventory_on_non_completed_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3935,9 +3794,8 @@ async fn create_test_user_and_event(pool: PgPool, uuid: &str, event_name: &str) 
     (user_id, event_id)
 }
 
-#[tokio::test]
-async fn test_create_group_via_dialog() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_create_group_via_dialog(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-dialog-user", "Group Event").await;
 
@@ -4010,9 +3868,8 @@ async fn test_create_group_via_dialog() {
     assert_eq!(groups[0]["groupName"].as_str().unwrap(), "Keychains");
 }
 
-#[tokio::test]
-async fn test_update_group_description() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_update_group_description(pool: PgPool) {
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-updater-creator", "Updater Event").await;
 
@@ -4076,9 +3933,8 @@ async fn test_update_group_description() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
-async fn test_implicit_group_via_first_merch() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_implicit_group_via_first_merch(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "implicit-group-user", "Implicit Group Event")
             .await;
@@ -4146,9 +4002,8 @@ async fn test_implicit_group_via_first_merch() {
     assert_eq!(groups[0]["createdBy"].as_i64().unwrap(), user_id);
 }
 
-#[tokio::test]
-async fn test_merch_includes_group_description() {
-    let pool = setup_test_pool().await;
+#[sqlx::test]
+async fn test_merch_includes_group_description(pool: PgPool) {
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-desc-merch", "Merch Desc Event").await;
 
@@ -4218,12 +4073,11 @@ async fn test_merch_includes_group_description() {
 
 // --- Issue #173 follow-up: extra tests for notification_counts and upsert shape ---
 
-#[tokio::test]
-async fn test_notification_counts_values() {
+#[sqlx::test]
+async fn test_notification_counts_values(pool: PgPool) {
     // Set up: 2 users, 1 event, 2 merch items ("Card A", "Card B").
     // We'll create three matches in different states and verify the
     // counts endpoint returns the correct values for each side.
-    let pool = setup_test_pool().await;
     let (u1, event_id) =
         create_test_user_and_event(pool.clone(), "notif-user-1", "Notif Event").await;
     let (u2, _) = create_test_user_and_event(pool.clone(), "notif-user-2", "Notif Event 2").await;
@@ -4488,14 +4342,13 @@ async fn test_notification_counts_values() {
     assert_eq!(json_i64(&body, "total"), 1);
 }
 
-#[tokio::test]
-async fn test_upsert_response_shape_preserved() {
+#[sqlx::test]
+async fn test_upsert_response_shape_preserved(pool: PgPool) {
     // Issue #173 item #5: the upsert response body should retain the
     // pre-Phase-4 shape: merch_name = Some("") (not None). The frontend
     // re-fetches via get_user_inventory (which joins merch) before
     // display, so the empty string never reaches the user; this
     // preserves the historical shape.
-    let pool = setup_test_pool().await;
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "upsert-shape-creator", "Upsert Shape").await;
 
@@ -4570,8 +4423,8 @@ async fn test_upsert_response_shape_preserved() {
         "group_name must be absent or null, got: {:?}",
         group_name
     );
-    // After the TRUNCATE ... RESTART IDENTITY in setup_test_pool, the
-    // first inserted inventory row gets id=1.
+    // With #[sqlx::test] each test gets a fresh, migrated database, so
+    // sequences start at 1 and the first inserted inventory row gets id=1.
     assert_eq!(body["id"].as_i64().unwrap(), 1);
     assert_eq!(body["userId"].as_i64().unwrap(), creator_id);
     assert_eq!(body["merchId"].as_i64().unwrap(), merch_id);
@@ -4591,10 +4444,8 @@ async fn test_upsert_response_shape_preserved() {
 // photo_url, and asserts that apply-inventory returns 200 (i.e. does
 // not panic the worker thread, which previously would have produced
 // an empty 502/503 response).
-#[tokio::test]
-async fn test_apply_inventory_handles_null_photo_url() {
-    let pool = setup_test_pool().await;
-
+#[sqlx::test]
+async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
     // 1. Create two users
     let user1_id = login_guest(&pool, "u1-photo-null", "tok1").await;
     let user2_id = login_guest(&pool, "u2-photo-null", "tok2").await;
