@@ -55,7 +55,7 @@ Where tests live:
 4. Run lints and tests: `task test`, `cargo fmt -- --check && cargo clippy -- -D warnings`, `flutter analyze`
 5. Create PR
 6. **Review with `/pr-review`.** Before requesting merge, run `/pr-review <PR>`. address every `[critical]` / `[major]`, and resolve `[minor]` / `[nit]` findings or explicitly accept them. Re-run `/pr-review` after non-trivial changes.
-7. **Merge is human-only. Wait for human merge or explicit user instruction.
+7. Report results to the user with pull request URL and wait. Merge is human-only. Wait for human merge or explicit user instruction.
 
 See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
 
