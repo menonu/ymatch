@@ -1,0 +1,65 @@
+# syntax=ghcr.io/menonu/ymatch/dockerfile:1
+# ---------------------------------------------------
+# E2E backend image (#276).
+# ---------------------------------------------------
+# Uses the prebuilt dependency base image
+# (ghcr.io/menonu/ymatch/backend-deps:<DEPS_TAG>) so the ~100s dependency
+# compile is a registry pull instead of a volatile BuildKit `type=gha`
+# cache layer (which GitHub Actions evicts, forcing full rebuilds — see
+# backend.Dockerfile.deps). Only the application crate is compiled here.
+#
+# The build half mirrors backend.Dockerfile.prod exactly (same COPY set +
+# `cargo build --release`); the only differences are the prebuilt-deps
+# base and the omitted apt + dummy-build steps. E2E exercises the HTTP
+# wire contract, and the application source is compiled identically, so
+# this is equivalent to building via backend.Dockerfile.prod. prod is left
+# untouched because OCI deploy builds locally on the VM and must not gain
+# a registry-base dependency.
+#
+# DEPS_TAG defaults to `latest` for local dev — build it once with
+# `task backend:deps` (which tags :latest in the local daemon). CI passes
+# the content-addressed sha256(backend/Cargo.lock) tag via buildx bake.
+ARG DEPS_TAG=latest
+FROM ghcr.io/menonu/ymatch/backend-deps:${DEPS_TAG} AS builder
+
+WORKDIR /usr/src/ymatch_backend
+
+# Copy actual source code and proto files (same set as backend.Dockerfile.prod)
+COPY backend/src ./src
+COPY backend/build.rs ./
+COPY backend/migrations ./migrations
+
+# We need the proto definitions to generate Rust code
+COPY proto /usr/src/proto
+
+# Build the real application. Reuses the cargo registry cache mount; the
+# dependency artifacts already live in target/ inside the base image, so
+# only the application crate is compiled.
+ARG GIT_HASH=unknown
+ENV GIT_HASH=$GIT_HASH
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    cargo build --release
+
+# ---------------------------------------------------
+# Stage 2: Runtime Environment
+# ---------------------------------------------------
+FROM ghcr.io/menonu/ymatch/debian:trixie-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/ymatch_backend/target/release/backend /usr/local/bin/ymatch_backend
+
+# Expose the API port
+EXPOSE 3000
+
+# Set environment variables (these should be overridden in production)
+ENV RUST_LOG="info"
+ENV PORT=3000
+
+# Run the binary
+CMD ["ymatch_backend"]

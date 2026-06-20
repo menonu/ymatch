@@ -4,12 +4,17 @@
 # driver is a Dart test that talks HTTP to localhost:3000.
 #
 # Usage (local dev):
-#   docker compose -f docker-compose.e2e.yml up -d --build
+#   task e2e:up     # ensures the prebuilt deps base image, then builds+starts
 #   flutter test test/e2e/
-#   docker compose -f docker-compose.e2e.yml down -v
+#   task e2e:down
+# (or, manually: run `task backend:deps` once first, then
+#   `docker compose -f docker-compose.e2e.yml up -d --build`.)
 #
 # Usage (CI):
-#   The .github/workflows/ci-e2e.yml workflow wraps these commands.
+#   The .github/workflows/ci-e2e.yml workflow wraps these commands. It
+#   computes DEPS_TAG = sha256(backend/Cargo.lock) and ensures the
+#   prebuilt dependency base image (backend.Dockerfile.deps) exists in
+#   ghcr before building e2e_backend from backend.Dockerfile.e2e.
 #
 # Data is wiped on `down -v`. This file is intentionally separate from
 # docker-compose.oci.yml (production) and docker-compose.yml (local
@@ -38,9 +43,15 @@ services:
   e2e_backend:
     build:
       context: .
-      dockerfile: backend.Dockerfile.prod
+      # E2E builds from a Dockerfile that uses the prebuilt dependency
+      # base image (backend-deps:<DEPS_TAG>) so the ~100s dependency
+      # compile is a registry pull, not a volatile cache layer (#276).
+      # DEPS_TAG defaults to `latest` for local dev (run `task
+      # backend:deps` once); CI overrides it with sha256(Cargo.lock).
+      dockerfile: backend.Dockerfile.e2e
       args:
         GIT_HASH: e2e
+        DEPS_TAG: ${DEPS_TAG:-latest}
     container_name: ymatch_e2e_backend
     environment:
       DATABASE_URL: "postgres://ymatch_user:e2e_test_password@e2e_db:5432/ymatch_e2e"

@@ -27,7 +27,10 @@ on:
 # See .github/workflows/mirror-images.yml for the mirror runbook.
 permissions:
   contents: read
-  packages: read
+  # `packages: write` lets the "Ensure backend deps image" step below
+  # build & push the prebuilt backend-deps base image on a cache miss
+  # (new Cargo.lock). Reads still work for the e2e_db / base-image pulls.
+  packages: write
 
 jobs:
   e2e:
@@ -67,20 +70,50 @@ jobs:
           echo "Failed to pull $IMAGE after 5 attempts"
           exit 1
 
+      - name: Ensure backend deps image
+        # #276: the expensive (~100s) cargo dependency-compile layer lives
+        # in a prebuilt, content-addressed base image
+        # (ghcr.io/menonu/ymatch/backend-deps:<DEPS_TAG>) rather than in
+        # the volatile BuildKit `type=gha` cache (which GitHub Actions'
+        # 10GB LRU limit evicts, forcing full recompiles). DEPS_TAG is
+        # sha256(backend/Cargo.lock) so each lockfile state has its own
+        # image. On a cache hit we just `docker pull` it. On a miss (new
+        # Cargo.lock) we build backend.Dockerfile.deps and push it; this
+        # first build pays the ~100s once, after which every run for that
+        # lockfile pulls. The buildx builder inherits the ghcr login from
+        # the step above, so --push is authenticated via GITHUB_TOKEN
+        # (packages: write). Exporting DEPS_TAG to $GITHUB_ENV so the
+        # bake step below can pin the base image tag.
+        run: |
+          DEPS_TAG=$(sha256sum backend/Cargo.lock | cut -c1-16)
+          echo "DEPS_TAG=$DEPS_TAG" >> "$GITHUB_ENV"
+          IMG=ghcr.io/menonu/ymatch/backend-deps:$DEPS_TAG
+          if docker pull "$IMG"; then
+            echo "::notice::deps image cache hit: $IMG"
+          else
+            echo "::notice::building+pushing deps image (first build for this Cargo.lock): $IMG"
+            docker buildx build -f backend.Dockerfile.deps -t "$IMG" --push .
+          fi
+
       - name: Build and start e2e stack
-        # Build the backend image via `docker buildx bake` with the GitHub
-        # Actions cache backend (type=gha) so the compiled-dependency
-        # layer persists across runs. On a cache hit (Cargo.lock unchanged)
-        # the `cargo build` layer is restored and never executes, so
-        # crates.io is not re-fetched — faster builds and no exposure to
-        # transient crates.io connection resets. `--load` makes the baked
-        # image available to the daemon so the subsequent `up` reuses it
-        # instead of rebuilding. `mode=max` exports intermediate layers
-        # (including the dep-build layer), not just the final image.
-        # `type=gha` only works inside GitHub Actions, so local dev still
-        # uses plain `docker compose -f docker-compose.e2e.yml up -d --build`.
+        # Build the backend image via `docker buildx bake`. The dependency
+        # layer now comes from the prebuilt backend-deps base image (ensured
+        # above), so only the application crate is compiled here. The
+        # `type=gha` cache is retained for this now-small app-build layer:
+        # on a hit the `cargo build` of the app crate is restored and
+        # skipped; on a miss it is only ~20s. Together this bounds the
+        # build step to (deps pull | already cached) + ~20s app build +
+        # apt + export, instead of the prior 100s+ dependency compile that
+        # recurred whenever the gha cache was evicted.
+        # `--load` makes the baked image available to the daemon so the
+        # subsequent `up` reuses it instead of rebuilding. `mode=max`
+        # exports intermediate layers. `type=gha` only works inside GitHub
+        # Actions, so local dev uses `task e2e:up` (see docker-compose.e2e.yml).
+        env:
+          DEPS_TAG: ${{ env.DEPS_TAG }}
         run: |
           docker buildx bake -f docker-compose.e2e.yml \
+            --set e2e_backend.args.DEPS_TAG="$DEPS_TAG" \
             --set e2e_backend.cache-from=type=gha,scope=e2e-backend \
             --set e2e_backend.cache-to=type=gha,scope=e2e-backend,mode=max \
             --load
