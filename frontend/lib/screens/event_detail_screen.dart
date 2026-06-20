@@ -61,6 +61,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final filterMode = ref.watch(merchFilterProvider);
     final displayMode = ref.watch(inventoryDisplayModeProvider);
     final searchQuery = ref.watch(itemSearchQueryProvider);
+    final l10n = AppLocalizations.of(context)!;
+    final otherItems = l10n.otherItems;
 
     return merchAsync.when(
       data: (merch) {
@@ -79,7 +81,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ),
                 );
               },
-              label: const Text('Add Merch'),
+              label: Text(l10n.addMerch),
               icon: const Icon(Icons.add_photo_alternate),
             ),
           );
@@ -118,7 +120,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         for (final item in merch) {
           final gName = item.hasGroupName() && item.groupName.isNotEmpty
               ? item.groupName
-              : 'Other Items';
+              : otherItems;
           allGroupKeys.add(gName);
         }
 
@@ -130,14 +132,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         for (final item in filteredMerch) {
           final gName = item.hasGroupName() && item.groupName.isNotEmpty
               ? item.groupName
-              : 'Other Items';
+              : otherItems;
           groupedMerch.putIfAbsent(gName, () => []).add(item);
         }
 
         final groupKeys = groupedMerch.keys.toList();
         groupKeys.sort((a, b) {
-          if (a == 'Other Items') return 1;
-          if (b == 'Other Items') return -1;
+          if (a == otherItems) return 1;
+          if (b == otherItems) return -1;
           return _naturalCompare(a, b);
         });
         // Natural sort items within each group
@@ -158,7 +160,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   padding: WidgetStateProperty.all(
                     const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  hintText: 'Search items...',
+                  hintText: l10n.searchItemsHint,
                   leading: const Icon(Icons.search, size: 20),
                   trailing: [
                     if (searchQuery.isNotEmpty)
@@ -180,7 +182,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 // Refresh button
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refresh,
                   onPressed: () {
                     ref.invalidate(merchProvider(widget.eventId));
                     if (user != null)
@@ -208,7 +210,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         ),
                     ],
                   ),
-                  tooltip: 'Show Controls',
+                  tooltip: l10n.showControls,
                   onSelected: (InventoryDisplayMode result) {
                     ref.read(inventoryDisplayModeProvider.notifier).state =
                         result;
@@ -234,39 +236,39 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
                 PopupMenuButton<ViewMode>(
                   icon: const Icon(Icons.view_agenda),
-                  tooltip: 'Change View Mode',
+                  tooltip: l10n.changeViewMode,
                   onSelected: (ViewMode result) {
                     ref.read(viewModeProvider.notifier).state = result;
                   },
                   itemBuilder: (BuildContext context) =>
                       <PopupMenuEntry<ViewMode>>[
-                        const PopupMenuItem<ViewMode>(
+                        PopupMenuItem<ViewMode>(
                           value: ViewMode.detailed,
                           child: Row(
                             children: [
-                              Icon(Icons.view_agenda_outlined, size: 20),
-                              SizedBox(width: 12),
-                              Text('Detailed View'),
+                              const Icon(Icons.view_agenda_outlined, size: 20),
+                              const SizedBox(width: 12),
+                              Text(AppLocalizations.of(context)!.detailedView),
                             ],
                           ),
                         ),
-                        const PopupMenuItem<ViewMode>(
+                        PopupMenuItem<ViewMode>(
                           value: ViewMode.grid,
                           child: Row(
                             children: [
-                              Icon(Icons.grid_view, size: 20),
-                              SizedBox(width: 12),
-                              Text('Grid View'),
+                              const Icon(Icons.grid_view, size: 20),
+                              const SizedBox(width: 12),
+                              Text(AppLocalizations.of(context)!.gridView),
                             ],
                           ),
                         ),
-                        const PopupMenuItem<ViewMode>(
+                        PopupMenuItem<ViewMode>(
                           value: ViewMode.list,
                           child: Row(
                             children: [
-                              Icon(Icons.view_list, size: 20),
-                              SizedBox(width: 12),
-                              Text('Compact List'),
+                              const Icon(Icons.view_list, size: 20),
+                              const SizedBox(width: 12),
+                              Text(AppLocalizations.of(context)!.compactList),
                             ],
                           ),
                         ),
@@ -309,38 +311,31 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Added $addedCount to WANT; '
-                              'could not add $failedCount',
+                              l10n.addedToWantPartial(addedCount, failedCount),
                             ),
                           ),
                         );
                       } else if (context.mounted && addedCount > 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              'Added $addedCount missing items to WANT',
-                            ),
+                            content: Text(l10n.addedMissingToWant(addedCount)),
                           ),
                         );
                       } else if (context.mounted && failedCount > 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not add some items to WANT'),
-                          ),
+                          SnackBar(content: Text(l10n.couldNotAddToWant)),
                         );
                       } else if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('No missing items found'),
-                          ),
+                          SnackBar(content: Text(l10n.noMissingItems)),
                         );
                       }
                     }
                   },
                   itemBuilder: (BuildContext context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'want_missing',
-                      child: Text('Want All Missing'),
+                      child: Text(l10n.wantAllMissing),
                     ),
                   ],
                 ),
@@ -355,7 +350,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         // Group jump dropdown
                         PopupMenuButton<int>(
                           icon: const Icon(Icons.list, size: 20),
-                          tooltip: 'Jump to group',
+                          tooltip: l10n.jumpToGroup,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 36),
                           onSelected: (idx) => tabCtrl.animateTo(idx),
@@ -530,10 +525,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             child: Builder(
                               builder: (context) {
                                 if (items.isEmpty) {
-                                  return const Center(
+                                  return Center(
                                     child: Text(
-                                      'No items match this filter.',
-                                      style: TextStyle(color: Colors.grey),
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.noItemsMatchFilter,
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
                                     ),
                                   );
                                 }
@@ -627,7 +626,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ),
                 );
               },
-              label: const Text('Add Merch'),
+              label: Text(l10n.addMerch),
               icon: const Icon(Icons.add_photo_alternate),
             ),
           ),
@@ -635,7 +634,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, stack) =>
+          Scaffold(body: Center(child: Text(l10n.errorPrefix(err.toString())))),
     );
   }
 
@@ -1027,7 +1027,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         ),
                         if (isOwner)
                           Tooltip(
-                            message: 'You created this item',
+                            message: AppLocalizations.of(
+                              context,
+                            )!.youCreatedThisItem,
                             child: Icon(
                               Icons.edit_note,
                               size: 18,
@@ -1116,6 +1118,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     WidgetRef ref,
     Merchandise item,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -1124,7 +1127,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Edit Name'),
+              title: Text(l10n.editName),
               onTap: () {
                 Navigator.pop(ctx);
                 _editMerchName(context, ref, item);
@@ -1132,7 +1135,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              title: Text(
+                l10n.delete,
+                style: const TextStyle(color: Colors.red),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteMerch(context, ref, item);
@@ -1147,19 +1153,20 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   void _editMerchName(BuildContext context, WidgetRef ref, Merchandise item) {
     final ctrl = TextEditingController(text: item.name);
     final user = ref.read(currentUserProvider);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit Item Name'),
+        title: Text(l10n.editItemName),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Item name'),
+          decoration: InputDecoration(hintText: l10n.editItemNameHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1172,7 +1179,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -1185,15 +1192,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     Merchandise item,
   ) {
     final user = ref.read(currentUserProvider);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Item'),
-        content: Text('Are you sure you want to delete "${item.name}"?'),
+        title: Text(l10n.deleteItem),
+        content: Text(l10n.deleteEventConfirm(item.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -1206,7 +1214,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -1215,6 +1223,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
   // ... rest of the helpers
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1222,14 +1231,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No merchandise yet',
+            l10n.noMerchandiseYet,
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
-            'Add items to start building your inventory.',
+            l10n.buildInventoryPrompt,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),

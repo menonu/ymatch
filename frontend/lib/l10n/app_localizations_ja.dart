@@ -342,4 +342,177 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get invModeAll => 'すべて';
+
+  @override
+  String get addMerch => 'グッズを追加';
+
+  @override
+  String get otherItems => 'その他のアイテム';
+
+  @override
+  String get searchItemsHint => 'アイテムを検索...';
+
+  @override
+  String get showControls => '表示設定';
+
+  @override
+  String get changeViewMode => '表示切替';
+
+  @override
+  String get detailedView => '詳細表示';
+
+  @override
+  String get gridView => 'グリッド表示';
+
+  @override
+  String get compactList => 'リスト表示';
+
+  @override
+  String addedToWantPartial(int added, int failed) {
+    return '求に$added件追加、$failed件は失敗';
+  }
+
+  @override
+  String addedMissingToWant(int count) {
+    return '不足$count件を求に追加';
+  }
+
+  @override
+  String get couldNotAddToWant => '一部のアイテムを求に追加できませんでした';
+
+  @override
+  String get noMissingItems => '不足アイテムはありません';
+
+  @override
+  String get wantAllMissing => '不足をすべて求に追加';
+
+  @override
+  String get jumpToGroup => 'グループにジャンプ';
+
+  @override
+  String get noItemsMatchFilter => 'このフィルターに一致するアイテムはありません。';
+
+  @override
+  String get youCreatedThisItem => 'あなたが作成したアイテム';
+
+  @override
+  String get editItemName => 'アイテム名を編集';
+
+  @override
+  String get editItemNameHint => 'アイテム名';
+
+  @override
+  String get deleteItem => 'アイテムを削除';
+
+  @override
+  String get noMerchandiseYet => 'グッズがまだありません';
+
+  @override
+  String get buildInventoryPrompt => 'アイテムを追加して在庫を作り始めましょう。';
+
+  @override
+  String get trades => '取引';
+
+  @override
+  String get tabMatch => 'マッチ';
+
+  @override
+  String get tabOfferOut => 'オファー送信';
+
+  @override
+  String get tabOfferIn => 'オファー受信';
+
+  @override
+  String get tabActive => '進行中';
+
+  @override
+  String get tabDone => '完了';
+
+  @override
+  String get unknownUser => '不明';
+
+  @override
+  String get statusPending => '保留中';
+
+  @override
+  String get statusOffered => 'オファー中';
+
+  @override
+  String get statusAccepted => '承認済';
+
+  @override
+  String get statusCompleted => '完了';
+
+  @override
+  String get youGive => 'あなたが渡すもの:';
+
+  @override
+  String get youReceive => 'あなたが受け取るもの:';
+
+  @override
+  String get giveLabel => '渡す:';
+
+  @override
+  String get receiveLabel => '受け取る:';
+
+  @override
+  String get reject => '拒否';
+
+  @override
+  String get makeOffer => 'オファーを作成';
+
+  @override
+  String get accept => '承認';
+
+  @override
+  String get cancelOffer => 'オファーを取り消す';
+
+  @override
+  String get waitingForResponse => '返信待ち...';
+
+  @override
+  String get markComplete => '完了にする';
+
+  @override
+  String get updateInventory => '在庫を更新';
+
+  @override
+  String get inventoryUpdated => '在庫更新済';
+
+  @override
+  String get inventoryUpdatedSnack => '在庫を更新しました！';
+
+  @override
+  String get makeTradeOffer => '取引オファーを作成';
+
+  @override
+  String get itemsYouGive => '渡すアイテム:';
+
+  @override
+  String get itemsYouReceive => '受け取るアイテム:';
+
+  @override
+  String qtyLabel(int count) {
+    return '数量: $count';
+  }
+
+  @override
+  String sendOfferItems(int count) {
+    return 'オファーを送信（$count件）';
+  }
+
+  @override
+  String get noPendingMatches => '保留中のマッチはありません。アイテムを追加しましょう！';
+
+  @override
+  String get noOutgoingOffers => '送信中のオファーはありません。';
+
+  @override
+  String get noIncomingOffers => '受信したオファーはありません。';
+
+  @override
+  String get noActiveTrades => '進行中の取引はありません。';
+
+  @override
+  String get noCompletedTrades => '完了した取引はまだありません。';
 }

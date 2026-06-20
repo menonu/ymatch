@@ -343,4 +343,178 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invModeAll => 'All';
+
+  @override
+  String get addMerch => 'Add Merch';
+
+  @override
+  String get otherItems => 'Other Items';
+
+  @override
+  String get searchItemsHint => 'Search items...';
+
+  @override
+  String get showControls => 'Show Controls';
+
+  @override
+  String get changeViewMode => 'Change View Mode';
+
+  @override
+  String get detailedView => 'Detailed View';
+
+  @override
+  String get gridView => 'Grid View';
+
+  @override
+  String get compactList => 'Compact List';
+
+  @override
+  String addedToWantPartial(int added, int failed) {
+    return 'Added $added to Wish; could not add $failed';
+  }
+
+  @override
+  String addedMissingToWant(int count) {
+    return 'Added $count missing items to Wish';
+  }
+
+  @override
+  String get couldNotAddToWant => 'Could not add some items to Wish';
+
+  @override
+  String get noMissingItems => 'No missing items found';
+
+  @override
+  String get wantAllMissing => 'Want All Missing';
+
+  @override
+  String get jumpToGroup => 'Jump to group';
+
+  @override
+  String get noItemsMatchFilter => 'No items match this filter.';
+
+  @override
+  String get youCreatedThisItem => 'You created this item';
+
+  @override
+  String get editItemName => 'Edit Item Name';
+
+  @override
+  String get editItemNameHint => 'Item name';
+
+  @override
+  String get deleteItem => 'Delete Item';
+
+  @override
+  String get noMerchandiseYet => 'No merchandise yet';
+
+  @override
+  String get buildInventoryPrompt =>
+      'Add items to start building your inventory.';
+
+  @override
+  String get trades => 'Trades';
+
+  @override
+  String get tabMatch => 'Match';
+
+  @override
+  String get tabOfferOut => 'Offer Out';
+
+  @override
+  String get tabOfferIn => 'Offer In';
+
+  @override
+  String get tabActive => 'Active';
+
+  @override
+  String get tabDone => 'Done';
+
+  @override
+  String get unknownUser => '???';
+
+  @override
+  String get statusPending => 'PENDING';
+
+  @override
+  String get statusOffered => 'OFFERED';
+
+  @override
+  String get statusAccepted => 'ACCEPTED';
+
+  @override
+  String get statusCompleted => 'COMPLETED';
+
+  @override
+  String get youGive => 'You give:';
+
+  @override
+  String get youReceive => 'You receive:';
+
+  @override
+  String get giveLabel => 'Give:';
+
+  @override
+  String get receiveLabel => 'Receive:';
+
+  @override
+  String get reject => 'Reject';
+
+  @override
+  String get makeOffer => 'Make Offer';
+
+  @override
+  String get accept => 'Accept';
+
+  @override
+  String get cancelOffer => 'Cancel Offer';
+
+  @override
+  String get waitingForResponse => 'Waiting for response...';
+
+  @override
+  String get markComplete => 'Mark Complete';
+
+  @override
+  String get updateInventory => 'Update Inventory';
+
+  @override
+  String get inventoryUpdated => 'Inventory Updated';
+
+  @override
+  String get inventoryUpdatedSnack => 'Inventory updated!';
+
+  @override
+  String get makeTradeOffer => 'Make Trade Offer';
+
+  @override
+  String get itemsYouGive => 'Items you give:';
+
+  @override
+  String get itemsYouReceive => 'Items you receive:';
+
+  @override
+  String qtyLabel(int count) {
+    return 'Qty: $count';
+  }
+
+  @override
+  String sendOfferItems(int count) {
+    return 'Send Offer ($count items)';
+  }
+
+  @override
+  String get noPendingMatches => 'No pending matches. Keep adding items!';
+
+  @override
+  String get noOutgoingOffers => 'No outgoing offers.';
+
+  @override
+  String get noIncomingOffers => 'No incoming offers.';
+
+  @override
+  String get noActiveTrades => 'No active trades.';
+
+  @override
+  String get noCompletedTrades => 'No completed trades yet.';
 }
