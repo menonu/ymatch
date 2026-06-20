@@ -310,4 +310,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openLink => 'Open Link';
+
+  @override
+  String get have => 'Own';
+
+  @override
+  String get want => 'Wish';
+
+  @override
+  String get trade => 'For Trade';
+
+  @override
+  String get haveShort => 'O';
+
+  @override
+  String get wantShort => 'W';
+
+  @override
+  String get tradeShort => 'F';
+
+  @override
+  String get merchFilterAll => 'All';
+
+  @override
+  String get merchFilterMissing => 'Missing';
+
+  @override
+  String get invModeJustHave => 'Just Own';
+
+  @override
+  String get invModeWantTrade => 'Wish & For Trade';
+
+  @override
+  String get invModeAll => 'All';
 }

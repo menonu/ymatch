@@ -98,5 +98,17 @@
   "noMessagesYet": "まだメッセージがありません。挨拶してみましょう！",
   "typeMessage": "メッセージを入力...",
   "openInMaps": "マップで開く",
-  "openLink": "リンクを開く"
+  "openLink": "リンクを開く",
+
+  "have": "所持",
+  "want": "求",
+  "trade": "譲",
+  "haveShort": "所",
+  "wantShort": "求",
+  "tradeShort": "譲",
+  "merchFilterAll": "すべて",
+  "merchFilterMissing": "未所持",
+  "invModeJustHave": "所持のみ",
+  "invModeWantTrade": "求・譲",
+  "invModeAll": "すべて"
 }

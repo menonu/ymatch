@@ -643,6 +643,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Link'**
   String get openLink;
+
+  /// Inventory status: items the user owns (formerly HAVE)
+  ///
+  /// In en, this message translates to:
+  /// **'Own'**
+  String get have;
+
+  /// Inventory status: items the user is looking for (formerly WANT)
+  ///
+  /// In en, this message translates to:
+  /// **'Wish'**
+  String get want;
+
+  /// Inventory status: items the user offers to trade (formerly TRADE)
+  ///
+  /// In en, this message translates to:
+  /// **'For Trade'**
+  String get trade;
+
+  /// Single-letter abbreviation for the Own status, used in compact counters
+  ///
+  /// In en, this message translates to:
+  /// **'O'**
+  String get haveShort;
+
+  /// Single-letter abbreviation for the Wish status, used in compact counters
+  ///
+  /// In en, this message translates to:
+  /// **'W'**
+  String get wantShort;
+
+  /// Single-letter abbreviation for the For Trade status, used in compact counters
+  ///
+  /// In en, this message translates to:
+  /// **'F'**
+  String get tradeShort;
+
+  /// Merchandise filter segment: show all items
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get merchFilterAll;
+
+  /// Merchandise filter segment: show items missing from inventory
+  ///
+  /// In en, this message translates to:
+  /// **'Missing'**
+  String get merchFilterMissing;
+
+  /// Inventory display-mode option: show only owned items
+  ///
+  /// In en, this message translates to:
+  /// **'Just Own'**
+  String get invModeJustHave;
+
+  /// Inventory display-mode option: show wished and for-trade items
+  ///
+  /// In en, this message translates to:
+  /// **'Wish & For Trade'**
+  String get invModeWantTrade;
+
+  /// Inventory display-mode option: show all inventory items
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get invModeAll;
 }
 
 class _AppLocalizationsDelegate

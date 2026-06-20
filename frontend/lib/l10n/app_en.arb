@@ -450,5 +450,50 @@
   "openLink": "Open Link",
   "@openLink": {
     "description": "Link label for opening a non-map URL"
+  },
+
+  "have": "Own",
+  "@have": {
+    "description": "Inventory status: items the user owns (formerly HAVE)"
+  },
+  "want": "Wish",
+  "@want": {
+    "description": "Inventory status: items the user is looking for (formerly WANT)"
+  },
+  "trade": "For Trade",
+  "@trade": {
+    "description": "Inventory status: items the user offers to trade (formerly TRADE)"
+  },
+  "haveShort": "O",
+  "@haveShort": {
+    "description": "Single-letter abbreviation for the Own status, used in compact counters"
+  },
+  "wantShort": "W",
+  "@wantShort": {
+    "description": "Single-letter abbreviation for the Wish status, used in compact counters"
+  },
+  "tradeShort": "F",
+  "@tradeShort": {
+    "description": "Single-letter abbreviation for the For Trade status, used in compact counters"
+  },
+  "merchFilterAll": "All",
+  "@merchFilterAll": {
+    "description": "Merchandise filter segment: show all items"
+  },
+  "merchFilterMissing": "Missing",
+  "@merchFilterMissing": {
+    "description": "Merchandise filter segment: show items missing from inventory"
+  },
+  "invModeJustHave": "Just Own",
+  "@invModeJustHave": {
+    "description": "Inventory display-mode option: show only owned items"
+  },
+  "invModeWantTrade": "Wish & For Trade",
+  "@invModeWantTrade": {
+    "description": "Inventory display-mode option: show wished and for-trade items"
+  },
+  "invModeAll": "All",
+  "@invModeAll": {
+    "description": "Inventory display-mode option: show all inventory items"
   }
 }

@@ -309,4 +309,37 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get openLink => 'リンクを開く';
+
+  @override
+  String get have => '所持';
+
+  @override
+  String get want => '求';
+
+  @override
+  String get trade => '譲';
+
+  @override
+  String get haveShort => '所';
+
+  @override
+  String get wantShort => '求';
+
+  @override
+  String get tradeShort => '譲';
+
+  @override
+  String get merchFilterAll => 'すべて';
+
+  @override
+  String get merchFilterMissing => '未所持';
+
+  @override
+  String get invModeJustHave => '所持のみ';
+
+  @override
+  String get invModeWantTrade => '求・譲';
+
+  @override
+  String get invModeAll => 'すべて';
 }
