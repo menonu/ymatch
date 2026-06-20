@@ -20,6 +20,15 @@ on:
     branches:
       - main
 
+# Base images live in our (private) ghcr.io namespace (ghcr.io/menonu/ymatch/*).
+# The `docker login` step below authenticates the daemon so buildx (base
+# images + the `# syntax=` frontend) and the e2e_db pull resolve via
+# GITHUB_TOKEN, which reads packages in this repo — no public flip needed.
+# See .github/workflows/mirror-images.yml for the mirror runbook.
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   e2e:
     name: Frontend E2E
@@ -29,6 +38,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Login to ghcr.io
+        # Authenticate the Docker daemon so buildx (base images + the
+        # `# syntax=` frontend) and the e2e_db pull resolve via GITHUB_TOKEN
+        # instead of anonymous pulls (avoids any registry rate limit).
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Set up Docker Buildx
         # v4 + version:latest pulls buildx >= v0.21.0, required for the
@@ -41,7 +56,7 @@ jobs:
 
       - name: Pull E2E DB image with retry
         run: |
-          IMAGE=public.ecr.aws/docker/library/postgres:16-alpine
+          IMAGE=ghcr.io/menonu/ymatch/postgres:16-alpine
           for i in 1 2 3 4 5; do
             echo "Pull attempt $i for $IMAGE..."
             if docker pull "$IMAGE"; then

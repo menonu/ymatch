@@ -1,0 +1,118 @@
+name: Mirror base images to ghcr.io
+
+# Copies the third-party base images used by our Dockerfiles, compose files,
+# and CI workflows into the project's own ghcr.io namespace
+# (ghcr.io/menonu/ymatch/<base>:<tag>). CI then pulls from ghcr —
+# authenticated via the built-in GITHUB_TOKEN (effectively unlimited). Local
+# dev pulls the same packages (see the visibility note below for the
+# public-vs-private / login detail). This decouples us from Docker Hub *and*
+# ECR Public rate limits: ECR Public caps anonymous pulls at 1/sec per IP
+# (hard, non-adjustable), which BuildKit's parallel build-stage pulls blow
+# past and which shared-IP environments (dev container, CI NAT) exhaust
+# quickly.
+#
+# Sources are pulled SEQUENTIALLY (one `crane copy` at a time) so the sync
+# itself stays under ECR Public's 1 anonymous pull/sec limit.
+#
+# ---------------------------------------------------------------------------
+# Packages are PRIVATE by default and we keep them that way — CI authenticates
+# via the built-in GITHUB_TOKEN (works for packages in this repo), and local
+# dev does a one-time `docker login ghcr.io` (see below). No visibility change
+# is required for CI.
+#
+# GitHub exposes NO API to flip package visibility, so if you ever DO want
+# public (e.g. so local dev `docker pull` works without a login), it is a
+# one-time MANUAL step per package:
+#   https://github.com/users/menonu/packages/container/ymatch/<base>/settings
+#     → Danger Zone → Change visibility → Public
+#
+# Local dev (private packages): authenticate once with a PAT that has
+# `read:packages`:
+#   echo $GHCR_PAT | docker login ghcr.io -u menonu --password-stdin
+# (these are copies of upstream-public images, so flipping public later is
+# harmless if you prefer passwordless local pulls).
+# ---------------------------------------------------------------------------
+
+on:
+  schedule:
+    # Mon 03:17 UTC weekly — off-minute to avoid the cron fleet, low CI
+    # contention. Re-mirrors to pick up upstream base-image patches.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+  # Run once on first introduction so the packages exist before CI depends
+  # on them (and on every change to this workflow). `push` (unlike
+  # `workflow_dispatch`/`schedule`) runs the workflow file version on the
+  # pushed branch even before it lands on the default branch, so this
+  # fires on the introducing PR branch as well as on main.
+  push:
+    paths:
+      - '.github/workflows/mirror-images.yml'
+
+permissions:
+  packages: write
+  contents: read
+
+env:
+  GHCR: ghcr.io/menonu/ymatch
+
+jobs:
+  mirror:
+    name: Sync base images to ghcr.io
+    runs-on: ubuntu-latest
+    # Cancel superseded runs: the push trigger can fire on rapid commits and
+    # `crane copy` is idempotent, so there's no value in N parallel jobs
+    # racing on the same destination tags.
+    concurrency:
+      group: mirror-images
+      cancel-in-progress: true
+
+    steps:
+      - name: Install crane
+        # Static binary from go-containerregistry's latest release (Google's
+        # registry; not subject to the Docker Hub / ECR limits we're avoiding).
+        run: |
+          gh release download --repo google/go-containerregistry \
+            --pattern 'go-containerregistry_Linux_x86_64.tar.gz' -D /tmp/crane
+          tar -xzf /tmp/crane/go-containerregistry_Linux_x86_64.tar.gz -C /tmp/crane crane
+          sudo install -m 0755 /tmp/crane/crane /usr/local/bin/crane
+          crane version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Mirror images
+        # Each line: "<source> <dest-name>". `crane copy` preserves multi-arch
+        # manifests. Pulled sequentially to respect ECR Public's 1 pull/sec.
+        run: |
+          set -u
+          images=(
+            "public.ecr.aws/docker/library/rust:1-slim rust:1-slim"
+            "public.ecr.aws/docker/library/debian:trixie-slim debian:trixie-slim"
+            "public.ecr.aws/docker/library/postgres:16-alpine postgres:16-alpine"
+            "public.ecr.aws/ubuntu/ubuntu:22.04 ubuntu:22.04"
+            "public.ecr.aws/nginx/nginx:alpine nginx:alpine"
+            "public.ecr.aws/docker/library/caddy:2-alpine caddy:2-alpine"
+            "docker.io/dpage/pgadmin4:latest pgadmin4:latest"
+            "docker.io/docker/dockerfile:1 dockerfile:1"
+          )
+          failed=0
+          for pair in "${images[@]}"; do
+            set -- $pair
+            src="$1"; name="$2"; dst="$GHCR/$name"
+            ok=0
+            for i in 1 2 3 4 5; do
+              echo "::group::copy $src -> $dst (attempt $i)"
+              if crane copy "$src" "$dst"; then ok=1; echo "::endgroup::"; break; fi
+              echo "::endgroup::"
+              [ "$i" -lt 5 ] && sleep $((2 ** (i - 1)))
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "::error::Failed to mirror $src after 5 attempts"
+              failed=1
+            else
+              echo "Mirrored $src -> $dst ($(crane digest "$dst"))"
+            fi
+          done
+          exit $failed
