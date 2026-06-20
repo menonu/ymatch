@@ -17,7 +17,7 @@
 
 services:
   e2e_db:
-    image: public.ecr.aws/docker/library/postgres:16-alpine
+    image: ghcr.io/menonu/ymatch/postgres:16-alpine
     container_name: ymatch_e2e_db
     environment:
       POSTGRES_USER: ymatch_user

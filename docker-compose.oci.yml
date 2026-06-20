@@ -14,7 +14,7 @@ services:
 
   # --- Production PostgreSQL ---
   db:
-    image: postgres:16-alpine
+    image: ghcr.io/menonu/ymatch/postgres:16-alpine
     container_name: ymatch_db
     restart: unless-stopped
     environment:
@@ -68,7 +68,7 @@ services:
 
   # --- Production Caddy (ports 80/443) ---
   caddy:
-    image: caddy:2-alpine
+    image: ghcr.io/menonu/ymatch/caddy:2-alpine
     container_name: ymatch_caddy
     restart: unless-stopped
     ports:
@@ -92,7 +92,7 @@ services:
 
   # --- Staging PostgreSQL ---
   staging_db:
-    image: postgres:16-alpine
+    image: ghcr.io/menonu/ymatch/postgres:16-alpine
     container_name: ymatch_staging_db
     restart: unless-stopped
     environment:
@@ -146,7 +146,7 @@ services:
 
   # --- Staging Caddy (ports 8080/8443) ---
   staging_caddy:
-    image: caddy:2-alpine
+    image: ghcr.io/menonu/ymatch/caddy:2-alpine
     container_name: ymatch_staging_caddy
     restart: unless-stopped
     ports:

@@ -1,7 +1,7 @@
 services:
   # Main Database (PostgreSQL)
   db:
-    image: public.ecr.aws/docker/library/postgres:16-alpine
+    image: ghcr.io/menonu/ymatch/postgres:16-alpine
     container_name: ymatch_db
     environment:
       POSTGRES_USER: ymatch_user
@@ -16,7 +16,7 @@ services:
 
   # Database Admin UI (Optional)
   pgadmin:
-    image: dpage/pgadmin4
+    image: ghcr.io/menonu/ymatch/pgadmin4:latest
     container_name: ymatch_pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@ymatch.com

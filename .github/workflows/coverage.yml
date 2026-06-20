@@ -14,13 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read  # ghcr base images; see mirror-images.yml
     defaults:
       run:
         working-directory: ./backend
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: ghcr.io/menonu/ymatch/postgres:16-alpine
         env:
           POSTGRES_USER: ymatch_user
           POSTGRES_PASSWORD: secure_dev_password

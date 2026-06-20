@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/rust:latest
+FROM ghcr.io/menonu/ymatch/rust:1-slim
 
 # Install Dart
 RUN apt-get update && apt-get install -y apt-transport-https wget gnupg
