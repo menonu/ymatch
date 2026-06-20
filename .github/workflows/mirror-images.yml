@@ -3,12 +3,13 @@ name: Mirror base images to ghcr.io
 # Copies the third-party base images used by our Dockerfiles, compose files,
 # and CI workflows into the project's own ghcr.io namespace
 # (ghcr.io/menonu/ymatch/<base>:<tag>). CI then pulls from ghcr —
-# authenticated via the built-in GITHUB_TOKEN (effectively unlimited) — and
-# local dev pulls anonymously from the public packages. This decouples us
-# from Docker Hub *and* ECR Public rate limits: ECR Public caps anonymous
-# pulls at 1/sec per IP (hard, non-adjustable), which BuildKit's parallel
-# build-stage pulls blow past and which shared-IP environments (dev
-# container, CI NAT) exhaust quickly.
+# authenticated via the built-in GITHUB_TOKEN (effectively unlimited). Local
+# dev pulls the same packages (see the visibility note below for the
+# public-vs-private / login detail). This decouples us from Docker Hub *and*
+# ECR Public rate limits: ECR Public caps anonymous pulls at 1/sec per IP
+# (hard, non-adjustable), which BuildKit's parallel build-stage pulls blow
+# past and which shared-IP environments (dev container, CI NAT) exhaust
+# quickly.
 #
 # Sources are pulled SEQUENTIALLY (one `crane copy` at a time) so the sync
 # itself stays under ECR Public's 1 anonymous pull/sec limit.
@@ -58,6 +59,12 @@ jobs:
   mirror:
     name: Sync base images to ghcr.io
     runs-on: ubuntu-latest
+    # Cancel superseded runs: the push trigger can fire on rapid commits and
+    # `crane copy` is idempotent, so there's no value in N parallel jobs
+    # racing on the same destination tags.
+    concurrency:
+      group: mirror-images
+      cancel-in-progress: true
 
     steps:
       - name: Install crane
@@ -99,7 +106,7 @@ jobs:
               echo "::group::copy $src -> $dst (attempt $i)"
               if crane copy "$src" "$dst"; then ok=1; echo "::endgroup::"; break; fi
               echo "::endgroup::"
-              sleep $((2 ** (i - 1)))
+              [ "$i" -lt 5 ] && sleep $((2 ** (i - 1)))
             done
             if [ "$ok" -ne 1 ]; then
               echo "::error::Failed to mirror $src after 5 attempts"
