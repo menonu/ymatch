@@ -633,6 +633,37 @@ final $typed_data.Uint8List updateEventRequestDescriptor = $convert.base64Decode
     'ChJVcGRhdGVFdmVudFJlcXVlc3QSFwoHdXNlcl9pZBgBIAEoBVIGdXNlcklkEhcKBG5hbWUYAi'
     'ABKAlIAFIEbmFtZYgBAUIHCgVfbmFtZQ==');
 
+@$core.Deprecated('Use toggleFavoriteRequestDescriptor instead')
+const ToggleFavoriteRequest$json = {
+  '1': 'ToggleFavoriteRequest',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'is_favorite', '3': 2, '4': 1, '5': 8, '10': 'isFavorite'},
+  ],
+};
+
+/// Descriptor for `ToggleFavoriteRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toggleFavoriteRequestDescriptor = $convert.base64Decode(
+    'ChVUb2dnbGVGYXZvcml0ZVJlcXVlc3QSFwoHdXNlcl9pZBgBIAEoBVIGdXNlcklkEh8KC2lzX2'
+    'Zhdm9yaXRlGAIgASgIUgppc0Zhdm9yaXRl');
+
+@$core.Deprecated('Use toggleFavoriteGroupRequestDescriptor instead')
+const ToggleFavoriteGroupRequest$json = {
+  '1': 'ToggleFavoriteGroupRequest',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'group_name', '3': 2, '4': 1, '5': 9, '10': 'groupName'},
+    {'1': 'is_favorite', '3': 3, '4': 1, '5': 8, '10': 'isFavorite'},
+  ],
+};
+
+/// Descriptor for `ToggleFavoriteGroupRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toggleFavoriteGroupRequestDescriptor =
+    $convert.base64Decode(
+        'ChpUb2dnbGVGYXZvcml0ZUdyb3VwUmVxdWVzdBIXCgd1c2VyX2lkGAEgASgFUgZ1c2VySWQSHQ'
+        'oKZ3JvdXBfbmFtZRgCIAEoCVIJZ3JvdXBOYW1lEh8KC2lzX2Zhdm9yaXRlGAMgASgIUgppc0Zh'
+        'dm9yaXRl');
+
 @$core.Deprecated('Use updateInventoryRequestDescriptor instead')
 const UpdateInventoryRequest$json = {
   '1': 'UpdateInventoryRequest',
@@ -1011,6 +1042,20 @@ const UpdateUserRoleRequest$json = {
 final $typed_data.Uint8List updateUserRoleRequestDescriptor =
     $convert.base64Decode(
         'ChVVcGRhdGVVc2VyUm9sZVJlcXVlc3QSEgoEcm9sZRgBIAEoCVIEcm9sZQ==');
+
+@$core.Deprecated('Use updateUsernameRequestDescriptor instead')
+const UpdateUsernameRequest$json = {
+  '1': 'UpdateUsernameRequest',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'username', '3': 2, '4': 1, '5': 9, '10': 'username'},
+  ],
+};
+
+/// Descriptor for `UpdateUsernameRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateUsernameRequestDescriptor = $convert.base64Decode(
+    'ChVVcGRhdGVVc2VybmFtZVJlcXVlc3QSFwoHdXNlcl9pZBgBIAEoBVIGdXNlcklkEhoKCHVzZX'
+    'JuYW1lGAIgASgJUgh1c2VybmFtZQ==');
 
 @$core.Deprecated('Use userActionRequestDescriptor instead')
 const UserActionRequest$json = {

@@ -361,3 +361,165 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         .nest_service("/uploads", static_service)
         .layer(cors)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    // --- env_rate_limit ---
+
+    #[test]
+    fn env_rate_limit_falls_back_to_default_when_unset() {
+        // Read-only: a unique, never-set var name. Edition 2024 makes
+        // `std::env::set_var` unsafe and racy under parallel `cargo test`,
+        // so this only exercises the unset → default path (no mutation).
+        assert_eq!(
+            env_rate_limit("TEST_RL_UNSET_185_A", 42),
+            NonZeroU32::new(42).unwrap()
+        );
+    }
+
+    // --- extract_client_ip ---
+
+    /// Build a GET request with an optional `x-forwarded-for` header.
+    fn req_with_xff(header: Option<&str>) -> Request<Body> {
+        let mut builder = Request::builder().method("GET").uri("/");
+        if let Some(value) = header {
+            builder = builder.header("x-forwarded-for", value);
+        }
+        builder.body(Body::empty()).unwrap()
+    }
+
+    #[test]
+    fn extract_client_ip_reads_single_xff() {
+        assert_eq!(
+            extract_client_ip(&req_with_xff(Some("1.2.3.4"))),
+            "1.2.3.4".parse::<IpAddr>().unwrap(),
+        );
+    }
+
+    #[test]
+    fn extract_client_ip_takes_first_of_many_xff() {
+        assert_eq!(
+            extract_client_ip(&req_with_xff(Some("1.2.3.4, 5.6.7.8"))),
+            "1.2.3.4".parse::<IpAddr>().unwrap(),
+        );
+    }
+
+    #[test]
+    fn extract_client_ip_missing_header_falls_back_to_zero() {
+        assert_eq!(
+            extract_client_ip(&req_with_xff(None)),
+            IpAddr::from([0, 0, 0, 0]),
+        );
+    }
+
+    #[test]
+    fn extract_client_ip_invalid_ip_falls_back_to_zero() {
+        assert_eq!(
+            extract_client_ip(&req_with_xff(Some("not-an-ip"))),
+            IpAddr::from([0, 0, 0, 0]),
+        );
+    }
+
+    // --- rate_limit middleware (via a tiny standalone router + oneshot) ---
+
+    /// Build a router with a 1 req/s, burst-2 limiter wired through
+    /// `rate_limit`. No `AppState`, pool, or storage — the rate-limit layer
+    /// short-circuits before any handler runs.
+    fn rate_limited_app() -> Router {
+        let limiter: Arc<IpLimiter> = Arc::new(RateLimiter::keyed(
+            Quota::per_second(NonZeroU32::new(1).unwrap()).allow_burst(NonZeroU32::new(2).unwrap()),
+        ));
+        Router::new()
+            .route("/", get(|| async { "ok" }))
+            .layer(middleware::from_fn_with_state(
+                limiter,
+                |axum::extract::State(lim): axum::extract::State<Arc<IpLimiter>>,
+                 req: Request<Body>,
+                 next: Next| async move { rate_limit(req, next, lim).await },
+            ))
+    }
+
+    async fn body_string(response: Response) -> String {
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn rate_limit_passes_when_under_quota() {
+        let app = rate_limited_app();
+        let res = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(body_string(res).await, "ok");
+    }
+
+    #[tokio::test]
+    async fn rate_limit_returns_429_when_burst_exceeded() {
+        let app = rate_limited_app();
+        // Same client IP (no x-forwarded-for → 0.0.0.0) for all requests.
+        // Burst is 2, so the first two consume the budget and the third is
+        // rejected. The three in-process `oneshot`s complete in well under
+        // the 1s refill window, so the third is deterministically 429 (a
+        // sub-millisecond refill is far less than one whole token).
+        let req = || {
+            Request::builder()
+                .method("GET")
+                .uri("/")
+                .body(Body::empty())
+                .unwrap()
+        };
+        let first = app.clone().oneshot(req()).await.unwrap();
+        assert_eq!(first.status(), StatusCode::OK);
+
+        let second = app.clone().oneshot(req()).await.unwrap();
+        assert_eq!(second.status(), StatusCode::OK);
+
+        let third = app.oneshot(req()).await.unwrap();
+        assert_eq!(third.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body_string(third).await, "Too Many Requests");
+    }
+
+    #[tokio::test]
+    async fn rate_limit_isolates_buckets_per_ip() {
+        let app = rate_limited_app();
+        // Two distinct client IPs each get their own burst budget, so both
+        // requests pass (a single IP would only be limited after its own 2).
+        let a = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/")
+                    .header("x-forwarded-for", "10.0.0.1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let b = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/")
+                    .header("x-forwarded-for", "10.0.0.2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(a.status(), StatusCode::OK);
+        assert_eq!(b.status(), StatusCode::OK);
+    }
+}
