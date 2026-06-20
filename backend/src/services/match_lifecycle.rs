@@ -492,4 +492,33 @@ mod tests {
             ))
         );
     }
+
+    // Remaining valid-target / invalid-source pairs that fall into the arms
+    // above but weren't asserted directly — pins the full table.
+
+    #[test]
+    fn accept_from_completed_rejected() {
+        assert_eq!(
+            validate_status_transition("ACCEPTED", "COMPLETED"),
+            Err(AppError::bad_request("Can only accept OFFERED matches"))
+        );
+    }
+
+    #[test]
+    fn complete_from_pending_rejected() {
+        assert_eq!(
+            validate_status_transition("COMPLETED", "PENDING"),
+            Err(AppError::bad_request("Can only complete ACCEPTED matches"))
+        );
+    }
+
+    #[test]
+    fn reject_from_completed_rejected() {
+        assert_eq!(
+            validate_status_transition("REJECTED", "COMPLETED"),
+            Err(AppError::bad_request(
+                "Can only reject PENDING or OFFERED matches"
+            ))
+        );
+    }
 }

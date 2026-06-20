@@ -426,12 +426,12 @@ mod tests {
 
     // --- rate_limit middleware (via a tiny standalone router + oneshot) ---
 
-    /// Build a router with a 1 req/s, burst-1 limiter wired through
+    /// Build a router with a 1 req/s, burst-2 limiter wired through
     /// `rate_limit`. No `AppState`, pool, or storage — the rate-limit layer
     /// short-circuits before any handler runs.
     fn rate_limited_app() -> Router {
         let limiter: Arc<IpLimiter> = Arc::new(RateLimiter::keyed(
-            Quota::per_second(NonZeroU32::new(1).unwrap()).allow_burst(NonZeroU32::new(1).unwrap()),
+            Quota::per_second(NonZeroU32::new(1).unwrap()).allow_burst(NonZeroU32::new(2).unwrap()),
         ));
         Router::new()
             .route("/", get(|| async { "ok" }))
@@ -468,39 +468,34 @@ mod tests {
     #[tokio::test]
     async fn rate_limit_returns_429_when_burst_exceeded() {
         let app = rate_limited_app();
-        // Same client IP (no x-forwarded-for → 0.0.0.0) for both requests.
-        let first = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .method("GET")
-                    .uri("/")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+        // Same client IP (no x-forwarded-for → 0.0.0.0) for all requests.
+        // Burst is 2, so the first two consume the budget and the third is
+        // rejected. The three in-process `oneshot`s complete in well under
+        // the 1s refill window, so the third is deterministically 429 (a
+        // sub-millisecond refill is far less than one whole token).
+        let req = || {
+            Request::builder()
+                .method("GET")
+                .uri("/")
+                .body(Body::empty())
+                .unwrap()
+        };
+        let first = app.clone().oneshot(req()).await.unwrap();
         assert_eq!(first.status(), StatusCode::OK);
 
-        let second = app
-            .oneshot(
-                Request::builder()
-                    .method("GET")
-                    .uri("/")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(body_string(second).await, "Too Many Requests");
+        let second = app.clone().oneshot(req()).await.unwrap();
+        assert_eq!(second.status(), StatusCode::OK);
+
+        let third = app.oneshot(req()).await.unwrap();
+        assert_eq!(third.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body_string(third).await, "Too Many Requests");
     }
 
     #[tokio::test]
     async fn rate_limit_isolates_buckets_per_ip() {
         let app = rate_limited_app();
         // Two distinct client IPs each get their own burst budget, so both
-        // first requests pass even though a single IP would already be limited.
+        // requests pass (a single IP would only be limited after its own 2).
         let a = app
             .clone()
             .oneshot(
