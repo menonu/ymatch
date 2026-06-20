@@ -21,7 +21,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::OfferTradeRequest;
 use crate::repositories::inventory::InventoryRepository;
-use crate::repositories::match_::MatchRepository;
+use crate::repositories::match_::{MatchRepository, MatchStatusSnapshot};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -83,12 +83,7 @@ impl MatchLifecycleService {
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
-        if locked.status != STATUS_PENDING {
-            return Err(AppError::bad_request("Can only offer on PENDING matches"));
-        }
-        if offer.user_id != locked.user1_id && offer.user_id != locked.user2_id {
-            return Err(AppError::forbidden("Not part of this match"));
-        }
+        validate_offer_transition(&offer, &locked)?;
 
         self.matches
             .insert_match_items(&mut *tx, match_id, offer.user_id, &offer.items)
@@ -110,10 +105,7 @@ impl MatchLifecycleService {
     /// - OFFERED         -> ACCEPTED  (cascades to delete other PENDING matches)
     /// - ACCEPTED        -> COMPLETED
     pub async fn change_status(&self, match_id: i32, new_status: &str) -> Result<(), AppError> {
-        let valid = matches!(new_status, "ACCEPTED" | "REJECTED" | "COMPLETED");
-        if !valid {
-            return Err(AppError::bad_request("Invalid status"));
-        }
+        validate_transition_target(new_status)?;
 
         let mut tx = self.pool.begin().await?;
 
@@ -123,20 +115,7 @@ impl MatchLifecycleService {
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
-        match (new_status, locked.status.as_str()) {
-            ("ACCEPTED", s) if s != STATUS_OFFERED => {
-                return Err(AppError::bad_request("Can only accept OFFERED matches"));
-            }
-            ("COMPLETED", s) if s != STATUS_ACCEPTED => {
-                return Err(AppError::bad_request("Can only complete ACCEPTED matches"));
-            }
-            ("REJECTED", s) if s != STATUS_PENDING && s != STATUS_OFFERED => {
-                return Err(AppError::bad_request(
-                    "Can only reject PENDING or OFFERED matches",
-                ));
-            }
-            _ => {}
-        }
+        validate_status_transition(new_status, &locked.status)?;
 
         self.matches
             .set_status(&mut *tx, match_id, new_status)
@@ -238,10 +217,65 @@ impl MatchLifecycleService {
 }
 
 // Note: the lifecycle service requires a real database (transactions are
-// the core of correctness). The state machine logic for
-// `apply_inventory` is small and pure enough to unit test in isolation.
-// The transaction-bearing methods (offer, change_status) are covered by
-// the integration test suite in backend/tests/api_tests.rs.
+// the core of correctness), so the transaction-bearing parts of
+// `offer`, `change_status`, and `apply_inventory` are covered by the
+// integration test suite in backend/tests/api_tests.rs. The pure
+// state-machine guards are factored out below (`validate_offer_transition`,
+// `validate_transition_target`, `validate_status_transition`) and
+// `apply_inventory_delta` so they can be unit-tested without a database.
+
+/// Validate the PENDING -> OFFERED transition against the locked match.
+///
+/// Factored out of [`MatchLifecycleService::offer`] so the state-machine
+/// guards can be unit-tested without a database. Assumes the caller has
+/// already resolved the not-found case (the match exists) and checked the
+/// payload is non-empty (that check stays before opening the transaction).
+fn validate_offer_transition(
+    offer: &OfferTradeRequest,
+    locked: &MatchStatusSnapshot,
+) -> Result<(), AppError> {
+    if locked.status != STATUS_PENDING {
+        return Err(AppError::bad_request("Can only offer on PENDING matches"));
+    }
+    if offer.user_id != locked.user1_id && offer.user_id != locked.user2_id {
+        return Err(AppError::forbidden("Not part of this match"));
+    }
+    Ok(())
+}
+
+/// Reject transition targets that are not part of the state machine.
+///
+/// Factored out of [`MatchLifecycleService::change_status`] so it can be
+/// unit-tested. Called *before* opening the transaction so an invalid
+/// target short-circuits before any DB work — and before the not-found
+/// check (an invalid status on a missing match id must still be a 400, not
+/// a 404; see `test_update_match_status_validation`).
+fn validate_transition_target(new_status: &str) -> Result<(), AppError> {
+    if !matches!(new_status, "ACCEPTED" | "REJECTED" | "COMPLETED") {
+        return Err(AppError::bad_request("Invalid status"));
+    }
+    Ok(())
+}
+
+/// Validate a status transition against the match's current status.
+///
+/// Factored out of [`MatchLifecycleService::change_status`] so the
+/// state-machine guards can be unit-tested without a database. Assumes the
+/// target is already known-valid (see [`validate_transition_target`]).
+fn validate_status_transition(new_status: &str, current_status: &str) -> Result<(), AppError> {
+    match (new_status, current_status) {
+        ("ACCEPTED", s) if s != STATUS_OFFERED => {
+            Err(AppError::bad_request("Can only accept OFFERED matches"))
+        }
+        ("COMPLETED", s) if s != STATUS_ACCEPTED => {
+            Err(AppError::bad_request("Can only complete ACCEPTED matches"))
+        }
+        ("REJECTED", s) if s != STATUS_PENDING && s != STATUS_OFFERED => Err(
+            AppError::bad_request("Can only reject PENDING or OFFERED matches"),
+        ),
+        _ => Ok(()),
+    }
+}
 
 /// Map `(direction, requesting_is_offerer) -> (delta_trade, delta_have)`.
 ///
@@ -269,7 +303,35 @@ fn apply_inventory_delta(
 
 #[cfg(test)]
 mod tests {
-    use super::apply_inventory_delta;
+    use super::*;
+    use crate::generated::ymatch::OfferItem;
+
+    /// Build a `MatchStatusSnapshot` with only the fields the guards read.
+    fn snapshot(status: &str, user1: i32, user2: i32) -> MatchStatusSnapshot {
+        MatchStatusSnapshot {
+            user1_id: user1,
+            user2_id: user2,
+            status: status.to_string(),
+            offered_by: None,
+            user1_applied: false,
+            user2_applied: false,
+        }
+    }
+
+    /// Build an `OfferTradeRequest` for `user_id` with a single dummy item.
+    /// The guards under test don't inspect items, so one placeholder suffices.
+    fn offer(user_id: i32) -> OfferTradeRequest {
+        OfferTradeRequest {
+            user_id,
+            items: vec![OfferItem {
+                merch_id: 1,
+                direction: "GIVE".into(),
+                quantity: 1,
+            }],
+        }
+    }
+
+    // --- apply_inventory_delta ---
 
     #[test]
     fn offerer_give_decrements_own_trade() {
@@ -295,5 +357,168 @@ mod tests {
     fn unknown_direction_is_noop() {
         assert_eq!(apply_inventory_delta("FOO", true, 1), (0, 0));
         assert_eq!(apply_inventory_delta("FOO", false, 1), (0, 0));
+    }
+
+    // --- validate_offer_transition (PENDING -> OFFERED) ---
+
+    #[test]
+    fn offer_on_non_pending_rejected() {
+        // Status is checked before participation, so a participant offering
+        // on a non-PENDING match still gets the status error.
+        assert_eq!(
+            validate_offer_transition(&offer(1), &snapshot("OFFERED", 1, 2)),
+            Err(AppError::bad_request("Can only offer on PENDING matches"))
+        );
+    }
+
+    #[test]
+    fn offer_on_completed_rejected() {
+        assert_eq!(
+            validate_offer_transition(&offer(1), &snapshot("COMPLETED", 1, 2)),
+            Err(AppError::bad_request("Can only offer on PENDING matches"))
+        );
+    }
+
+    #[test]
+    fn offer_by_non_participant_forbidden() {
+        assert_eq!(
+            validate_offer_transition(&offer(3), &snapshot("PENDING", 1, 2)),
+            Err(AppError::forbidden("Not part of this match"))
+        );
+    }
+
+    #[test]
+    fn offer_by_user1_on_pending_ok() {
+        assert_eq!(
+            validate_offer_transition(&offer(1), &snapshot("PENDING", 1, 2)),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn offer_by_user2_on_pending_ok() {
+        assert_eq!(
+            validate_offer_transition(&offer(2), &snapshot("PENDING", 1, 2)),
+            Ok(())
+        );
+    }
+
+    // --- validate_transition_target ---
+
+    #[test]
+    fn transition_target_pending_rejected() {
+        // PENDING is a source state, not a valid transition target.
+        assert_eq!(
+            validate_transition_target("PENDING"),
+            Err(AppError::bad_request("Invalid status"))
+        );
+    }
+
+    #[test]
+    fn transition_target_unknown_rejected() {
+        assert_eq!(
+            validate_transition_target("FOO"),
+            Err(AppError::bad_request("Invalid status"))
+        );
+    }
+
+    #[test]
+    fn transition_target_empty_rejected() {
+        assert_eq!(
+            validate_transition_target(""),
+            Err(AppError::bad_request("Invalid status"))
+        );
+    }
+
+    #[test]
+    fn transition_target_accepted_ok() {
+        assert_eq!(validate_transition_target("ACCEPTED"), Ok(()));
+    }
+
+    #[test]
+    fn transition_target_rejected_ok() {
+        assert_eq!(validate_transition_target("REJECTED"), Ok(()));
+    }
+
+    #[test]
+    fn transition_target_completed_ok() {
+        assert_eq!(validate_transition_target("COMPLETED"), Ok(()));
+    }
+
+    // --- validate_status_transition (the four-arm guard) ---
+
+    #[test]
+    fn accept_from_pending_rejected() {
+        assert_eq!(
+            validate_status_transition("ACCEPTED", "PENDING"),
+            Err(AppError::bad_request("Can only accept OFFERED matches"))
+        );
+    }
+
+    #[test]
+    fn accept_from_offered_ok() {
+        assert_eq!(validate_status_transition("ACCEPTED", "OFFERED"), Ok(()));
+    }
+
+    #[test]
+    fn complete_from_offered_rejected() {
+        assert_eq!(
+            validate_status_transition("COMPLETED", "OFFERED"),
+            Err(AppError::bad_request("Can only complete ACCEPTED matches"))
+        );
+    }
+
+    #[test]
+    fn complete_from_accepted_ok() {
+        assert_eq!(validate_status_transition("COMPLETED", "ACCEPTED"), Ok(()));
+    }
+
+    #[test]
+    fn reject_from_pending_ok() {
+        assert_eq!(validate_status_transition("REJECTED", "PENDING"), Ok(()));
+    }
+
+    #[test]
+    fn reject_from_offered_ok() {
+        assert_eq!(validate_status_transition("REJECTED", "OFFERED"), Ok(()));
+    }
+
+    #[test]
+    fn reject_from_accepted_rejected() {
+        assert_eq!(
+            validate_status_transition("REJECTED", "ACCEPTED"),
+            Err(AppError::bad_request(
+                "Can only reject PENDING or OFFERED matches"
+            ))
+        );
+    }
+
+    // Remaining valid-target / invalid-source pairs that fall into the arms
+    // above but weren't asserted directly — pins the full table.
+
+    #[test]
+    fn accept_from_completed_rejected() {
+        assert_eq!(
+            validate_status_transition("ACCEPTED", "COMPLETED"),
+            Err(AppError::bad_request("Can only accept OFFERED matches"))
+        );
+    }
+
+    #[test]
+    fn complete_from_pending_rejected() {
+        assert_eq!(
+            validate_status_transition("COMPLETED", "PENDING"),
+            Err(AppError::bad_request("Can only complete ACCEPTED matches"))
+        );
+    }
+
+    #[test]
+    fn reject_from_completed_rejected() {
+        assert_eq!(
+            validate_status_transition("REJECTED", "COMPLETED"),
+            Err(AppError::bad_request(
+                "Can only reject PENDING or OFFERED matches"
+            ))
+        );
     }
 }
