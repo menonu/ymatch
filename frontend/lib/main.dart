@@ -38,20 +38,27 @@ final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(
 );
 final _shellNavigatorAdminKey = GlobalKey<NavigatorState>(debugLabel: 'admin');
 
-final routerProvider = Provider<GoRouter>((ref) {
-  // Assuming authProvider is defined elsewhere and provides a value that indicates auth status.
-  // For example, a StreamProvider<User?> or FutureProvider<User?>
-  // For this example, we'll use a dummy provider if authProvider isn't defined in the context.
-  // In a real app, you'd have a proper authProvider.
-  final authState = ref.watch(authProvider);
+// Bridges auth-state changes to GoRouter so the redirect is re-evaluated on
+// login/logout WITHOUT rebuilding routerProvider. Rebuilding routerProvider
+// would recreate the GoRouter and reset navigation — the cause of #206's
+// blank page after a username update (which changes the user but not login
+// status). ref.listen registers a side-effect listener that does NOT create a
+// rebuild dependency, so routerProvider is built once and stays stable.
+class _AuthRefreshNotifier extends ChangeNotifier {
+  _AuthRefreshNotifier(Ref ref) {
+    ref.listen<dynamic>(authProvider, (_, _) => notifyListeners());
+  }
+}
 
+final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+    refreshListenable: _AuthRefreshNotifier(ref),
     redirect: (context, state) {
-      // If auth is loading, maybe return null or splash?
-      // For now assume null value means not logged in.
-      final isLoggedIn = authState.value != null;
+      // Read fresh auth state on every redirect (login/logout/refresh) instead
+      // of capturing a snapshot at provider-build time.
+      final isLoggedIn = ref.read(authProvider).value != null;
       final isLoginRoute = state.uri.path == '/login';
 
       if (!isLoggedIn && !isLoginRoute) {
