@@ -76,7 +76,7 @@ jobs:
       # default reporting; we collect a single lcov + summary below.
       - name: Run tests with coverage
         run: |
-          cargo llvm-cov test --no-report -- --test-threads=1
+          cargo llvm-cov test --no-report
 
       # Produce an lcov.info for local inspection (not gated on; never
       # fails the build). Also write a one-line text summary to stdout

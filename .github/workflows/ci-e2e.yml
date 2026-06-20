@@ -31,15 +31,13 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Cache backend build (registry buildkit cache)
-        uses: actions/cache@v4
+        # v4 + version:latest pulls buildx >= v0.21.0, required for the
+        # `type=gha` v2 cache API (the legacy v1 cache API was shut down
+        # 2025-04-15). Used by the `docker buildx bake` step below to
+        # persist the backend image's BuildKit layer cache across runs.
+        uses: docker/setup-buildx-action@v4
         with:
-          path: /tmp/.buildx-cache
-          key: buildx-${{ runner.os }}-e2e-backend-${{ hashFiles('backend/Cargo.lock', 'backend.Dockerfile.prod') }}
-          restore-keys: |
-            buildx-${{ runner.os }}-e2e-backend-
+          version: latest
 
       - name: Pull E2E DB image with retry
         run: |
@@ -55,8 +53,22 @@ jobs:
           exit 1
 
       - name: Build and start e2e stack
+        # Build the backend image via `docker buildx bake` with the GitHub
+        # Actions cache backend (type=gha) so the compiled-dependency
+        # layer persists across runs. On a cache hit (Cargo.lock unchanged)
+        # the `cargo build` layer is restored and never executes, so
+        # crates.io is not re-fetched — faster builds and no exposure to
+        # transient crates.io connection resets. `--load` makes the baked
+        # image available to the daemon so the subsequent `up` reuses it
+        # instead of rebuilding. `mode=max` exports intermediate layers
+        # (including the dep-build layer), not just the final image.
+        # `type=gha` only works inside GitHub Actions, so local dev still
+        # uses plain `docker compose -f docker-compose.e2e.yml up -d --build`.
         run: |
-          docker compose -f docker-compose.e2e.yml build e2e_backend
+          docker buildx bake -f docker-compose.e2e.yml \
+            --set e2e_backend.cache-from=type=gha,scope=e2e-backend \
+            --set e2e_backend.cache-to=type=gha,scope=e2e-backend,mode=max \
+            --load
           docker compose -f docker-compose.e2e.yml up -d e2e_db e2e_backend
 
       - name: Wait for backend health

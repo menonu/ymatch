@@ -12,6 +12,13 @@ WORKDIR /usr/src/ymatch_backend
 # Cache dependencies by copying Cargo.toml and Cargo.lock first
 COPY backend/Cargo.toml backend/Cargo.lock ./
 
+# Retry crate downloads so a transient crates.io connection reset
+# (e.g. "Connection reset by peer") doesn't fail the whole build.
+# Only matters on a cache miss; on a BuildKit/GHA cache hit the
+# `cargo build` layer below is restored and never executes.
+ENV CARGO_NET_RETRY=5
+ENV CARGO_NET_CONNECT_TIMEOUT=10
+
 # Create dummy source files to build dependencies.
 # Use BuildKit cache mounts for /usr/local/cargo (registry + git deps)
 # so downloaded crates persist across `docker compose build` runs.
