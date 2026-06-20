@@ -1,0 +1,22 @@
+# New Relic Terraform variables template (non-secret config).
+#
+# Copy to terraform/newrelic/terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+#
+# SECRETS (api_key, nr_license_key, discord_webhook_url) do NOT go here.
+# They are supplied via TF_VAR_* env vars from a gitignored .env — see
+# terraform/newrelic/.env.example and docs/how_to/terraform_apply.md.
+# (Terraform precedence: terraform.tfvars overrides TF_VAR_ env, so a
+# given variable must live in only one place.)
+
+# New Relic account id (identifier — not committed with a real value in
+# the repo; this file is a placeholder template).
+account_id = 0
+
+# New Relic region.
+region = "US"
+
+# Public IP of the OCI VM the synthetic monitors ping
+# (https://<app_public_ip>.nip.io/...). Host identifier — keep out of
+# the repo; this template is a placeholder.
+app_public_ip = "203.0.113.10"

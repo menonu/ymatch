@@ -11,11 +11,17 @@ variable "user_ocid" {
 variable "fingerprint" {
   description = "OCI API Key Fingerprint"
   type        = string
+  # Credential material (together with private_key_path it is the OCI API
+  # signing key) — redact from `terraform plan` output. The value is still
+  # gitignored in terraform.tfvars; this is defense-in-depth.
+  sensitive = true
 }
 
 variable "private_key_path" {
   description = "Path to OCI API Private Key (.pem)"
   type        = string
+  # Path to the OCI API signing key — redact from `terraform plan` output.
+  sensitive = true
 }
 
 variable "region" {

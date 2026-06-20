@@ -1,6 +1,9 @@
 variable "account_id" {
   description = "New Relic Account ID"
   type        = number
+  # Account identifier — redact from `terraform plan` output (the value
+  # is still gitignored in terraform.tfvars; this is defense-in-depth).
+  sensitive = true
 }
 
 variable "api_key" {

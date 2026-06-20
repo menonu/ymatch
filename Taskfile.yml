@@ -154,3 +154,66 @@ tasks:
       - lcov --summary coverage/lcov.info
       - cmd: 'echo "HTML:  frontend/coverage/html/index.html"'
       - cmd: 'echo "lcov:  frontend/coverage/lcov.info"'
+
+  # ─── Terraform (secrets via TF_VAR_* from gitignored .env) ───────────
+  # See docs/how_to/terraform_apply.md. Each task sources the module's
+  # gitignored .env (TF_VAR_* secrets) before running terraform, so no
+  # secret is ever typed by hand or committed. terraform.tfvars (non-secret
+  # config) and .env (secrets) are both gitignored; precedence note in the
+  # how-to: terraform.tfvars OVERRIDES TF_VAR_ env, so a variable must live
+  # in only one of the two files.
+  tf:newrelic:init:
+    desc: terraform init (newrelic) — run once
+    dir: terraform/newrelic
+    cmds:
+      - terraform init -input=false
+
+  tf:newrelic:plan:
+    desc: terraform plan (newrelic) — sources .env for TF_VAR_* secrets
+    dir: terraform/newrelic
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          echo "::error::terraform/newrelic/.env not found. Copy .env.example to .env and fill in secrets." >&2
+          exit 1
+        fi
+        set -a && . ./.env && set +a && terraform plan -input=false
+
+  tf:newrelic:apply:
+    desc: terraform apply (newrelic) — sources .env for TF_VAR_* secrets
+    dir: terraform/newrelic
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          echo "::error::terraform/newrelic/.env not found. Copy .env.example to .env and fill in secrets." >&2
+          exit 1
+        fi
+        set -a && . ./.env && set +a && terraform apply -input=false
+
+  tf:oci:init:
+    desc: terraform init (oci) — run once
+    dir: terraform/oci
+    cmds:
+      - terraform init -input=false
+
+  tf:oci:plan:
+    desc: terraform plan (oci) — sources .env for TF_VAR_* secrets
+    dir: terraform/oci
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          echo "::error::terraform/oci/.env not found. Copy .env.example to .env and fill in secrets." >&2
+          exit 1
+        fi
+        set -a && . ./.env && set +a && terraform plan -input=false
+
+  tf:oci:apply:
+    desc: terraform apply (oci) — sources .env for TF_VAR_* secrets
+    dir: terraform/oci
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          echo "::error::terraform/oci/.env not found. Copy .env.example to .env and fill in secrets." >&2
+          exit 1
+        fi
+        set -a && . ./.env && set +a && terraform apply -input=false

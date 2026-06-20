@@ -1,6 +1,12 @@
-# OCI Terraform variables template
+# OCI Terraform variables template (non-secret config).
 # Copy to terraform/oci/terraform.tfvars and fill in real values.
-# terraform.tfvars is gitignored.
+# terraform.tfvars is gitignored — never commit it.
+#
+# SECRETS do NOT go here. They are supplied via TF_VAR_* env vars from a
+# gitignored .env — see terraform/oci/.env.example and
+# docs/how_to/terraform_apply.md. (Terraform precedence: terraform.tfvars
+# overrides TF_VAR_ env, so a given variable must live in only one place.)
+# Secrets in .env: db_password, nr_license_key, nr_account_id, alert_email.
 
 # OCI authentication
 tenancy_ocid     = "ocid1.tenancy.oc1..YOUR_TENANCY_OCID"
@@ -15,19 +21,11 @@ compartment_ocid = "ocid1.tenancy.oc1..YOUR_TENANCY_OCID"
 ssh_public_key   = "ssh-ed25519 AAAA... ymatch-oci"
 ssh_public_key_v2 = "ssh-ed25519 AAAA... ymatch-oci-v2"
 
-# Database
-db_password = "your_secure_db_password"
-
 # Instance sizing
 instance_ocpus      = 2
 instance_memory_gb  = 12
 boot_volume_size_gb = 50
 
-# New Relic / Alerting (passed via TF_VAR_* env vars from .env, not here)
-# - nr_license_key
-# - nr_account_id
-# - alert_email
-#
 # NR display name (unique per instance, set here so each instance is
 # distinguishable in the New Relic Infrastructure dashboard). Defaults
 # to "ymatch-oci-arm" if unset.
