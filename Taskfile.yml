@@ -67,8 +67,33 @@ tasks:
       # are skipped (not run) even when selected with `--tags`.
       - flutter test --tags=integration --run-skipped
 
+  backend:deps:
+    desc: Ensure the prebuilt backend dependency base image exists locally (required once before e2e:up)
+    # #276: pulls the content-addressed deps base image (sha256(Cargo.lock))
+    # from ghcr if present; otherwise builds backend.Dockerfile.deps into the
+    # local daemon. Tags `:latest` so docker-compose.e2e.yml's default
+    # DEPS_TAG=latest resolves. Local builds are NOT pushed (no write auth
+    # needed); CI pushes via ci-e2e.yml instead. Login once with
+    # `echo $GHCR_PAT | docker login ghcr.io -u menonu --password-stdin` to
+    # pull the private image.
+    cmds:
+      - |
+        set -eu
+        DEPS_TAG=$(sha256sum backend/Cargo.lock | cut -c1-16)
+        IMG=ghcr.io/menonu/ymatch/backend-deps:$DEPS_TAG
+        LATEST=ghcr.io/menonu/ymatch/backend-deps:latest
+        if docker pull "$IMG"; then
+          echo "Pulled $IMG"
+        else
+          echo "Building $IMG locally (backend.Dockerfile.deps)…"
+          docker build -f backend.Dockerfile.deps -t "$IMG" .
+        fi
+        docker tag "$IMG" "$LATEST"
+        echo "Tagged $LATEST"
+
   e2e:up:
     desc: Start the E2E stack (db + backend, no Caddy)
+    deps: [backend:deps]
     cmds:
       - docker compose -f docker-compose.e2e.yml up -d --build
       - |

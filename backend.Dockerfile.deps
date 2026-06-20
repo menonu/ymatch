@@ -1,0 +1,60 @@
+# syntax=ghcr.io/menonu/ymatch/dockerfile:1
+# ---------------------------------------------------
+# Prebuilt backend *dependency* base image (#276).
+# ---------------------------------------------------
+# Contains rust:1-slim + apt build deps + a dummy `cargo build --release`
+# of the dependencies declared in backend/Cargo.lock. Tagged by
+# sha256(backend/Cargo.lock) so the image content is addressable by the
+# lockfile state: when Cargo.lock is unchanged this image is a registry
+# pull, and the ~100s dependency-compile layer never runs in the E2E
+# build (see backend.Dockerfile.e2e, which FROMs this image).
+#
+# Why this exists: the E2E CI build (`ci-e2e.yml`) previously compiled
+# dependencies inside the image and cached the layer via BuildKit
+# `type=gha`. That cache is subject to GitHub Actions' per-repo 10GB LRU
+# limit and is shared across many workflows, so the large dep-build layer
+# was evicted periodically, forcing full recompiles (observed 104s on a
+# miss — run 27861019865). A registry image is durable and not subject to
+# that eviction, so the E2E build time becomes bounded and stable.
+#
+# Built & pushed by the "Ensure backend deps image" step in ci-e2e.yml
+# (pull on hit; build+push on miss). Locally via `task backend:deps`
+# (pull or build into the daemon, no push).
+#
+# NOTE: this mirrors the apt + dummy-build half of backend.Dockerfile.prod.
+# If you change apt packages or the dummy-build recipe here, mirror the
+# change in backend.Dockerfile.prod's builder stage so the two stay
+# consistent (prod still builds deps inline for the OCI VM, which does not
+# pull this prebuilt base).
+FROM ghcr.io/menonu/ymatch/rust:1-slim
+
+# Install system dependencies required for compilation
+RUN apt-get update && apt-get install -y pkg-config libssl-dev protobuf-compiler git && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/ymatch_backend
+
+# Retry crate downloads so a transient crates.io connection reset
+# (e.g. "Connection reset by peer") doesn't fail the (rare) first build
+# of a new Cargo.lock. Subsequent builds of the same lockhash are skipped
+# entirely — the image already exists in the registry.
+ENV CARGO_NET_RETRY=5
+ENV CARGO_NET_CONNECT_TIMEOUT=10
+
+# Cache dependencies by copying Cargo.toml and Cargo.lock first
+COPY backend/Cargo.toml backend/Cargo.lock ./
+
+# Create dummy source files to build dependencies. Use BuildKit cache
+# mounts for /usr/local/cargo (registry + git deps) so the (rare) first
+# build of a new lockhash downloads crates once. The compiled dep
+# artifacts land in target/ inside the image (not in a cache mount), so
+# the downstream E2E build can reuse them.
+#
+# build.rs is deliberately NOT copied here (matches backend.Dockerfile.prod):
+# the app's build script is only needed when real source is compiled, and
+# omitting it lets the dependency build depend solely on Cargo.lock.
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    mkdir src && \
+    echo 'fn main() {println!("if you see this, the build broke")}' > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
