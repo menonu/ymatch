@@ -20,11 +20,11 @@ on:
     branches:
       - main
 
-# Base images live in our ghcr.io namespace (ghcr.io/menonu/ymatch/*). The
-# `docker login` step below authenticates the daemon to ghcr so buildx and
-# the db pull use GITHUB_TOKEN (effectively unlimited) instead of anonymous.
-# `services:`-style anonymous pulls still need the packages public — see
-# .github/workflows/mirror-images.yml for the one-time flip runbook.
+# Base images live in our (private) ghcr.io namespace (ghcr.io/menonu/ymatch/*).
+# The `docker login` step below authenticates the daemon so buildx (base
+# images + the `# syntax=` frontend) and the e2e_db pull resolve via
+# GITHUB_TOKEN, which reads packages in this repo — no public flip needed.
+# See .github/workflows/mirror-images.yml for the mirror runbook.
 permissions:
   contents: read
   packages: read

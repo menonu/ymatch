@@ -22,6 +22,10 @@ jobs:
     services:
       postgres:
         image: ghcr.io/menonu/ymatch/postgres:16-alpine
+        credentials:
+          # Private ghcr base image; GITHUB_TOKEN reads packages in this repo.
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: ymatch_user
           POSTGRES_PASSWORD: secure_dev_password

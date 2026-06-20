@@ -14,24 +14,22 @@ name: Mirror base images to ghcr.io
 # itself stays under ECR Public's 1 anonymous pull/sec limit.
 #
 # ---------------------------------------------------------------------------
-# ONE-TIME MANUAL STEP (GitHub exposes NO API to set package visibility, so
-# this can't be automated):
+# Packages are PRIVATE by default and we keep them that way — CI authenticates
+# via the built-in GITHUB_TOKEN (works for packages in this repo), and local
+# dev does a one-time `docker login ghcr.io` (see below). No visibility change
+# is required for CI.
 #
-#   ghcr packages are created PRIVATE by default. After the FIRST successful
-#   run of this workflow, the repo owner must manually flip each of the 8
-#   packages to public once:
+# GitHub exposes NO API to flip package visibility, so if you ever DO want
+# public (e.g. so local dev `docker pull` works without a login), it is a
+# one-time MANUAL step per package:
+#   https://github.com/users/menonu/packages/container/ymatch/<base>/settings
+#     → Danger Zone → Change visibility → Public
 #
-#     https://github.com/users/menonu/packages/container/ymatch/<base>/settings
-#       → Danger Zone → Change visibility → Public
-#
-#   (substitute each <base>: rust, debian, postgres, ubuntu, nginx, caddy,
-#    pgadmin4, dockerfile)
-#
-#   Until then: CI steps that `docker login ghcr.io` still work (the repo's
-#   GITHUB_TOKEN inherits package read access), but GitHub Actions `services:`
-#   blocks — which cannot inject auth before job start — and anonymous local
-#   `docker pull` cannot read the private packages. So flip them public
-#   before merging the PR that repoints `services:` at ghcr.
+# Local dev (private packages): authenticate once with a PAT that has
+# `read:packages`:
+#   echo $GHCR_PAT | docker login ghcr.io -u menonu --password-stdin
+# (these are copies of upstream-public images, so flipping public later is
+# harmless if you prefer passwordless local pulls).
 # ---------------------------------------------------------------------------
 
 on:

@@ -8,10 +8,10 @@ on:
     branches:
       - main
 
-# Base images live in our ghcr.io namespace (ghcr.io/menonu/ymatch/*). The
-# `services:` postgres below is pulled anonymously at job start, so that
-# package must be public — a one-time manual flip, see
-# .github/workflows/mirror-images.yml for the runbook.
+# Base images live in our (private) ghcr.io namespace (ghcr.io/menonu/ymatch/*).
+# The `services:` postgres below authenticates via `credentials` with the
+# GITHUB_TOKEN, which can read packages in this repo — no public flip needed.
+# See .github/workflows/mirror-images.yml for the mirror runbook.
 permissions:
   contents: read
   packages: read
@@ -27,6 +27,10 @@ jobs:
     services:
       postgres:
         image: ghcr.io/menonu/ymatch/postgres:16-alpine
+        credentials:
+          # Private ghcr base image; GITHUB_TOKEN reads packages in this repo.
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: ymatch_user
           POSTGRES_PASSWORD: secure_dev_password
