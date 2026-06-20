@@ -4,8 +4,13 @@ name: Frontend E2E
 #
 # Spins up the backend + PostgreSQL via docker-compose.e2e.yml, runs
 # the Flutter E2E test that drives the real ApiClient, and tears down
-# the stack. Slow (image build + trade-lifecycle test), so this is a
-# separate workflow from `ci.yml` and runs only on PR + main.
+# the stack. Slow (image build + trade-lifecycle test), so to keep the
+# PR feedback loop fast this runs **post-merge on `main`** only (plus a
+# manual `workflow_dispatch` for risky pre-merge runs) — see #279. PR
+# validation is handled by the lighter `ci.yml` (Backend/Frontend Build
+# & Test). An E2E regression therefore surfaces as a failed `main` run
+# after merge, to be fixed by a follow-up; that is the accepted
+# cycle-time trade-off.
 #
 # The E2E test exercises the wire contract that #202 broke: a real
 # OfferTradeRequest is serialized with toProto3Json() (camelCase) and
@@ -16,9 +21,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  # Manual trigger so a human can run E2E on a PR branch before merge
+  # for risky changes (e.g. `gh workflow run ci-e2e.yml --ref <branch>`)
+  # without making it mandatory on every PR (#279).
+  workflow_dispatch:
 
 # Base images live in our (private) ghcr.io namespace (ghcr.io/menonu/ymatch/*).
 # The `docker login` step below authenticates the daemon so buildx (base

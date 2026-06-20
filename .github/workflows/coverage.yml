@@ -1,12 +1,19 @@
 name: Backend Coverage
 
+# Runs **post-merge on `main`** only (plus a manual `workflow_dispatch`)
+# to keep the PR feedback loop fast — see #279. PR validation is handled
+# by the lighter `ci.yml`. The 70% threshold gate below therefore
+# surfaces a coverage drop as a failed `main` run after merge (fixed by
+# a follow-up) rather than blocking the PR; that is the accepted
+# cycle-time trade-off.
+
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  # Manual trigger so a human can run coverage on a PR branch before
+  # merge for risky changes without making it mandatory on every PR (#279).
+  workflow_dispatch:
 
 jobs:
   coverage:
