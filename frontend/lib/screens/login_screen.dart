@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 
@@ -23,6 +24,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final l10n = AppLocalizations.of(context)!;
     final bool isBackendError =
         authState.hasError && authState.error is BackendUnavailableException;
 
@@ -45,7 +47,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'ymatch',
+                    l10n.appName,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -55,7 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Trade merch seamlessly.',
+                    l10n.loginTagline,
                     textAlign: TextAlign.center,
                     style: Theme.of(
                       context,
@@ -80,7 +82,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'バックエンドに接続できません',
+                            l10n.loginBackendErrorTitle,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.red.shade700,
@@ -88,7 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'サービスが一時停止中の可能性があります。\nしばらく経ってから再試行してください。',
+                            l10n.loginBackendErrorBody,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
@@ -98,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             icon: const Icon(Icons.refresh),
-                            label: const Text('再試行'),
+                            label: Text(l10n.retry),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red.shade600,
                               foregroundColor: Colors.white,
@@ -110,40 +112,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                   ] else if (authState.isLoading)
-                    const Column(
+                    Column(
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Logging in...'),
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(l10n.loggingIn),
                       ],
                     )
                   else if (_isRestoring) ...[
                     Text(
-                      'Restore Account',
+                      l10n.restoreAccount,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _uuidController,
-                      decoration: const InputDecoration(
-                        labelText: 'Master Key (UUID)',
-                        prefixIcon: Icon(Icons.key),
+                      decoration: InputDecoration(
+                        labelText: l10n.masterKeyUuid,
+                        prefixIcon: const Icon(Icons.key),
                       ),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: _restore,
-                      child: const Text('Restore Account'),
+                      child: Text(l10n.restoreAccount),
                     ),
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () => setState(() => _isRestoring = false),
-                      child: const Text('Cancel'),
+                      child: Text(l10n.cancel),
                     ),
                   ] else ...[
                     ElevatedButton.icon(
                       icon: const Icon(Icons.bolt),
-                      label: const Text('Start as New User'),
+                      label: Text(l10n.startAsNewUser),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -153,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
                       icon: const Icon(Icons.restore),
-                      label: const Text('Restore Existing Account'),
+                      label: Text(l10n.restoreExistingAccount),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),

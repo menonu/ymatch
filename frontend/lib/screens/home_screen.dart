@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 
@@ -24,6 +25,7 @@ class HomeScreen extends ConsumerWidget {
     final filterMode = ref.watch(eventFilterProvider);
     final user = ref.watch(currentUserProvider);
     final searchQuery = ref.watch(searchQueryProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -36,7 +38,7 @@ class HomeScreen extends ConsumerWidget {
             padding: WidgetStateProperty.all(
               const EdgeInsets.symmetric(horizontal: 12),
             ),
-            hintText: 'Search events, groups...',
+            hintText: l10n.searchEventsHint,
             leading: const Icon(Icons.search, size: 20),
             trailing: [
               if (searchQuery.isNotEmpty)
@@ -58,28 +60,28 @@ class HomeScreen extends ConsumerWidget {
           if (searchQuery.isEmpty) ...[
             IconButton(
               icon: const Icon(Icons.refresh),
-              tooltip: 'Refresh',
+              tooltip: l10n.refresh,
               onPressed: () => ref.invalidate(eventsProvider),
             ),
             PopupMenuButton<EventSort>(
               icon: const Icon(Icons.sort),
-              tooltip: 'Sort Events',
+              tooltip: l10n.sortEvents,
               onSelected: (EventSort result) {
                 ref.read(eventSortProvider.notifier).state = result;
               },
               itemBuilder: (BuildContext context) =>
                   <PopupMenuEntry<EventSort>>[
-                    const PopupMenuItem<EventSort>(
+                    PopupMenuItem<EventSort>(
                       value: EventSort.recent,
-                      child: Text('Newest First'),
+                      child: Text(l10n.sortNewestFirst),
                     ),
-                    const PopupMenuItem<EventSort>(
+                    PopupMenuItem<EventSort>(
                       value: EventSort.popular,
-                      child: Text('Most Popular'),
+                      child: Text(l10n.sortMostPopular),
                     ),
-                    const PopupMenuItem<EventSort>(
+                    PopupMenuItem<EventSort>(
                       value: EventSort.alphabetical,
-                      child: Text('Alphabetical'),
+                      child: Text(l10n.sortAlphabetical),
                     ),
                   ],
             ),
@@ -107,7 +109,7 @@ class HomeScreen extends ConsumerWidget {
           ? FloatingActionButton.extended(
               onPressed: () => _showAddEventDialog(context, ref),
               icon: const Icon(Icons.add),
-              label: const Text('New Event'),
+              label: Text(l10n.newEvent),
             )
           : null,
     );
@@ -161,18 +163,26 @@ class HomeScreen extends ConsumerWidget {
                             child: _buildShortcutChip(
                               context,
                               Icons.event,
-                              'Fav: ${event.name}',
+                              AppLocalizations.of(
+                                context,
+                              )!.favPrefix(event.name),
                               event.id,
                             ),
                           );
                         }),
                         ...favGroups.map((group) {
+                          final l10n = AppLocalizations.of(context)!;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: _buildShortcutChip(
                               context,
                               Icons.star,
-                              '${group.hasEventName() ? group.eventName : 'Group'}: ${group.groupName}',
+                              l10n.groupChipLabel(
+                                group.hasEventName()
+                                    ? group.eventName
+                                    : l10n.groupFallback,
+                                group.groupName,
+                              ),
                               group.eventId,
                             ),
                           );
@@ -193,18 +203,18 @@ class HomeScreen extends ConsumerWidget {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SegmentedButton<EventFilter>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: EventFilter.all,
-                    label: Text('All Events'),
+                    label: Text(AppLocalizations.of(context)!.filterAllEvents),
                   ),
                   ButtonSegment(
                     value: EventFilter.favorite,
-                    label: Text('Favorites'),
+                    label: Text(AppLocalizations.of(context)!.filterFavorites),
                   ),
                   ButtonSegment(
                     value: EventFilter.joined,
-                    label: Text('My Items'),
+                    label: Text(AppLocalizations.of(context)!.filterMyItems),
                   ),
                 ],
                 selected: {filterMode},
@@ -239,10 +249,10 @@ class HomeScreen extends ConsumerWidget {
               }).toList();
 
               if (events.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
-                    'No events match this filter.',
-                    style: TextStyle(color: Colors.grey),
+                    AppLocalizations.of(context)!.noEventsMatchFilter,
+                    style: const TextStyle(color: Colors.grey),
                   ),
                 );
               }
@@ -274,7 +284,8 @@ class HomeScreen extends ConsumerWidget {
                 itemCount: events.length,
                 itemBuilder: (context, index) {
                   final event = events[index];
-                  final isOwner = user != null &&
+                  final isOwner =
+                      user != null &&
                       event.hasCreatorId() &&
                       event.creatorId == user.id;
                   return Card(
@@ -319,23 +330,34 @@ class HomeScreen extends ConsumerWidget {
                                   if (isOwner)
                                     Padding(
                                       padding: const EdgeInsets.only(left: 6),
-                                      child: Icon(Icons.edit_note, size: 16, color: Colors.blue[400]),
+                                      child: Icon(
+                                        Icons.edit_note,
+                                        size: 16,
+                                        color: Colors.blue[400],
+                                      ),
                                     ),
                                   if (event.hasStatus() &&
                                       event.status == 'draft')
                                     Container(
                                       margin: const EdgeInsets.only(top: 4),
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.orange[100],
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: Text('DRAFT',
-                                          style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.orange[800])),
+                                      child: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.draftBadge,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange[800],
+                                        ),
+                                      ),
                                     ),
                                   const SizedBox(height: 8),
                                   Row(
@@ -347,7 +369,13 @@ class HomeScreen extends ConsumerWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '${event.hasActiveParticipants() ? event.activeParticipants : 0} traders',
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.tradersCount(
+                                          event.hasActiveParticipants()
+                                              ? event.activeParticipants
+                                              : 0,
+                                        ),
                                         style: TextStyle(
                                           color: Colors.grey[700],
                                           fontSize: 12,
@@ -361,7 +389,13 @@ class HomeScreen extends ConsumerWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '${event.hasUniqueViews() ? event.uniqueViews : 0} views',
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.viewsCount(
+                                          event.hasUniqueViews()
+                                              ? event.uniqueViews
+                                              : 0,
+                                        ),
                                         style: TextStyle(
                                           color: Colors.grey[700],
                                           fontSize: 12,
@@ -379,7 +413,7 @@ class HomeScreen extends ConsumerWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _formatDate(event.createdAt),
+                                        _formatDate(context, event.createdAt),
                                         style: TextStyle(
                                           color: Colors.grey[700],
                                           fontSize: 12,
@@ -424,7 +458,11 @@ class HomeScreen extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, stack) => Center(child: Text('Error: $err')),
+            error: (err, stack) => Center(
+              child: Text(
+                AppLocalizations.of(context)!.errorPrefix(err.toString()),
+              ),
+            ),
           ),
         ),
       ],
@@ -460,17 +498,19 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  String _formatDate(String isoDate) {
-    if (isoDate.isEmpty) return 'Unknown date';
+  String _formatDate(BuildContext context, String isoDate) {
+    final l10n = AppLocalizations.of(context)!;
+    if (isoDate.isEmpty) return l10n.unknownDate;
     try {
       final date = DateTime.parse(isoDate).toLocal();
       return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
     } catch (_) {
-      return 'Invalid date';
+      return l10n.invalidDate;
     }
   }
 
   void _showEventActions(BuildContext context, WidgetRef ref, Event event) {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -479,7 +519,7 @@ class HomeScreen extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Edit Name'),
+              title: Text(l10n.editName),
               onTap: () {
                 Navigator.pop(ctx);
                 _editEventName(context, ref, event);
@@ -487,7 +527,10 @@ class HomeScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              title: Text(
+                l10n.delete,
+                style: const TextStyle(color: Colors.red),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteEvent(context, ref, event);
@@ -502,19 +545,20 @@ class HomeScreen extends ConsumerWidget {
   void _editEventName(BuildContext context, WidgetRef ref, Event event) {
     final ctrl = TextEditingController(text: event.name);
     final user = ref.read(currentUserProvider);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit Event Name'),
+        title: Text(l10n.editEventName),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Event name'),
+          decoration: InputDecoration(hintText: l10n.eventNameHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -527,7 +571,7 @@ class HomeScreen extends ConsumerWidget {
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -536,15 +580,16 @@ class HomeScreen extends ConsumerWidget {
 
   void _confirmDeleteEvent(BuildContext context, WidgetRef ref, Event event) {
     final user = ref.read(currentUserProvider);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Event'),
-        content: Text('Are you sure you want to delete "${event.name}"?'),
+        title: Text(l10n.deleteEvent),
+        content: Text(l10n.deleteEventConfirm(event.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -557,7 +602,7 @@ class HomeScreen extends ConsumerWidget {
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -565,6 +610,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -572,14 +618,14 @@ class HomeScreen extends ConsumerWidget {
           Icon(Icons.event_busy, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No events found',
+            l10n.noEventsFound,
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
-            'Create an event to start trading.',
+            l10n.createEventPrompt,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
@@ -587,7 +633,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             icon: const Icon(Icons.add),
-            label: const Text('Create Event'),
+            label: Text(l10n.createEvent),
             onPressed: () => _showAddEventDialog(context, ref),
           ),
         ],
@@ -599,22 +645,23 @@ class HomeScreen extends ConsumerWidget {
     final nameController = TextEditingController();
     final eventsAsync = ref.read(eventsProvider);
     final eventCount = eventsAsync.valueOrNull?.length ?? 0;
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New Event'),
+        title: Text(l10n.newEvent),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
-            labelText: 'Event Name',
-            hintText: 'Event ${eventCount + 1}',
+            labelText: l10n.eventNameLabel,
+            hintText: l10n.newEventNameHint(eventCount + 1),
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -628,7 +675,7 @@ class HomeScreen extends ConsumerWidget {
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            child: const Text('Create'),
+            child: Text(l10n.create),
           ),
         ],
       ),

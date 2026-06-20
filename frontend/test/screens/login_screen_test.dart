@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/models/models.dart';
+
+/// Wraps [child] with the same localization delegates [MyApp] uses so
+/// screens that call `AppLocalizations.of(context)` resolve strings in
+/// widget tests. Defaults to the English locale (test default).
+Widget _localized(Widget child) => MaterialApp(
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: child,
+);
 
 void main() {
   testWidgets(
@@ -13,7 +23,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [authProvider.overrideWith((ref) => MockAuthController())],
-          child: const MaterialApp(home: LoginScreen()),
+          child: _localized(const LoginScreen()),
         ),
       );
 
@@ -30,7 +40,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [authProvider.overrideWith((ref) => MockAuthController())],
-          child: const MaterialApp(home: LoginScreen()),
+          child: _localized(const LoginScreen()),
         ),
       );
 
@@ -44,6 +54,53 @@ void main() {
         findsWidgets,
       ); // Can be title and button
       expect(find.text('Cancel'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'LoginScreen renders Japanese strings when the locale is ja (#207)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authProvider.overrideWith((ref) => MockAuthController())],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const LoginScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Japanese translations from app_ja.arb should be rendered.
+      expect(find.text('ymatch'), findsOneWidget); // brand stays untranslated
+      expect(find.text('グッズをスムーズに取引。'), findsOneWidget);
+      expect(find.text('新規ユーザーとして開始'), findsOneWidget);
+      expect(find.text('既存のアカウントを復元'), findsOneWidget);
+      // English strings must NOT appear in the Japanese locale.
+      expect(find.text('Start as New User'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'LoginScreen falls back to English for an unsupported locale (#207)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authProvider.overrideWith((ref) => MockAuthController())],
+          child: MaterialApp(
+            locale: const Locale('fr'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const LoginScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trade merch seamlessly.'), findsOneWidget);
+      expect(find.text('Start as New User'), findsOneWidget);
     },
   );
 }

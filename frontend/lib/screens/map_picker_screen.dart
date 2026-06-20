@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../l10n/app_localizations.dart';
 
 class MapPickerScreen extends StatefulWidget {
   const MapPickerScreen({super.key});
@@ -22,10 +23,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             onPressed: () {
               Navigator.pop(context, _selectedLocation);
             },
-            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.primary),
-            child: const Text(
-              'Confirm',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
+            child: Text(
+              AppLocalizations.of(context)!.confirm,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],

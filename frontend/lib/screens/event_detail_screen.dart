@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -182,7 +183,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   tooltip: 'Refresh',
                   onPressed: () {
                     ref.invalidate(merchProvider(widget.eventId));
-                    if (user != null) ref.invalidate(inventoryProvider(user.id));
+                    if (user != null)
+                      ref.invalidate(inventoryProvider(user.id));
                   },
                 ),
                 // Show controls (display mode) moved to AppBar
@@ -208,20 +210,25 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ),
                   tooltip: 'Show Controls',
                   onSelected: (InventoryDisplayMode result) {
-                    ref.read(inventoryDisplayModeProvider.notifier).state = result;
+                    ref.read(inventoryDisplayModeProvider.notifier).state =
+                        result;
                   },
                   itemBuilder: (BuildContext context) => [
-                    const PopupMenuItem<InventoryDisplayMode>(
+                    PopupMenuItem<InventoryDisplayMode>(
                       value: InventoryDisplayMode.have,
-                      child: Text('Just HAVE'),
+                      child: Text(
+                        AppLocalizations.of(context)!.invModeJustHave,
+                      ),
                     ),
-                    const PopupMenuItem<InventoryDisplayMode>(
+                    PopupMenuItem<InventoryDisplayMode>(
                       value: InventoryDisplayMode.wantTrade,
-                      child: Text('WANT & TRADE'),
+                      child: Text(
+                        AppLocalizations.of(context)!.invModeWantTrade,
+                      ),
                     ),
-                    const PopupMenuItem<InventoryDisplayMode>(
+                    PopupMenuItem<InventoryDisplayMode>(
                       value: InventoryDisplayMode.all,
-                      child: Text('All'),
+                      child: Text(AppLocalizations.of(context)!.invModeAll),
                     ),
                   ],
                 ),
@@ -294,7 +301,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         }
                       }
 
-                      if (context.mounted && addedCount > 0 && failedCount > 0) {
+                      if (context.mounted &&
+                          addedCount > 0 &&
+                          failedCount > 0) {
                         // Partial failure: surface both counts so the user
                         // knows not everything was saved (#239).
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -316,9 +325,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       } else if (context.mounted && failedCount > 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text(
-                              'Could not add some items to WANT',
-                            ),
+                            content: Text('Could not add some items to WANT'),
                           ),
                         );
                       } else if (context.mounted) {
@@ -352,12 +359,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 36),
                           onSelected: (idx) => tabCtrl.animateTo(idx),
-                          itemBuilder: (_) => groupKeys.asMap().entries.map((e) {
-                            return PopupMenuItem<int>(
-                              value: e.key,
-                              child: Text(e.value),
-                            );
-                          }).toList(),
+                          itemBuilder: (_) =>
+                              groupKeys.asMap().entries.map((e) {
+                                return PopupMenuItem<int>(
+                                  value: e.key,
+                                  child: Text(e.value),
+                                );
+                              }).toList(),
                         ),
                         Expanded(
                           child: TabBar(
@@ -367,7 +375,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                 child: Consumer(
                                   builder: (context, ref, _) {
                                     final favGroups =
-                                        ref.watch(favoriteGroupsProvider).valueOrNull ?? [];
+                                        ref
+                                            .watch(favoriteGroupsProvider)
+                                            .valueOrNull ??
+                                        [];
                                     final isFav = favGroups.any(
                                       (g) =>
                                           g.eventId == widget.eventId &&
@@ -383,17 +394,24 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                               ? null
                                               : () async {
                                                   await ref
-                                                      .read(eventsControllerProvider.notifier)
+                                                      .read(
+                                                        eventsControllerProvider
+                                                            .notifier,
+                                                      )
                                                       .toggleFavoriteGroup(
                                                         widget.eventId,
                                                         user.id,
                                                         name,
                                                         !isFav,
                                                       );
-                                                  ref.invalidate(favoriteGroupsProvider);
+                                                  ref.invalidate(
+                                                    favoriteGroupsProvider,
+                                                  );
                                                 },
                                           child: Icon(
-                                            isFav ? Icons.star : Icons.star_border,
+                                            isFav
+                                                ? Icons.star
+                                                : Icons.star_border,
                                             color: Colors.amber,
                                             size: 18,
                                           ),
@@ -427,33 +445,49 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: SegmentedButton<MerchFilter>(
-                            segments: const [
+                            segments: [
                               ButtonSegment(
                                 value: MerchFilter.all,
-                                label: Text('All'),
-                                icon: Icon(Icons.inventory_2_outlined, size: 16),
+                                label: Text(
+                                  AppLocalizations.of(context)!.merchFilterAll,
+                                ),
+                                icon: const Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 16,
+                                ),
                               ),
                               ButtonSegment(
                                 value: MerchFilter.have,
-                                label: Text('HAVE'),
-                                icon: Icon(Icons.check_circle_outline, size: 16),
+                                label: Text(AppLocalizations.of(context)!.have),
+                                icon: const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 16,
+                                ),
                               ),
                               ButtonSegment(
                                 value: MerchFilter.want,
-                                label: Text('WANT'),
-                                icon: Icon(Icons.favorite_border, size: 16),
+                                label: Text(AppLocalizations.of(context)!.want),
+                                icon: const Icon(
+                                  Icons.favorite_border,
+                                  size: 16,
+                                ),
                               ),
                               ButtonSegment(
                                 value: MerchFilter.missing,
-                                label: Text('Missing'),
-                                icon: Icon(Icons.help_outline, size: 16),
+                                label: Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.merchFilterMissing,
+                                ),
+                                icon: const Icon(Icons.help_outline, size: 16),
                               ),
                             ],
                             selected: {filterMode},
-                            onSelectionChanged: (Set<MerchFilter> newSelection) {
-                              ref.read(merchFilterProvider.notifier).state =
-                                  newSelection.first;
-                            },
+                            onSelectionChanged:
+                                (Set<MerchFilter> newSelection) {
+                                  ref.read(merchFilterProvider.notifier).state =
+                                      newSelection.first;
+                                },
                             style: SegmentedButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               textStyle: const TextStyle(fontSize: 11),
@@ -626,14 +660,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         displayMode == InventoryDisplayMode.wantTrade ||
         displayMode == InventoryDisplayMode.all;
 
-    final isOwner = user != null &&
-        item.hasCreatorId() &&
-        item.creatorId == user.id;
+    final isOwner =
+        user != null && item.hasCreatorId() && item.creatorId == user.id;
 
     return GestureDetector(
-      onLongPress: isOwner
-          ? () => _showMerchActions(context, ref, item)
-          : null,
+      onLongPress: isOwner ? () => _showMerchActions(context, ref, item) : null,
       child: Card(
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
@@ -658,57 +689,64 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     Positioned(
                       top: 2,
                       right: 2,
-                      child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
+                      child: Icon(
+                        Icons.edit_note,
+                        size: 14,
+                        color: Colors.blue[400],
+                      ),
                     ),
                 ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Text(
-              item.name,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Text(
+                item.name,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
             ),
-          ),
-          Row(
-            children: [
-              if (showHave)
-                Expanded(
-                  child: _buildGridCounter(
-                    context,
-                    'H',
-                    haveQty,
-                    AppTheme.haveColor,
-                    (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+            Row(
+              children: [
+                if (showHave)
+                  Expanded(
+                    child: _buildGridCounter(
+                      context,
+                      AppLocalizations.of(context)!.haveShort,
+                      haveQty,
+                      AppTheme.haveColor,
+                      (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                    ),
                   ),
-                ),
-              if (showWantTrade) ...[
-                Expanded(
-                  child: _buildGridCounter(
-                    context,
-                    'W',
-                    wantQty,
-                    AppTheme.wantColor,
-                    (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                if (showWantTrade) ...[
+                  Expanded(
+                    child: _buildGridCounter(
+                      context,
+                      AppLocalizations.of(context)!.wantShort,
+                      wantQty,
+                      AppTheme.wantColor,
+                      (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _buildGridCounter(
-                    context,
-                    'T',
-                    tradeQty,
-                    AppTheme.tradeColor,
-                    (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                  Expanded(
+                    child: _buildGridCounter(
+                      context,
+                      AppLocalizations.of(context)!.tradeShort,
+                      tradeQty,
+                      AppTheme.tradeColor,
+                      (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -804,14 +842,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         displayMode == InventoryDisplayMode.wantTrade ||
         displayMode == InventoryDisplayMode.all;
 
-    final isOwner = user != null &&
-        item.hasCreatorId() &&
-        item.creatorId == user.id;
+    final isOwner =
+        user != null && item.hasCreatorId() && item.creatorId == user.id;
 
     return GestureDetector(
-      onLongPress: isOwner
-          ? () => _showMerchActions(context, ref, item)
-          : null,
+      onLongPress: isOwner ? () => _showMerchActions(context, ref, item) : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -833,7 +868,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             Expanded(
               child: Text(
                 item.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -845,7 +883,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             if (showHave)
               _buildCompactCounter(
                 context,
-                'HAVE',
+                AppLocalizations.of(context)!.haveShort,
                 haveQty,
                 AppTheme.haveColor,
                 (q) => _updateInv(ref, user, item.id, 'HAVE', q),
@@ -854,7 +892,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             if (showWantTrade) ...[
               _buildCompactCounter(
                 context,
-                'WANT',
+                AppLocalizations.of(context)!.wantShort,
                 wantQty,
                 AppTheme.wantColor,
                 (q) => _updateInv(ref, user, item.id, 'WANT', q),
@@ -862,7 +900,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               const SizedBox(width: 4),
               _buildCompactCounter(
                 context,
-                'TRADE',
+                AppLocalizations.of(context)!.tradeShort,
                 tradeQty,
                 AppTheme.tradeColor,
                 (q) => _updateInv(ref, user, item.id, 'TRADE', q),
@@ -895,12 +933,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Icon(Icons.remove, size: 12,
-                color: qty > 0 ? color : Colors.grey[400]),
+              child: Icon(
+                Icons.remove,
+                size: 12,
+                color: qty > 0 ? color : Colors.grey[400],
+              ),
             ),
           ),
           Text(
-            '${label[0]}$qty',
+            '$label$qty',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -940,14 +981,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         displayMode == InventoryDisplayMode.wantTrade ||
         displayMode == InventoryDisplayMode.all;
 
-    final isOwner = user != null &&
-        item.hasCreatorId() &&
-        item.creatorId == user.id;
+    final isOwner =
+        user != null && item.hasCreatorId() && item.creatorId == user.id;
 
     return GestureDetector(
-      onLongPress: isOwner
-          ? () => _showMerchActions(context, ref, item)
-          : null,
+      onLongPress: isOwner ? () => _showMerchActions(context, ref, item) : null,
       child: Card(
         margin: const EdgeInsets.only(bottom: 8),
         clipBehavior: Clip.antiAlias,
@@ -983,9 +1021,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         Expanded(
                           child: Text(
                             item.name,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
                         if (isOwner)
@@ -1007,6 +1044,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             flex: 5,
                             child: _buildStepper(
                               label: 'HAVE',
+                              displayLabel: AppLocalizations.of(context)!.have,
                               color: AppTheme.haveColor,
                               qty: haveQty,
                               onUpdate: (q) =>
@@ -1019,6 +1057,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             flex: 5,
                             child: _buildStepper(
                               label: 'WANT',
+                              displayLabel: AppLocalizations.of(context)!.want,
                               color: AppTheme.wantColor,
                               qty: wantQty,
                               onUpdate: (q) =>
@@ -1030,6 +1069,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             flex: 5,
                             child: _buildStepper(
                               label: 'TRADE',
+                              displayLabel: AppLocalizations.of(context)!.trade,
                               color: AppTheme.tradeColor,
                               qty: tradeQty,
                               onUpdate: (q) =>
@@ -1104,11 +1144,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  void _editMerchName(
-    BuildContext context,
-    WidgetRef ref,
-    Merchandise item,
-  ) {
+  void _editMerchName(BuildContext context, WidgetRef ref, Merchandise item) {
     final ctrl = TextEditingController(text: item.name);
     final user = ref.read(currentUserProvider);
     showDialog(
@@ -1205,6 +1241,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
   Widget _buildStepper({
     required String label,
+    required String displayLabel,
     required Color color,
     required int qty,
     required Function(int) onUpdate,
@@ -1225,9 +1262,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
-                  child: Container(
-                    color: Colors.transparent,
-                  ),
+                  child: Container(color: Colors.transparent),
                 ),
               ),
               Expanded(
@@ -1235,9 +1270,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   key: Key('stepper_inc_$label'),
                   behavior: HitTestBehavior.opaque,
                   onTap: () => onUpdate(qty + 1),
-                  child: Container(
-                    color: Colors.transparent,
-                  ),
+                  child: Container(color: Colors.transparent),
                 ),
               ),
             ],
@@ -1282,7 +1315,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    label,
+                    displayLabel,
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w800,
