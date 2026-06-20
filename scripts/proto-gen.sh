@@ -24,7 +24,7 @@ docker compose -f "$PROJECT_ROOT/docker-compose.proto.yml" run --rm \
   sh -c "protoc --dart_out=/workspace/frontend/lib/generated -I/workspace/proto /workspace/proto/models.proto && \
          cd /workspace/scripts/proto-gen-rs && cargo run && \
          chown -R \"\$HOST_UID:\$HOST_GID\" \
-           /workspace/scripts/proto-gen-rs/target \
+           /workspace/scripts/proto-gen-rs \
            /workspace/frontend/lib/generated \
            /workspace/backend/src/generated"
 
