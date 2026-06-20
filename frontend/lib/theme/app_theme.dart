@@ -21,6 +21,14 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      // Japanese font (#291). Loaded via Google Fonts CDN in web/index.html
+      // (<link> tag). The browser registers it under the CSS family name
+      // "Noto Sans JP", which Flutter Web's renderer uses directly. This
+      // forces Japanese glyph variants for kanji/kana on every platform,
+      // avoiding 中華フォント (Chinese-style glyphs) on Android browsers
+      // without a Japanese system font.
+      fontFamily: 'Noto Sans JP',
+      fontFamilyFallback: const ['Yu Gothic', 'Hiragino Sans', 'Meiryo', 'sans-serif'],
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         primary: primaryColor,
