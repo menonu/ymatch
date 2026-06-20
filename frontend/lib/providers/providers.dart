@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -232,7 +233,10 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
         'isFavorite': isFavorite,
       });
     } catch (e) {
-      // Handle error if needed
+      // Don't rethrow: the caller (home_screen) relies on this returning
+      // normally so it can ref.invalidate(eventsProvider) to refresh the
+      // true state. At minimum log so the failure isn't silently lost (#239).
+      debugPrint('toggleFavorite($eventId, $userId, $isFavorite) failed: $e');
     }
   }
 
@@ -249,7 +253,11 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
         'isFavorite': isFavorite,
       });
     } catch (e) {
-      // Handle error if needed
+      // See toggleFavorite: log, don't rethrow (#239).
+      debugPrint(
+        'toggleFavoriteGroup($eventId, $userId, $groupName, $isFavorite) '
+        'failed: $e',
+      );
     }
   }
 
@@ -494,7 +502,13 @@ class UserInventoryNotifier
       // Do NOT invalidate yet, let the user keep clicking.
       // We can refresh later or on some other event if needed.
     } catch (e) {
+      // Roll back the optimistic state, then rethrow so callers can
+      // react to the failure (e.g. the "Want All Missing" loop in
+      // event_detail_screen.dart only counts items that were actually
+      // saved). See #239 — previously this was swallowed silently.
       state = previousState;
+      debugPrint('updateItem($merchId, $status, $quantity) failed: $e');
+      rethrow;
     }
   }
 }

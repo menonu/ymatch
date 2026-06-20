@@ -277,20 +277,47 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           .toSet();
 
                       int addedCount = 0;
+                      int failedCount = 0;
                       for (final item in merch) {
                         if (!ownedOrWantedIds.contains(item.id)) {
-                          ref
-                              .read(inventoryProvider(user.id).notifier)
-                              .updateItem(item.id, 'WANT', 1);
-                          addedCount++;
+                          // Await each call so the count reflects what was
+                          // actually saved: updateItem rethrows on failure
+                          // (#239), so a failed POST doesn't count as added.
+                          try {
+                            await ref
+                                .read(inventoryProvider(user.id).notifier)
+                                .updateItem(item.id, 'WANT', 1);
+                            addedCount++;
+                          } catch (_) {
+                            failedCount++;
+                          }
                         }
                       }
 
-                      if (context.mounted && addedCount > 0) {
+                      if (context.mounted && addedCount > 0 && failedCount > 0) {
+                        // Partial failure: surface both counts so the user
+                        // knows not everything was saved (#239).
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Added $addedCount to WANT; '
+                              'could not add $failedCount',
+                            ),
+                          ),
+                        );
+                      } else if (context.mounted && addedCount > 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
                               'Added $addedCount missing items to WANT',
+                            ),
+                          ),
+                        );
+                      } else if (context.mounted && failedCount > 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Could not add some items to WANT',
                             ),
                           ),
                         );
@@ -1022,17 +1049,25 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  void _updateInv(
+  Future<void> _updateInv(
     WidgetRef ref,
     User? user,
     int merchId,
     String status,
     int qty,
-  ) {
+  ) async {
     if (user != null) {
-      ref
-          .read(inventoryProvider(user.id).notifier)
-          .updateItem(merchId, status, qty);
+      // updateItem rethrows on failure (#239); the optimistic state is
+      // rolled back inside the notifier, so the UI reverts on its own.
+      // Swallow here so the +/- steppers don't surface an uncaught
+      // async error; the rollback is the user-visible signal.
+      try {
+        await ref
+            .read(inventoryProvider(user.id).notifier)
+            .updateItem(merchId, status, qty);
+      } catch (_) {
+        // Optimistic rollback already handled by the notifier.
+      }
     }
   }
 
