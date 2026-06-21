@@ -91,10 +91,16 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  # Japanese font (#291): Noto Sans JP is loaded via Google Fonts CDN in
-  # web/index.html (<link> tag). The browser makes it available to Flutter
-  # Web's renderer by its CSS family name "Noto Sans JP", set in
-  # AppTheme.lightTheme.fontFamily. No bundled font file needed.
+  # Japanese font (#291): Noto Sans JP is bundled as a TTF in fonts/ and
+  # declared here so Flutter Web's CanvasKit renderer loads it from the
+  # asset bundle (FontManifest.json). CanvasKit does NOT use CSS <link>
+  # fonts — it needs the font file registered via the engine.
+  # The font file is gitignored (downloaded in the Docker build, see
+  # frontend.Dockerfile.prod) to keep the repo small.
+  fonts:
+    - family: NotoSansJP
+      fonts:
+        - asset: fonts/NotoSansJP-Regular.ttf
 
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
