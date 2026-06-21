@@ -157,6 +157,11 @@ jobs:
         working-directory: ./frontend
         run: flutter pub get
 
+      - name: Download Noto Sans JP font
+        # The font file is gitignored (~5MB) — fetch it from Google Fonts
+        # CDN so flutter test can include it in the asset bundle. See #291.
+        run: ./scripts/download_font.sh
+
       - name: Run E2E test
         working-directory: ./frontend
         env:
