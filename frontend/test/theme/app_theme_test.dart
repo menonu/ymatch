@@ -5,9 +5,10 @@ import 'package:frontend/theme/app_theme.dart';
 ///
 /// On Android browsers without a Japanese system font, kanji render with
 /// Chinese-style glyphs because Flutter falls back to a CJK-SC font.
-/// Loading Noto Sans JP from Google Fonts CDN via <link> in web/index.html
-/// makes Japanese glyph variants available to Flutter Web's renderer, and
-/// setting it as the theme font family ensures it is used throughout the app.
+/// Bundling Noto Sans JP as a TTF (declared in pubspec.yaml) and setting it
+/// as the theme font family ensures Flutter Web's CanvasKit renderer loads
+/// Japanese glyph variants from the asset bundle, regardless of the
+/// device's system fonts.
 void main() {
   group('AppTheme font family (#291)', () {
     test('lightTheme sets a Japanese-capable font family', () {
@@ -23,9 +24,9 @@ void main() {
       );
       expect(
         fontFamily,
-        'Noto Sans JP',
-        reason: 'Expected "Noto Sans JP" (Google Fonts CSS family name '
-            'loaded via <link> in web/index.html)',
+        'NotoSansJP',
+        reason: 'Expected "NotoSansJP" (the family name registered in '
+            'pubspec.yaml and loaded by CanvasKit from the asset bundle)',
       );
     });
 
@@ -33,7 +34,7 @@ void main() {
       final theme = AppTheme.lightTheme;
       final fallback = theme.textTheme.bodyLarge?.fontFamilyFallback;
 
-      // fontFamilyFallback ensures that if the CDN font fails to load,
+      // fontFamilyFallback ensures that if the bundled font fails to load,
       // the device falls back to a Japanese-capable system font before
       // a generic sans-serif that may render CJK-SC glyphs.
       expect(
