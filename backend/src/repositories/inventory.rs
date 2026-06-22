@@ -147,4 +147,37 @@ impl InventoryRepository {
         .await?;
         Ok(())
     }
+
+    /// Fetch a user's WANT quantities for the given merch_ids as a
+    /// `merch_id -> quantity` map. Used by the offer-quantity cap in
+    /// [`crate::services::match_lifecycle::MatchLifecycleService::offer`]
+    /// to enforce that an offered quantity never exceeds the receiving
+    /// side's WANT quantity (issue #294). Runs on the supplied executor
+    /// so the read participates in the offer transaction's snapshot.
+    pub async fn want_quantities<'c, E>(
+        &self,
+        exec: E,
+        user_id: i32,
+        merch_ids: &[i32],
+    ) -> Result<std::collections::HashMap<i32, i32>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        if merch_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let rows = sqlx::query(
+            "SELECT merch_id, quantity FROM inventory \
+             WHERE user_id = $1 AND status = 'WANT' AND merch_id = ANY($2)",
+        )
+        .bind(user_id)
+        .bind(merch_ids)
+        .fetch_all(exec)
+        .await?;
+        let mut map = std::collections::HashMap::with_capacity(rows.len());
+        for r in rows {
+            map.insert(r.get::<i32, _>("merch_id"), r.get::<i32, _>("quantity"));
+        }
+        Ok(map)
+    }
 }

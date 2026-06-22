@@ -85,6 +85,25 @@ impl MatchLifecycleService {
 
         validate_offer_transition(&offer, &locked)?;
 
+        // Issue #294: cap offered quantities by the receiving side's WANT
+        // quantity. GIVE is capped by the *other* participant's want;
+        // RECEIVE is capped by the *offerer's* own want.
+        let merch_ids: Vec<i32> = offer.items.iter().map(|i| i.merch_id).collect();
+        let other_id = if offer.user_id == locked.user1_id {
+            locked.user2_id
+        } else {
+            locked.user1_id
+        };
+        let offerer_wants = self
+            .inventory
+            .want_quantities(&mut *tx, offer.user_id, &merch_ids)
+            .await?;
+        let other_wants = self
+            .inventory
+            .want_quantities(&mut *tx, other_id, &merch_ids)
+            .await?;
+        validate_offer_quantities(&offer, &offerer_wants, &other_wants)?;
+
         self.matches
             .insert_match_items(&mut *tx, match_id, offer.user_id, &offer.items)
             .await?;
@@ -224,6 +243,60 @@ impl MatchLifecycleService {
 // `validate_transition_target`, `validate_status_transition`) and
 // `apply_inventory_delta` so they can be unit-tested without a database.
 
+/// Validate that each offered item's quantity is within the matched/wanted
+/// quantity on the receiving side.
+///
+/// Factored out of [`MatchLifecycleService::offer`] so the cap can be
+/// unit-tested without a database. The caller resolves the want-quantity
+/// maps from the inventory table and passes them in:
+///
+/// - `offerer_wants` — the offerer's WANT quantities, keyed by merch_id.
+///   Caps RECEIVE items (the offerer receives, so the offerer must want at
+///   least that many).
+/// - `other_wants` — the other participant's WANT quantities, keyed by
+///   merch_id. Caps GIVE items (the offerer gives, so the other side must
+///   want at least that many).
+///
+/// Quantities are aggregated per `(direction, merch_id)` so a caller cannot
+/// bypass the cap by splitting one over-quota item into several rows.
+fn validate_offer_quantities(
+    offer: &OfferTradeRequest,
+    offerer_wants: &std::collections::HashMap<i32, i32>,
+    other_wants: &std::collections::HashMap<i32, i32>,
+) -> Result<(), AppError> {
+    let mut give_totals: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    let mut recv_totals: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    for item in &offer.items {
+        if item.quantity <= 0 {
+            return Err(AppError::bad_request("Offer quantity must be positive"));
+        }
+        match item.direction.as_str() {
+            "GIVE" => *give_totals.entry(item.merch_id).or_insert(0) += item.quantity,
+            "RECEIVE" => *recv_totals.entry(item.merch_id).or_insert(0) += item.quantity,
+            other => {
+                return Err(AppError::bad_request(format!("Invalid direction: {other}")));
+            }
+        }
+    }
+    for (merch_id, total) in &give_totals {
+        let cap = other_wants.get(merch_id).copied().unwrap_or(0);
+        if *total > cap {
+            return Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity",
+            ));
+        }
+    }
+    for (merch_id, total) in &recv_totals {
+        let cap = offerer_wants.get(merch_id).copied().unwrap_or(0);
+        if *total > cap {
+            return Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity",
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Validate the PENDING -> OFFERED transition against the locked match.
 ///
 /// Factored out of [`MatchLifecycleService::offer`] so the state-machine
@@ -357,6 +430,122 @@ mod tests {
     fn unknown_direction_is_noop() {
         assert_eq!(apply_inventory_delta("FOO", true, 1), (0, 0));
         assert_eq!(apply_inventory_delta("FOO", false, 1), (0, 0));
+    }
+
+    // --- validate_offer_quantities (want-quantity cap) ---
+
+    fn want_map(entries: &[(i32, i32)]) -> std::collections::HashMap<i32, i32> {
+        entries.iter().copied().collect()
+    }
+
+    fn offer_qty(user_id: i32, items: &[(i32, &str, i32)]) -> OfferTradeRequest {
+        OfferTradeRequest {
+            user_id,
+            items: items
+                .iter()
+                .map(|(merch_id, direction, quantity)| OfferItem {
+                    merch_id: *merch_id,
+                    direction: (*direction).to_string(),
+                    quantity: *quantity,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn give_within_other_want_ok() {
+        // Offerer gives merch 1 x2; other side wants merch 1 x2.
+        let offer = offer_qty(1, &[(1, "GIVE", 2)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 2)])),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn give_exceeding_other_want_rejected() {
+        // Offerer gives merch 1 x3; other side only wants x2.
+        let offer = offer_qty(1, &[(1, "GIVE", 3)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 2)])),
+            Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity"
+            ))
+        );
+    }
+
+    #[test]
+    fn give_with_no_matching_want_rejected() {
+        // Offerer gives merch 1 x1; other side does not want it at all.
+        let offer = offer_qty(1, &[(1, "GIVE", 1)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[])),
+            Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity"
+            ))
+        );
+    }
+
+    #[test]
+    fn receive_within_offerer_want_ok() {
+        // Offerer receives merch 2 x1; offerer wants merch 2 x1.
+        let offer = offer_qty(1, &[(2, "RECEIVE", 1)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[(2, 1)]), &want_map(&[])),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn receive_exceeding_offerer_want_rejected() {
+        // Offerer receives merch 2 x2; offerer only wants x1.
+        let offer = offer_qty(1, &[(2, "RECEIVE", 2)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[(2, 1)]), &want_map(&[])),
+            Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity"
+            ))
+        );
+    }
+
+    #[test]
+    fn split_items_cannot_bypass_cap() {
+        // Two GIVE rows of merch 1 x1 each; other side wants only x1.
+        // Aggregation must catch the 2-total exceeding the 1-cap.
+        let offer = offer_qty(1, &[(1, "GIVE", 1), (1, "GIVE", 1)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 1)])),
+            Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity"
+            ))
+        );
+    }
+
+    #[test]
+    fn non_positive_quantity_rejected() {
+        let offer = offer_qty(1, &[(1, "GIVE", 0)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 1)])),
+            Err(AppError::bad_request("Offer quantity must be positive"))
+        );
+    }
+
+    #[test]
+    fn invalid_direction_rejected() {
+        let offer = offer_qty(1, &[(1, "TRADE", 1)]);
+        assert!(validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 1)])).is_err());
+    }
+
+    #[test]
+    fn mixed_directions_each_capped_independently() {
+        // GIVE merch 1 x1 (other wants 1) + RECEIVE merch 2 x2 (offerer wants 1).
+        let offer = offer_qty(1, &[(1, "GIVE", 1), (2, "RECEIVE", 2)]);
+        assert_eq!(
+            validate_offer_quantities(&offer, &want_map(&[(2, 1)]), &want_map(&[(1, 1)])),
+            Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity"
+            ))
+        );
     }
 
     // --- validate_offer_transition (PENDING -> OFFERED) ---

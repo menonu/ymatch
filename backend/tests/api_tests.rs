@@ -3737,6 +3737,282 @@ async fn test_offer_with_frontend_proto3_json(pool: PgPool) {
     assert_eq!(matches[0]["offeredBy"], user1_id);
 }
 
+/// Like [`setup_pending_trade_match`] but lets the caller pick the inventory
+/// quantities, so a trade side can hold more units than the other side wants
+/// (the precondition for the over-quantity cap test, issue #294).
+///
+/// Layout (mirrors `setup_pending_trade_match`):
+///   user1: TRADE Card A (qty `u1_trade`), WANT Card B (qty `u1_want`)
+///   user2: TRADE Card B (qty `u2_trade`), WANT Card A (qty `u2_want`)
+async fn setup_pending_trade_match_quantities(
+    pool: PgPool,
+    u1_trade: i32,
+    u1_want: i32,
+    u2_trade: i32,
+    u2_want: i32,
+) -> (i64, i64, i64, i64, i64) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"uuid": "user1-qty-cap-test", "deviceToken": "tok1"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user1: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user1_id = user1["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"uuid": "user2-qty-cap-test", "deviceToken": "tok2"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user2: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let user2_id = user2["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/events")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Qty Cap Trade Event", "creatorId": {}}}"#,
+                    user1_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let event: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let event_id = event["id"].as_i64().unwrap();
+
+    async fn create_merch(pool: &PgPool, event_id: i64, name: &str) -> i64 {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(&format!("/api/v1/events/{}/merch", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"name": "{}", "photoUrl": "", "groupName": "Cards"}}"#,
+                        name
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let merch: serde_json::Value =
+            serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+        merch["id"].as_i64().unwrap()
+    }
+
+    let merch_a_id = create_merch(&pool, event_id, "Card A").await;
+    let merch_b_id = create_merch(&pool, event_id, "Card B").await;
+
+    for (uid, mid, status, qty) in [
+        (user1_id, merch_a_id, "TRADE", u1_trade),
+        (user1_id, merch_b_id, "WANT", u1_want),
+        (user2_id, merch_b_id, "TRADE", u2_trade),
+        (user2_id, merch_a_id, "WANT", u2_want),
+    ] {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/user/inventory")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": {}}}"#,
+                        uid, mid, status, qty
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    let matches_created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("Matching algorithm failed");
+    assert!(matches_created >= 1, "Should create at least 1 match");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!matches.is_empty());
+    let match_id = matches[0]["id"].as_i64().unwrap();
+    assert_eq!(matches[0]["status"], "PENDING");
+
+    (match_id, user1_id, user2_id, merch_a_id, merch_b_id)
+}
+
+/// Issue #294: an offer whose per-item quantity exceeds the matched/wanted
+/// quantity on the receiving side must be rejected (400), while an offer at
+/// or under the want quantity still succeeds.
+#[sqlx::test]
+async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
+    // user1 TRADE Card A x2, WANT Card B x1
+    // user2 TRADE Card B x2, WANT Card A x1
+    // Both want quantities are 1, so any offer of 2 units must be capped.
+    let (match_id, user1_id, _user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 1, 2, 1).await;
+
+    // The match listing must surface the capped (LEAST of trade and want)
+    // quantities so the offer dialog cannot even present more than the
+    // receiving side wants: user1's TRADE Card A (2) is capped by user2's
+    // WANT (1) -> userHaves qty 1.
+    //
+    // (The RECEIVE-side listing cap is covered by the backend enforcement
+    // assertions below; the userWants listing has a separate pre-existing
+    // grouping bug tracked in #295.)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let haves = matches[0]["userHaves"].as_array().unwrap();
+    let have_a = haves
+        .iter()
+        .find(|i| i["merchId"].as_i64() == Some(merch_a_id))
+        .unwrap();
+    assert_eq!(have_a["quantity"].as_i64().unwrap(), 1);
+
+    // GIVE Card A x2 exceeds user2's WANT of Card A (x1) -> 400.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "direction": "GIVE", "quantity": 2}}
+                    ]}}"#,
+                    user1_id, merch_a_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Match must still be PENDING after a rejected offer (no state mutation).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(matches[0]["status"], "PENDING");
+
+    // RECEIVE Card B x2 exceeds user1's own WANT of Card B (x1) -> 400.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 2}}
+                    ]}}"#,
+                    user1_id, merch_b_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // An offer capped to the want quantity (1 each) still succeeds.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
+                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
+                    ]}}"#,
+                    user1_id, merch_a_id, merch_b_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(matches[0]["status"], "OFFERED");
+}
+
 #[sqlx::test]
 async fn test_apply_inventory_on_non_completed_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -4128,7 +4404,7 @@ async fn test_notification_counts_values(pool: PgPool) {
             .oneshot(
                 Request::builder()
                     .method("POST")
-                    .uri(&format!("/api/v1/user/{}/inventory", user_id))
+                    .uri("/api/v1/user/inventory")
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
                         r#"{{"userId": {}, "merchId": {}, "status": "WANT", "quantity": 1}}"#,
@@ -4143,7 +4419,7 @@ async fn test_notification_counts_values(pool: PgPool) {
             .oneshot(
                 Request::builder()
                     .method("POST")
-                    .uri(&format!("/api/v1/user/{}/inventory", user_id))
+                    .uri("/api/v1/user/inventory")
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
                         r#"{{"userId": {}, "merchId": {}, "status": "TRADE", "quantity": 1}}"#,
