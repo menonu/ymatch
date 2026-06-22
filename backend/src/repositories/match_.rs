@@ -101,8 +101,14 @@ impl MatchRepository {
 
         // Query 2: haves — the requesting user's TRADE items that
         // match some WANT of any peer.
+        //
+        // The selected `quantity` is capped to `LEAST(i.quantity, w.quantity)`
+        // so the trade-offer dialog never shows (or submits) more units than
+        // the receiving side actually wants — issue #294. The server-side
+        // `offer` path enforces the same cap independently.
         let have_sql = r#"
-            SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity,
+            SELECT i.id, i.user_id, i.merch_id, i.status,
+                   LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
                    w.user_id AS peer_user_id
             FROM inventory i
@@ -119,9 +125,11 @@ impl MatchRepository {
             .fetch_all(&self.pool)
             .await?;
 
-        // Query 3: wants — the mirror of haves, single query.
+        // Query 3: wants — the mirror of haves, single query. The `quantity`
+        // is capped the same way (LEAST of peer's TRADE and requester's WANT).
         let want_sql = r#"
-            SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity,
+            SELECT i.id, i.user_id, i.merch_id, i.status,
+                   LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
                    w.user_id AS peer_user_id
             FROM inventory i
