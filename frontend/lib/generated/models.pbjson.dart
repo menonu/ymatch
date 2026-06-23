@@ -496,8 +496,7 @@ const MatchItem$json = {
     {'1': 'id', '3': 1, '4': 1, '5': 5, '10': 'id'},
     {'1': 'match_id', '3': 2, '4': 1, '5': 5, '10': 'matchId'},
     {'1': 'merch_id', '3': 3, '4': 1, '5': 5, '10': 'merchId'},
-    {'1': 'owner_id', '3': 4, '4': 1, '5': 5, '10': 'ownerId'},
-    {'1': 'direction', '3': 5, '4': 1, '5': 9, '10': 'direction'},
+    {'1': 'giver_user_id', '3': 4, '4': 1, '5': 5, '10': 'giverUserId'},
     {'1': 'quantity', '3': 6, '4': 1, '5': 5, '10': 'quantity'},
     {
       '1': 'merch_name',
@@ -522,15 +521,18 @@ const MatchItem$json = {
     {'1': '_merch_name'},
     {'1': '_photo_url'},
   ],
+  '9': [
+    {'1': 5, '2': 6},
+  ],
 };
 
 /// Descriptor for `MatchItem`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List matchItemDescriptor = $convert.base64Decode(
     'CglNYXRjaEl0ZW0SDgoCaWQYASABKAVSAmlkEhkKCG1hdGNoX2lkGAIgASgFUgdtYXRjaElkEh'
-    'kKCG1lcmNoX2lkGAMgASgFUgdtZXJjaElkEhkKCG93bmVyX2lkGAQgASgFUgdvd25lcklkEhwK'
-    'CWRpcmVjdGlvbhgFIAEoCVIJZGlyZWN0aW9uEhoKCHF1YW50aXR5GAYgASgFUghxdWFudGl0eR'
-    'IiCgptZXJjaF9uYW1lGAcgASgJSABSCW1lcmNoTmFtZYgBARIgCglwaG90b191cmwYCCABKAlI'
-    'AVIIcGhvdG9VcmyIAQFCDQoLX21lcmNoX25hbWVCDAoKX3Bob3RvX3VybA==');
+    'kKCG1lcmNoX2lkGAMgASgFUgdtZXJjaElkEiIKDWdpdmVyX3VzZXJfaWQYBCABKAVSC2dpdmVy'
+    'VXNlcklkEhoKCHF1YW50aXR5GAYgASgFUghxdWFudGl0eRIiCgptZXJjaF9uYW1lGAcgASgJSA'
+    'BSCW1lcmNoTmFtZYgBARIgCglwaG90b191cmwYCCABKAlIAVIIcGhvdG9VcmyIAQFCDQoLX21l'
+    'cmNoX25hbWVCDAoKX3Bob3RvX3VybEoECAUQBg==');
 
 @$core.Deprecated('Use guestLoginRequestDescriptor instead')
 const GuestLoginRequest$json = {
@@ -775,13 +777,15 @@ const UpdateMatchStatusRequest$json = {
   '1': 'UpdateMatchStatusRequest',
   '2': [
     {'1': 'status', '3': 1, '4': 1, '5': 9, '10': 'status'},
+    {'1': 'user_id', '3': 2, '4': 1, '5': 5, '10': 'userId'},
   ],
 };
 
 /// Descriptor for `UpdateMatchStatusRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List updateMatchStatusRequestDescriptor =
     $convert.base64Decode(
-        'ChhVcGRhdGVNYXRjaFN0YXR1c1JlcXVlc3QSFgoGc3RhdHVzGAEgASgJUgZzdGF0dXM=');
+        'ChhVcGRhdGVNYXRjaFN0YXR1c1JlcXVlc3QSFgoGc3RhdHVzGAEgASgJUgZzdGF0dXMSFwoHdX'
+        'Nlcl9pZBgCIAEoBVIGdXNlcklk');
 
 @$core.Deprecated('Use offerTradeRequestDescriptor instead')
 const OfferTradeRequest$json = {
@@ -809,15 +813,15 @@ const OfferItem$json = {
   '1': 'OfferItem',
   '2': [
     {'1': 'merch_id', '3': 1, '4': 1, '5': 5, '10': 'merchId'},
-    {'1': 'direction', '3': 2, '4': 1, '5': 9, '10': 'direction'},
+    {'1': 'giver_user_id', '3': 2, '4': 1, '5': 5, '10': 'giverUserId'},
     {'1': 'quantity', '3': 3, '4': 1, '5': 5, '10': 'quantity'},
   ],
 };
 
 /// Descriptor for `OfferItem`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List offerItemDescriptor = $convert.base64Decode(
-    'CglPZmZlckl0ZW0SGQoIbWVyY2hfaWQYASABKAVSB21lcmNoSWQSHAoJZGlyZWN0aW9uGAIgAS'
-    'gJUglkaXJlY3Rpb24SGgoIcXVhbnRpdHkYAyABKAVSCHF1YW50aXR5');
+    'CglPZmZlckl0ZW0SGQoIbWVyY2hfaWQYASABKAVSB21lcmNoSWQSIgoNZ2l2ZXJfdXNlcl9pZB'
+    'gCIAEoBVILZ2l2ZXJVc2VySWQSGgoIcXVhbnRpdHkYAyABKAVSCHF1YW50aXR5');
 
 @$core.Deprecated('Use applyInventoryRequestDescriptor instead')
 const ApplyInventoryRequest$json = {

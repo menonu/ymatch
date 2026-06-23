@@ -997,8 +997,7 @@ class MatchItem extends $pb.GeneratedMessage {
     $core.int? id,
     $core.int? matchId,
     $core.int? merchId,
-    $core.int? ownerId,
-    $core.String? direction,
+    $core.int? giverUserId,
     $core.int? quantity,
     $core.String? merchName,
     $core.String? photoUrl,
@@ -1007,8 +1006,7 @@ class MatchItem extends $pb.GeneratedMessage {
     if (id != null) result.id = id;
     if (matchId != null) result.matchId = matchId;
     if (merchId != null) result.merchId = merchId;
-    if (ownerId != null) result.ownerId = ownerId;
-    if (direction != null) result.direction = direction;
+    if (giverUserId != null) result.giverUserId = giverUserId;
     if (quantity != null) result.quantity = quantity;
     if (merchName != null) result.merchName = merchName;
     if (photoUrl != null) result.photoUrl = photoUrl;
@@ -1031,8 +1029,7 @@ class MatchItem extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'id')
     ..aI(2, _omitFieldNames ? '' : 'matchId')
     ..aI(3, _omitFieldNames ? '' : 'merchId')
-    ..aI(4, _omitFieldNames ? '' : 'ownerId')
-    ..aOS(5, _omitFieldNames ? '' : 'direction')
+    ..aI(4, _omitFieldNames ? '' : 'giverUserId')
     ..aI(6, _omitFieldNames ? '' : 'quantity')
     ..aOS(7, _omitFieldNames ? '' : 'merchName')
     ..aOS(8, _omitFieldNames ? '' : 'photoUrl')
@@ -1084,47 +1081,38 @@ class MatchItem extends $pb.GeneratedMessage {
   void clearMerchId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get ownerId => $_getIZ(3);
+  $core.int get giverUserId => $_getIZ(3);
   @$pb.TagNumber(4)
-  set ownerId($core.int value) => $_setSignedInt32(3, value);
+  set giverUserId($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasOwnerId() => $_has(3);
+  $core.bool hasGiverUserId() => $_has(3);
   @$pb.TagNumber(4)
-  void clearOwnerId() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get direction => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set direction($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasDirection() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearDirection() => $_clearField(5);
+  void clearGiverUserId() => $_clearField(4);
 
   @$pb.TagNumber(6)
-  $core.int get quantity => $_getIZ(5);
+  $core.int get quantity => $_getIZ(4);
   @$pb.TagNumber(6)
-  set quantity($core.int value) => $_setSignedInt32(5, value);
+  set quantity($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasQuantity() => $_has(5);
+  $core.bool hasQuantity() => $_has(4);
   @$pb.TagNumber(6)
   void clearQuantity() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get merchName => $_getSZ(6);
+  $core.String get merchName => $_getSZ(5);
   @$pb.TagNumber(7)
-  set merchName($core.String value) => $_setString(6, value);
+  set merchName($core.String value) => $_setString(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasMerchName() => $_has(6);
+  $core.bool hasMerchName() => $_has(5);
   @$pb.TagNumber(7)
   void clearMerchName() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get photoUrl => $_getSZ(7);
+  $core.String get photoUrl => $_getSZ(6);
   @$pb.TagNumber(8)
-  set photoUrl($core.String value) => $_setString(7, value);
+  set photoUrl($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasPhotoUrl() => $_has(7);
+  $core.bool hasPhotoUrl() => $_has(6);
   @$pb.TagNumber(8)
   void clearPhotoUrl() => $_clearField(8);
 }
@@ -1917,9 +1905,11 @@ class UpdateMerchRequest extends $pb.GeneratedMessage {
 class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
   factory UpdateMatchStatusRequest({
     $core.String? status,
+    $core.int? userId,
   }) {
     final result = create();
     if (status != null) result.status = status;
+    if (userId != null) result.userId = userId;
     return result;
   }
 
@@ -1937,6 +1927,7 @@ class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'status')
+    ..aI(2, _omitFieldNames ? '' : 'userId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1967,6 +1958,15 @@ class UpdateMatchStatusRequest extends $pb.GeneratedMessage {
   $core.bool hasStatus() => $_has(0);
   @$pb.TagNumber(1)
   void clearStatus() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get userId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set userId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUserId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUserId() => $_clearField(2);
 }
 
 class OfferTradeRequest extends $pb.GeneratedMessage {
@@ -2033,12 +2033,12 @@ class OfferTradeRequest extends $pb.GeneratedMessage {
 class OfferItem extends $pb.GeneratedMessage {
   factory OfferItem({
     $core.int? merchId,
-    $core.String? direction,
+    $core.int? giverUserId,
     $core.int? quantity,
   }) {
     final result = create();
     if (merchId != null) result.merchId = merchId;
-    if (direction != null) result.direction = direction;
+    if (giverUserId != null) result.giverUserId = giverUserId;
     if (quantity != null) result.quantity = quantity;
     return result;
   }
@@ -2057,7 +2057,7 @@ class OfferItem extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'merchId')
-    ..aOS(2, _omitFieldNames ? '' : 'direction')
+    ..aI(2, _omitFieldNames ? '' : 'giverUserId')
     ..aI(3, _omitFieldNames ? '' : 'quantity')
     ..hasRequiredFields = false;
 
@@ -2089,13 +2089,13 @@ class OfferItem extends $pb.GeneratedMessage {
   void clearMerchId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.String get direction => $_getSZ(1);
+  $core.int get giverUserId => $_getIZ(1);
   @$pb.TagNumber(2)
-  set direction($core.String value) => $_setString(1, value);
+  set giverUserId($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasDirection() => $_has(1);
+  $core.bool hasGiverUserId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearDirection() => $_clearField(2);
+  void clearGiverUserId() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.int get quantity => $_getIZ(2);

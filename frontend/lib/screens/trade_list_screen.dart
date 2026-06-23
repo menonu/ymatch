@@ -10,6 +10,12 @@ import '../utils/image_helper.dart';
 
 enum TradeTab { match_, offerOut, offerIn, active, completed }
 
+/// Offer-dialog mode (#297): which leg sections the proposer is editing.
+/// `give` = only what I give; `receive` = only what I want to receive;
+/// `both` = both. Sections not shown are left untouched (accumulating), so a
+/// counter-offer can add only its own side to move toward balance.
+enum _OfferMode { give, receive, both }
+
 class TradeListScreen extends ConsumerStatefulWidget {
   const TradeListScreen({super.key});
 
@@ -64,7 +70,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     final l10n = AppLocalizations.of(context)!;
     try {
       final client = ref.read(apiClientProvider);
-      final payload = UpdateMatchStatusRequest()..status = newStatus;
+      final payload = UpdateMatchStatusRequest()
+        ..status = newStatus
+        ..userId = userId;
       await client.post(
         '/api/v1/matches/$matchId/status',
         payload.toProto3Json() as Map<String, dynamic>,
@@ -316,11 +324,17 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
               // Items section
               if (match.selectedItems.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _buildSelectedItems(context, match),
+                _buildSelectedItems(context, user.id, match),
               ] else if (match.userHaves.isNotEmpty ||
                   match.userWants.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _buildPotentialItems(context, match),
+              ],
+
+              // Balance indicator on an open proposal (#297)
+              if (match.status == 'OFFERED') ...[
+                const SizedBox(height: 8),
+                _buildBalanceIndicator(context, user.id, match),
               ],
 
               // Action buttons
@@ -433,13 +447,72 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     );
   }
 
-  Widget _buildSelectedItems(BuildContext context, TradeMatch match) {
+  /// Per-side quantity totals for the current proposal legs (#297).
+  /// Give = legs where the viewer is the giver; Receive = legs where the
+  /// other party is the giver (the viewer receives).
+  (int give, int receive) _legTotals(int userId, TradeMatch match) {
+    int give = 0;
+    int receive = 0;
+    for (final i in match.selectedItems) {
+      if (i.giverUserId == userId) {
+        give += i.quantity;
+      } else {
+        receive += i.quantity;
+      }
+    }
+    return (give, receive);
+  }
+
+  bool _isBalanced(int userId, TradeMatch match) {
+    final (give, receive) = _legTotals(userId, match);
+    return give == receive && give > 0;
+  }
+
+  Widget _buildBalanceIndicator(
+    BuildContext context,
+    int userId,
+    TradeMatch match,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final (give, receive) = _legTotals(userId, match);
+    final balanced = give == receive && give > 0;
+    final color = balanced ? Colors.green : Colors.orange;
+    return Row(
+      children: [
+        Icon(
+          balanced ? Icons.balance : Icons.error_outline,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          l10n.balanceSummary(give, receive),
+          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          balanced ? l10n.balanced : l10n.unbalanced,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelectedItems(
+    BuildContext context,
+    int userId,
+    TradeMatch match,
+  ) {
     final l10n = AppLocalizations.of(context)!;
     final gives = match.selectedItems
-        .where((i) => i.direction == 'GIVE')
+        .where((i) => i.giverUserId == userId)
         .toList();
     final receives = match.selectedItems
-        .where((i) => i.direction == 'RECEIVE')
+        .where((i) => i.giverUserId != userId)
         .toList();
 
     return Column(
@@ -534,6 +607,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           ),
         ];
       case TradeTab.offerIn:
+        final balanced = _isBalanced(user.id, match);
         return [
           const SizedBox(height: 12),
           const Divider(height: 1),
@@ -547,10 +621,22 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                 child: Text(l10n.reject),
               ),
               const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: () => _showOfferDialog(user, match),
+                child: Text(l10n.counterOffer),
+              ),
+              const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () => _updateStatus(user.id, match.id, 'ACCEPTED'),
+                // Accept is the non-proposer's, only of a balanced proposal
+                // (#297). The backend enforces it too; this just prevents the
+                // user from trying an impossible accept.
+                onPressed: balanced
+                    ? () => _updateStatus(user.id, match.id, 'ACCEPTED')
+                    : null,
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: Text(l10n.accept),
+                child: Text(balanced
+                    ? l10n.accept
+                    : l10n.acceptBalanceHint),
               ),
             ],
           ),
@@ -630,19 +716,137 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
   }
 
   void _showOfferDialog(User user, TradeMatch match) {
-    // Build selectable items: user's TRADE items (give) and other's TRADE items (receive)
-    final giveItems = match.userHaves; // items user can give
-    final receiveItems = match.userWants; // items user can receive
     final l10n = AppLocalizations.of(context)!;
+    final meId = user.id;
+    final otherId = meId == match.user1Id ? match.user2Id : match.user1Id;
 
-    final selectedGive = <int>{};
-    final selectedReceive = <int>{};
+    // Candidates: give = my TRADE items (cap = receiver's want, already
+    // capped by the listing query LEAST); receive = other's TRADE items I
+    // want (cap = my want).
+    final giveItems = match.userHaves;
+    final receiveItems = match.userWants;
+
+    // Selection state, pre-filled from existing legs (counter-offer).
+    final giveOn = <int, bool>{};
+    final giveQty = <int, int>{};
+    final giveInitially = <int>{};
+    final receiveOn = <int, bool>{};
+    final receiveQty = <int, int>{};
+    final receiveInitially = <int>{};
+    for (final leg in match.selectedItems) {
+      if (leg.giverUserId == meId) {
+        giveOn[leg.merchId] = true;
+        giveQty[leg.merchId] = leg.quantity;
+        giveInitially.add(leg.merchId);
+      } else {
+        receiveOn[leg.merchId] = true;
+        receiveQty[leg.merchId] = leg.quantity;
+        receiveInitially.add(leg.merchId);
+      }
+    }
+    for (final i in giveItems) {
+      giveOn.putIfAbsent(i.merchId, () => false);
+      giveQty.putIfAbsent(i.merchId, () => 1);
+    }
+    for (final i in receiveItems) {
+      receiveOn.putIfAbsent(i.merchId, () => false);
+      receiveQty.putIfAbsent(i.merchId, () => 1);
+    }
+
+    var mode = _OfferMode.both;
+
+    // Projected per-side totals after applying the visible-section edits to
+    // the existing legs (hidden sections persist unchanged).
+    (int, int) projectedTotals() {
+      final give = <int, int>{};
+      final recv = <int, int>{};
+      for (final leg in match.selectedItems) {
+        if (leg.giverUserId == meId) {
+          give[leg.merchId] = leg.quantity;
+        } else {
+          recv[leg.merchId] = leg.quantity;
+        }
+      }
+      if (mode == _OfferMode.give || mode == _OfferMode.both) {
+        for (final i in giveItems) {
+          if (giveOn[i.merchId] == true) {
+            give[i.merchId] = giveQty[i.merchId] ?? 1;
+          } else if (giveInitially.contains(i.merchId)) {
+            give[i.merchId] = 0;
+          }
+        }
+      }
+      if (mode == _OfferMode.receive || mode == _OfferMode.both) {
+        for (final i in receiveItems) {
+          if (receiveOn[i.merchId] == true) {
+            recv[i.merchId] = receiveQty[i.merchId] ?? 1;
+          } else if (receiveInitially.contains(i.merchId)) {
+            recv[i.merchId] = 0;
+          }
+        }
+      }
+      final g = give.values.fold(0, (a, b) => a + b);
+      final r = recv.values.fold(0, (a, b) => a + b);
+      return (g, r);
+    }
+
+    List<OfferItem> buildItems() {
+      final items = <OfferItem>[];
+      if (mode == _OfferMode.give || mode == _OfferMode.both) {
+        for (final i in giveItems) {
+          if (giveOn[i.merchId] == true) {
+            items.add(
+              OfferItem()
+                ..merchId = i.merchId
+                ..giverUserId = meId
+                ..quantity = giveQty[i.merchId] ?? 1,
+            );
+          } else if (giveInitially.contains(i.merchId)) {
+            // Uncheck a prefilled leg → remove it (qty 0, accumulating).
+            items.add(
+              OfferItem()
+                ..merchId = i.merchId
+                ..giverUserId = meId
+                ..quantity = 0,
+            );
+          }
+        }
+      }
+      if (mode == _OfferMode.receive || mode == _OfferMode.both) {
+        for (final i in receiveItems) {
+          if (receiveOn[i.merchId] == true) {
+            items.add(
+              OfferItem()
+                ..merchId = i.merchId
+                ..giverUserId = otherId
+                ..quantity = receiveQty[i.merchId] ?? 1,
+            );
+          } else if (receiveInitially.contains(i.merchId)) {
+            items.add(
+              OfferItem()
+                ..merchId = i.merchId
+                ..giverUserId = otherId
+                ..quantity = 0,
+            );
+          }
+        }
+      }
+      return items;
+    }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final totalSelected = selectedGive.length + selectedReceive.length;
+          final items = buildItems();
+          final hasChange = items.isNotEmpty;
+          final (g, r) = projectedTotals();
+          final balanced = g == r && g > 0;
+          final legCount = items.where((i) => i.quantity > 0).length;
+          final showGive =
+              mode == _OfferMode.give || mode == _OfferMode.both;
+          final showReceive =
+              mode == _OfferMode.receive || mode == _OfferMode.both;
 
           return AlertDialog(
             title: Text(l10n.makeTradeOffer),
@@ -651,7 +855,51 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (giveItems.isNotEmpty) ...[
+                  SegmentedButton<_OfferMode>(
+                    segments: [
+                      ButtonSegment(
+                        value: _OfferMode.give,
+                        label: Text(l10n.giveOnlyMode),
+                      ),
+                      ButtonSegment(
+                        value: _OfferMode.receive,
+                        label: Text(l10n.receiveOnlyMode),
+                      ),
+                      ButtonSegment(
+                        value: _OfferMode.both,
+                        label: Text(l10n.bothMode),
+                      ),
+                    ],
+                    selected: {mode},
+                    onSelectionChanged: (s) =>
+                        setDialogState(() => mode = s.first),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        balanced ? Icons.balance : Icons.error_outline,
+                        size: 16,
+                        color: balanced ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        l10n.balanceSummary(g, r),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        balanced ? l10n.balanced : l10n.unbalanced,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: balanced ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (showGive && giveItems.isNotEmpty) ...[
+                    const SizedBox(height: 8),
                     Text(
                       l10n.itemsYouGive,
                       style: TextStyle(
@@ -661,29 +909,20 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                     ),
                     const SizedBox(height: 4),
                     ...giveItems.map(
-                      (item) => CheckboxListTile(
-                        dense: true,
-                        title: Text(
-                          item.merchName,
-                          style: const TextStyle(fontSize: 14),
+                      (item) => _legRow(
+                        item: item,
+                        selected: giveOn[item.merchId] ?? false,
+                        qty: giveQty[item.merchId] ?? 1,
+                        onToggle: (v) => setDialogState(
+                          () => giveOn[item.merchId] = v ?? false,
                         ),
-                        subtitle: Text(
-                          l10n.qtyLabel(item.quantity),
-                          style: const TextStyle(fontSize: 12),
+                        onQty: (q) => setDialogState(
+                          () => giveQty[item.merchId] = q,
                         ),
-                        value: selectedGive.contains(item.merchId),
-                        activeColor: AppTheme.tradeColor,
-                        onChanged: (v) => setDialogState(() {
-                          if (v == true) {
-                            selectedGive.add(item.merchId);
-                          } else {
-                            selectedGive.remove(item.merchId);
-                          }
-                        }),
                       ),
                     ),
                   ],
-                  if (receiveItems.isNotEmpty) ...[
+                  if (showReceive && receiveItems.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       l10n.itemsYouReceive,
@@ -694,25 +933,16 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                     ),
                     const SizedBox(height: 4),
                     ...receiveItems.map(
-                      (item) => CheckboxListTile(
-                        dense: true,
-                        title: Text(
-                          item.merchName,
-                          style: const TextStyle(fontSize: 14),
+                      (item) => _legRow(
+                        item: item,
+                        selected: receiveOn[item.merchId] ?? false,
+                        qty: receiveQty[item.merchId] ?? 1,
+                        onToggle: (v) => setDialogState(
+                          () => receiveOn[item.merchId] = v ?? false,
                         ),
-                        subtitle: Text(
-                          l10n.qtyLabel(item.quantity),
-                          style: const TextStyle(fontSize: 12),
+                        onQty: (q) => setDialogState(
+                          () => receiveQty[item.merchId] = q,
                         ),
-                        value: selectedReceive.contains(item.merchId),
-                        activeColor: AppTheme.wantColor,
-                        onChanged: (v) => setDialogState(() {
-                          if (v == true) {
-                            selectedReceive.add(item.merchId);
-                          } else {
-                            selectedReceive.remove(item.merchId);
-                          }
-                        }),
                       ),
                     ),
                   ],
@@ -725,40 +955,75 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                 child: Text(l10n.cancel),
               ),
               ElevatedButton(
-                onPressed: totalSelected > 0
+                onPressed: hasChange
                     ? () {
-                        final items = <OfferItem>[];
-                        for (final merchId in selectedGive) {
-                          final inv = giveItems.firstWhere(
-                            (i) => i.merchId == merchId,
-                          );
-                          items.add(
-                            OfferItem()
-                              ..merchId = merchId
-                              ..direction = 'GIVE'
-                              ..quantity = inv.quantity,
-                          );
-                        }
-                        for (final merchId in selectedReceive) {
-                          final inv = receiveItems.firstWhere(
-                            (i) => i.merchId == merchId,
-                          );
-                          items.add(
-                            OfferItem()
-                              ..merchId = merchId
-                              ..direction = 'RECEIVE'
-                              ..quantity = inv.quantity,
-                          );
-                        }
                         Navigator.pop(ctx);
-                        _submitOffer(user.id, match.id, items);
+                        _submitOffer(meId, match.id, items);
                       }
                     : null,
-                child: Text(l10n.sendOfferItems(totalSelected)),
+                child: Text(l10n.sendOfferItems(legCount)),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _legRow({
+    required InventoryItem item,
+    required bool selected,
+    required int qty,
+    required ValueChanged<bool?> onToggle,
+    required ValueChanged<int> onQty,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Checkbox(
+            value: selected,
+            // Stepper 1..cap so the user cannot over-offer (#294/#297). cap =
+            // item.quantity (already LEAST(trade, want) from the listing).
+            onChanged: onToggle,
+            activeColor: AppTheme.tradeColor,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.merchName, style: const TextStyle(fontSize: 14)),
+                Text(
+                  l10n.qtyLabel(item.quantity),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: selected && qty > 1
+                ? () => onQty(qty - 1)
+                : null,
+          ),
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$qty',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: selected && qty < item.quantity
+                ? () => onQty(qty + 1)
+                : null,
+          ),
+        ],
       ),
     );
   }

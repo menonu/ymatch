@@ -1707,10 +1707,7 @@ impl serde::Serialize for MatchItem {
         if self.merch_id != 0 {
             len += 1;
         }
-        if self.owner_id != 0 {
-            len += 1;
-        }
-        if !self.direction.is_empty() {
+        if self.giver_user_id != 0 {
             len += 1;
         }
         if self.quantity != 0 {
@@ -1732,11 +1729,8 @@ impl serde::Serialize for MatchItem {
         if self.merch_id != 0 {
             struct_ser.serialize_field("merchId", &self.merch_id)?;
         }
-        if self.owner_id != 0 {
-            struct_ser.serialize_field("ownerId", &self.owner_id)?;
-        }
-        if !self.direction.is_empty() {
-            struct_ser.serialize_field("direction", &self.direction)?;
+        if self.giver_user_id != 0 {
+            struct_ser.serialize_field("giverUserId", &self.giver_user_id)?;
         }
         if self.quantity != 0 {
             struct_ser.serialize_field("quantity", &self.quantity)?;
@@ -1762,9 +1756,8 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
             "matchId",
             "merch_id",
             "merchId",
-            "owner_id",
-            "ownerId",
-            "direction",
+            "giver_user_id",
+            "giverUserId",
             "quantity",
             "merch_name",
             "merchName",
@@ -1777,8 +1770,7 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
             Id,
             MatchId,
             MerchId,
-            OwnerId,
-            Direction,
+            GiverUserId,
             Quantity,
             MerchName,
             PhotoUrl,
@@ -1806,8 +1798,7 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                             "id" => Ok(GeneratedField::Id),
                             "matchId" | "match_id" => Ok(GeneratedField::MatchId),
                             "merchId" | "merch_id" => Ok(GeneratedField::MerchId),
-                            "ownerId" | "owner_id" => Ok(GeneratedField::OwnerId),
-                            "direction" => Ok(GeneratedField::Direction),
+                            "giverUserId" | "giver_user_id" => Ok(GeneratedField::GiverUserId),
                             "quantity" => Ok(GeneratedField::Quantity),
                             "merchName" | "merch_name" => Ok(GeneratedField::MerchName),
                             "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
@@ -1833,8 +1824,7 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                 let mut id__ = None;
                 let mut match_id__ = None;
                 let mut merch_id__ = None;
-                let mut owner_id__ = None;
-                let mut direction__ = None;
+                let mut giver_user_id__ = None;
                 let mut quantity__ = None;
                 let mut merch_name__ = None;
                 let mut photo_url__ = None;
@@ -1864,19 +1854,13 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::OwnerId => {
-                            if owner_id__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("ownerId"));
+                        GeneratedField::GiverUserId => {
+                            if giver_user_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("giverUserId"));
                             }
-                            owner_id__ = 
+                            giver_user_id__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
-                        }
-                        GeneratedField::Direction => {
-                            if direction__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("direction"));
-                            }
-                            direction__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Quantity => {
                             if quantity__.is_some() {
@@ -1904,8 +1888,7 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                     id: id__.unwrap_or_default(),
                     match_id: match_id__.unwrap_or_default(),
                     merch_id: merch_id__.unwrap_or_default(),
-                    owner_id: owner_id__.unwrap_or_default(),
-                    direction: direction__.unwrap_or_default(),
+                    giver_user_id: giver_user_id__.unwrap_or_default(),
                     quantity: quantity__.unwrap_or_default(),
                     merch_name: merch_name__,
                     photo_url: photo_url__,
@@ -2783,7 +2766,7 @@ impl serde::Serialize for OfferItem {
         if self.merch_id != 0 {
             len += 1;
         }
-        if !self.direction.is_empty() {
+        if self.giver_user_id != 0 {
             len += 1;
         }
         if self.quantity != 0 {
@@ -2793,8 +2776,8 @@ impl serde::Serialize for OfferItem {
         if self.merch_id != 0 {
             struct_ser.serialize_field("merchId", &self.merch_id)?;
         }
-        if !self.direction.is_empty() {
-            struct_ser.serialize_field("direction", &self.direction)?;
+        if self.giver_user_id != 0 {
+            struct_ser.serialize_field("giverUserId", &self.giver_user_id)?;
         }
         if self.quantity != 0 {
             struct_ser.serialize_field("quantity", &self.quantity)?;
@@ -2811,14 +2794,15 @@ impl<'de> serde::Deserialize<'de> for OfferItem {
         const FIELDS: &[&str] = &[
             "merch_id",
             "merchId",
-            "direction",
+            "giver_user_id",
+            "giverUserId",
             "quantity",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             MerchId,
-            Direction,
+            GiverUserId,
             Quantity,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -2842,7 +2826,7 @@ impl<'de> serde::Deserialize<'de> for OfferItem {
                     {
                         match value {
                             "merchId" | "merch_id" => Ok(GeneratedField::MerchId),
-                            "direction" => Ok(GeneratedField::Direction),
+                            "giverUserId" | "giver_user_id" => Ok(GeneratedField::GiverUserId),
                             "quantity" => Ok(GeneratedField::Quantity),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -2864,7 +2848,7 @@ impl<'de> serde::Deserialize<'de> for OfferItem {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut merch_id__ = None;
-                let mut direction__ = None;
+                let mut giver_user_id__ = None;
                 let mut quantity__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
@@ -2876,11 +2860,13 @@ impl<'de> serde::Deserialize<'de> for OfferItem {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::Direction => {
-                            if direction__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("direction"));
+                        GeneratedField::GiverUserId => {
+                            if giver_user_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("giverUserId"));
                             }
-                            direction__ = Some(map_.next_value()?);
+                            giver_user_id__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
                         }
                         GeneratedField::Quantity => {
                             if quantity__.is_some() {
@@ -2894,7 +2880,7 @@ impl<'de> serde::Deserialize<'de> for OfferItem {
                 }
                 Ok(OfferItem {
                     merch_id: merch_id__.unwrap_or_default(),
-                    direction: direction__.unwrap_or_default(),
+                    giver_user_id: giver_user_id__.unwrap_or_default(),
                     quantity: quantity__.unwrap_or_default(),
                 })
             }
@@ -4323,9 +4309,15 @@ impl serde::Serialize for UpdateMatchStatusRequest {
         if !self.status.is_empty() {
             len += 1;
         }
+        if self.user_id != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.UpdateMatchStatusRequest", len)?;
         if !self.status.is_empty() {
             struct_ser.serialize_field("status", &self.status)?;
+        }
+        if self.user_id != 0 {
+            struct_ser.serialize_field("userId", &self.user_id)?;
         }
         struct_ser.end()
     }
@@ -4338,11 +4330,14 @@ impl<'de> serde::Deserialize<'de> for UpdateMatchStatusRequest {
     {
         const FIELDS: &[&str] = &[
             "status",
+            "user_id",
+            "userId",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Status,
+            UserId,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4365,6 +4360,7 @@ impl<'de> serde::Deserialize<'de> for UpdateMatchStatusRequest {
                     {
                         match value {
                             "status" => Ok(GeneratedField::Status),
+                            "userId" | "user_id" => Ok(GeneratedField::UserId),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4385,6 +4381,7 @@ impl<'de> serde::Deserialize<'de> for UpdateMatchStatusRequest {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut status__ = None;
+                let mut user_id__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Status => {
@@ -4393,10 +4390,19 @@ impl<'de> serde::Deserialize<'de> for UpdateMatchStatusRequest {
                             }
                             status__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::UserId => {
+                            if user_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("userId"));
+                            }
+                            user_id__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
                     }
                 }
                 Ok(UpdateMatchStatusRequest {
                     status: status__.unwrap_or_default(),
+                    user_id: user_id__.unwrap_or_default(),
                 })
             }
         }

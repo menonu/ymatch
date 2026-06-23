@@ -15,8 +15,9 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
           AND NOT EXISTS (
             SELECT 1 FROM match_items mi
             JOIN matches mat ON mi.match_id = mat.id
-            WHERE mi.owner_id = i.user_id AND mi.merch_id = i.merch_id
+            WHERE mi.merch_id = i.merch_id
               AND mat.status IN ('OFFERED', 'ACCEPTED')
+              AND (mat.user1_id = i.user_id OR mat.user2_id = i.user_id)
           )
         ORDER BY i.updated_at ASC
         "#,
@@ -41,8 +42,9 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
               AND NOT EXISTS (
                 SELECT 1 FROM match_items mi
                 JOIN matches mat ON mi.match_id = mat.id
-                WHERE mi.owner_id = i.user_id AND mi.merch_id = i.merch_id
+                WHERE mi.merch_id = i.merch_id
                   AND mat.status IN ('OFFERED', 'ACCEPTED')
+                  AND (mat.user1_id = i.user_id OR mat.user2_id = i.user_id)
               )"#,
         )
         .bind(want_merch_id)

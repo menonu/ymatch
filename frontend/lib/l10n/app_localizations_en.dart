@@ -494,6 +494,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get itemsYouReceive => 'Items you receive:';
 
   @override
+  String get counterOffer => 'Counter-offer';
+
+  @override
+  String get balanced => 'Balanced';
+
+  @override
+  String get unbalanced => 'Unbalanced';
+
+  @override
+  String get acceptBalanceHint => 'Accept requires a balanced offer';
+
+  @override
+  String balanceSummary(int give, int recv) {
+    return 'You give $give / receive $recv';
+  }
+
+  @override
+  String get giveOnlyMode => 'Give only';
+
+  @override
+  String get receiveOnlyMode => 'Receive only';
+
+  @override
+  String get bothMode => 'Give & receive';
+
+  @override
   String qtyLabel(int count) {
     return 'Qty: $count';
   }
