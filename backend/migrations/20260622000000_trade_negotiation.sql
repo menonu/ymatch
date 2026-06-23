@@ -26,8 +26,33 @@ ALTER TABLE match_items DROP COLUMN IF EXISTS owner_id;
 ALTER TABLE match_items DROP COLUMN IF EXISTS direction;
 
 -- 3. One row per (match, giver, merch) so partial upserts accumulate.
+--    The old schema had no unique constraint on (match_id, owner_id, merch_id,
+--    direction), so a buggy/old client could leave two rows that backfill to
+--    the same (giver_user_id, merch_id). Deduplicate BEFORE adding the unique
+--    constraint, summing quantities into one surviving row per key (sum is
+--    non-lossy for genuine dupes; distinct directions already map to distinct
+--    givers in step 1, so they never collide here).
 ALTER TABLE match_items
   DROP CONSTRAINT IF EXISTS match_items_leg_unique;
+UPDATE match_items mi
+SET quantity = summed.qty
+FROM (
+  SELECT match_id, giver_user_id, merch_id, SUM(quantity) AS qty
+  FROM match_items
+  GROUP BY match_id, giver_user_id, merch_id
+  HAVING COUNT(*) > 1
+) AS summed
+WHERE mi.match_id = summed.match_id
+  AND mi.giver_user_id = summed.giver_user_id
+  AND mi.merch_id = summed.merch_id;
+DELETE FROM match_items mi
+WHERE EXISTS (
+  SELECT 1 FROM match_items mi2
+  WHERE mi2.match_id = mi.match_id
+    AND mi2.giver_user_id = mi.giver_user_id
+    AND mi2.merch_id = mi.merch_id
+    AND mi2.ctid < mi.ctid
+);
 ALTER TABLE match_items
   ADD CONSTRAINT match_items_leg_unique UNIQUE (match_id, giver_user_id, merch_id);
 

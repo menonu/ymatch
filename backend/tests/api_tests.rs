@@ -4176,6 +4176,122 @@ async fn test_trade_negotiation_counter_offer_and_balance(pool: PgPool) {
     assert_eq!(m["status"], "ACCEPTED");
 }
 
+/// The accept gate re-validates the FULL accumulated leg set against the
+/// receiver's CURRENT want quantity (#297 review). A leg that was within
+/// the cap when proposed can become over-capacity if the receiver lowers
+/// their WANT mid-negotiation; accept must then be rejected with 400 even
+/// though the proposal is balanced — otherwise `apply_inventory` would
+/// over-deliver. The proposer can then counter the leg down to the new
+/// cap and the non-proposer can accept.
+#[sqlx::test]
+async fn test_accept_rejected_when_leg_exceeds_current_want(pool: PgPool) {
+    // WANT x2 on both sides so a 2:2 balanced proposal fits the cap
+    // initially. user1: TRADE A x2 / WANT B x2; user2: TRADE B x2 / WANT A x2.
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    let post_offer = |pool: &PgPool, uid: i64, items: &str| {
+        let pool = pool.clone();
+        let body = format!(r#"{{"userId": {}, "items": [{}]}}"#, uid, items);
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/matches/{}/offer", match_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    let post_status = |pool: &PgPool, uid: i64, status: &str| {
+        let pool = pool.clone();
+        let body = format!(r#"{{"status": "{}", "userId": {}}}"#, status, uid);
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/matches/{}/status", match_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    // Lower user2's WANT of Card A from 2 to `qty` (the inventory upsert
+    // overwrites quantity on conflict, so this is a real mid-negotiation
+    // change to the cap on user1's give-of-A leg).
+    let lower_want = |pool: &PgPool, uid: i64, merch: i64, qty: i32| {
+        let pool = pool.clone();
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/user/inventory")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"userId": {}, "merchId": {}, "status": "WANT", "quantity": {}}}"#,
+                        uid, merch, qty
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+
+    // 1. user1 opens a balanced 2:2 proposal: give A x2 (giver=u1) +
+    //    receive B x2 (giver=u2). Both legs within cap (WANT x2). -> OFFERED.
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 2}}, {{"merchId": {}, "giverUserId": {}, "quantity": 2}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_offer(&pool, user1_id, &items).await.status(),
+        StatusCode::OK
+    );
+
+    // 2. user2 lowers their WANT of Card A from 2 to 1. user1's persisted
+    //    give-of-A x2 leg now exceeds the receiver's WANT (1). The
+    //    proposal is still balanced (2:2), so only the cap gate should
+    //    block accept.
+    assert_eq!(
+        lower_want(&pool, user2_id, merch_a_id, 1).await.status(),
+        StatusCode::OK
+    );
+
+    // 3. user2 (non-proposer) accepts -> 400 (over-cap, despite balanced).
+    assert_eq!(
+        post_status(&pool, user2_id, "ACCEPTED").await.status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // 4. user2 counters the A leg down to 1 (giver=u1, the editor's
+    //    receive) and the B leg down to 1 (giver=u2). Now balanced 1:1 and
+    //    within the new cap. -> OFFERED, offeredBy=user2.
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 1}}, {{"merchId": {}, "giverUserId": {}, "quantity": 1}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_offer(&pool, user2_id, &items).await.status(),
+        StatusCode::OK
+    );
+
+    // 5. user1 (non-proposer now) accepts the within-cap balanced proposal.
+    assert_eq!(
+        post_status(&pool, user1_id, "ACCEPTED").await.status(),
+        StatusCode::OK
+    );
+}
+
 #[sqlx::test]
 async fn test_apply_inventory_on_non_completed_rejected(pool: PgPool) {
     let app = backend::routes::create_router(pool.clone(), test_storage());

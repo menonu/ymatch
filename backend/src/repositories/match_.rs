@@ -282,7 +282,27 @@ impl MatchRepository {
     }
 
     /// List `match_items` joined with `merchandise` for the apply endpoint.
+    ///
+    /// Delegates to [`list_match_items_in_tx`] on the pool. The
+    /// transaction-aware variant exists so `change_status`'s accept gate
+    /// can read the legs inside the same `FOR UPDATE` transaction it
+    /// holds (see [`crate::services::match_lifecycle`]).
     pub async fn list_match_items(&self, match_id: i32) -> Result<Vec<MatchItem>, AppError> {
+        self.list_match_items_in_tx(&self.pool, match_id).await
+    }
+
+    /// Transaction-aware [`list_match_items`]: same query, run on the
+    /// supplied executor so the read participates in the caller's
+    /// transaction snapshot (e.g. the accept gate reads legs under the
+    /// `FOR UPDATE` lock it already holds).
+    pub async fn list_match_items_in_tx<'c, E>(
+        &self,
+        exec: E,
+        match_id: i32,
+    ) -> Result<Vec<MatchItem>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let rows = sqlx::query(
             r#"SELECT mi.id, mi.match_id, mi.merch_id, mi.giver_user_id, mi.quantity,
                       m.name AS merch_name, m.photo_url
@@ -292,7 +312,7 @@ impl MatchRepository {
                ORDER BY mi.giver_user_id, mi.id"#,
         )
         .bind(match_id)
-        .fetch_all(&self.pool)
+        .fetch_all(exec)
         .await?;
         Ok(rows
             .iter()
@@ -434,6 +454,13 @@ impl MatchRepository {
     /// non-proposer can add only their-give (or only their receive) to move
     /// toward balance. Single statement so the generic `Executor` is consumed
     /// once; the caller (service) reborrow `&mut *tx` per call.
+    ///
+    /// **Ordering contract:** the service calls [`upsert_legs`] *before*
+    /// [`remove_legs`] within one transaction. They touch disjoint leg sets
+    /// (positive vs zero quantity), so the order does not change the final
+    /// rows, but the pair is one logical "apply these legs" step — keep them
+    /// adjacent and in this order. (A future single `apply_legs` that
+    /// partitions internally would remove this contract.)
     pub async fn upsert_legs<'c, E>(
         &self,
         exec: E,
@@ -473,7 +500,8 @@ impl MatchRepository {
 
     /// Remove the zero-quantity legs of a proposal (#297) — the proposer
     /// explicitly dropped them. Single statement; the caller reborrow
-    /// `&mut *tx` per call.
+    /// `&mut *tx` per call. See [`upsert_legs`] for the **ordering contract**
+    /// (upsert before remove, within one transaction).
     pub async fn remove_legs<'c, E>(
         &self,
         exec: E,

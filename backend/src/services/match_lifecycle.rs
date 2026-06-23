@@ -167,12 +167,21 @@ impl MatchLifecycleService {
         validate_status_transition(new_status, &locked.status)?;
 
         if new_status == STATUS_ACCEPTED {
-            // Accept is the non-proposer's, and only of a balanced proposal.
+            // Accept is the non-proposer's, and only of a balanced
+            // proposal whose every leg is still within the receiver's
+            // current WANT quantity. The legs are read *inside* this
+            // transaction (under the `FOR UPDATE` lock on the match row)
+            // so the accept decision is consistent with the locked
+            // snapshot — a concurrent propose is blocked by the lock and
+            // cannot have committed legs we don't see (#297 review).
             let proposer = locked.offered_by.unwrap_or(locked.user1_id);
             if user_id == proposer {
                 return Err(AppError::bad_request("Cannot accept your own proposal"));
             }
-            let items = self.matches.list_match_items(match_id).await?;
+            let items = self
+                .matches
+                .list_match_items_in_tx(&mut *tx, match_id)
+                .await?;
             let legs: Vec<(i32, i32)> = items
                 .iter()
                 .map(|i| (i.giver_user_id, i.quantity))
@@ -182,6 +191,36 @@ impl MatchLifecycleService {
                     "Cannot accept an unbalanced proposal",
                 ));
             }
+            // Re-validate the FULL accumulated leg set against the
+            // receiver's current WANT. A leg submitted earlier (and
+            // within cap then) can become over-capacity if the receiver's
+            // WANT changed mid-negotiation; the per-propose cap only
+            // checks the submitted legs, so the final gate re-checks the
+            // whole set before inventory is applied (#297 review).
+            let offer_items: Vec<OfferItem> = items
+                .iter()
+                .map(|i| OfferItem {
+                    merch_id: i.merch_id,
+                    giver_user_id: i.giver_user_id,
+                    quantity: i.quantity,
+                })
+                .collect();
+            let merch_ids: Vec<i32> = offer_items.iter().map(|i| i.merch_id).collect();
+            let user1_wants = self
+                .inventory
+                .want_quantities(&mut *tx, locked.user1_id, &merch_ids)
+                .await?;
+            let user2_wants = self
+                .inventory
+                .want_quantities(&mut *tx, locked.user2_id, &merch_ids)
+                .await?;
+            validate_legs(
+                &offer_items,
+                locked.user1_id,
+                locked.user2_id,
+                &user1_wants,
+                &user2_wants,
+            )?;
             self.matches
                 .set_status(&mut *tx, match_id, new_status)
                 .await?;

@@ -227,12 +227,15 @@ class _Match {
 /// with two fresh merch items, and a cross-trade inventory (u1 TRADE A /
 /// WANT B; u2 TRADE B / WANT A). The unique event + merch per call means
 /// the auto-matcher can only pair within this provision — scenarios
-/// never collide with each other. `u1TradeQty` lets the want-qty-cap
-/// scenario offer more than the receiver wants.
+/// never collide with each other. The four quantity params let the
+/// want-qty-cap scenarios start with more units than the other side wants
+/// (the precondition for over-cap legs).
 Future<_Match> _provisionPendingMatch(
   ApiClient api, {
   required String tag,
-  int u1TradeQty = 1,
+  int u1TradeAQty = 1,
+  int u1WantBQty = 1,
+  int u2TradeBQty = 1,
   int u2WantAQty = 1,
 }) async {
   final u1 = await _guestLogin(api, tag: '${tag}_u1');
@@ -257,9 +260,9 @@ Future<_Match> _provisionPendingMatch(
     groupName: 'neg-$tag',
   );
 
-  await _setInventory(api, userId: u1, merchId: cardA, status: 'TRADE', quantity: u1TradeQty);
-  await _setInventory(api, userId: u1, merchId: cardB, status: 'WANT');
-  await _setInventory(api, userId: u2, merchId: cardB, status: 'TRADE');
+  await _setInventory(api, userId: u1, merchId: cardA, status: 'TRADE', quantity: u1TradeAQty);
+  await _setInventory(api, userId: u1, merchId: cardB, status: 'WANT', quantity: u1WantBQty);
+  await _setInventory(api, userId: u2, merchId: cardB, status: 'TRADE', quantity: u2TradeBQty);
   await _setInventory(api, userId: u2, merchId: cardA, status: 'WANT', quantity: u2WantAQty);
 
   // Wait for the auto-matcher (every 5s in the e2e stack) to produce the
@@ -509,7 +512,7 @@ void main() {
     // u1 TRADEs cardA x2, but u2 only WANTs cardA x1 → the cap on a
     // give-of-A leg is 1. Offering 2 must be rejected with 400 and the
     // match must stay PENDING.
-    final m = await _provisionPendingMatch(a.api, tag: 'cap', u1TradeQty: 2, u2WantAQty: 1);
+    final m = await _provisionPendingMatch(a.api, tag: 'cap', u1TradeAQty: 2, u2WantAQty: 1);
 
     expect(
       await _offer(a, m.id, m.u1, [
@@ -531,6 +534,53 @@ void main() {
       200,
     );
     expect((await _getMatch(a.api, m.u1, m.id))['status'], 'OFFERED');
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test('accept re-validates the full leg set against current want (#297 cap-at-accept)', () async {
+    final a = _newApi();
+    // WANT x2 on both sides so a 2:2 balanced proposal fits the cap
+    // initially. u1 TRADE A x2 / WANT B x2; u2 TRADE B x2 / WANT A x2.
+    final m = await _provisionPendingMatch(
+      a.api,
+      tag: 'cap-accept',
+      u1TradeAQty: 2,
+      u1WantBQty: 2,
+      u2TradeBQty: 2,
+      u2WantAQty: 2,
+    );
+
+    // 1. u1 opens a balanced 2:2 proposal: give A x2 (giver=u1) + receive
+    //    B x2 (giver=u2). Both legs within cap (WANT x2). -> OFFERED.
+    expect(
+      await _offer(a, m.id, m.u1, [
+        pb.OfferItem(merchId: m.cardA, giverUserId: m.u1, quantity: 2),
+        pb.OfferItem(merchId: m.cardB, giverUserId: m.u2, quantity: 2),
+      ]),
+      200,
+    );
+
+    // 2. u2 lowers their WANT of cardA from 2 to 1. u1's persisted
+    //    give-of-A x2 leg now exceeds the receiver's WANT (1). The
+    //    proposal is still balanced (2:2), so only the cap gate should
+    //    block accept — proving accept re-validates the full set, not
+    //    just balance.
+    await _setInventory(a.api, userId: m.u2, merchId: m.cardA, status: 'WANT', quantity: 1);
+    expect(await _setStatus(a, m.id, m.u2, 'ACCEPTED'), 400,
+        reason: 'balanced but over-cap after WANT lowered must be rejected at accept');
+
+    // 3. u2 counters the legs down to 1:1 (the A leg is giver=u1, the
+    //    editor's receive; the B leg is giver=u2). Now balanced and within
+    //    the new cap. -> OFFERED, offeredBy=u2.
+    expect(
+      await _offer(a, m.id, m.u2, [
+        pb.OfferItem(merchId: m.cardA, giverUserId: m.u1, quantity: 1),
+        pb.OfferItem(merchId: m.cardB, giverUserId: m.u2, quantity: 1),
+      ]),
+      200,
+    );
+    // 4. u1 (non-proposer now) accepts the within-cap balanced proposal.
+    expect(await _setStatus(a, m.id, m.u1, 'ACCEPTED'), 200);
+    expect((await _getMatch(a.api, m.u1, m.id))['status'], 'ACCEPTED');
   }, timeout: const Timeout(Duration(minutes: 2)));
 
   test('non-participant is forbidden from proposing and accepting (#297 authz)', () async {
