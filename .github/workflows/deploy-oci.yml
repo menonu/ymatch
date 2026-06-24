@@ -118,7 +118,6 @@ jobs:
           name: Release ${{ github.ref_name }}
           body: |
             Deployed to production.
-            - URL: https://${{ secrets.OCI_VM_HOST }}.nip.io
             - Commit: ${{ github.sha }}
           draft: false
           prerelease: false
