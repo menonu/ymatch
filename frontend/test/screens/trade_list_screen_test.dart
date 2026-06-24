@@ -101,6 +101,10 @@ void main() {
         find.text('渡す数と受け取る数が釣り合っていれば、取引できます。'),
         findsOneWidget,
       );
+
+      // Both sections always visible under ja too (parity with the EN test).
+      expect(find.text('渡すアイテム:'), findsOneWidget);
+      expect(find.text('受け取るアイテム:'), findsOneWidget);
     },
   );
 }
