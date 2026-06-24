@@ -2303,6 +2303,7 @@ backend/target/debug/incremental/backend-3s0mw4gna776z/s-hdzlrd5nfu-18wkkub-5t2b
 terraform/terraform.tfvars
 terraform/oci/terraform.tfvars
 terraform/newrelic/terraform.tfvars
+terraform/*/backend.hcl
 .firebase/
 terraform/.terraform/
 terraform/oci/.terraform/

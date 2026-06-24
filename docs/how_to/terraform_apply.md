@@ -47,6 +47,8 @@ cp terraform/oci/terraform.tfvars.example terraform/oci/terraform.tfvars
 #   edit terraform.tfvars: OCIDs, region, SSH public keys, sizing, nr_display_name
 cp terraform/oci/.env.example                 terraform/oci/.env
 #   edit .env: TF_VAR_db_password, TF_VAR_nr_license_key, TF_VAR_nr_account_id, TF_VAR_alert_email
+cp terraform/oci/backend.hcl.example          terraform/oci/backend.hcl
+#   edit backend.hcl: namespace (oci os ns get), region
 task tf:oci:init
 ```
 
@@ -80,10 +82,53 @@ and **delete it from `terraform.tfvars`** — otherwise tfvars wins and
 
 - `terraform/*/terraform.tfvars` (gitignored)
 - `terraform/*/.env` (gitignored via `**/.env`)
-- `terraform/*/terraform.tfstate*` (gitignored — and **contains secrets**,
-  so never share it; a remote encrypted backend is a future hardening
-  step)
+- `terraform/*/backend.hcl` (gitignored — contains the tenancy Object
+  Storage namespace)
+- `terraform/*/terraform.tfstate*` (gitignored; the `oci` module now
+  stores state remotely in OCI Object Storage — see below — so the local
+  file is only a stale pre-migration copy)
 - `terraform/*/.terraform/` (gitignored provider cache)
 
-Only `.tf`, `*.tfvars.example`, and `.env.example` are committed, and
-they contain only placeholders — never real values.
+Only `.tf`, `*.tfvars.example`, `.env.example`, and `backend.hcl.example`
+are committed, and they contain only placeholders — never real values.
+
+## Remote state backend (OCI module)
+
+The `terraform/oci` module stores state in an **OCI Object Storage**
+bucket (`ymatch-tfstate`) rather than a local file, so state is shared
+across machines and protected by Object Storage locking (#302). The
+bucket is created out-of-band (it can't be managed by the config that
+stores its state in it) and the tenancy-specific backend values live in
+the gitignored `backend.hcl`.
+
+### One-time bucket bootstrap
+
+```bash
+# Object Storage namespace for your tenancy
+oci os ns get                       # e.g. "axsxw8hyxmch"
+
+# Create the state bucket in the root compartment (tenancy) with
+# versioning so state history is recoverable.
+TENANCY=$(grep '^tenancy' ~/.oci/config | awk '{print $3}')
+oci os bucket create --name ymatch-tfstate --compartment-id "$TENANCY" --versioning Enabled
+```
+
+### Point the module at the backend
+
+```bash
+cd terraform/oci
+cp backend.hcl.example backend.hcl
+#   edit backend.hcl: namespace (from `oci os ns get`), region
+task tf:oci:init      # runs: terraform init -backend-config=backend.hcl
+```
+
+If you have an existing local `terraform.tfstate`, migrate it to the
+remote backend (one-time):
+
+```bash
+terraform init -backend-config=backend.hcl -migrate-state
+```
+
+After migration, `task tf:oci:plan` / `task tf:oci:apply` read and write
+state through the remote backend automatically — no tarball/scp of state
+files between machines.

@@ -5,6 +5,18 @@ terraform {
       version = ">= 6.0.0"
     }
   }
+
+  # Remote state in OCI Object Storage (#302). Tenancy-specific values
+  # (object-storage namespace, region) are supplied via a gitignored
+  # backend.hcl at `terraform init -backend-config=backend.hcl` — see
+  # backend.hcl.example and docs/how_to/terraform_apply.md. Only the
+  # non-secret structural bits (bucket name, state key) live here, and the
+  # ymatch-tfstate bucket is created out-of-band (it can't be managed by the
+  # same config that stores its state in it).
+  backend "oci" {
+    bucket = "ymatch-tfstate"
+    key    = "terraform/oci/terraform.tfstate"
+  }
 }
 
 provider "oci" {
