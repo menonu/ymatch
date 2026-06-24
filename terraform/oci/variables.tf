@@ -34,13 +34,13 @@ variable "compartment_ocid" {
   type        = string
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key content for VM access"
+variable "ssh_public_key_v2" {
+  description = "SSH public key for the production instance (ymatch-arm-v2)"
   type        = string
 }
 
-variable "ssh_public_key_v2" {
-  description = "SSH public key for replacement instance (ymatch-arm-v2)"
+variable "ssh_public_key_staging" {
+  description = "SSH public key for the dedicated staging instance (ymatch-arm-staging)"
   type        = string
 }
 
@@ -68,6 +68,18 @@ variable "instance_memory_gb" {
   default     = 12
 }
 
+variable "staging_instance_ocpus" {
+  description = "Number of OCPUs for the staging A1 instance. Default 1 to fit alongside production within the 4-OCPU free-tier quota (prod 2 + staging 1 = 3)."
+  type        = number
+  default     = 1
+}
+
+variable "staging_instance_memory_gb" {
+  description = "Memory in GB for the staging A1 instance. Default 4 to fit alongside production within the 24-GB free-tier quota (prod 12 + staging 4 = 16)."
+  type        = number
+  default     = 4
+}
+
 variable "boot_volume_size_gb" {
   description = "Boot volume size in GB (free tier: up to 200GB total)"
   type        = number
@@ -86,9 +98,15 @@ variable "nr_account_id" {
 }
 
 variable "nr_display_name" {
-  description = "Display name for the New Relic Infrastructure agent. Use a unique name per instance to distinguish in NR dashboards."
+  description = "Display name for the production New Relic Infrastructure agent. Use a unique name per instance to distinguish in NR dashboards."
   type        = string
   default     = "ymatch-oci-arm"
+}
+
+variable "nr_display_name_staging" {
+  description = "Display name for the staging New Relic Infrastructure agent."
+  type        = string
+  default     = "ymatch-oci-arm-staging"
 }
 
 variable "alert_email" {

@@ -7,8 +7,7 @@
 # Optional env:
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
-#   DB_PASSWORD / STAGING_DB_PASSWORD - reused from a previous deploy
-#                                       (required by compose validation)
+#   DB_PASSWORD      - reused from a previous deploy
 
 set -euo pipefail
 
@@ -20,16 +19,12 @@ REPO_DIR="$HOME/ymatch"
 oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 
-# docker-compose.oci.yml validates all services, so we need the full
-# set of env vars even when redeploying a single service. Always
-# regenerate the .env file from current env vars to ensure it's
-# consistent (handles the case where the previous deploy only wrote
-# DB_PASSWORD and not STAGING_DB_PASSWORD).
+# Always regenerate the .env file from current env vars to ensure it's
+# consistent with this VM's deploy.
 PUBLIC_IP="$(oci_detect_public_ip)"
 DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD env var required (or run oci_deploy_production.sh first)}"
-STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:-$DB_PASSWORD}"
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-oci_write_compose_env "$REPO_DIR" DB_PASSWORD STAGING_DB_PASSWORD PUBLIC_IP GIT_HASH
+oci_write_compose_env "$REPO_DIR" DB_PASSWORD PUBLIC_IP GIT_HASH
 
 echo "=== Rebuilding backend ==="
 docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" build backend

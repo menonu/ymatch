@@ -1,6 +1,6 @@
 # Deploying ymatch to Oracle Cloud Infrastructure (OCI) — Always Free Tier
 
-This guide deploys the complete ymatch stack (Flutter web frontend, Rust/Axum backend, PostgreSQL) on a single OCI ARM Ampere A1 instance using the Always Free tier.
+This guide deploys the complete ymatch stack (Flutter web frontend, Rust/Axum backend, PostgreSQL) on OCI ARM Ampere A1 instances using the Always Free tier. Production and staging run on **separate VMs** (`ymatch-arm-v2` and `ymatch-arm-staging`) but use an **identical stack** — the same `docker-compose.oci.yml`, the same `Caddyfile.oci`, and the same container names — differing only by VM host and DB password. See issue #209 for the rationale.
 
 ## Architecture
 
@@ -13,20 +13,25 @@ Internet → Caddy (443/80, auto-SSL via nip.io)
                               PostgreSQL (port 5432)
 ```
 
-All services run as Docker containers on one `VM.Standard.A1.Flex` instance.
+This stack runs identically on each VM:
+
+| Environment | Instance | OCPUs / Memory | URL | Deploy workflow |
+|-------------|----------|----------------|-----|-----------------|
+| Production | `ymatch-arm-v2` | 2 / 12 GB | `https://<prod_ip>.nip.io` | `deploy-oci.yml` |
+| Staging | `ymatch-arm-staging` | 1 / 4 GB | `https://<staging_ip>.nip.io` | `deploy-oci-staging.yml` |
 
 ## Cost Analysis (OCI Always Free Tier)
 
 | Resource | Free Tier Limit | Our Usage | Status |
 |----------|----------------|-----------|--------|
-| A1 Flex ARM (OCPUs) | 4 OCPUs total | 2 OCPUs | ✅ FREE |
-| A1 Flex ARM (Memory) | 24 GB total | 12 GB | ✅ FREE |
-| Boot Volume | 200 GB total | 50 GB | ✅ FREE |
-| Public IPv4 | Included (no charge) | 1 IP | ✅ FREE |
+| A1 Flex ARM (OCPUs) | 4 OCPUs total | 3 OCPUs (prod 2 + staging 1) | ✅ FREE |
+| A1 Flex ARM (Memory) | 24 GB total | 16 GB (prod 12 + staging 4) | ✅ FREE |
+| Boot Volume | 200 GB total | 100 GB (50 GB × 2) | ✅ FREE |
+| Public IPv4 | 2 included (no charge) | 2 IPs | ✅ FREE |
 | Outbound Data | 10 TB/month | Minimal | ✅ FREE |
 | VCN, Subnet, IGW | No charge | — | ✅ FREE |
 
-> **Note**: OCI Always Free ARM resources are shared across your tenancy. You can adjust `instance_ocpus` and `instance_memory_gb` in Terraform variables (up to 4 OCPUs / 24 GB total across all A1 instances).
+> **Note**: OCI Always Free ARM resources are shared across your tenancy (4 OCPUs / 24 GB total across all A1 instances). The retired `ymatch-arm` (v1) instance was destroyed to make room for the staging VM. Adjust `instance_ocpus` / `instance_memory_gb` (production) and `staging_instance_ocpus` / `staging_instance_memory_gb` (staging) in Terraform variables, keeping the combined total within the free-tier limits.
 
 ## Prerequisites
 
@@ -185,16 +190,18 @@ docker system df
 
 ## GitHub Secrets Management
 
-CI/CD workflows (`.github/workflows/deploy-oci.yml` and `deploy-oci-staging.yml`) read several OCI-related values from GitHub Secrets. You must update these whenever the underlying credential changes — most commonly when the VM is recreated and gets a new public IP.
+CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-oci-staging.yml` for staging) read several OCI-related values from GitHub Secrets. Production and staging now target **separate VMs**, so each has its own host and SSH-key secrets. You must update these whenever the underlying credential changes — most commonly when a VM is recreated and gets a new public IP.
 
 ### Secrets Reference
 
 | Secret | Used by | When to update |
 |--------|---------|----------------|
-| `OCI_VM_HOST` | All deploy workflows | **Every time the VM's public IP changes** (recreates via Terraform) |
-| `OCI_SSH_PRIVATE_KEY` | All deploy workflows | When the SSH key pair used for VM access is rotated |
-| `OCI_DB_PASSWORD` | `deploy-oci.yml` (production) and `deploy-oci-staging.yml` (validates compose) | When the production database password changes |
-| `OCI_STAGING_DB_PASSWORD` | `deploy-oci-staging.yml` | When the staging database password changes |
+| `OCI_VM_HOST` | `deploy-oci.yml` (production) | **Every time the production VM's public IP changes** (recreates via Terraform) |
+| `OCI_SSH_PRIVATE_KEY` | `deploy-oci.yml` (production) | When the production SSH key pair is rotated |
+| `OCI_DB_PASSWORD` | `deploy-oci.yml` (production) | When the production database password changes |
+| `OCI_STAGING_VM_HOST` | `deploy-oci-staging.yml` (staging) | **Every time the staging VM's public IP changes** (recreates via Terraform) |
+| `OCI_STAGING_SSH_PRIVATE_KEY` | `deploy-oci-staging.yml` (staging) | When the staging SSH key pair is rotated |
+| `OCI_STAGING_DB_PASSWORD` | `deploy-oci-staging.yml` (staging) | When the staging database password changes |
 | `GCP_SA_KEY` | (not OCI-specific; for billing backup) | When the GCP service account is rotated |
 | `NEW_RELIC_LICENSE_KEY` | NR deployment report | When the NR license is rotated |
 | `NEW_RELIC_ACCOUNT_ID` | NR deployment report | When the NR account changes |
@@ -211,6 +218,8 @@ cat > /tmp/oci-secrets.env <<'EOF'
 OCI_VM_HOST=<redacted>
 OCI_SSH_PRIVATE_KEY=/home/you/.ssh/oci_ymatch_v2
 OCI_DB_PASSWORD=ymatch_oci_prod_2026
+OCI_STAGING_VM_HOST=<redacted>
+OCI_STAGING_SSH_PRIVATE_KEY=/home/you/.ssh/oci_ymatch_staging
 OCI_STAGING_DB_PASSWORD=ymatch_oci_staging_2026
 EOF
 
@@ -225,6 +234,8 @@ gh auth status > /dev/null || { echo "Run 'gh auth login' first"; exit 1; }
 gh secret set OCI_VM_HOST --body "$OCI_VM_HOST"
 gh secret set OCI_SSH_PRIVATE_KEY < "$OCI_SSH_PRIVATE_KEY"
 gh secret set OCI_DB_PASSWORD --body "$OCI_DB_PASSWORD"
+gh secret set OCI_STAGING_VM_HOST --body "$OCI_STAGING_VM_HOST"
+gh secret set OCI_STAGING_SSH_PRIVATE_KEY < "$OCI_STAGING_SSH_PRIVATE_KEY"
 gh secret set OCI_STAGING_DB_PASSWORD --body "$OCI_STAGING_DB_PASSWORD"
 
 # Clean up
@@ -234,8 +245,9 @@ shred -u /tmp/oci-secrets.env
 For a **single-value update** (the most common case after a VM recreate):
 
 ```bash
-# Just the new IP — only OCI_VM_HOST changes in a typical recreate
-gh secret set OCI_VM_HOST --body "<redacted>"
+# Just the new IP — only the relevant host secret changes in a typical recreate
+gh secret set OCI_VM_HOST --body "<redacted>"          # production
+gh secret set OCI_STAGING_VM_HOST --body "<redacted>"  # staging
 
 # Verify (the value is not echoed, only the metadata)
 gh secret list
@@ -243,19 +255,20 @@ gh secret list
 
 ### When a VM is Recreated
 
-Terraform may assign a **different public IP** when an instance is destroyed and recreated (observed in issue #148). The new IP must be set in `OCI_VM_HOST` before the next CI run, otherwise workflows will fail with SSH connection errors.
+Terraform may assign a **different public IP** when an instance is destroyed and recreated (observed in issue #148). The new IP must be set in the matching host secret before the next CI run, otherwise workflows will fail with SSH connection errors.
 
 ```bash
-# After terraform apply, get the new IP
+# After terraform apply, get the new IPs
 cd terraform/oci
-terraform output instance_v2_public_ip
-# Output: "<redacted>"
+terraform output instance_v2_public_ip            # production
+terraform output instance_staging_public_ip       # staging
 
-# Update the secret
-gh secret set OCI_VM_HOST --body "<redacted>"
+# Update the matching secret
+gh secret set OCI_VM_HOST --body "<redacted>"          # production
+gh secret set OCI_STAGING_VM_HOST --body "<redacted>"  # staging
 ```
 
-The SSH key in `OCI_SSH_PRIVATE_KEY` does **not** need to change on a recreate if the Terraform `ssh_public_key_v2` variable is unchanged — the new instance is provisioned with the same public key.
+The SSH key secrets do **not** need to change on a recreate if the Terraform `ssh_public_key_v2` / `ssh_public_key_staging` variables are unchanged — the new instance is provisioned with the same public key.
 
 > **Future work**: A `scripts/update_oci_secrets.sh` helper was discussed (issue #139) but rejected in favor of documenting the manual procedure. The `gh secret set` invocation is short enough that a wrapper script adds little value, and the manual flow keeps the operation visible.
 

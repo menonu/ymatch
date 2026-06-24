@@ -28,8 +28,8 @@ resource "oci_budget_alert_rule" "spend_alert" {
 resource "oci_identity_dynamic_group" "ymatch_instance" {
   compartment_id = var.tenancy_ocid
   name           = "ymatch-instance-group"
-  description    = "Dynamic group for ymatch VM instance"
-  matching_rule  = "instance.id = '${oci_core_instance.ymatch.id}'"
+  description    = "Dynamic group for the production ymatch VM instance"
+  matching_rule  = "instance.id = '${oci_core_instance.ymatch_v2.id}'"
 }
 
 resource "oci_identity_policy" "ymatch_usage_read" {

@@ -18,15 +18,20 @@ compartment_ocid = "ocid1.tenancy.oc1..YOUR_TENANCY_OCID"
 
 # SSH public keys (for VM access)
 # Generate with: ssh-keygen -t ed25519 -C "ymatch-oci" -f ~/.ssh/oci_ymatch
-ssh_public_key   = "ssh-ed25519 AAAA... ymatch-oci"
-ssh_public_key_v2 = "ssh-ed25519 AAAA... ymatch-oci-v2"
+ssh_public_key_v2       = "ssh-ed25519 AAAA... ymatch-oci-v2"
+ssh_public_key_staging  = "ssh-ed25519 AAAA... ymatch-oci-staging"
 
-# Instance sizing
-instance_ocpus      = 2
-instance_memory_gb  = 12
-boot_volume_size_gb = 50
+# Instance sizing.
+# OCI Always Free A1 quota is 4 OCPUs / 24 GB total across all A1 instances.
+# With prod (2 OCPU / 12 GB) + staging (1 OCPU / 4 GB) = 3 OCPU / 16 GB, leaving
+# headroom. The retired v1 instance must be destroyed before apply (issue #209).
+instance_ocpus             = 2
+instance_memory_gb         = 12
+staging_instance_ocpus     = 1
+staging_instance_memory_gb = 4
+boot_volume_size_gb        = 50
 
-# NR display name (unique per instance, set here so each instance is
-# distinguishable in the New Relic Infrastructure dashboard). Defaults
-# to "ymatch-oci-arm" if unset.
-nr_display_name = "ymatch-oci-arm-v2"
+# NR display names (unique per instance, set here so each instance is
+# distinguishable in the New Relic Infrastructure dashboard).
+nr_display_name         = "ymatch-oci-arm-v2"
+nr_display_name_staging = "ymatch-oci-arm-staging"

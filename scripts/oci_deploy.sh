@@ -1,5 +1,7 @@
 #!/bin/bash
-# Deploy ymatch to OCI ARM instance (full stack: production + staging)
+# Deploy ymatch to an OCI ARM instance (the full stack for whichever VM this
+# runs on — production or staging, which now use identical stacks on separate
+# VMs; see issue #209).
 # Run this ON the OCI VM after SSH-ing in
 #
 # Usage: ./scripts/oci_deploy.sh <db_password> [public_ip]
@@ -17,7 +19,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/oci_deploy_common.sh"
 
 DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: $0 <db_password> [public_ip]}}"
-STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:-${DB_PASSWORD}}"
 PUBLIC_IP="$(oci_detect_public_ip "${2:-}")"
 
 echo "=== ymatch OCI Deploy (full stack) ==="
@@ -30,7 +31,7 @@ oci_sync_repo "$REPO_DIR"
 
 # Determine env vars for docker compose
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-oci_write_compose_env "$REPO_DIR" DB_PASSWORD STAGING_DB_PASSWORD PUBLIC_IP GIT_HASH
+oci_write_compose_env "$REPO_DIR" DB_PASSWORD PUBLIC_IP GIT_HASH
 
 cd "$REPO_DIR"
 
