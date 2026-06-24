@@ -52,7 +52,7 @@ pub async fn update_match_status(
 ) -> Result<StatusCode, AppError> {
     state
         .match_lifecycle
-        .change_status(match_id, &payload.status)
+        .change_status(match_id, payload.user_id, &payload.status)
         .await?;
     Ok(StatusCode::OK)
 }
@@ -84,14 +84,13 @@ mod tests {
 
     #[test]
     fn offer_trade_request_deserializes_from_proto3_json() {
-        let json =
-            r#"{"userId": 42, "items": [{"merchId": 7, "direction": "GIVE", "quantity": 3}]}"#;
+        let json = r#"{"userId": 42, "items": [{"merchId": 7, "giverUserId": 42, "quantity": 3}]}"#;
         let req: OfferTradeRequest =
             serde_json::from_str(json).expect("camelCase proto3 JSON should deserialize");
         assert_eq!(req.user_id, 42);
         assert_eq!(req.items.len(), 1);
         assert_eq!(req.items[0].merch_id, 7);
-        assert_eq!(req.items[0].direction, "GIVE");
+        assert_eq!(req.items[0].giver_user_id, 42);
         assert_eq!(req.items[0].quantity, 3);
     }
 }

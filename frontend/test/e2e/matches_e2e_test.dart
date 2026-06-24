@@ -216,11 +216,11 @@ void main() {
       ..items.addAll([
         pb.OfferItem()
           ..merchId = cardA
-          ..direction = 'GIVE'
+          ..giverUserId = user1Id
           ..quantity = 1,
         pb.OfferItem()
           ..merchId = cardB
-          ..direction = 'RECEIVE'
+          ..giverUserId = user2Id
           ..quantity = 1,
       ]);
     await api.post(
@@ -230,14 +230,17 @@ void main() {
     expect(await getMatchStatus(matchId), 'OFFERED');
 
     // 2. OFFERED → ACCEPTED  via POST /matches/{id}/status
+    //    The non-proposer (user2) accepts the balanced proposal.
     await api.post('/api/v1/matches/$matchId/status', {
       'status': 'ACCEPTED',
+      'userId': user2Id,
     });
     expect(await getMatchStatus(matchId), 'ACCEPTED');
 
     // 3. ACCEPTED → COMPLETED  via POST /matches/{id}/status
     await api.post('/api/v1/matches/$matchId/status', {
       'status': 'COMPLETED',
+      'userId': user1Id,
     });
     expect(await getMatchStatus(matchId), 'COMPLETED');
 

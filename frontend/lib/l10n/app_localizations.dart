@@ -998,6 +998,54 @@ abstract class AppLocalizations {
   /// **'Items you receive:'**
   String get itemsYouReceive;
 
+  /// Button for the non-proposer to edit and resend a proposal
+  ///
+  /// In en, this message translates to:
+  /// **'Counter-offer'**
+  String get counterOffer;
+
+  /// Balance indicator label when the two sides give equal total quantity
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get balanced;
+
+  /// Balance indicator label when the two sides give unequal total quantity
+  ///
+  /// In en, this message translates to:
+  /// **'Unbalanced'**
+  String get unbalanced;
+
+  /// Hint explaining the accept button is disabled until balanced
+  ///
+  /// In en, this message translates to:
+  /// **'Accept requires a balanced offer'**
+  String get acceptBalanceHint;
+
+  /// Per-side quantity totals shown on an OFFERED match card
+  ///
+  /// In en, this message translates to:
+  /// **'You give {give} / receive {recv}'**
+  String balanceSummary(int give, int recv);
+
+  /// Offer dialog mode: specify only what I give
+  ///
+  /// In en, this message translates to:
+  /// **'Give only'**
+  String get giveOnlyMode;
+
+  /// Offer dialog mode: specify only what I want to receive
+  ///
+  /// In en, this message translates to:
+  /// **'Receive only'**
+  String get receiveOnlyMode;
+
+  /// Offer dialog mode: specify both give and receive
+  ///
+  /// In en, this message translates to:
+  /// **'Give & receive'**
+  String get bothMode;
+
   /// Quantity label in the offer dialog
   ///
   /// In en, this message translates to:

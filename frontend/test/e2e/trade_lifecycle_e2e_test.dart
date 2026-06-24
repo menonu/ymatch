@@ -269,11 +269,15 @@ void main() {
     //    shape the Flutter app sends. We use the generated proto
     //    message's `toProto3Json()` (camelCase) so any future
     //    backend casing regression is caught.
+    //    Legs are absolute (#297): each leg is (giverUserId, merchId,
+    //    quantity). u1 gives Card A (giverUserId = u1Id); u1 receives
+    //    Card B, i.e. u2 gives it (giverUserId = u2Id). One-for-one is
+    //    balanced, so the non-proposer (u2) can accept.
     final offerReq = pb.OfferTradeRequest(
       userId: u1Id,
       items: [
-        pb.OfferItem(merchId: cardA, direction: 'GIVE', quantity: 1),
-        pb.OfferItem(merchId: cardB, direction: 'RECEIVE', quantity: 1),
+        pb.OfferItem(merchId: cardA, giverUserId: u1Id, quantity: 1),
+        pb.OfferItem(merchId: cardB, giverUserId: u2Id, quantity: 1),
       ],
     );
     final offerBody = offerReq.toProto3Json() as Map;
@@ -283,7 +287,7 @@ void main() {
     //    implementation changes), this assertion will fail.
     expect(offerBody.keys, containsAll(['userId', 'items']));
     final firstItem = (offerBody['items'] as List).first as Map;
-    expect(firstItem.keys, containsAll(['merchId', 'direction', 'quantity']));
+    expect(firstItem.keys, containsAll(['merchId', 'giverUserId', 'quantity']));
 
     //    Cast to typed map for the API client.
     final offerBodyTyped = Map<String, dynamic>.from(offerBody);
@@ -301,9 +305,13 @@ void main() {
 
     // 7. The OTHER user accepts the offer. The status endpoint is
     //    POST /api/v1/matches/:id/status (not PUT), so use _post.
+    //    #297: accept must come from the non-proposer (u2, since u1
+    //    opened the offer) and the proposal must be balanced — the
+    //    one-for-one legs above satisfy both. The body carries
+    //    `userId` for authorization (UpdateMatchStatusRequest.user_id).
     final acceptStatus = await helper._post(
       '/api/v1/matches/$matchId/status',
-      {'status': 'ACCEPTED'},
+      {'status': 'ACCEPTED', 'userId': u2Id},
     );
     expect(acceptStatus, 200);
 
@@ -313,7 +321,7 @@ void main() {
     //    Either user can drive this transition.
     final complete = await helper._post(
       '/api/v1/matches/$matchId/status',
-      {'status': 'COMPLETED'},
+      {'status': 'COMPLETED', 'userId': u1Id},
     );
     expect(complete, 200);
 

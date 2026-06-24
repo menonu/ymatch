@@ -2838,27 +2838,29 @@ async fn test_match_set_offered_by_writes_column(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_match_insert_match_items_inserts_rows(pool: PgPool) {
+async fn test_match_upsert_legs_inserts_and_updates_rows(pool: PgPool) {
     use backend::generated::ymatch::OfferItem;
 
-    let (u1, _, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
+    let (u1, u2, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
     let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
+    // Two absolute legs with different givers — distinct rows under the
+    // (match_id, giver_user_id, merch_id) unique key.
     let items = vec![
         OfferItem {
             merch_id: merch_for_u1,
-            direction: "GIVE".to_string(),
+            giver_user_id: u1 as i32,
             quantity: 2,
         },
         OfferItem {
             merch_id: merch_for_u1,
-            direction: "RECEIVE".to_string(),
+            giver_user_id: u2 as i32,
             quantity: 1,
         },
     ];
     matches
-        .insert_match_items(&mut *tx, match_id as i32, u1 as i32, &items)
+        .upsert_legs(&mut *tx, match_id as i32, &items)
         .await
         .unwrap();
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM match_items WHERE match_id = $1")
@@ -2867,20 +2869,50 @@ async fn test_match_insert_match_items_inserts_rows(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(count.0, 2);
+
+    // Re-submitting an existing (giver, merch) leg upserts — no new row.
+    let update = vec![OfferItem {
+        merch_id: merch_for_u1,
+        giver_user_id: u1 as i32,
+        quantity: 5,
+    }];
+    matches
+        .upsert_legs(&mut *tx, match_id as i32, &update)
+        .await
+        .unwrap();
+    let count2: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM match_items WHERE match_id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(count2.0, 2);
+    let qty: (i32,) = sqlx::query_as(
+        "SELECT quantity FROM match_items WHERE match_id = $1 AND giver_user_id = $2",
+    )
+    .bind(match_id as i32)
+    .bind(u1 as i32)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(qty.0, 5);
 }
 
 #[sqlx::test]
 async fn test_match_delete_match_items_removes_all(pool: PgPool) {
-    let (u1, _, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
+    let (u1, u2, match_id, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
 
-    // Pre-seed two match_items rows.
-    sqlx::query("INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity) VALUES ($1, $2, $3, 'GIVE', 1), ($1, $2, $3, 'RECEIVE', 2)")
-        .bind(match_id as i32)
-        .bind(merch_for_u1)
-        .bind(u1 as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    // Pre-seed two match_items legs (absolute: giver_user_id).
+    sqlx::query(
+        "INSERT INTO match_items (match_id, merch_id, giver_user_id, quantity) \
+         VALUES ($1, $2, $3, 1), ($1, $2, $4, 2)",
+    )
+    .bind(match_id as i32)
+    .bind(merch_for_u1)
+    .bind(u1 as i32)
+    .bind(u2 as i32)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let mut tx = pool.begin().await.unwrap();
     let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
@@ -3280,7 +3312,8 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         "inventory_applied should be false/null for new match"
     );
 
-    // 6. User1 offers: GIVE Card A, RECEIVE Card B
+    // 6. User1 proposes: give Card A (giver=user1), receive Card B (giver=user2).
+    //    1:1 legs → balanced.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3290,10 +3323,10 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"userId": {}, "items": [
-                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
-                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
                     ]}}"#,
-                    user1_id, merch_a_id, merch_b_id
+                    user1_id, merch_a_id, user1_id, merch_b_id, user2_id
                 )))
                 .unwrap(),
         )
@@ -3317,7 +3350,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
     assert_eq!(matches[0]["status"], "OFFERED");
     assert_eq!(matches[0]["offeredBy"], user1_id);
 
-    // 7. User2 accepts
+    // 7. User2 (non-proposer) accepts the balanced proposal
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3325,14 +3358,17 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/status", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"status": "ACCEPTED"}"#))
+                .body(Body::from(format!(
+                    r#"{{"status": "ACCEPTED", "userId": {}}}"#,
+                    user2_id
+                )))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // 8. Complete
+    // 8. Complete (either participant may complete)
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3340,7 +3376,10 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/status", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"status": "COMPLETED"}"#))
+                .body(Body::from(format!(
+                    r#"{{"status": "COMPLETED", "userId": {}}}"#,
+                    user1_id
+                )))
                 .unwrap(),
         )
         .await
@@ -3548,7 +3587,7 @@ async fn test_offer_on_non_pending_match_rejected(pool: PgPool) {
                 .uri("/api/v1/matches/99999/offer")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"userId": 1, "items": [{"merchId": 1, "direction": "GIVE", "quantity": 1}]}"#,
+                    r#"{"userId": 1, "items": [{"merchId": 1, "giverUserId": 1, "quantity": 1}]}"#,
                 ))
                 .unwrap(),
         )
@@ -3697,10 +3736,11 @@ async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
 
 #[sqlx::test]
 async fn test_offer_with_frontend_proto3_json(pool: PgPool) {
-    let (match_id, user1_id, _user2_id, merch_a_id, merch_b_id) =
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
         setup_pending_trade_match(pool.clone()).await;
 
     // Frontend sends proto3 JSON (camelCase) from OfferTradeRequest.toProto3Json().
+    // GIVE Card A (giver=user1) + RECEIVE Card B (giver=user2) → balanced 1:1.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3710,10 +3750,10 @@ async fn test_offer_with_frontend_proto3_json(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"userId": {}, "items": [
-                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
-                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
                     ]}}"#,
-                    user1_id, merch_a_id, merch_b_id
+                    user1_id, merch_a_id, user1_id, merch_b_id, user2_id
                 )))
                 .unwrap(),
         )
@@ -3883,25 +3923,24 @@ async fn setup_pending_trade_match_quantities(
     (match_id, user1_id, user2_id, merch_a_id, merch_b_id)
 }
 
-/// Issue #294: an offer whose per-item quantity exceeds the matched/wanted
+/// Issue #294: an offer whose per-leg quantity exceeds the matched/wanted
 /// quantity on the receiving side must be rejected (400), while an offer at
-/// or under the want quantity still succeeds.
+/// or under the want quantity still succeeds. Legs are absolute (#297): the
+/// receiver of a leg is the non-giver, so GIVE is capped by the opponent's
+/// want and RECEIVE (giver=opponent) is capped by the requester's own want.
 #[sqlx::test]
 async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
     // user1 TRADE Card A x2, WANT Card B x1
     // user2 TRADE Card B x2, WANT Card A x1
     // Both want quantities are 1, so any offer of 2 units must be capped.
-    let (match_id, user1_id, _user2_id, merch_a_id, merch_b_id) =
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
         setup_pending_trade_match_quantities(pool.clone(), 2, 1, 2, 1).await;
 
     // The match listing must surface the capped (LEAST of trade and want)
     // quantities so the offer dialog cannot even present more than the
-    // receiving side wants: user1's TRADE Card A (2) is capped by user2's
-    // WANT (1) -> userHaves qty 1.
-    //
-    // (The RECEIVE-side listing cap is covered by the backend enforcement
-    // assertions below; the userWants listing has a separate pre-existing
-    // grouping bug tracked in #295.)
+    // receiving side wants. userHaves: user1 TRADE Card A (2) capped by
+    // user2 WANT (1) -> 1. userWants: user2 TRADE Card B (2) capped by
+    // user1 WANT (1) -> 1 (now populated — #295 fixed in this PR).
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3921,8 +3960,14 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
         .find(|i| i["merchId"].as_i64() == Some(merch_a_id))
         .unwrap();
     assert_eq!(have_a["quantity"].as_i64().unwrap(), 1);
+    let wants = matches[0]["userWants"].as_array().unwrap();
+    let want_b = wants
+        .iter()
+        .find(|i| i["merchId"].as_i64() == Some(merch_b_id))
+        .unwrap();
+    assert_eq!(want_b["quantity"].as_i64().unwrap(), 1);
 
-    // GIVE Card A x2 exceeds user2's WANT of Card A (x1) -> 400.
+    // GIVE Card A x2 (giver=user1) exceeds user2's WANT of Card A (x1) -> 400.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3932,9 +3977,9 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"userId": {}, "items": [
-                        {{"merchId": {}, "direction": "GIVE", "quantity": 2}}
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 2}}
                     ]}}"#,
-                    user1_id, merch_a_id
+                    user1_id, merch_a_id, user1_id
                 )))
                 .unwrap(),
         )
@@ -3957,7 +4002,7 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(matches[0]["status"], "PENDING");
 
-    // RECEIVE Card B x2 exceeds user1's own WANT of Card B (x1) -> 400.
+    // RECEIVE Card B x2 (giver=user2) exceeds user1's WANT of Card B (x1) -> 400.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3967,9 +4012,9 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"userId": {}, "items": [
-                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 2}}
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 2}}
                     ]}}"#,
-                    user1_id, merch_b_id
+                    user1_id, merch_b_id, user2_id
                 )))
                 .unwrap(),
         )
@@ -3977,7 +4022,8 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
-    // An offer capped to the want quantity (1 each) still succeeds.
+    // An offer capped to the want quantity (1 each) still succeeds and is
+    // balanced (user1 gives A x1, user2 gives B x1).
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3987,10 +4033,10 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"userId": {}, "items": [
-                        {{"merchId": {}, "direction": "GIVE", "quantity": 1}},
-                        {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
                     ]}}"#,
-                    user1_id, merch_a_id, merch_b_id
+                    user1_id, merch_a_id, user1_id, merch_b_id, user2_id
                 )))
                 .unwrap(),
         )
@@ -4011,6 +4057,239 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
     let matches: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(matches[0]["status"], "OFFERED");
+}
+
+/// Issue #297: the negotiation state machine. A give-only opening proposal is
+/// unbalanced and cannot be accepted; the proposer cannot accept or counter
+/// their own; the non-proposer counter-offers to add the complementary leg
+/// (accumulating), making it balanced, and then the (new) non-proposer accepts.
+#[sqlx::test]
+async fn test_trade_negotiation_counter_offer_and_balance(pool: PgPool) {
+    // user1 TRADE A WANT B; user2 TRADE B WANT A.
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    let post_offer = |pool: &PgPool, uid: i64, items: &str| {
+        let pool = pool.clone();
+        let body = format!(r#"{{"userId": {}, "items": [{}]}}"#, uid, items);
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/matches/{}/offer", match_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    let post_status = |pool: &PgPool, uid: i64, status: &str| {
+        let pool = pool.clone();
+        let body = format!(r#"{{"status": "{}", "userId": {}}}"#, status, uid);
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/matches/{}/status", match_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    let fetch_matches = |pool: &PgPool, uid: i64| {
+        let pool = pool.clone();
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            let resp = app
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/api/v1/matches/user/{}", uid))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let matches: Vec<serde_json::Value> =
+                serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+            matches[0].clone()
+        }
+    };
+
+    // 1. user1 opens give-only (unbalanced): give A x1. -> OFFERED, offeredBy=user1.
+    let give_a = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 1}}"#,
+        merch_a_id, user1_id
+    );
+    assert_eq!(
+        post_offer(&pool, user1_id, &give_a).await.status(),
+        StatusCode::OK
+    );
+    let m = fetch_matches(&pool, user1_id).await;
+    assert_eq!(m["status"], "OFFERED");
+    assert_eq!(m["offeredBy"], user1_id);
+
+    // 2. user2 accept while unbalanced -> 400 (Cannot accept an unbalanced proposal).
+    assert_eq!(
+        post_status(&pool, user2_id, "ACCEPTED").await.status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // 3. user1 (proposer) accept own -> 400 (Cannot accept your own proposal).
+    assert_eq!(
+        post_status(&pool, user1_id, "ACCEPTED").await.status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // 4. user1 counter their own proposal -> 400 (Cannot counter your own proposal).
+    assert_eq!(
+        post_offer(&pool, user1_id, &give_a).await.status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // 5. user2 counter-offer: add give B x1 (giver=user2). Legs accumulate
+    //    -> (u1:A1) + (u2:B1) balanced. -> OFFERED, offeredBy=user2.
+    let give_b = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 1}}"#,
+        merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_offer(&pool, user2_id, &give_b).await.status(),
+        StatusCode::OK
+    );
+    let m = fetch_matches(&pool, user1_id).await;
+    assert_eq!(m["status"], "OFFERED");
+    assert_eq!(m["offeredBy"], user2_id);
+
+    // 6. user1 (non-proposer now) accepts the balanced proposal -> ACCEPTED.
+    assert_eq!(
+        post_status(&pool, user1_id, "ACCEPTED").await.status(),
+        StatusCode::OK
+    );
+    let m = fetch_matches(&pool, user1_id).await;
+    assert_eq!(m["status"], "ACCEPTED");
+}
+
+/// The accept gate re-validates the FULL accumulated leg set against the
+/// receiver's CURRENT want quantity (#297 review). A leg that was within
+/// the cap when proposed can become over-capacity if the receiver lowers
+/// their WANT mid-negotiation; accept must then be rejected with 400 even
+/// though the proposal is balanced — otherwise `apply_inventory` would
+/// over-deliver. The proposer can then counter the leg down to the new
+/// cap and the non-proposer can accept.
+#[sqlx::test]
+async fn test_accept_rejected_when_leg_exceeds_current_want(pool: PgPool) {
+    // WANT x2 on both sides so a 2:2 balanced proposal fits the cap
+    // initially. user1: TRADE A x2 / WANT B x2; user2: TRADE B x2 / WANT A x2.
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    let post_offer = |pool: &PgPool, uid: i64, items: &str| {
+        let pool = pool.clone();
+        let body = format!(r#"{{"userId": {}, "items": [{}]}}"#, uid, items);
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/matches/{}/offer", match_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    let post_status = |pool: &PgPool, uid: i64, status: &str| {
+        let pool = pool.clone();
+        let body = format!(r#"{{"status": "{}", "userId": {}}}"#, status, uid);
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/matches/{}/status", match_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    // Lower user2's WANT of Card A from 2 to `qty` (the inventory upsert
+    // overwrites quantity on conflict, so this is a real mid-negotiation
+    // change to the cap on user1's give-of-A leg).
+    let lower_want = |pool: &PgPool, uid: i64, merch: i64, qty: i32| {
+        let pool = pool.clone();
+        async move {
+            let app = backend::routes::create_router(pool, test_storage());
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/user/inventory")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"userId": {}, "merchId": {}, "status": "WANT", "quantity": {}}}"#,
+                        uid, merch, qty
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+
+    // 1. user1 opens a balanced 2:2 proposal: give A x2 (giver=u1) +
+    //    receive B x2 (giver=u2). Both legs within cap (WANT x2). -> OFFERED.
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 2}}, {{"merchId": {}, "giverUserId": {}, "quantity": 2}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_offer(&pool, user1_id, &items).await.status(),
+        StatusCode::OK
+    );
+
+    // 2. user2 lowers their WANT of Card A from 2 to 1. user1's persisted
+    //    give-of-A x2 leg now exceeds the receiver's WANT (1). The
+    //    proposal is still balanced (2:2), so only the cap gate should
+    //    block accept.
+    assert_eq!(
+        lower_want(&pool, user2_id, merch_a_id, 1).await.status(),
+        StatusCode::OK
+    );
+
+    // 3. user2 (non-proposer) accepts -> 400 (over-cap, despite balanced).
+    assert_eq!(
+        post_status(&pool, user2_id, "ACCEPTED").await.status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // 4. user2 counters the A leg down to 1 (giver=u1, the editor's
+    //    receive) and the B leg down to 1 (giver=u2). Now balanced 1:1 and
+    //    within the new cap. -> OFFERED, offeredBy=user2.
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 1}}, {{"merchId": {}, "giverUserId": {}, "quantity": 1}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_offer(&pool, user2_id, &items).await.status(),
+        StatusCode::OK
+    );
+
+    // 5. user1 (non-proposer now) accepts the within-cap balanced proposal.
+    assert_eq!(
+        post_status(&pool, user1_id, "ACCEPTED").await.status(),
+        StatusCode::OK
+    );
 }
 
 #[sqlx::test]
@@ -4480,7 +4759,8 @@ async fn test_notification_counts_values(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(json_i64(&body, "pendingMatches"), 1);
 
-    // ---- Transition to OFFERED via u1; send a message from u2 (unread for u1) ----
+    // ---- Transition to OFFERED via u1 (balanced: give m_a, receive m_b);
+    //      send a message from u2 (unread for u1) ----
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -4489,8 +4769,8 @@ async fn test_notification_counts_values(pool: PgPool) {
                 .uri(&format!("/api/v1/matches/{}/offer", match_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"userId": {}, "items": [{{"merchId": {}, "direction": "GIVE", "quantity": 1}}]}}"#,
-                    u1, m_a_id
+                    r#"{{"userId": {}, "items": [{{"merchId": {}, "giverUserId": {}, "quantity": 1}}, {{"merchId": {}, "giverUserId": {}, "quantity": 1}}]}}"#,
+                    u1, m_a_id, u1, m_b_id, u2
                 )))
                 .unwrap(),
         )
@@ -4585,7 +4865,7 @@ async fn test_notification_counts_values(pool: PgPool) {
 
     // ---- Transition OFFERED -> ACCEPTED: counts should change again ----
     // Note: the offer's "offeree" is u2; for ACCEPTED, the user_id in
-    // the body is the offeree accepting.
+    // the body is the non-proposer accepting (u2).
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let _ = app
         .oneshot(
@@ -4593,7 +4873,10 @@ async fn test_notification_counts_values(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/matches/{}/status", match_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"status": "ACCEPTED"}"#))
+                .body(Body::from(format!(
+                    r#"{{"status": "ACCEPTED", "userId": {}}}"#,
+                    u2
+                )))
                 .unwrap(),
         )
         .await
@@ -4782,10 +5065,10 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
         .as_i64()
         .unwrap();
 
-    // 7. Walk the lifecycle
+    // 7. Walk the lifecycle (balanced: user1 gives A, user2 gives B)
     let offer_body = format!(
-        r#"{{"userId": {}, "items": [{{"merchId": {}, "direction": "GIVE", "quantity": 1}}, {{"merchId": {}, "direction": "RECEIVE", "quantity": 1}}]}}"#,
-        user1_id, card_a, card_b
+        r#"{{"userId": {}, "items": [{{"merchId": {}, "giverUserId": {}, "quantity": 1}}, {{"merchId": {}, "giverUserId": {}, "quantity": 1}}]}}"#,
+        user1_id, card_a, user1_id, card_b, user2_id
     );
     assert_eq!(
         post_json(
@@ -4802,7 +5085,7 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
         post_json(
             &pool,
             &format!("/api/v1/matches/{}/status", match_id),
-            r#"{"status": "ACCEPTED"}"#
+            &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id)
         )
         .await
         .status(),
@@ -4813,7 +5096,7 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
         post_json(
             &pool,
             &format!("/api/v1/matches/{}/status", match_id),
-            r#"{"status": "COMPLETED"}"#
+            &format!(r#"{{"status": "COMPLETED", "userId": {}}}"#, user1_id)
         )
         .await
         .status(),

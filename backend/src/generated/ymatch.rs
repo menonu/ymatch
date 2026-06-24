@@ -164,11 +164,9 @@ pub struct MatchItem {
     pub match_id: i32,
     #[prost(int32, tag = "3")]
     pub merch_id: i32,
+    /// the user who gives this leg
     #[prost(int32, tag = "4")]
-    pub owner_id: i32,
-    /// "GIVE" or "RECEIVE"
-    #[prost(string, tag = "5")]
-    pub direction: ::prost::alloc::string::String,
+    pub giver_user_id: i32,
     #[prost(int32, tag = "6")]
     pub quantity: i32,
     #[prost(string, optional, tag = "7")]
@@ -285,6 +283,9 @@ pub struct UpdateMatchStatusRequest {
     /// "ACCEPTED", "REJECTED", "COMPLETED"
     #[prost(string, tag = "1")]
     pub status: ::prost::alloc::string::String,
+    /// the user accepting/rejecting/completing (#297 authz)
+    #[prost(int32, tag = "2")]
+    pub user_id: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -299,9 +300,10 @@ pub struct OfferTradeRequest {
 pub struct OfferItem {
     #[prost(int32, tag = "1")]
     pub merch_id: i32,
-    /// "GIVE" or "RECEIVE"
-    #[prost(string, tag = "2")]
-    pub direction: ::prost::alloc::string::String,
+    /// the leg's giver: proposer for give, other participant for receive (#297)
+    #[prost(int32, tag = "2")]
+    pub giver_user_id: i32,
+    /// 0 removes the leg (partial update)
     #[prost(int32, tag = "3")]
     pub quantity: i32,
 }

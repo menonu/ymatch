@@ -4,24 +4,32 @@
 //! the match state machine. Repositories are single-statement; this
 //! service is the only place we open `pool.begin()`.
 //!
-//! State machine:
+//! State machine (#297 negotiation):
 //!
 //! ```text
-//!     PENDING ──offer──> OFFERED
-//!     PENDING ──reject──> REJECTED  (also: OFFERED ──reject──> REJECTED)
-//!     OFFERED ──accept──> ACCEPTED
+//!     PENDING ──propose──> OFFERED ──counter──> OFFERED ── …
+//!        │                   │
+//!        │                   ├─accept (non-proposer + balanced)──> ACCEPTED
+//!        │                   └─reject──────────────────────────> REJECTED
+//!        └──reject──> REJECTED
 //!     ACCEPTED ──complete──> COMPLETED
 //! ```
 //!
+//! `OFFERED` is the "proposal on the table" state; `offered_by` is the last
+//! proposer. Either participant may open from PENDING; only the non-proposer
+//! may counter-offer from OFFERED. Legs accumulate by partial upsert
+//! (unspecified legs persist). Accept is the non-proposer's and requires a
+//! balanced proposal (Σ qty each side gives equal and > 0).
+//!
 //! The apply-inventory step runs *after* COMPLETED and updates the
-//! `inventory` table based on the offer's `match_items` rows. Each side
+//! `inventory` table based on the offer's `match_items` legs. Each side
 //! applies independently; the per-user flag (`user{1,2}_inventory_applied_at`)
 //! prevents double-application.
 
 use crate::error::AppError;
-use crate::generated::ymatch::OfferTradeRequest;
+use crate::generated::ymatch::{OfferItem, OfferTradeRequest};
 use crate::repositories::inventory::InventoryRepository;
-use crate::repositories::match_::{MatchRepository, MatchStatusSnapshot};
+use crate::repositories::match_::MatchRepository;
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -58,18 +66,19 @@ impl MatchLifecycleService {
         }
     }
 
-    /// Transition PENDING -> OFFERED.
+    /// Submit or counter-offer a proposal (#297).
     ///
-    /// Validates: match exists, status==PENDING, user is one of the two
-    /// participants, payload contains at least one item. Inserts each
-    /// `match_items` row, sets `offered_by` and `status='OFFERED'`.
-    /// Atomic.
+    /// A proposal is a set of absolute legs `(giver_user_id, merch_id,
+    /// quantity)`. From PENDING, either participant may open. From OFFERED,
+    /// only the non-proposer may counter-offer. Legs are upserted partially
+    /// (unspecified legs persist; `quantity == 0` removes a leg), so a
+    /// counter can add only its own give/receive to move toward balance.
     ///
-    /// The SQL lives in `MatchRepository` (the `_conn` methods) so the
-    /// repository owns the `matches` and `match_items` tables. This
-    /// service is the orchestrator: open a tx, call the repo
-    /// methods with `&mut *tx`, commit. Drop the `tx` and the
-    /// rollback happens automatically.
+    /// Validates: match exists; transition is legal (`validate_propose_transition`);
+    /// each leg's giver is a participant, quantity >= 0, and the resulting
+    /// quantity per `(giver, merch)` does not exceed the receiver's WANT
+    /// quantity (`validate_legs`). Then upserts legs, sets `offered_by` to
+    /// the proposer and `status='OFFERED'`. Atomic.
     pub async fn offer(&self, match_id: i32, offer: OfferTradeRequest) -> Result<(), AppError> {
         if offer.items.is_empty() {
             return Err(AppError::bad_request("Must select at least one item"));
@@ -83,29 +92,39 @@ impl MatchLifecycleService {
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
-        validate_offer_transition(&offer, &locked)?;
+        validate_propose_transition(
+            &locked.status,
+            offer.user_id,
+            locked.user1_id,
+            locked.user2_id,
+            locked.offered_by,
+        )?;
 
-        // Issue #294: cap offered quantities by the receiving side's WANT
-        // quantity. GIVE is capped by the *other* participant's want;
-        // RECEIVE is capped by the *offerer's* own want.
+        // Issue #294/#297: cap each leg's quantity by the receiver's WANT
+        // quantity. The receiver of a leg is the non-giver, so we need both
+        // participants' want quantities.
         let merch_ids: Vec<i32> = offer.items.iter().map(|i| i.merch_id).collect();
-        let other_id = if offer.user_id == locked.user1_id {
-            locked.user2_id
-        } else {
-            locked.user1_id
-        };
-        let offerer_wants = self
+        let user1_wants = self
             .inventory
-            .want_quantities(&mut *tx, offer.user_id, &merch_ids)
+            .want_quantities(&mut *tx, locked.user1_id, &merch_ids)
             .await?;
-        let other_wants = self
+        let user2_wants = self
             .inventory
-            .want_quantities(&mut *tx, other_id, &merch_ids)
+            .want_quantities(&mut *tx, locked.user2_id, &merch_ids)
             .await?;
-        validate_offer_quantities(&offer, &offerer_wants, &other_wants)?;
+        validate_legs(
+            &offer.items,
+            locked.user1_id,
+            locked.user2_id,
+            &user1_wants,
+            &user2_wants,
+        )?;
 
         self.matches
-            .insert_match_items(&mut *tx, match_id, offer.user_id, &offer.items)
+            .upsert_legs(&mut *tx, match_id, &offer.items)
+            .await?;
+        self.matches
+            .remove_legs(&mut *tx, match_id, &offer.items)
             .await?;
         self.matches
             .set_status(&mut *tx, match_id, STATUS_OFFERED)
@@ -121,9 +140,19 @@ impl MatchLifecycleService {
     /// Validate a state transition and apply it. Possible transitions:
     ///
     /// - PENDING/OFFERED -> REJECTED  (cascades to delete match_items)
-    /// - OFFERED         -> ACCEPTED  (cascades to delete other PENDING matches)
+    /// - OFFERED         -> ACCEPTED  (non-proposer + balanced only; purges
+    ///   other PENDING matches between the same pair)
     /// - ACCEPTED        -> COMPLETED
-    pub async fn change_status(&self, match_id: i32, new_status: &str) -> Result<(), AppError> {
+    ///
+    /// `user_id` is the acting user (carried by `UpdateMatchStatusRequest`
+    /// since #297); `validate_participation` closes the previous authz gap
+    /// where `change_status` ignored who was calling.
+    pub async fn change_status(
+        &self,
+        match_id: i32,
+        user_id: i32,
+        new_status: &str,
+    ) -> Result<(), AppError> {
         validate_transition_target(new_status)?;
 
         let mut tx = self.pool.begin().await?;
@@ -134,21 +163,78 @@ impl MatchLifecycleService {
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
+        validate_participation(user_id, locked.user1_id, locked.user2_id)?;
         validate_status_transition(new_status, &locked.status)?;
 
-        self.matches
-            .set_status(&mut *tx, match_id, new_status)
-            .await?;
-
         if new_status == STATUS_ACCEPTED {
+            // Accept is the non-proposer's, and only of a balanced
+            // proposal whose every leg is still within the receiver's
+            // current WANT quantity. The legs are read *inside* this
+            // transaction (under the `FOR UPDATE` lock on the match row)
+            // so the accept decision is consistent with the locked
+            // snapshot — a concurrent propose is blocked by the lock and
+            // cannot have committed legs we don't see (#297 review).
+            let proposer = locked.offered_by.unwrap_or(locked.user1_id);
+            if user_id == proposer {
+                return Err(AppError::bad_request("Cannot accept your own proposal"));
+            }
+            let items = self
+                .matches
+                .list_match_items_in_tx(&mut *tx, match_id)
+                .await?;
+            let legs: Vec<(i32, i32)> = items
+                .iter()
+                .map(|i| (i.giver_user_id, i.quantity))
+                .collect();
+            if !is_balanced(&legs, locked.user1_id, locked.user2_id) {
+                return Err(AppError::bad_request(
+                    "Cannot accept an unbalanced proposal",
+                ));
+            }
+            // Re-validate the FULL accumulated leg set against the
+            // receiver's current WANT. A leg submitted earlier (and
+            // within cap then) can become over-capacity if the receiver's
+            // WANT changed mid-negotiation; the per-propose cap only
+            // checks the submitted legs, so the final gate re-checks the
+            // whole set before inventory is applied (#297 review).
+            let offer_items: Vec<OfferItem> = items
+                .iter()
+                .map(|i| OfferItem {
+                    merch_id: i.merch_id,
+                    giver_user_id: i.giver_user_id,
+                    quantity: i.quantity,
+                })
+                .collect();
+            let merch_ids: Vec<i32> = offer_items.iter().map(|i| i.merch_id).collect();
+            let user1_wants = self
+                .inventory
+                .want_quantities(&mut *tx, locked.user1_id, &merch_ids)
+                .await?;
+            let user2_wants = self
+                .inventory
+                .want_quantities(&mut *tx, locked.user2_id, &merch_ids)
+                .await?;
+            validate_legs(
+                &offer_items,
+                locked.user1_id,
+                locked.user2_id,
+                &user1_wants,
+                &user2_wants,
+            )?;
+            self.matches
+                .set_status(&mut *tx, match_id, new_status)
+                .await?;
             // Purge other PENDING matches between the same pair.
             self.matches
                 .purge_other_pending(&mut *tx, match_id, locked.user1_id, locked.user2_id)
                 .await?;
-        }
-
-        if new_status == STATUS_REJECTED {
-            self.matches.delete_match_items(&mut *tx, match_id).await?;
+        } else {
+            self.matches
+                .set_status(&mut *tx, match_id, new_status)
+                .await?;
+            if new_status == STATUS_REJECTED {
+                self.matches.delete_match_items(&mut *tx, match_id).await?;
+            }
         }
 
         tx.commit().await?;
@@ -159,10 +245,11 @@ impl MatchLifecycleService {
     /// match. Each side applies independently; the per-user flag
     /// (`user{1,2}_inventory_applied_at`) prevents double-application.
     ///
-    /// The state machine logic for `apply_inventory` is small and
-    /// pure enough to unit test in isolation
-    /// (`apply_inventory_delta`); the transaction-bearing part is
-    /// covered by the integration test
+    /// Legs are absolute (#297): for each leg `(giver, merch, qty)`, the
+    /// giver's TRADE decreases by qty and the receiver's HAVE increases by
+    /// qty. The pure side selection lives in [`apply_inventory_delta`] (so it
+    /// can be unit-tested without a database); the transaction-bearing part
+    /// is covered by the integration test
     /// `test_trade_lifecycle_offer_accept_complete_apply`.
     pub async fn apply_inventory(&self, match_id: i32, user_id: i32) -> Result<(), AppError> {
         let snapshot = self
@@ -192,9 +279,6 @@ impl MatchLifecycleService {
             ));
         }
 
-        let offered_by = snapshot.offered_by.unwrap_or(snapshot.user1_id);
-        let requesting_is_offerer = user_id == offered_by;
-
         let items = self.matches.list_match_items(match_id).await?;
 
         // Open a single transaction so the inventory writes and the
@@ -205,19 +289,11 @@ impl MatchLifecycleService {
         let mut tx = self.pool.begin().await?;
 
         for item in &items {
-            // Items stored from offerer's perspective:
-            //   GIVE = offerer gives, other receives
-            //   RECEIVE = offerer receives, other gives
-            //
-            // For the requesting user:
-            //   - if they are the offerer:
-            //       GIVE    -> decrement own TRADE
-            //       RECEIVE -> increment own HAVE
-            //   - if they are the other (non-offerer):
-            //       GIVE    -> increment own HAVE (they received the offerer's item)
-            //       RECEIVE -> decrement own TRADE (they gave this item)
+            // Absolute leg (#297): giver gives qty of merch to the receiver.
+            //   requesting == giver    -> decrement own TRADE
+            //   requesting == receiver -> increment own HAVE
             let (delta_trade, delta_have) =
-                apply_inventory_delta(&item.direction, requesting_is_offerer, item.quantity);
+                apply_inventory_delta(item.giver_user_id, user_id, item.quantity);
             if delta_trade == 0 && delta_have == 0 {
                 continue;
             }
@@ -239,78 +315,122 @@ impl MatchLifecycleService {
 // the core of correctness), so the transaction-bearing parts of
 // `offer`, `change_status`, and `apply_inventory` are covered by the
 // integration test suite in backend/tests/api_tests.rs. The pure
-// state-machine guards are factored out below (`validate_offer_transition`,
-// `validate_transition_target`, `validate_status_transition`) and
-// `apply_inventory_delta` so they can be unit-tested without a database.
+// state-machine guards are factored out below (`validate_propose_transition`,
+// `validate_participation`, `validate_legs`, `is_balanced`,
+// `validate_transition_target`, `validate_status_transition`,
+// `apply_inventory_delta`) so they can be unit-tested without a database.
 
-/// Validate that each offered item's quantity is within the matched/wanted
-/// quantity on the receiving side.
+/// Validate that the proposed legs are well-formed and within the receiver's
+/// WANT quantity (#294/#297).
 ///
-/// Factored out of [`MatchLifecycleService::offer`] so the cap can be
-/// unit-tested without a database. The caller resolves the want-quantity
-/// maps from the inventory table and passes them in:
-///
-/// - `offerer_wants` — the offerer's WANT quantities, keyed by merch_id.
-///   Caps RECEIVE items (the offerer receives, so the offerer must want at
-///   least that many).
-/// - `other_wants` — the other participant's WANT quantities, keyed by
-///   merch_id. Caps GIVE items (the offerer gives, so the other side must
-///   want at least that many).
-///
-/// Quantities are aggregated per `(direction, merch_id)` so a caller cannot
-/// bypass the cap by splitting one over-quota item into several rows.
-fn validate_offer_quantities(
-    offer: &OfferTradeRequest,
-    offerer_wants: &std::collections::HashMap<i32, i32>,
-    other_wants: &std::collections::HashMap<i32, i32>,
+/// Each leg is `(giver_user_id, merch_id, quantity)`; the receiver is the
+/// non-giver, so the cap is the non-giver's WANT of that merch. `quantity`
+/// may be 0 (remove the leg); negative is rejected. Quantities are
+/// aggregated per `(giver, merch_id)` so a caller cannot bypass the cap by
+/// splitting one over-quota leg into several rows. `user1_wants` /
+/// `user2_wants` are the two participants' WANT maps keyed by merch_id.
+fn validate_legs(
+    items: &[OfferItem],
+    user1_id: i32,
+    user2_id: i32,
+    user1_wants: &std::collections::HashMap<i32, i32>,
+    user2_wants: &std::collections::HashMap<i32, i32>,
 ) -> Result<(), AppError> {
-    let mut give_totals: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
-    let mut recv_totals: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
-    for item in &offer.items {
-        if item.quantity <= 0 {
-            return Err(AppError::bad_request("Offer quantity must be positive"));
+    // giver -> merch_id -> aggregated qty (positive legs only)
+    let mut totals: std::collections::HashMap<i32, std::collections::HashMap<i32, i32>> =
+        std::collections::HashMap::new();
+    for item in items {
+        if item.giver_user_id != user1_id && item.giver_user_id != user2_id {
+            return Err(AppError::bad_request("Invalid leg giver"));
         }
-        match item.direction.as_str() {
-            "GIVE" => *give_totals.entry(item.merch_id).or_insert(0) += item.quantity,
-            "RECEIVE" => *recv_totals.entry(item.merch_id).or_insert(0) += item.quantity,
-            other => {
-                return Err(AppError::bad_request(format!("Invalid direction: {other}")));
+        if item.quantity < 0 {
+            return Err(AppError::bad_request("Offer quantity must not be negative"));
+        }
+        if item.quantity > 0 {
+            *totals
+                .entry(item.giver_user_id)
+                .or_default()
+                .entry(item.merch_id)
+                .or_insert(0) += item.quantity;
+        }
+    }
+    for (giver, merch_totals) in &totals {
+        let non_giver = if *giver == user1_id {
+            user2_id
+        } else {
+            user1_id
+        };
+        let wants = if non_giver == user1_id {
+            user1_wants
+        } else {
+            user2_wants
+        };
+        for (merch_id, total) in merch_totals {
+            let cap = wants.get(merch_id).copied().unwrap_or(0);
+            if *total > cap {
+                return Err(AppError::bad_request(
+                    "Offered quantity exceeds the matched/wanted quantity",
+                ));
             }
-        }
-    }
-    for (merch_id, total) in &give_totals {
-        let cap = other_wants.get(merch_id).copied().unwrap_or(0);
-        if *total > cap {
-            return Err(AppError::bad_request(
-                "Offered quantity exceeds the matched/wanted quantity",
-            ));
-        }
-    }
-    for (merch_id, total) in &recv_totals {
-        let cap = offerer_wants.get(merch_id).copied().unwrap_or(0);
-        if *total > cap {
-            return Err(AppError::bad_request(
-                "Offered quantity exceeds the matched/wanted quantity",
-            ));
         }
     }
     Ok(())
 }
 
-/// Validate the PENDING -> OFFERED transition against the locked match.
-///
-/// Factored out of [`MatchLifecycleService::offer`] so the state-machine
-/// guards can be unit-tested without a database. Assumes the caller has
-/// already resolved the not-found case (the match exists) and checked the
-/// payload is non-empty (that check stays before opening the transaction).
-fn validate_offer_transition(
-    offer: &OfferTradeRequest,
-    locked: &MatchStatusSnapshot,
-) -> Result<(), AppError> {
-    if locked.status != STATUS_PENDING {
-        return Err(AppError::bad_request("Can only offer on PENDING matches"));
+/// Whether the proposal's legs balance: the total quantity each side gives
+/// is equal AND at least one side gives something (so a 0:0 / empty proposal
+/// is not "balanced" and cannot be accepted). `legs` is `(giver_user_id,
+/// quantity)` per leg.
+fn is_balanced(legs: &[(i32, i32)], user1_id: i32, user2_id: i32) -> bool {
+    let mut u1 = 0;
+    let mut u2 = 0;
+    for (giver, qty) in legs {
+        if *giver == user1_id {
+            u1 += qty;
+        } else if *giver == user2_id {
+            u2 += qty;
+        }
     }
-    if offer.user_id != locked.user1_id && offer.user_id != locked.user2_id {
+    u1 == u2 && u1 > 0
+}
+
+/// Validate that a propose/counter-offer transition is legal (#297).
+///
+/// From PENDING either participant may open. From OFFERED only the
+/// non-proposer may counter-offer (the proposer must wait for a response).
+/// The caller has already resolved the not-found case; the non-empty-payload
+/// check stays before opening the transaction.
+fn validate_propose_transition(
+    status: &str,
+    user_id: i32,
+    user1_id: i32,
+    user2_id: i32,
+    offered_by: Option<i32>,
+) -> Result<(), AppError> {
+    if user_id != user1_id && user_id != user2_id {
+        return Err(AppError::forbidden("Not part of this match"));
+    }
+    match status {
+        STATUS_PENDING => Ok(()),
+        STATUS_OFFERED => {
+            let proposer = offered_by.unwrap_or(user1_id);
+            if user_id == proposer {
+                Err(AppError::bad_request(
+                    "Cannot counter your own proposal; wait for a response",
+                ))
+            } else {
+                Ok(())
+            }
+        }
+        _ => Err(AppError::bad_request(
+            "Can only propose on PENDING or OFFERED matches",
+        )),
+    }
+}
+
+/// Validate that the acting user is one of the match's two participants.
+fn validate_participation(user_id: i32, user1_id: i32, user2_id: i32) -> Result<(), AppError> {
+    if user_id != user1_id && user_id != user2_id {
         return Err(AppError::forbidden("Not part of this match"));
     }
     Ok(())
@@ -350,27 +470,19 @@ fn validate_status_transition(new_status: &str, current_status: &str) -> Result<
     }
 }
 
-/// Map `(direction, requesting_is_offerer) -> (delta_trade, delta_have)`.
+/// Map `(giver_id, requesting_user_id, quantity) -> (delta_trade, delta_have)`.
 ///
-/// This is the same logic that `apply_inventory` uses, factored out as a
-/// pure function so it can be unit-tested without a database.
-fn apply_inventory_delta(
-    direction: &str,
-    requesting_is_offerer: bool,
-    quantity: i32,
-) -> (i32, i32) {
-    if requesting_is_offerer {
-        match direction {
-            "GIVE" => (quantity, 0),
-            "RECEIVE" => (0, quantity),
-            _ => (0, 0),
-        }
+/// Absolute legs (#297): the giver's TRADE decreases by qty and the
+/// receiver's HAVE increases by qty. For the requesting user, return the
+/// side that applies to them: if they are the giver → `(qty, 0)` (their
+/// TRADE decreases); if they are the receiver → `(0, qty)` (their HAVE
+/// increases). Factored out as a pure function so it can be unit-tested
+/// without a database.
+fn apply_inventory_delta(giver_id: i32, requesting_user_id: i32, quantity: i32) -> (i32, i32) {
+    if giver_id == requesting_user_id {
+        (quantity, 0)
     } else {
-        match direction {
-            "GIVE" => (0, quantity),
-            "RECEIVE" => (quantity, 0),
-            _ => (0, 0),
-        }
+        (0, quantity)
     }
 }
 
@@ -379,95 +491,70 @@ mod tests {
     use super::*;
     use crate::generated::ymatch::OfferItem;
 
-    /// Build a `MatchStatusSnapshot` with only the fields the guards read.
-    fn snapshot(status: &str, user1: i32, user2: i32) -> MatchStatusSnapshot {
-        MatchStatusSnapshot {
-            user1_id: user1,
-            user2_id: user2,
-            status: status.to_string(),
-            offered_by: None,
-            user1_applied: false,
-            user2_applied: false,
-        }
-    }
-
-    /// Build an `OfferTradeRequest` for `user_id` with a single dummy item.
-    /// The guards under test don't inspect items, so one placeholder suffices.
-    fn offer(user_id: i32) -> OfferTradeRequest {
-        OfferTradeRequest {
-            user_id,
-            items: vec![OfferItem {
-                merch_id: 1,
-                direction: "GIVE".into(),
-                quantity: 1,
-            }],
-        }
-    }
-
-    // --- apply_inventory_delta ---
-
-    #[test]
-    fn offerer_give_decrements_own_trade() {
-        assert_eq!(apply_inventory_delta("GIVE", true, 3), (3, 0));
-    }
-
-    #[test]
-    fn offerer_receive_increments_own_have() {
-        assert_eq!(apply_inventory_delta("RECEIVE", true, 5), (0, 5));
-    }
-
-    #[test]
-    fn other_give_increments_own_have() {
-        assert_eq!(apply_inventory_delta("GIVE", false, 2), (0, 2));
-    }
-
-    #[test]
-    fn other_receive_decrements_own_trade() {
-        assert_eq!(apply_inventory_delta("RECEIVE", false, 4), (4, 0));
-    }
-
-    #[test]
-    fn unknown_direction_is_noop() {
-        assert_eq!(apply_inventory_delta("FOO", true, 1), (0, 0));
-        assert_eq!(apply_inventory_delta("FOO", false, 1), (0, 0));
-    }
-
-    // --- validate_offer_quantities (want-quantity cap) ---
-
     fn want_map(entries: &[(i32, i32)]) -> std::collections::HashMap<i32, i32> {
         entries.iter().copied().collect()
     }
 
-    fn offer_qty(user_id: i32, items: &[(i32, &str, i32)]) -> OfferTradeRequest {
-        OfferTradeRequest {
-            user_id,
-            items: items
-                .iter()
-                .map(|(merch_id, direction, quantity)| OfferItem {
-                    merch_id: *merch_id,
-                    direction: (*direction).to_string(),
-                    quantity: *quantity,
-                })
-                .collect(),
-        }
+    /// Build a leg list `(giver_user_id, merch_id, quantity)` for `validate_legs`.
+    fn legs(items: &[(i32, i32, i32)]) -> Vec<OfferItem> {
+        items
+            .iter()
+            .map(|(giver, merch, qty)| OfferItem {
+                merch_id: *merch,
+                giver_user_id: *giver,
+                quantity: *qty,
+            })
+            .collect()
+    }
+
+    // --- apply_inventory_delta (giver-absolute, #297) ---
+
+    #[test]
+    fn giver_is_requester_decrements_own_trade() {
+        // Requesting user is the giver: their TRADE decreases by qty.
+        assert_eq!(apply_inventory_delta(1, 1, 3), (3, 0));
     }
 
     #[test]
-    fn give_within_other_want_ok() {
-        // Offerer gives merch 1 x2; other side wants merch 1 x2.
-        let offer = offer_qty(1, &[(1, "GIVE", 2)]);
+    fn receiver_increments_own_have() {
+        // Requesting user is the receiver: their HAVE increases by qty.
+        assert_eq!(apply_inventory_delta(2, 1, 5), (0, 5));
+    }
+
+    #[test]
+    fn zero_quantity_is_noop() {
+        assert_eq!(apply_inventory_delta(1, 1, 0), (0, 0));
+        assert_eq!(apply_inventory_delta(2, 1, 0), (0, 0));
+    }
+
+    // --- validate_legs (want-quantity cap, giver model) ---
+
+    #[test]
+    fn give_leg_within_receiver_want_ok() {
+        // giver=1 gives merch 1 x2; receiver=2 wants merch 1 x2.
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 2)])),
+            validate_legs(
+                &legs(&[(1, 1, 2)]),
+                1,
+                2,
+                &want_map(&[]),
+                &want_map(&[(1, 2)])
+            ),
             Ok(())
         );
     }
 
     #[test]
-    fn give_exceeding_other_want_rejected() {
-        // Offerer gives merch 1 x3; other side only wants x2.
-        let offer = offer_qty(1, &[(1, "GIVE", 3)]);
+    fn give_leg_exceeds_receiver_want_rejected() {
+        // giver=1 gives merch 1 x3; receiver=2 only wants x2.
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 2)])),
+            validate_legs(
+                &legs(&[(1, 1, 3)]),
+                1,
+                2,
+                &want_map(&[]),
+                &want_map(&[(1, 2)])
+            ),
             Err(AppError::bad_request(
                 "Offered quantity exceeds the matched/wanted quantity"
             ))
@@ -475,11 +562,27 @@ mod tests {
     }
 
     #[test]
-    fn give_with_no_matching_want_rejected() {
-        // Offerer gives merch 1 x1; other side does not want it at all.
-        let offer = offer_qty(1, &[(1, "GIVE", 1)]);
+    fn receive_leg_capped_by_requester_want() {
+        // giver=2 gives merch 2 (= user1 receives); receiver=1 wants merch 2 x1.
+        // qty 1 ok, qty 2 rejected.
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[])),
+            validate_legs(
+                &legs(&[(2, 2, 1)]),
+                1,
+                2,
+                &want_map(&[(2, 1)]),
+                &want_map(&[])
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            validate_legs(
+                &legs(&[(2, 2, 2)]),
+                1,
+                2,
+                &want_map(&[(2, 1)]),
+                &want_map(&[])
+            ),
             Err(AppError::bad_request(
                 "Offered quantity exceeds the matched/wanted quantity"
             ))
@@ -487,108 +590,168 @@ mod tests {
     }
 
     #[test]
-    fn receive_within_offerer_want_ok() {
-        // Offerer receives merch 2 x1; offerer wants merch 2 x1.
-        let offer = offer_qty(1, &[(2, "RECEIVE", 1)]);
+    fn split_legs_cannot_bypass_cap() {
+        // Two legs (giver=1, merch=1, qty=1); receiver=2 wants only x1.
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[(2, 1)]), &want_map(&[])),
+            validate_legs(
+                &legs(&[(1, 1, 1), (1, 1, 1)]),
+                1,
+                2,
+                &want_map(&[]),
+                &want_map(&[(1, 1)])
+            ),
+            Err(AppError::bad_request(
+                "Offered quantity exceeds the matched/wanted quantity"
+            ))
+        );
+    }
+
+    #[test]
+    fn negative_quantity_rejected() {
+        assert_eq!(
+            validate_legs(
+                &legs(&[(1, 1, -1)]),
+                1,
+                2,
+                &want_map(&[]),
+                &want_map(&[(1, 1)])
+            ),
+            Err(AppError::bad_request("Offer quantity must not be negative"))
+        );
+    }
+
+    #[test]
+    fn invalid_giver_rejected() {
+        // giver=3 is not a participant.
+        assert_eq!(
+            validate_legs(
+                &legs(&[(3, 1, 1)]),
+                1,
+                2,
+                &want_map(&[]),
+                &want_map(&[(1, 1)])
+            ),
+            Err(AppError::bad_request("Invalid leg giver"))
+        );
+    }
+
+    #[test]
+    fn zero_quantity_leg_allowed_no_cap_check() {
+        // qty 0 = remove; no want is required for a removal.
+        assert_eq!(
+            validate_legs(&legs(&[(1, 1, 0)]), 1, 2, &want_map(&[]), &want_map(&[])),
             Ok(())
         );
     }
 
     #[test]
-    fn receive_exceeding_offerer_want_rejected() {
-        // Offerer receives merch 2 x2; offerer only wants x1.
-        let offer = offer_qty(1, &[(2, "RECEIVE", 2)]);
+    fn each_side_capped_independently() {
+        // giver=1 gives merch 1 x1 (receiver 2 wants 1 → ok);
+        // giver=2 gives merch 2 x2 (receiver 1 wants 1 → reject).
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[(2, 1)]), &want_map(&[])),
+            validate_legs(
+                &legs(&[(1, 1, 1), (2, 2, 2)]),
+                1,
+                2,
+                &want_map(&[(2, 1)]),
+                &want_map(&[(1, 1)])
+            ),
             Err(AppError::bad_request(
                 "Offered quantity exceeds the matched/wanted quantity"
             ))
         );
     }
 
+    // --- is_balanced ---
+
     #[test]
-    fn split_items_cannot_bypass_cap() {
-        // Two GIVE rows of merch 1 x1 each; other side wants only x1.
-        // Aggregation must catch the 2-total exceeding the 1-cap.
-        let offer = offer_qty(1, &[(1, "GIVE", 1), (1, "GIVE", 1)]);
+    fn balanced_when_equal_totals() {
+        // u1 gives 2, u2 gives 2 → balanced.
+        assert!(is_balanced(&[(1, 2), (2, 2)], 1, 2));
+    }
+
+    #[test]
+    fn unbalanced_when_totals_differ() {
+        assert!(!is_balanced(&[(1, 3), (2, 2)], 1, 2));
+    }
+
+    #[test]
+    fn balanced_across_different_merch() {
+        // u1 gives 1 of merch A + 1 of merch B (total 2); u2 gives 2 of merch C.
+        assert!(is_balanced(&[(1, 1), (1, 1), (2, 2)], 1, 2));
+    }
+
+    #[test]
+    fn empty_proposal_not_balanced() {
+        // 0:0 is not a trade.
+        assert!(!is_balanced(&[], 1, 2));
+    }
+
+    // --- validate_propose_transition (PENDING open / OFFERED counter) ---
+
+    #[test]
+    fn propose_open_on_pending_by_either_participant_ok() {
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 1)])),
+            validate_propose_transition(STATUS_PENDING, 1, 1, 2, None),
+            Ok(())
+        );
+        assert_eq!(
+            validate_propose_transition(STATUS_PENDING, 2, 1, 2, None),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn counter_on_offered_by_non_proposer_ok() {
+        // offered_by=1 (proposer); user 2 counters.
+        assert_eq!(
+            validate_propose_transition(STATUS_OFFERED, 2, 1, 2, Some(1)),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn counter_on_offered_by_proposer_rejected() {
+        // offered_by=1; user 1 cannot counter their own proposal.
+        assert_eq!(
+            validate_propose_transition(STATUS_OFFERED, 1, 1, 2, Some(1)),
             Err(AppError::bad_request(
-                "Offered quantity exceeds the matched/wanted quantity"
+                "Cannot counter your own proposal; wait for a response"
             ))
         );
     }
 
     #[test]
-    fn non_positive_quantity_rejected() {
-        let offer = offer_qty(1, &[(1, "GIVE", 0)]);
+    fn propose_by_non_participant_forbidden() {
         assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 1)])),
-            Err(AppError::bad_request("Offer quantity must be positive"))
-        );
-    }
-
-    #[test]
-    fn invalid_direction_rejected() {
-        let offer = offer_qty(1, &[(1, "TRADE", 1)]);
-        assert!(validate_offer_quantities(&offer, &want_map(&[]), &want_map(&[(1, 1)])).is_err());
-    }
-
-    #[test]
-    fn mixed_directions_each_capped_independently() {
-        // GIVE merch 1 x1 (other wants 1) + RECEIVE merch 2 x2 (offerer wants 1).
-        let offer = offer_qty(1, &[(1, "GIVE", 1), (2, "RECEIVE", 2)]);
-        assert_eq!(
-            validate_offer_quantities(&offer, &want_map(&[(2, 1)]), &want_map(&[(1, 1)])),
-            Err(AppError::bad_request(
-                "Offered quantity exceeds the matched/wanted quantity"
-            ))
-        );
-    }
-
-    // --- validate_offer_transition (PENDING -> OFFERED) ---
-
-    #[test]
-    fn offer_on_non_pending_rejected() {
-        // Status is checked before participation, so a participant offering
-        // on a non-PENDING match still gets the status error.
-        assert_eq!(
-            validate_offer_transition(&offer(1), &snapshot("OFFERED", 1, 2)),
-            Err(AppError::bad_request("Can only offer on PENDING matches"))
-        );
-    }
-
-    #[test]
-    fn offer_on_completed_rejected() {
-        assert_eq!(
-            validate_offer_transition(&offer(1), &snapshot("COMPLETED", 1, 2)),
-            Err(AppError::bad_request("Can only offer on PENDING matches"))
-        );
-    }
-
-    #[test]
-    fn offer_by_non_participant_forbidden() {
-        assert_eq!(
-            validate_offer_transition(&offer(3), &snapshot("PENDING", 1, 2)),
+            validate_propose_transition(STATUS_PENDING, 3, 1, 2, None),
             Err(AppError::forbidden("Not part of this match"))
         );
     }
 
     #[test]
-    fn offer_by_user1_on_pending_ok() {
+    fn propose_on_completed_rejected() {
         assert_eq!(
-            validate_offer_transition(&offer(1), &snapshot("PENDING", 1, 2)),
-            Ok(())
+            validate_propose_transition(STATUS_COMPLETED, 1, 1, 2, None),
+            Err(AppError::bad_request(
+                "Can only propose on PENDING or OFFERED matches"
+            ))
         );
     }
 
+    // --- validate_participation ---
+
     #[test]
-    fn offer_by_user2_on_pending_ok() {
+    fn participation_ok_for_either_user() {
+        assert_eq!(validate_participation(1, 1, 2), Ok(()));
+        assert_eq!(validate_participation(2, 1, 2), Ok(()));
+    }
+
+    #[test]
+    fn participation_rejected_for_outsider() {
         assert_eq!(
-            validate_offer_transition(&offer(2), &snapshot("PENDING", 1, 2)),
-            Ok(())
+            validate_participation(3, 1, 2),
+            Err(AppError::forbidden("Not part of this match"))
         );
     }
 

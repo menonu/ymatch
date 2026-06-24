@@ -492,6 +492,32 @@ class AppLocalizationsJa extends AppLocalizations {
   String get itemsYouReceive => '受け取るアイテム:';
 
   @override
+  String get counterOffer => '逆オファー';
+
+  @override
+  String get balanced => '均衡';
+
+  @override
+  String get unbalanced => '不均衡';
+
+  @override
+  String get acceptBalanceHint => '承諾には均衡したオファーが必要です';
+
+  @override
+  String balanceSummary(int give, int recv) {
+    return '渡す $give / 受取 $recv';
+  }
+
+  @override
+  String get giveOnlyMode => '渡すだけ';
+
+  @override
+  String get receiveOnlyMode => 'もらうだけ';
+
+  @override
+  String get bothMode => '渡して受け取る';
+
+  @override
   String qtyLabel(int count) {
     return '数量: $count';
   }

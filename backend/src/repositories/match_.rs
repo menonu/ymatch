@@ -23,9 +23,9 @@
 //! or any other sqlx Executor.
 //!
 //! The Executor is consumed by `.execute()` so the method body must
-//! use it exactly once. For [`insert_match_items`] the previous
-//! N-statement loop is refactored into a single `INSERT ... SELECT
-//! FROM UNNEST(...)` so the bulk insert runs as one statement.
+//! use it exactly once. For [`MatchRepository::upsert_legs`] (#297) the
+//! partial leg upsert runs as at most two statements (one upsert, one
+//! delete of zero-quantity legs).
 //!
 //! Standard pattern in sqlx: the service opens the transaction
 //! (`let mut tx = self.pool.begin().await?;`) and the repo methods are
@@ -127,11 +127,16 @@ impl MatchRepository {
 
         // Query 3: wants — the mirror of haves, single query. The `quantity`
         // is capped the same way (LEAST of peer's TRADE and requester's WANT).
+        //
+        // `peer_user_id` is `i.user_id` (the peer who TRADES the item), so
+        // `wants_by_peer` is keyed by the peer — matching the `other_id`
+        // lookup in the assembly. Previously this keyed by `w.user_id`
+        // (the requester), leaving `userWants` always empty (#295).
         let want_sql = r#"
             SELECT i.id, i.user_id, i.merch_id, i.status,
                    LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
-                   w.user_id AS peer_user_id
+                   i.user_id AS peer_user_id
             FROM inventory i
             JOIN merchandise m ON m.id = i.merch_id
             JOIN inventory w
@@ -147,13 +152,14 @@ impl MatchRepository {
             .await?;
 
         // Query 4: match_items for the matches we care about, batched.
+        // Legs are absolute: each row is "giver_user_id gives merch_id qty".
         let items_sql = r#"
-            SELECT mi.id, mi.match_id, mi.merch_id, mi.owner_id, mi.direction, mi.quantity,
+            SELECT mi.id, mi.match_id, mi.merch_id, mi.giver_user_id, mi.quantity,
                    m.name AS merch_name, m.photo_url
             FROM match_items mi
             JOIN merchandise m ON m.id = mi.merch_id
             WHERE mi.match_id = ANY($1)
-            ORDER BY mi.direction, mi.id
+            ORDER BY mi.giver_user_id, mi.id
         "#;
         let item_rows = sqlx::query(items_sql)
             .bind(&match_ids)
@@ -208,8 +214,7 @@ impl MatchRepository {
                 id: r.get("id"),
                 match_id: mid,
                 merch_id: r.get("merch_id"),
-                owner_id: r.get("owner_id"),
-                direction: r.get("direction"),
+                giver_user_id: r.get("giver_user_id"),
                 quantity: r.get("quantity"),
                 merch_name: Some(r.get("merch_name")),
                 // See #224. Decode as Option<String>.
@@ -277,17 +282,37 @@ impl MatchRepository {
     }
 
     /// List `match_items` joined with `merchandise` for the apply endpoint.
+    ///
+    /// Delegates to [`list_match_items_in_tx`] on the pool. The
+    /// transaction-aware variant exists so `change_status`'s accept gate
+    /// can read the legs inside the same `FOR UPDATE` transaction it
+    /// holds (see [`crate::services::match_lifecycle`]).
     pub async fn list_match_items(&self, match_id: i32) -> Result<Vec<MatchItem>, AppError> {
+        self.list_match_items_in_tx(&self.pool, match_id).await
+    }
+
+    /// Transaction-aware [`list_match_items`]: same query, run on the
+    /// supplied executor so the read participates in the caller's
+    /// transaction snapshot (e.g. the accept gate reads legs under the
+    /// `FOR UPDATE` lock it already holds).
+    pub async fn list_match_items_in_tx<'c, E>(
+        &self,
+        exec: E,
+        match_id: i32,
+    ) -> Result<Vec<MatchItem>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let rows = sqlx::query(
-            r#"SELECT mi.id, mi.match_id, mi.merch_id, mi.owner_id, mi.direction, mi.quantity,
+            r#"SELECT mi.id, mi.match_id, mi.merch_id, mi.giver_user_id, mi.quantity,
                       m.name AS merch_name, m.photo_url
                FROM match_items mi
                JOIN merchandise m ON m.id = mi.merch_id
                WHERE mi.match_id = $1
-               ORDER BY mi.direction, mi.id"#,
+               ORDER BY mi.giver_user_id, mi.id"#,
         )
         .bind(match_id)
-        .fetch_all(&self.pool)
+        .fetch_all(exec)
         .await?;
         Ok(rows
             .iter()
@@ -295,8 +320,7 @@ impl MatchRepository {
                 id: r.get("id"),
                 match_id: r.get("match_id"),
                 merch_id: r.get("merch_id"),
-                owner_id: r.get("owner_id"),
-                direction: r.get("direction"),
+                giver_user_id: r.get("giver_user_id"),
                 quantity: r.get("quantity"),
                 merch_name: Some(r.get("merch_name")),
                 // See #224. Decode as Option<String> directly; no
@@ -420,39 +444,94 @@ impl MatchRepository {
         Ok(())
     }
 
-    /// Bulk-insert match_items rows for an offer.
+    /// Upsert the positive-quantity legs of a proposal (#297).
     ///
-    /// Implemented as a single `INSERT ... SELECT FROM UNNEST(...)` so
-    /// the generic `Executor` parameter (consumed by `.execute()`) is
-    /// used exactly once per call. Empty `items` is a no-op (the
-    /// `UNNEST` of empty arrays produces zero rows).
-    pub async fn insert_match_items<'c, E>(
+    /// Each `OfferItem` is an absolute leg `(giver_user_id, merch_id, quantity)`;
+    /// legs with `quantity > 0` are upserted on the key `(match_id, giver_user_id,
+    /// merch_id)` (the unique constraint lets `ON CONFLICT … DO UPDATE` set the
+    /// new quantity). Zero-quantity legs are removed by [`remove_legs`]. Legs
+    /// not mentioned in `items` are untouched, so counter-offers accumulate: a
+    /// non-proposer can add only their-give (or only their receive) to move
+    /// toward balance. Single statement so the generic `Executor` is consumed
+    /// once; the caller (service) reborrow `&mut *tx` per call.
+    ///
+    /// **Ordering contract:** the service calls [`upsert_legs`] *before*
+    /// [`remove_legs`] within one transaction. They touch disjoint leg sets
+    /// (positive vs zero quantity), so the order does not change the final
+    /// rows, but the pair is one logical "apply these legs" step — keep them
+    /// adjacent and in this order. (A future single `apply_legs` that
+    /// partitions internally would remove this contract.)
+    pub async fn upsert_legs<'c, E>(
         &self,
         exec: E,
         match_id: i32,
-        owner_id: i32,
         items: &[OfferItem],
     ) -> Result<(), AppError>
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        if items.is_empty() {
+        let upsert: Vec<(i32, i32, i32)> = items
+            .iter()
+            .filter(|i| i.quantity > 0)
+            .map(|i| (i.giver_user_id, i.merch_id, i.quantity))
+            .collect();
+        if upsert.is_empty() {
             return Ok(());
         }
-        let merch_ids: Vec<i32> = items.iter().map(|i| i.merch_id).collect();
-        let directions: Vec<String> = items.iter().map(|i| i.direction.clone()).collect();
-        let quantities: Vec<i32> = items.iter().map(|i| i.quantity).collect();
+        let givers: Vec<i32> = upsert.iter().map(|t| t.0).collect();
+        let merch: Vec<i32> = upsert.iter().map(|t| t.1).collect();
+        let qty: Vec<i32> = upsert.iter().map(|t| t.2).collect();
         sqlx::query(
-            r#"INSERT INTO match_items (match_id, merch_id, owner_id, direction, quantity)
-               SELECT $1, merch_id, $3, direction, quantity
-               FROM UNNEST($2::int[], $4::text[], $5::int[])
-                 AS t(merch_id, direction, quantity)"#,
+            r#"INSERT INTO match_items (match_id, giver_user_id, merch_id, quantity)
+               SELECT $1, giver_user_id, merch_id, quantity
+               FROM UNNEST($2::int[], $3::int[], $4::int[])
+                 AS t(giver_user_id, merch_id, quantity)
+               ON CONFLICT (match_id, giver_user_id, merch_id)
+               DO UPDATE SET quantity = EXCLUDED.quantity"#,
         )
         .bind(match_id)
-        .bind(&merch_ids)
-        .bind(owner_id)
-        .bind(&directions)
-        .bind(&quantities)
+        .bind(&givers)
+        .bind(&merch)
+        .bind(&qty)
+        .execute(exec)
+        .await?;
+        Ok(())
+    }
+
+    /// Remove the zero-quantity legs of a proposal (#297) — the proposer
+    /// explicitly dropped them. Single statement; the caller reborrow
+    /// `&mut *tx` per call. See [`upsert_legs`] for the **ordering contract**
+    /// (upsert before remove, within one transaction).
+    pub async fn remove_legs<'c, E>(
+        &self,
+        exec: E,
+        match_id: i32,
+        items: &[OfferItem],
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let del: Vec<(i32, i32)> = items
+            .iter()
+            .filter(|i| i.quantity == 0)
+            .map(|i| (i.giver_user_id, i.merch_id))
+            .collect();
+        if del.is_empty() {
+            return Ok(());
+        }
+        let givers: Vec<i32> = del.iter().map(|t| t.0).collect();
+        let merch: Vec<i32> = del.iter().map(|t| t.1).collect();
+        sqlx::query(
+            r#"DELETE FROM match_items
+               WHERE match_id = $1
+                 AND (giver_user_id, merch_id) IN (
+                   SELECT giver_user_id, merch_id
+                   FROM UNNEST($2::int[], $3::int[]) AS t(giver_user_id, merch_id)
+                 )"#,
+        )
+        .bind(match_id)
+        .bind(&givers)
+        .bind(&merch)
         .execute(exec)
         .await?;
         Ok(())

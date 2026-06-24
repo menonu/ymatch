@@ -697,6 +697,42 @@
   "@itemsYouReceive": {
     "description": "Section header in the offer dialog for receive items"
   },
+  "counterOffer": "Counter-offer",
+  "@counterOffer": {
+    "description": "Button for the non-proposer to edit and resend a proposal"
+  },
+  "balanced": "Balanced",
+  "@balanced": {
+    "description": "Balance indicator label when the two sides give equal total quantity"
+  },
+  "unbalanced": "Unbalanced",
+  "@unbalanced": {
+    "description": "Balance indicator label when the two sides give unequal total quantity"
+  },
+  "acceptBalanceHint": "Accept requires a balanced offer",
+  "@acceptBalanceHint": {
+    "description": "Hint explaining the accept button is disabled until balanced"
+  },
+  "balanceSummary": "You give {give} / receive {recv}",
+  "@balanceSummary": {
+    "description": "Per-side quantity totals shown on an OFFERED match card",
+    "placeholders": {
+      "give": {"type": "int"},
+      "recv": {"type": "int"}
+    }
+  },
+  "giveOnlyMode": "Give only",
+  "@giveOnlyMode": {
+    "description": "Offer dialog mode: specify only what I give"
+  },
+  "receiveOnlyMode": "Receive only",
+  "@receiveOnlyMode": {
+    "description": "Offer dialog mode: specify only what I want to receive"
+  },
+  "bothMode": "Give & receive",
+  "@bothMode": {
+    "description": "Offer dialog mode: specify both give and receive"
+  },
   "qtyLabel": "Qty: {count}",
   "@qtyLabel": {
     "description": "Quantity label in the offer dialog",
