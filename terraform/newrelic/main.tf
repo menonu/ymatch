@@ -5,6 +5,15 @@ terraform {
       version = "~> 3.50"
     }
   }
+
+  # Remote state in OCI Object Storage (#307), sharing the ymatch-tfstate
+  # bucket created in #302 under a distinct key. Same partial-backend
+  # pattern as terraform/oci: tenancy namespace/region come from a
+  # gitignored backend.hcl at `terraform init -backend-config=backend.hcl`.
+  backend "oci" {
+    bucket = "ymatch-tfstate"
+    key    = "terraform/newrelic/terraform.tfstate"
+  }
 }
 
 provider "newrelic" {

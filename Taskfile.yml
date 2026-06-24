@@ -163,10 +163,15 @@ tasks:
   # how-to: terraform.tfvars OVERRIDES TF_VAR_ env, so a variable must live
   # in only one of the two files.
   tf:newrelic:init:
-    desc: terraform init (newrelic) — run once
+    desc: terraform init (newrelic) — run once (needs backend.hcl for the remote OCI state backend)
     dir: terraform/newrelic
     cmds:
-      - terraform init -input=false
+      - |
+        if [ ! -f backend.hcl ]; then
+          echo "::error::terraform/newrelic/backend.hcl not found. Copy backend.hcl.example to backend.hcl and fill in namespace/region." >&2
+          exit 1
+        fi
+        terraform init -input=false -backend-config=backend.hcl
 
   tf:newrelic:plan:
     desc: terraform plan (newrelic) — sources .env for TF_VAR_* secrets

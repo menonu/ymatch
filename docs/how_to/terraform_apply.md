@@ -40,6 +40,8 @@ cp terraform/newrelic/terraform.tfvars.example terraform/newrelic/terraform.tfva
 #   edit terraform.tfvars: account_id, region, app_public_ip
 cp terraform/newrelic/.env.example            terraform/newrelic/.env
 #   edit .env: TF_VAR_api_key, TF_VAR_nr_license_key, TF_VAR_discord_webhook_url
+cp terraform/newrelic/backend.hcl.example     terraform/newrelic/backend.hcl
+#   edit backend.hcl: namespace (oci os ns get), region
 task tf:newrelic:init
 
 # oci
@@ -92,14 +94,15 @@ and **delete it from `terraform.tfvars`** — otherwise tfvars wins and
 Only `.tf`, `*.tfvars.example`, `.env.example`, and `backend.hcl.example`
 are committed, and they contain only placeholders — never real values.
 
-## Remote state backend (OCI module)
+## Remote state backend (OCI Object Storage)
 
-The `terraform/oci` module stores state in an **OCI Object Storage**
-bucket (`ymatch-tfstate`) rather than a local file, so state is shared
-across machines and protected by Object Storage locking (#302). The
-bucket is created out-of-band (it can't be managed by the config that
-stores its state in it) and the tenancy-specific backend values live in
-the gitignored `backend.hcl`.
+Both `terraform/oci` (#302) and `terraform/newrelic` (#307) store state
+in the same **OCI Object Storage** bucket (`ymatch-tfstate`), each under
+a distinct state key, rather than local files — so state is shared
+across machines and protected by Object Storage locking. The bucket is
+created out-of-band (it can't be managed by a config that stores its
+state in it) and the tenancy-specific backend values live in each
+module's gitignored `backend.hcl`.
 
 ### One-time bucket bootstrap
 
@@ -113,13 +116,15 @@ TENANCY=$(grep '^tenancy' ~/.oci/config | awk '{print $3}')
 oci os bucket create --name ymatch-tfstate --compartment-id "$TENANCY" --versioning Enabled
 ```
 
-### Point the module at the backend
+### Point a module at the backend
+
+Repeat per module (`terraform/oci`, `terraform/newrelic`):
 
 ```bash
-cd terraform/oci
+cd terraform/oci        # or terraform/newrelic
 cp backend.hcl.example backend.hcl
 #   edit backend.hcl: namespace (from `oci os ns get`), region
-task tf:oci:init      # runs: terraform init -backend-config=backend.hcl
+task tf:oci:init        # or task tf:newrelic:init — runs terraform init -backend-config=backend.hcl
 ```
 
 If you have an existing local `terraform.tfstate`, migrate it to the
@@ -129,6 +134,6 @@ remote backend (one-time):
 terraform init -backend-config=backend.hcl -migrate-state
 ```
 
-After migration, `task tf:oci:plan` / `task tf:oci:apply` read and write
-state through the remote backend automatically — no tarball/scp of state
-files between machines.
+After migration, `task tf:oci:plan` / `task tf:oci:apply` (and the
+`tf:newrelic:*` equivalents) read and write state through the remote
+backend automatically — no tarball/scp of state files between machines.
