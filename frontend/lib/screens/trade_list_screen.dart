@@ -10,12 +10,6 @@ import '../utils/image_helper.dart';
 
 enum TradeTab { match_, offerOut, offerIn, active, completed }
 
-/// Offer-dialog mode (#297): which leg sections the proposer is editing.
-/// `give` = only what I give; `receive` = only what I want to receive;
-/// `both` = both. Sections not shown are left untouched (accumulating), so a
-/// counter-offer can add only its own side to move toward balance.
-enum _OfferMode { give, receive, both }
-
 class TradeListScreen extends ConsumerStatefulWidget {
   const TradeListScreen({super.key});
 
@@ -753,10 +747,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
       receiveQty.putIfAbsent(i.merchId, () => 1);
     }
 
-    var mode = _OfferMode.both;
-
-    // Projected per-side totals after applying the visible-section edits to
-    // the existing legs (hidden sections persist unchanged).
+    // Projected per-side totals after applying the dialog edits to the
+    // existing legs. Both sections are always shown (#303); the accumulating
+    // partial-update still holds because only checked legs are submitted.
     (int, int) projectedTotals() {
       final give = <int, int>{};
       final recv = <int, int>{};
@@ -767,22 +760,18 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           recv[leg.merchId] = leg.quantity;
         }
       }
-      if (mode == _OfferMode.give || mode == _OfferMode.both) {
-        for (final i in giveItems) {
-          if (giveOn[i.merchId] == true) {
-            give[i.merchId] = giveQty[i.merchId] ?? 1;
-          } else if (giveInitially.contains(i.merchId)) {
-            give[i.merchId] = 0;
-          }
+      for (final i in giveItems) {
+        if (giveOn[i.merchId] == true) {
+          give[i.merchId] = giveQty[i.merchId] ?? 1;
+        } else if (giveInitially.contains(i.merchId)) {
+          give[i.merchId] = 0;
         }
       }
-      if (mode == _OfferMode.receive || mode == _OfferMode.both) {
-        for (final i in receiveItems) {
-          if (receiveOn[i.merchId] == true) {
-            recv[i.merchId] = receiveQty[i.merchId] ?? 1;
-          } else if (receiveInitially.contains(i.merchId)) {
-            recv[i.merchId] = 0;
-          }
+      for (final i in receiveItems) {
+        if (receiveOn[i.merchId] == true) {
+          recv[i.merchId] = receiveQty[i.merchId] ?? 1;
+        } else if (receiveInitially.contains(i.merchId)) {
+          recv[i.merchId] = 0;
         }
       }
       final g = give.values.fold(0, (a, b) => a + b);
@@ -792,43 +781,39 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
 
     List<OfferItem> buildItems() {
       final items = <OfferItem>[];
-      if (mode == _OfferMode.give || mode == _OfferMode.both) {
-        for (final i in giveItems) {
-          if (giveOn[i.merchId] == true) {
-            items.add(
-              OfferItem()
-                ..merchId = i.merchId
-                ..giverUserId = meId
-                ..quantity = giveQty[i.merchId] ?? 1,
-            );
-          } else if (giveInitially.contains(i.merchId)) {
-            // Uncheck a prefilled leg → remove it (qty 0, accumulating).
-            items.add(
-              OfferItem()
-                ..merchId = i.merchId
-                ..giverUserId = meId
-                ..quantity = 0,
-            );
-          }
+      for (final i in giveItems) {
+        if (giveOn[i.merchId] == true) {
+          items.add(
+            OfferItem()
+              ..merchId = i.merchId
+              ..giverUserId = meId
+              ..quantity = giveQty[i.merchId] ?? 1,
+          );
+        } else if (giveInitially.contains(i.merchId)) {
+          // Uncheck a prefilled leg → remove it (qty 0, accumulating).
+          items.add(
+            OfferItem()
+              ..merchId = i.merchId
+              ..giverUserId = meId
+              ..quantity = 0,
+          );
         }
       }
-      if (mode == _OfferMode.receive || mode == _OfferMode.both) {
-        for (final i in receiveItems) {
-          if (receiveOn[i.merchId] == true) {
-            items.add(
-              OfferItem()
-                ..merchId = i.merchId
-                ..giverUserId = otherId
-                ..quantity = receiveQty[i.merchId] ?? 1,
-            );
-          } else if (receiveInitially.contains(i.merchId)) {
-            items.add(
-              OfferItem()
-                ..merchId = i.merchId
-                ..giverUserId = otherId
-                ..quantity = 0,
-            );
-          }
+      for (final i in receiveItems) {
+        if (receiveOn[i.merchId] == true) {
+          items.add(
+            OfferItem()
+              ..merchId = i.merchId
+              ..giverUserId = otherId
+              ..quantity = receiveQty[i.merchId] ?? 1,
+          );
+        } else if (receiveInitially.contains(i.merchId)) {
+          items.add(
+            OfferItem()
+              ..merchId = i.merchId
+              ..giverUserId = otherId
+              ..quantity = 0,
+          );
         }
       }
       return items;
@@ -843,10 +828,6 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           final (g, r) = projectedTotals();
           final balanced = g == r && g > 0;
           final legCount = items.where((i) => i.quantity > 0).length;
-          final showGive =
-              mode == _OfferMode.give || mode == _OfferMode.both;
-          final showReceive =
-              mode == _OfferMode.receive || mode == _OfferMode.both;
 
           return AlertDialog(
             title: Text(l10n.makeTradeOffer),
@@ -855,26 +836,6 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SegmentedButton<_OfferMode>(
-                    segments: [
-                      ButtonSegment(
-                        value: _OfferMode.give,
-                        label: Text(l10n.giveOnlyMode),
-                      ),
-                      ButtonSegment(
-                        value: _OfferMode.receive,
-                        label: Text(l10n.receiveOnlyMode),
-                      ),
-                      ButtonSegment(
-                        value: _OfferMode.both,
-                        label: Text(l10n.bothMode),
-                      ),
-                    ],
-                    selected: {mode},
-                    onSelectionChanged: (s) =>
-                        setDialogState(() => mode = s.first),
-                  ),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(
@@ -898,7 +859,12 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                       ),
                     ],
                   ),
-                  if (showGive && giveItems.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.balanceExplanation,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  if (giveItems.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       l10n.itemsYouGive,
@@ -922,7 +888,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                       ),
                     ),
                   ],
-                  if (showReceive && receiveItems.isNotEmpty) ...[
+                  if (receiveItems.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       l10n.itemsYouReceive,

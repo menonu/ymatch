@@ -509,13 +509,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get giveOnlyMode => '渡すだけ';
-
-  @override
-  String get receiveOnlyMode => 'もらうだけ';
-
-  @override
-  String get bothMode => '渡して受け取る';
+  String get balanceExplanation => '渡す数と受け取る数が釣り合っていれば、取引できます。';
 
   @override
   String qtyLabel(int count) {
