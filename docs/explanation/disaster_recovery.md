@@ -113,14 +113,20 @@ non-obvious gotcha is that the OCI Console rejects ed25519 keys
 ### 4. Redeploy scripts need all env vars, not just the ones for the target service
 
 The `docker-compose.oci.yml` validates **all** services at parse
-time, not just the ones being deployed. This means redeploying
-just `ymatch_backend` still requires `STAGING_DB_PASSWORD` to be
-set, because the compose file references both production and
-staging services.
+time, not just the ones being deployed. When production and staging
+shared a single VM and compose file, this meant redeploying just
+`ymatch_backend` required `STAGING_DB_PASSWORD` to be set, because
+the compose file referenced both production and staging services.
 
 The fix in PR #147 was to **always regenerate the `.env` file** at
 the start of any deploy or redeploy, ensuring all required variables
 are present.
+
+> **Update (#209):** production and staging now run on separate VMs
+> with a single-stack compose file, so the cross-environment
+> validation no longer applies — redeploying `ymatch_backend` only
+> needs `DB_PASSWORD`. The "always regenerate `.env`" practice from
+> #147 is still followed.
 
 ### 5. GitHub Actions `GITHUB_TOKEN` rotates per run
 
