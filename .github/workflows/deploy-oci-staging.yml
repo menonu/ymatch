@@ -24,13 +24,13 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.OCI_SSH_PRIVATE_KEY }}" > ~/.ssh/oci_key
+          echo "${{ secrets.OCI_STAGING_SSH_PRIVATE_KEY }}" > ~/.ssh/oci_key
           chmod 600 ~/.ssh/oci_key
-          ssh-keyscan -H ${{ secrets.OCI_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H ${{ secrets.OCI_STAGING_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Sync repo to VM
         env:
-          HOST: ${{ secrets.OCI_VM_HOST }}
+          HOST: ${{ secrets.OCI_STAGING_VM_HOST }}
         run: |
           ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'SYNC_SCRIPT'
           set -euo pipefail
@@ -60,29 +60,29 @@ jobs:
 
       - name: Deploy to Staging
         env:
-          HOST: ${{ secrets.OCI_VM_HOST }}
+          HOST: ${{ secrets.OCI_STAGING_VM_HOST }}
         run: |
           ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'DEPLOY_SCRIPT'
           set -euo pipefail
           cd ~/ymatch
 
-          # Use the new deploy script which handles env vars safely
-          # (--env-file) and supports non-git working trees.
-          export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
-          export STAGING_DB_PASSWORD="${{ secrets.OCI_STAGING_DB_PASSWORD }}"
+          # Use the deploy script which handles env vars safely (--env-file)
+          # and supports non-git working trees. Staging uses the same stack as
+          # production; DB_PASSWORD here is the staging DB password.
+          export DB_PASSWORD="${{ secrets.OCI_STAGING_DB_PASSWORD }}"
 
           ./scripts/oci_deploy_staging.sh
 
           echo "=== Running staging migrations ==="
-          docker exec ymatch_staging_backend ymatch_backend migrate 2>/dev/null || true
+          docker exec ymatch_backend ymatch_backend migrate 2>/dev/null || true
           DEPLOY_SCRIPT
 
       - name: Health check (Staging)
         env:
-          HOST: ${{ secrets.OCI_VM_HOST }}
+          HOST: ${{ secrets.OCI_STAGING_VM_HOST }}
         run: |
           for i in $(seq 1 12); do
-            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "http://${HOST}:8080/api/v1/system/status" || true)
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/api/v1/system/status" || true)
             if [ "$STATUS" = "200" ]; then
               echo "✅ Staging backend healthy (attempt $i)"
               break
@@ -91,7 +91,7 @@ jobs:
             sleep 5
           done
 
-          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "http://${HOST}:8080/" || true)
+          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/" || true)
           if [ "$FRONTEND" = "200" ]; then
             echo "✅ Staging frontend healthy"
           else

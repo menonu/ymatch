@@ -74,33 +74,13 @@ resource "oci_core_security_list" "ymatch" {
     }
   }
 
-  # HTTPS (Production)
+  # HTTPS
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
     tcp_options {
       min = 443
       max = 443
-    }
-  }
-
-  # Staging HTTP
-  ingress_security_rules {
-    protocol = "6"
-    source   = "0.0.0.0/0"
-    tcp_options {
-      min = 8080
-      max = 8080
-    }
-  }
-
-  # Staging HTTPS
-  ingress_security_rules {
-    protocol = "6"
-    source   = "0.0.0.0/0"
-    tcp_options {
-      min = 8443
-      max = 8443
     }
   }
 
@@ -149,39 +129,10 @@ data "oci_core_images" "ubuntu_arm" {
   sort_order               = "DESC"
 }
 
-resource "oci_core_instance" "ymatch" {
-  compartment_id      = var.compartment_ocid
-  availability_domain = var.availability_domain != "" ? var.availability_domain : data.oci_identity_availability_domains.ads.availability_domains[0].name
-  display_name        = "ymatch-arm"
-  shape               = "VM.Standard.A1.Flex"
-
-  shape_config {
-    ocpus         = var.instance_ocpus
-    memory_in_gbs = var.instance_memory_gb
-  }
-
-  create_vnic_details {
-    subnet_id        = oci_core_subnet.ymatch.id
-    assign_public_ip = true
-    display_name     = "ymatch-vnic"
-  }
-
-  source_details {
-    source_type             = "image"
-    source_id               = data.oci_core_images.ubuntu_arm.images[0].id
-    boot_volume_size_in_gbs = var.boot_volume_size_gb
-  }
-
-  metadata = {
-    ssh_authorized_keys = var.ssh_public_key
-    user_data           = base64encode(local.cloud_init)
-  }
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [metadata, source_details]
-  }
-}
+# NOTE: the original `ymatch` (v1) instance was retired in issue #209 to free
+# A1 free-tier quota for the dedicated staging VM. Removing this resource block
+# also removed its `prevent_destroy` guard, so `terraform apply` will plan to
+# destroy the retired v1 instance — review that destroy action before approving.
 
 resource "oci_core_instance" "ymatch_v2" {
   compartment_id      = var.compartment_ocid
@@ -216,8 +167,46 @@ resource "oci_core_instance" "ymatch_v2" {
   }
 }
 
+# Dedicated staging VM (issue #209). Identical stack to production, deployed to
+# its own host so prod and staging no longer share CPU/memory/disk.
+resource "oci_core_instance" "ymatch_staging" {
+  compartment_id      = var.compartment_ocid
+  availability_domain = var.availability_domain != "" ? var.availability_domain : data.oci_identity_availability_domains.ads.availability_domains[0].name
+  display_name        = "ymatch-arm-staging"
+  shape               = "VM.Standard.A1.Flex"
+
+  shape_config {
+    ocpus         = var.staging_instance_ocpus
+    memory_in_gbs = var.staging_instance_memory_gb
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.ymatch.id
+    assign_public_ip = true
+    display_name     = "ymatch-vnic-staging"
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_arm.images[0].id
+    boot_volume_size_in_gbs = var.boot_volume_size_gb
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key_staging
+    user_data           = base64encode(local.cloud_init_staging)
+  }
+
+  lifecycle {
+    ignore_changes = [metadata, source_details]
+  }
+}
+
 locals {
-  cloud_init = <<-EOT
+  # Shared cloud-init body for all A1 instances. The New Relic display name is
+  # injected per instance via the __NR_DISPLAY_NAME__ placeholder so prod and
+  # staging are distinguishable in the NR Infrastructure dashboard.
+  cloud_init_template = <<-EOT
     #!/bin/bash
     set -euo pipefail
     exec > /var/log/ymatch-setup.log 2>&1
@@ -257,10 +246,10 @@ locals {
     usermod -aG docker ubuntu
 
     # Open ports in iptables (OCI Ubuntu images have restrictive iptables by default)
+    # Only 80/443 are needed — staging moved to its own VM on 80/443 (issue #209),
+    # so the old 8080/8443 staging ports are no longer used on either host.
     iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
     iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-    iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8080 -j ACCEPT
-    iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8443 -j ACCEPT
 
     # Persist iptables rules (works on both 22.04 and 24.04)
     if command -v netfilter-persistent &>/dev/null; then
@@ -274,7 +263,7 @@ locals {
     # New Relic Infrastructure Agent
     # ---------------------------------------------------
     echo "license_key: ${var.nr_license_key}" > /etc/newrelic-infra.yml
-    echo "display_name: ${var.nr_display_name}" >> /etc/newrelic-infra.yml
+    echo "display_name: __NR_DISPLAY_NAME__" >> /etc/newrelic-infra.yml
 
     curl -fsSL https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg \
       | gpg --dearmor -o /etc/apt/trusted.gpg.d/newrelic-infra.gpg --yes
@@ -302,4 +291,8 @@ locals {
     echo "=== ymatch OCI setup complete at $(date) ==="
     echo "SSH in and run: cd ~/ymatch && ./scripts/oci_deploy.sh"
   EOT
+
+  # Per-instance cloud-init: inject the NR display name for each environment.
+  cloud_init         = replace(local.cloud_init_template, "__NR_DISPLAY_NAME__", var.nr_display_name)
+  cloud_init_staging = replace(local.cloud_init_template, "__NR_DISPLAY_NAME__", var.nr_display_name_staging)
 }

@@ -1,18 +1,19 @@
-# OCI Always Free Tier — Full Stack Deployment (Production + Staging)
-# Run on ARM Ampere A1 instance with Docker Compose
+# OCI Always Free Tier — Full Stack Deployment
+# Run on ARM Ampere A1 instance with Docker Compose.
 #
-# Production: ports 80/443 (via Caddy)
-# Staging:    ports 8080/8443 (via Staging Caddy)
+# This single compose file is used by BOTH production and staging, each on its
+# own VM (see issue #209). The two environments are byte-identical stacks that
+# differ only by VM host and DB password:
+#   - Production: deployed via .github/workflows/deploy-oci.yml (OCI_VM_HOST)
+#   - Staging:    deployed via .github/workflows/deploy-oci-staging.yml (OCI_STAGING_VM_HOST)
+#
+# Caddy serves on 80/443 with auto-SSL via nip.io for both environments.
 #
 # Usage:
-#   PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx STAGING_DB_PASSWORD=yyy docker compose -f docker-compose.oci.yml up -d --build
+#   PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc docker compose -f docker-compose.oci.yml up -d --build
 
 services:
-  # ===================================================
-  # PRODUCTION
-  # ===================================================
-
-  # --- Production PostgreSQL ---
+  # --- PostgreSQL ---
   db:
     image: ghcr.io/menonu/ymatch/postgres:16-alpine
     container_name: ymatch_db
@@ -31,7 +32,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- Production Backend ---
+  # --- Backend ---
   backend:
     build:
       context: .
@@ -53,7 +54,7 @@ services:
       db:
         condition: service_healthy
 
-  # --- Production Frontend ---
+  # --- Frontend ---
   frontend:
     build:
       context: .
@@ -66,7 +67,7 @@ services:
     networks:
       - ymatch
 
-  # --- Production Caddy (ports 80/443) ---
+  # --- Caddy (ports 80/443, auto-SSL via nip.io) ---
   caddy:
     image: ghcr.io/menonu/ymatch/caddy:2-alpine
     container_name: ymatch_caddy
@@ -86,98 +87,12 @@ services:
       - backend
       - frontend
 
-  # ===================================================
-  # STAGING
-  # ===================================================
-
-  # --- Staging PostgreSQL ---
-  staging_db:
-    image: ghcr.io/menonu/ymatch/postgres:16-alpine
-    container_name: ymatch_staging_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ymatch_user
-      POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD:?Set STAGING_DB_PASSWORD env var}
-      POSTGRES_DB: ymatch_staging
-    volumes:
-      - staging_pg_data:/var/lib/postgresql/data
-    networks:
-      - ymatch_staging
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ymatch_user -d ymatch_staging"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # --- Staging Backend ---
-  staging_backend:
-    build:
-      context: .
-      dockerfile: backend.Dockerfile.prod
-      args:
-        GIT_HASH: ${GIT_HASH:-unknown}
-    container_name: ymatch_staging_backend
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: "postgres://ymatch_user:${STAGING_DB_PASSWORD}@staging_db:5432/ymatch_staging"
-      RUST_LOG: info
-      PORT: "3000"
-      IMAGE_STORAGE: local
-    volumes:
-      - staging_uploads:/app/uploads
-    networks:
-      - ymatch_staging
-    depends_on:
-      staging_db:
-        condition: service_healthy
-
-  # --- Staging Frontend ---
-  staging_frontend:
-    build:
-      context: .
-      dockerfile: frontend.Dockerfile.prod
-      args:
-        API_BASE_URL: ""
-        GIT_HASH: ${GIT_HASH:-unknown}
-    container_name: ymatch_staging_frontend
-    restart: unless-stopped
-    networks:
-      - ymatch_staging
-
-  # --- Staging Caddy (ports 8080/8443) ---
-  staging_caddy:
-    image: ghcr.io/menonu/ymatch/caddy:2-alpine
-    container_name: ymatch_staging_caddy
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-      - "8443:443"
-    volumes:
-      - ./Caddyfile.oci.staging:/etc/caddy/Caddyfile:ro
-      - staging_caddy_data:/data
-      - staging_caddy_config:/config
-    environment:
-      PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP env var}
-    networks:
-      - ymatch_staging
-    depends_on:
-      - staging_backend
-      - staging_frontend
-
 networks:
   ymatch:
     driver: bridge
-  ymatch_staging:
-    driver: bridge
 
 volumes:
-  # Production
   pg_data:
   uploads:
   caddy_data:
   caddy_config:
-  # Staging
-  staging_pg_data:
-  staging_uploads:
-  staging_caddy_data:
-  staging_caddy_config:

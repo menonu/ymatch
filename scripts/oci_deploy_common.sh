@@ -8,7 +8,7 @@
 #   oci_get_git_hash <repo_dir>      - rev-parse or "manual"
 #   oci_write_compose_env <dir> <vars...>  - write .env file for docker compose
 #
-# Required env (set by caller): DB_PASSWORD, STAGING_DB_PASSWORD, PUBLIC_IP, GIT_HASH
+# Required env (set by caller): DB_PASSWORD, PUBLIC_IP, GIT_HASH
 # Optional env:
 #   GH_TOKEN            - GitHub PAT for HTTPS clone (preferred)
 #   GH_SSH_KEY_PATH     - path to SSH key for git clone (alternative)

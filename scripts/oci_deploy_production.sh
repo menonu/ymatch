@@ -30,11 +30,8 @@ REPO_DIR="$HOME/ymatch"
 oci_sync_repo "$REPO_DIR"
 
 # Determine env vars for docker compose.
-# `STAGING_DB_PASSWORD` is also required because docker-compose.oci.yml
-# validates all services; default to DB_PASSWORD if not set.
-STAGING_DB_PASSWORD="${STAGING_DB_PASSWORD:-$DB_PASSWORD}"
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-oci_write_compose_env "$REPO_DIR" DB_PASSWORD STAGING_DB_PASSWORD PUBLIC_IP GIT_HASH
+oci_write_compose_env "$REPO_DIR" DB_PASSWORD PUBLIC_IP GIT_HASH
 
 cd "$REPO_DIR"
 
@@ -42,7 +39,7 @@ cd "$REPO_DIR"
 echo ""
 echo "Building and starting production containers..."
 
-# Build production frontend with correct API base URL (port 443)
+# Build production frontend with correct API base URL (HTTPS via nip.io)
 docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" build \
   --build-arg API_BASE_URL="https://${PUBLIC_IP}.nip.io" \
   --build-arg GIT_HASH="$GIT_HASH" \
