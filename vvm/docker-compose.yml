@@ -35,6 +35,7 @@ services:
       - ./storage/claude:/home/ubuntu/.claude
       - ./storage/gh:/home/ubuntu/.config/gh
       - ./storage/ollama:/home/ubuntu/.ollama
+      - ./storage/oci:/home/ubuntu/.oci
       - docker-data:/var/lib/docker
       - cargo-cache:/home/ubuntu/.cargo/registry
       - pub-cache:/home/ubuntu/.pub-cache
