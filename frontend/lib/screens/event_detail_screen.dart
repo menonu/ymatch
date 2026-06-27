@@ -682,7 +682,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   Positioned.fill(
                     child: buildImage(
                       item.hasPhotoUrl() ? item.photoUrl : null,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   if (isOwner)
@@ -1007,7 +1007,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     item.hasPhotoUrl() ? item.photoUrl : null,
                     width: 72,
                     height: 72,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
