@@ -42,8 +42,8 @@ void main() {
       // HAVE/WANT labels, which do not appear anywhere on the JA screen.
       expect(
         find.text(
-          '+ と - を使って、交換したいアイテムの数を増減させます。'
-          '求 / 譲 の数に応じて交換のマッチングが行われます。',
+          '+ と - を使って、交換したいアイテムの数を入力します。'
+          '求 / 譲の数に応じて、アイテムグループ内で交換のマッチングが行われます。',
         ),
         findsOneWidget,
       );
@@ -75,8 +75,9 @@ void main() {
       );
       expect(
         find.text(
-          'Use + and - to adjust the quantities of items you want to '
-          'exchange. Matching is based on your Wish / For Trade quantities.',
+          'Use + and - to enter the quantities of items you want to '
+          'exchange. Matching is performed within an item group based on '
+          'your Wish / For Trade quantities.',
         ),
         findsOneWidget,
       );

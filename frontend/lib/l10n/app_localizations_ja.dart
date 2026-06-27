@@ -210,7 +210,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get tradeStep2 =>
-      '+ と - を使って、交換したいアイテムの数を増減させます。求 / 譲 の数に応じて交換のマッチングが行われます。';
+      '+ と - を使って、交換したいアイテムの数を入力します。求 / 譲の数に応じて、アイテムグループ内で交換のマッチングが行われます。';
 
   @override
   String get tradeStep3 => 'マッチを開き、取引したい相手を確認します。';

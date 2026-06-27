@@ -293,7 +293,7 @@
   "@tradeStep1": {
     "description": "How-to-trade step 1"
   },
-  "tradeStep2": "Use + and - to adjust the quantities of items you want to exchange. Matching is based on your Wish / For Trade quantities.",
+  "tradeStep2": "Use + and - to enter the quantities of items you want to exchange. Matching is performed within an item group based on your Wish / For Trade quantities.",
   "@tradeStep2": {
     "description": "How-to-trade step 2"
   },

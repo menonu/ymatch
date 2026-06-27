@@ -211,7 +211,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tradeStep2 =>
-      'Use + and - to adjust the quantities of items you want to exchange. Matching is based on your Wish / For Trade quantities.';
+      'Use + and - to enter the quantities of items you want to exchange. Matching is performed within an item group based on your Wish / For Trade quantities.';
 
   @override
   String get tradeStep3 => 'Go to Matches to see who wants to trade with you.';

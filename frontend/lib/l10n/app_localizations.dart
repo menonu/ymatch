@@ -467,7 +467,7 @@ abstract class AppLocalizations {
   /// How-to-trade step 2
   ///
   /// In en, this message translates to:
-  /// **'Use + and - to adjust the quantities of items you want to exchange. Matching is based on your Wish / For Trade quantities.'**
+  /// **'Use + and - to enter the quantities of items you want to exchange. Matching is performed within an item group based on your Wish / For Trade quantities.'**
   String get tradeStep2;
 
   /// How-to-trade step 3
