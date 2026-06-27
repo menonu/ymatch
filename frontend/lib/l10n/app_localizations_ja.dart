@@ -250,6 +250,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String failedToUpdateItem(String name, String error) {
+    return '「$name」の更新に失敗しました: $error';
+  }
+
+  @override
   String get selectGroup => 'グループを選択';
 
   @override

@@ -1172,12 +1172,28 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             onPressed: () async {
               final newName = ctrl.text.trim();
               if (newName.isNotEmpty && user != null) {
-                await ref
-                    .read(merchControllerProvider.notifier)
-                    .updateMerch(item.eventId, item.id, user.id, name: newName);
-                ref.invalidate(merchProvider(widget.eventId));
+                try {
+                  await ref
+                      .read(merchControllerProvider.notifier)
+                      .updateMerch(item.eventId, item.id, user.id, name: newName);
+                  ref.invalidate(merchProvider(widget.eventId));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                } catch (e) {
+                  // #299: updateMerch rethrows on failure (e.g. a
+                  // duplicate-name 400). Surface the backend error instead
+                  // of silently closing the dialog as if the rename worked.
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.failedToUpdateItem(newName, e.toString())),
+                        duration: const Duration(seconds: 4),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Theme.of(ctx).colorScheme.error,
+                      ),
+                    );
+                  }
+                }
               }
-              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(l10n.save),
           ),

@@ -452,6 +452,10 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #299: rethrow so the caller (e.g. the edit-name dialog) can surface
+      // the backend error (such as a duplicate-name 400) instead of
+      // silently swallowing it and closing the dialog as if it succeeded.
+      rethrow;
     }
   }
 
