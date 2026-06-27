@@ -46,7 +46,7 @@ BottomNavBar
 
 ### HomeScreen (Items Tab)
 
-- **AppBar**: Search bar (events/groups), refresh button, sort popup menu (Newest / Most Popular / Alphabetical)
+- **AppBar**: Search bar (events/groups), refresh button, sort popup menu (Newest First / Most Popular / Alphabetical)
 - **Favorite Shortcuts**: Horizontal scrollable row of `ActionChip` widgets for favorited events and groups
 - **Filter Bar**: `SegmentedButton` — All Events, Favorites, My Items
 - **Event List**: `ListView.builder` of event cards with:
@@ -61,11 +61,11 @@ BottomNavBar
 ### EventDetailScreen
 
 - **AppBar**: Search bar (items), refresh, popup menus:
-  - Inventory display: Just HAVE / WANT & TRADE / All
-  - View mode: Detailed / Grid / Compact List
+  - Inventory display: Just Own / Wish & For Trade / All
+  - View mode: Detailed View / Grid View / Compact List
   - Overflow: Want All Missing
 - **TabBar**: Dynamic scrollable tabs per merchandise group, each with favorite star
-- **Filter Bar**: `SegmentedButton` — All, HAVE, WANT, Missing (with count badge)
+- **Filter Bar**: `SegmentedButton` — All, Own, Wish, Missing (with count badge)
 - **Content**: `TabBarView` with per-group content in selected view mode:
   - **Detailed View**: `ReorderableListView` with image, name, owner icon, stepper counters
   - **Grid View**: 3-column `GridView` with image, name, compact +/- counters
@@ -86,11 +86,11 @@ BottomNavBar
 - **AppBar**: Title "Trades"
 - **TabBar**: 5 tabs with badge counts:
   - **Match**: Pending matches — Reject / Make Offer buttons
-  - **Offer Out**: Sent offers — Cancel / "Waiting..." text
+  - **Offer Out**: Sent offers — Cancel Offer / "Waiting for response..." text
   - **Offer In**: Received offers — Reject / Accept buttons
   - **Active**: Accepted trades — Mark Complete button
   - **Done**: Completed trades — "Update Inventory" button
-- **Match Card**: User avatar, username, status chip, chat icon, selected items (Give/Receive), potential items
+- **Match Card**: User avatar, username, status chip, "Message" button, selected items (Give/Receive), potential items
 
 ### ChatScreen
 
@@ -108,7 +108,7 @@ BottomNavBar
 
 - **Profile Card**: Avatar, editable username (inline), UUID with copy button, warning text
 - **Instructions Card**: 3-step "How to Trade" guide
-- **Logout Button**: Red themed
+- **Logout Button**: Red themed, labeled "Log Out"
 - **Revision Info**: Frontend/backend git hashes
 
 ### AdminDashboardScreen

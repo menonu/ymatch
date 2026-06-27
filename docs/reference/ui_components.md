@@ -36,8 +36,8 @@ Component identifiers for consistent communication across the team.
 
 | Identifier | Parent Screen | Options |
 |-----------|---------------|---------|
-| `EventSortMenu` | `HomeScreen` | Newest, Most Popular, Alphabetical |
-| `InventoryDisplayMenu` | `EventDetailScreen` | Just HAVE, WANT & TRADE, All |
+| `EventSortMenu` | `HomeScreen` | Newest First, Most Popular, Alphabetical |
+| `InventoryDisplayMenu` | `EventDetailScreen` | Just Own, Wish & For Trade, All |
 | `ViewModeMenu` | `EventDetailScreen` | Detailed View, Grid View, Compact List |
 | `EventOverflowMenu` | `EventDetailScreen` | Want All Missing |
 | `GroupJumpMenu` | `EventDetailScreen` | Jump to group dropdown |
@@ -48,7 +48,7 @@ Component identifiers for consistent communication across the team.
 | Identifier | Parent Screen | Segments |
 |-----------|---------------|----------|
 | `EventFilterBar` | `HomeScreen` | All Events, Favorites, My Items |
-| `MerchFilterBar` | `EventDetailScreen` | All, HAVE, WANT, Missing |
+| `MerchFilterBar` | `EventDetailScreen` | All, Own, Wish, Missing |
 
 ### Floating Action Buttons
 
@@ -66,7 +66,7 @@ Component identifiers for consistent communication across the team.
 | `DeleteEventDialog` | `HomeScreen` | Bottom sheet "Delete" | Confirmation text |
 | `EditItemNameDialog` | `EventDetailScreen` | Bottom sheet "Edit Name" | Item name TextField |
 | `DeleteItemDialog` | `EventDetailScreen` | Bottom sheet "Delete" | Confirmation text |
-| `TradeOfferDialog` | `TradeListScreen` | "Make Offer" button | CheckboxListTile lists for GIVE/RECEIVE items |
+| `TradeOfferDialog` | `TradeListScreen` | "Make Offer" button | CheckboxListTile lists for give/receive items |
 | `NewGroupDialog` | `AddMerchScreen` | "New Group" ActionChip | Group name TextField |
 | `ImageSourceDialog` | `AddMerchScreen` | Image picker tap | Gallery / Camera options |
 | `AdminBanDialog` | `AdminDashboardScreen` | User "Ban" menu | Ban reason TextField |
@@ -186,9 +186,9 @@ Component identifiers for consistent communication across the team.
 | `UsernameUpdatedSnackbar` | `ProfileScreen` | "Username updated" |
 | `UsernameErrorSnackbar` | `ProfileScreen` | "Failed to update username: {error}" |
 | `UUIDCopiedSnackbar` | `ProfileScreen` | "Master Key copied to clipboard" |
-| `WantAllMissingSnackbar` | `EventDetailScreen` | "Added N missing items to WANT" |
+| `WantAllMissingSnackbar` | `EventDetailScreen` | "Added {count} missing items to Wish" |
 | `NoMissingSnackbar` | `EventDetailScreen` | "No missing items found" |
-| `MerchAddedSnackbar` | `AddMerchScreen` | "Added {name} successfully." |
+| `MerchAddedSnackbar` | `AddMerchScreen` | "Added "{name}" successfully." |
 | `GroupRequiredSnackbar` | `AddMerchScreen` | "Please select or create an item group first." |
 | `ImagePickErrorSnackbar` | `AddMerchScreen` | "Failed to pick image: {error}" |
 | `MessageSendErrorSnackbar` | `ChatScreen` | "Failed to send: {error}" |
@@ -228,8 +228,8 @@ Component identifiers for consistent communication across the team.
 |-----------|---------------|---------|
 | `eventSortProvider` | `HomeScreen` | Current sort mode |
 | `eventFilterProvider` | `HomeScreen` | Current filter mode |
-| `viewModeProvider` | `EventDetailScreen` | Detailed / Grid / List |
-| `merchFilterProvider` | `EventDetailScreen` | All / HAVE / WANT / Missing |
-| `inventoryDisplayModeProvider` | `EventDetailScreen` | Just HAVE / WANT & TRADE / All |
+| `viewModeProvider` | `EventDetailScreen` | Detailed View / Grid View / Compact List |
+| `merchFilterProvider` | `EventDetailScreen` | All / Own / Wish / Missing |
+| `inventoryDisplayModeProvider` | `EventDetailScreen` | Just Own / Wish & For Trade / All |
 | `itemSearchQueryProvider` | `EventDetailScreen` | Item search query |
 | `messagesProvider` | `ChatScreen` | Chat messages for a match |
