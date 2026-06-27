@@ -1,0 +1,45 @@
+name: Prod Diagnostic (temporary)
+
+# TEMPORARY read-only incident-response workflow for the release/0.3.3 prod
+# outage (backend 502). Manual dispatch only, NO mutations. Emits ONLY
+# non-sensitive aggregates (migration success flags + a count of duplicate
+# merch-name groups) — never raw logs, table contents, or merchandise names —
+# because this repo is public and GHA logs are world-readable. Remove after
+# the incident is resolved.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OCI_SSH_PRIVATE_KEY }}" > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+          ssh-keyscan -H ${{ secrets.OCI_VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run read-only diagnostics on prod VM
+        run: |
+          ssh -i ~/.ssh/oci_key -o StrictHostKeyChecking=no ubuntu@${{ secrets.OCI_VM_HOST }} bash -s <<'DIAG'
+          set +e
+          echo "===== HOST ====="; hostname
+          echo "===== GIT HEAD ====="; cd ~/ymatch && git rev-parse --short HEAD
+          echo "===== BACKEND CONTAINER STATE ====="
+          docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' ymatch_backend 2>/dev/null
+          echo "===== MIGRATIONS (version, success — no row data) ====="
+          docker exec ymatch_db psql -U ymatch_user -d ymatch -t -A -F'|' -c \
+            "SELECT version::text || '|' || success::text FROM _sqlx_migrations ORDER BY version DESC LIMIT 8;"
+          echo "===== COUNT of duplicate live merch-name groups (integer only) ====="
+          docker exec ymatch_db psql -U ymatch_user -d ymatch -t -A -c \
+            "SELECT count(*) FROM (SELECT 1 FROM merchandise WHERE is_deleted=false GROUP BY event_id, group_name, name HAVING count(*)>1) d;"
+          echo "===== END ====="
+          DIAG
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/oci_key
