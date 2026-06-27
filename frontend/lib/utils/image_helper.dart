@@ -32,11 +32,16 @@ String resolveImageUrl(String? url) {
 
 /// Helper to build an image widget from a URL string.
 /// Supports both standard HTTP(S) URLs and base64-encoded data URIs.
+///
+/// Defaults to [BoxFit.contain] so the *entire* uploaded image is visible —
+/// non-square images are letterboxed with transparent padding rather than
+/// center-cropped (#329). Pass an explicit `fit` to override (e.g. for a
+/// hero image that should fill its frame).
 Widget buildImage(
   String? url, {
   double? width,
   double? height,
-  BoxFit fit = BoxFit.cover,
+  BoxFit fit = BoxFit.contain,
   Widget? placeholder,
   Widget? errorWidget,
 }) {

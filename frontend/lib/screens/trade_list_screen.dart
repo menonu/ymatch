@@ -563,7 +563,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                 item.hasPhotoUrl() ? item.photoUrl : null,
                 width: 28,
                 height: 28,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
               ),
             ),
           ),
