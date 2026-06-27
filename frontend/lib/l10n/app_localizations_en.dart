@@ -511,13 +511,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get giveOnlyMode => 'Give only';
-
-  @override
-  String get receiveOnlyMode => 'Receive only';
-
-  @override
-  String get bothMode => 'Give & receive';
+  String get balanceExplanation =>
+      'A trade can be completed when the number of items you give and receive are balanced.';
 
   @override
   String qtyLabel(int count) {

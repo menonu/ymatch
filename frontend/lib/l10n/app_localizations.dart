@@ -1028,23 +1028,11 @@ abstract class AppLocalizations {
   /// **'You give {give} / receive {recv}'**
   String balanceSummary(int give, int recv);
 
-  /// Offer dialog mode: specify only what I give
+  /// Plain-language hint in the offer dialog: a balanced give/receive total enables the trade
   ///
   /// In en, this message translates to:
-  /// **'Give only'**
-  String get giveOnlyMode;
-
-  /// Offer dialog mode: specify only what I want to receive
-  ///
-  /// In en, this message translates to:
-  /// **'Receive only'**
-  String get receiveOnlyMode;
-
-  /// Offer dialog mode: specify both give and receive
-  ///
-  /// In en, this message translates to:
-  /// **'Give & receive'**
-  String get bothMode;
+  /// **'A trade can be completed when the number of items you give and receive are balanced.'**
+  String get balanceExplanation;
 
   /// Quantity label in the offer dialog
   ///

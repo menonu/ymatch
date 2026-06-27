@@ -721,17 +721,9 @@
       "recv": {"type": "int"}
     }
   },
-  "giveOnlyMode": "Give only",
-  "@giveOnlyMode": {
-    "description": "Offer dialog mode: specify only what I give"
-  },
-  "receiveOnlyMode": "Receive only",
-  "@receiveOnlyMode": {
-    "description": "Offer dialog mode: specify only what I want to receive"
-  },
-  "bothMode": "Give & receive",
-  "@bothMode": {
-    "description": "Offer dialog mode: specify both give and receive"
+  "balanceExplanation": "A trade can be completed when the number of items you give and receive are balanced.",
+  "@balanceExplanation": {
+    "description": "Plain-language hint in the offer dialog: a balanced give/receive total enables the trade"
   },
   "qtyLabel": "Qty: {count}",
   "@qtyLabel": {
