@@ -83,6 +83,7 @@ void main() {
 
       // Stale terminology is gone in English too.
       expect(find.textContaining('HAVE'), findsNothing);
+      expect(find.textContaining('WANT'), findsNothing);
       expect(find.textContaining('Events tab'), findsNothing);
     },
   );
@@ -117,6 +118,5 @@ class MockAuthController extends StateNotifier<AsyncValue<User?>>
   Future<void> updateUsername(int userId, String newUsername) async {}
 
   @override
-  // TODO: implement client
   get client => throw UnimplementedError();
 }
