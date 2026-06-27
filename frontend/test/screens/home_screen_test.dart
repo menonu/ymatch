@@ -46,7 +46,6 @@ class _MockAuthController extends StateNotifier<AsyncValue<User?>>
   Future<void> updateUsername(int userId, String newUsername) async {}
 
   @override
-  // ignore: TODO
   get client => throw UnimplementedError();
 }
 
@@ -69,15 +68,20 @@ void main() {
       expect(buttonFinder, findsOneWidget);
       final widthBefore = tester.getSize(buttonFinder).width;
 
-      // Select the "Favorites" tab and let the segmented button re-layout.
-      await tester.tap(find.text('Favorites'));
-      await tester.pumpAndSettle();
+      // Cycle through every tab. The width must stay constant regardless of
+      // which segment is selected (no check icon may be added/removed).
+      for (final label in const ['Favorites', 'All Events', 'My Items']) {
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
 
-      final widthAfter = tester.getSize(buttonFinder).width;
-
-      // The selected tab must not grow (e.g. by adding a check icon) and
-      // the unselected tab must not shrink — width is state-independent.
-      expect(widthAfter, equals(widthBefore));
+        // The selected tab must not grow (e.g. by adding a check icon) and
+        // the unselected tab must not shrink — width is state-independent.
+        expect(
+          tester.getSize(buttonFinder).width,
+          equals(widthBefore),
+          reason: 'width changed after selecting "$label"',
+        );
+      }
     },
   );
 }
