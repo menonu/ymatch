@@ -206,10 +206,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get howToTrade => '取引のやり方';
 
   @override
-  String get tradeStep1 => 'イベントタブを開き、あなたのイベントを見つけます。';
+  String get tradeStep1 => 'アイテムタブを開き、あなたのイベントを見つけます。';
 
   @override
-  String get tradeStep2 => '+ と - を使って HAVE と WANT アイテムを設定します。';
+  String get tradeStep2 =>
+      '+ と - を使って、交換したいアイテムの数を増減させます。求 / 譲 の数に応じて交換のマッチングが行われます。';
 
   @override
   String get tradeStep3 => 'マッチを開き、取引したい相手を確認します。';
