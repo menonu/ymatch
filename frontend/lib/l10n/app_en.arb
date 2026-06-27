@@ -443,6 +443,10 @@
   "@typeMessage": {
     "description": "Hint text in the chat message input"
   },
+  "messageAction": "Message",
+  "@messageAction": {
+    "description": "Button label on a match card to open the chat thread"
+  },
   "openInMaps": "Open in Maps",
   "@openInMaps": {
     "description": "Link label for opening a map URL"

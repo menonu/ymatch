@@ -307,10 +307,15 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                     ),
                   ),
                   if (tab != TradeTab.completed)
-                    const Icon(
-                      Icons.chat_bubble_outline,
-                      color: Colors.grey,
-                      size: 20,
+                    TextButton(
+                      onPressed: () =>
+                          context.go('/matches/chat/${match.id}'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(l10n.messageAction),
                     ),
                 ],
               ),

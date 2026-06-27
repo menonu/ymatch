@@ -107,6 +107,56 @@ void main() {
       expect(find.text('受け取るアイテム:'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'match card shows a "Message" text button instead of a chat icon (#310)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The affordance is now an explicit labeled button, not an icon.
+      expect(find.text('Message'), findsOneWidget);
+      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'match card shows the "メッセージ" button under ja locale (#310)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const TradeListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('メッセージ'), findsOneWidget);
+      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+    },
+  );
 }
 
 User _user() => User()..id = 1..username = 'me';
