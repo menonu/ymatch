@@ -170,6 +170,14 @@
   "balanceSummary": "渡す {give} / 受取 {recv}",
   "balanceExplanation": "渡す数と受け取る数が釣り合っていれば、取引できます。",
   "qtyLabel": "数量: {count}",
+  "itemContext": "{event}: {group}",
+  "@itemContext": {
+    "description": "Event:group context shown after an item name in the match UI so the user can tell which event/group an item belongs to (#322)",
+    "placeholders": {
+      "event": {"type": "String"},
+      "group": {"type": "String"}
+    }
+  },
   "sendOfferItems": "オファーを送信（{count}件）",
   "noPendingMatches": "保留中のマッチはありません。アイテムを追加しましょう！",
   "noOutgoingOffers": "送信中のオファーはありません。",

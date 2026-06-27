@@ -67,18 +67,25 @@ impl InventoryRepository {
             merch_name: Some("".to_string()),
             photo_url: None,
             group_name: None,
+            // No joined event data on upsert; the frontend re-fetches via
+            // list_for_user (which joins) before display, so None never
+            // reaches the user. See #173 item #5 and #322.
+            event_name: None,
         })
     }
 
     /// List all inventory rows for a user, joined to `merchandise` for
-    /// `merch_name` / `photo_url` / `group_name`.
+    /// `merch_name` / `photo_url` / `group_name` and to `events` for
+    /// `event_name` (#322).
     pub async fn list_for_user(&self, user_id: i32) -> Result<Vec<InventoryItem>, AppError> {
         let rows = sqlx::query(
             r#"SELECT
                    i.id, i.user_id, i.merch_id, i.status, i.quantity,
-                   m.name as merch_name, m.photo_url, m.group_name
+                   m.name as merch_name, m.photo_url, m.group_name,
+                   e.name as event_name
                FROM inventory i
                JOIN merchandise m ON i.merch_id = m.id
+               JOIN events e ON e.id = m.event_id
                WHERE i.user_id = $1"#,
         )
         .bind(user_id)
@@ -95,6 +102,7 @@ impl InventoryRepository {
                 merch_name: Some(row.get("merch_name")),
                 photo_url: row.get("photo_url"),
                 group_name: row.get("group_name"),
+                event_name: Some(row.get("event_name")),
             })
             .collect())
     }

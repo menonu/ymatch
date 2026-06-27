@@ -3448,6 +3448,21 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         "inventory_applied should be false/null for new match"
     );
 
+    // #322: potential items (userHaves/userWants) must carry event:group
+    // context so the match UI can show which event/group each item belongs to.
+    let haves = matches[0]["userHaves"]
+        .as_array()
+        .expect("userHaves should be an array");
+    assert!(!haves.is_empty(), "userHaves should include Card A");
+    assert_eq!(haves[0]["eventName"], "Trade Test Event");
+    assert_eq!(haves[0]["groupName"], "Cards");
+    let wants = matches[0]["userWants"]
+        .as_array()
+        .expect("userWants should be an array");
+    assert!(!wants.is_empty(), "userWants should include Card B");
+    assert_eq!(wants[0]["eventName"], "Trade Test Event");
+    assert_eq!(wants[0]["groupName"], "Cards");
+
     // 6. User1 proposes: give Card A (giver=user1), receive Card B (giver=user2).
     //    1:1 legs → balanced.
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -3485,6 +3500,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(matches[0]["status"], "OFFERED");
     assert_eq!(matches[0]["offeredBy"], user1_id);
+
+    // #322: selected legs (MatchItem) must also carry event:group context.
+    let selected = matches[0]["selectedItems"]
+        .as_array()
+        .expect("selectedItems should be an array");
+    assert_eq!(selected.len(), 2, "offer should create 2 legs");
+    for leg in selected {
+        assert_eq!(leg["eventName"], "Trade Test Event");
+        assert_eq!(leg["groupName"], "Cards");
+    }
 
     // 7. User2 (non-proposer) accepts the balanced proposal
     let app = backend::routes::create_router(pool.clone(), test_storage());

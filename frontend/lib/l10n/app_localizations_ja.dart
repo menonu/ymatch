@@ -525,6 +525,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String itemContext(String event, String group) {
+    return '$event: $group';
+  }
+
+  @override
   String sendOfferItems(int count) {
     return 'オファーを送信（$count件）';
   }

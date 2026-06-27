@@ -110,9 +110,12 @@ impl MatchRepository {
             SELECT i.id, i.user_id, i.merch_id, i.status,
                    LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
+                   m.group_name AS group_name,
+                   e.name AS event_name,
                    w.user_id AS peer_user_id
             FROM inventory i
             JOIN merchandise m ON m.id = i.merch_id
+            JOIN events e ON e.id = m.event_id
             JOIN inventory w
               ON w.merch_id = i.merch_id
              AND w.status = 'WANT' AND w.quantity > 0
@@ -136,9 +139,12 @@ impl MatchRepository {
             SELECT i.id, i.user_id, i.merch_id, i.status,
                    LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
+                   m.group_name AS group_name,
+                   e.name AS event_name,
                    i.user_id AS peer_user_id
             FROM inventory i
             JOIN merchandise m ON m.id = i.merch_id
+            JOIN events e ON e.id = m.event_id
             JOIN inventory w
               ON w.merch_id = i.merch_id
              AND w.status = 'WANT' AND w.quantity > 0
@@ -155,9 +161,12 @@ impl MatchRepository {
         // Legs are absolute: each row is "giver_user_id gives merch_id qty".
         let items_sql = r#"
             SELECT mi.id, mi.match_id, mi.merch_id, mi.giver_user_id, mi.quantity,
-                   m.name AS merch_name, m.photo_url
+                   m.name AS merch_name, m.photo_url,
+                   m.group_name AS group_name,
+                   e.name AS event_name
             FROM match_items mi
             JOIN merchandise m ON m.id = mi.merch_id
+            JOIN events e ON e.id = m.event_id
             WHERE mi.match_id = ANY($1)
             ORDER BY mi.giver_user_id, mi.id
         "#;
@@ -185,7 +194,12 @@ impl MatchRepository {
                     // (issue #224). The proto field is `optional string`, so
                     // this matches the wire format.
                     photo_url: r.get::<Option<String>, _>("photo_url"),
-                    group_name: None,
+                    // #322: merchandise.group_name is nullable (TEXT); decode
+                    // as Option<String> so NULL is preserved as None.
+                    group_name: r.get::<Option<String>, _>("group_name"),
+                    // #322: events.name is NOT NULL, but decode via Option for
+                    // uniformity with the proto `optional string` field.
+                    event_name: Some(r.get("event_name")),
                 });
         }
         let mut wants_by_peer: HashMap<i32, Vec<crate::generated::ymatch::InventoryItem>> =
@@ -204,7 +218,9 @@ impl MatchRepository {
                     merch_name: Some(r.get("merch_name")),
                     // See #224. Decode as Option<String>.
                     photo_url: r.get::<Option<String>, _>("photo_url"),
-                    group_name: None,
+                    // See #322 note above.
+                    group_name: r.get::<Option<String>, _>("group_name"),
+                    event_name: Some(r.get("event_name")),
                 });
         }
         let mut items_by_match: HashMap<i32, Vec<MatchItem>> = HashMap::new();
@@ -219,6 +235,9 @@ impl MatchRepository {
                 merch_name: Some(r.get("merch_name")),
                 // See #224. Decode as Option<String>.
                 photo_url: r.get::<Option<String>, _>("photo_url"),
+                // #322: carry group + event context for the match UI.
+                group_name: r.get::<Option<String>, _>("group_name"),
+                event_name: Some(r.get("event_name")),
             });
         }
 
@@ -305,9 +324,12 @@ impl MatchRepository {
     {
         let rows = sqlx::query(
             r#"SELECT mi.id, mi.match_id, mi.merch_id, mi.giver_user_id, mi.quantity,
-                      m.name AS merch_name, m.photo_url
+                      m.name AS merch_name, m.photo_url,
+                      m.group_name AS group_name,
+                      e.name AS event_name
                FROM match_items mi
                JOIN merchandise m ON m.id = mi.merch_id
+               JOIN events e ON e.id = m.event_id
                WHERE mi.match_id = $1
                ORDER BY mi.giver_user_id, mi.id"#,
         )
@@ -328,6 +350,9 @@ impl MatchRepository {
                 // as String and wrapped in Some, which panicked on
                 // NULL photo_url).
                 photo_url: r.get::<Option<String>, _>("photo_url"),
+                // #322: carry group + event context for the match UI.
+                group_name: r.get::<Option<String>, _>("group_name"),
+                event_name: Some(r.get("event_name")),
             })
             .collect())
     }

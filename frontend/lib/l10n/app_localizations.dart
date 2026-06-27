@@ -1052,6 +1052,12 @@ abstract class AppLocalizations {
   /// **'Qty: {count}'**
   String qtyLabel(int count);
 
+  /// Event:group context shown after an item name in the match UI so the user can tell which event/group an item belongs to (#322)
+  ///
+  /// In en, this message translates to:
+  /// **'{event}: {group}'**
+  String itemContext(String event, String group);
+
   /// Submit button on the offer dialog with the selected item count
   ///
   /// In en, this message translates to:

@@ -421,11 +421,35 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     );
   }
 
+  /// Builds the "event: group" context label for a match item (#322).
+  ///
+  /// Returns `null` when neither event nor group is available so callers
+  /// skip the context line entirely instead of rendering an empty ":"
+  /// placeholder. When only one of the two is known, returns it alone.
+  String? _itemContextLabel(
+    AppLocalizations l10n,
+    String? eventName,
+    String? groupName,
+  ) {
+    final event = (eventName ?? '').trim();
+    final group = (groupName ?? '').trim();
+    if (event.isEmpty && group.isEmpty) return null;
+    if (event.isEmpty) return group;
+    if (group.isEmpty) return event;
+    return l10n.itemContext(event, group);
+  }
+
   Widget _buildItemChips(List<InventoryItem> items, Color color) {
+    final l10n = AppLocalizations.of(context)!;
     return Wrap(
       spacing: 6,
       runSpacing: 4,
       children: items.map((item) {
+        final contextLabel = _itemContextLabel(
+          l10n,
+          item.eventName,
+          item.groupName,
+        );
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
@@ -433,13 +457,24 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
-          child: Text(
-            '${item.merchName} ×${item.quantity}',
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${item.merchName} ×${item.quantity}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (contextLabel != null)
+                Text(
+                  contextLabel,
+                  style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7)),
+                ),
+            ],
           ),
         );
       }).toList(),
@@ -547,6 +582,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
   }
 
   Widget _buildMatchItemRow(MatchItem item, Color color) {
+    final l10n = AppLocalizations.of(context)!;
+    final contextLabel =
+        _itemContextLabel(l10n, item.eventName, item.groupName);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -566,9 +604,23 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              '${item.merchName} ×${item.quantity}',
-              style: TextStyle(fontSize: 13, color: color),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${item.merchName} ×${item.quantity}',
+                  style: TextStyle(fontSize: 13, color: color),
+                ),
+                if (contextLabel != null)
+                  Text(
+                    contextLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: color.withValues(alpha: 0.7),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -949,6 +1001,8 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     required ValueChanged<int> onQty,
   }) {
     final l10n = AppLocalizations.of(context)!;
+    final contextLabel =
+        _itemContextLabel(l10n, item.eventName, item.groupName);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -969,6 +1023,11 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                   l10n.qtyLabel(item.quantity),
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
+                if (contextLabel != null)
+                  Text(
+                    contextLabel,
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
               ],
             ),
           ),

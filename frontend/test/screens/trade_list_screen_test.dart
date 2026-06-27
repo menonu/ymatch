@@ -22,6 +22,18 @@ InventoryItem _item(int merchId, String name, int qty, int userId) =>
       ..userId = userId
       ..status = 'HAVE';
 
+InventoryItem _itemWithContext(
+  int merchId,
+  String name,
+  int qty,
+  int userId, {
+  String? eventName,
+  String? groupName,
+}) =>
+    _item(merchId, name, qty, userId)
+      ..eventName = eventName ?? ''
+      ..groupName = groupName ?? '';
+
 TradeMatch _pendingMatch() => TradeMatch()
   ..id = 100
   ..user1Id = 1
@@ -133,14 +145,14 @@ void main() {
 
   testWidgets(
     'match card shows the "メッセージ" button under ja locale (#310)',
-    (WidgetTester tester) async {
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
             notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
+                  (ref) async => NotificationCounts(),
             ),
           ],
           child: MaterialApp(
@@ -155,6 +167,68 @@ void main() {
 
       expect(find.text('メッセージ'), findsOneWidget);
       expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'match card shows event:group context next to each item (#322)',
+        (WidgetTester tester) async {
+      final match = TradeMatch()
+        ..id = 200
+        ..user1Id = 1
+        ..user2Id = 2
+        ..status = 'PENDING'
+        ..userHaves.add(
+          _itemWithContext(10, 'Pikachu', 2, 1,
+              eventName: 'TokyoFest', groupName: 'BoosterBox'),
+        )
+        ..userWants.add(
+          _itemWithContext(20, 'Charizard', 1, 2,
+              eventName: 'OsakaCon', groupName: 'Promos'),
+        );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [match]),
+            notificationCountsProvider(1).overrideWith(
+                  (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Each item chip renders its event:group context as a second line.
+      expect(find.text('TokyoFest: BoosterBox'), findsOneWidget);
+      expect(find.text('OsakaCon: Promos'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'match card hides context when neither event nor group is set (#322)',
+        (WidgetTester tester) async {
+      // No event/group → no context line and no empty ":" placeholder.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+            notificationCountsProvider(1).overrideWith(
+                  (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // "_pendingMatch" items have no event/group; verify no bare separator
+      // leaks through. The item name + qty still render.
+      expect(find.text('Give Pen ×3'), findsOneWidget);
+      expect(find.text(': '), findsNothing);
     },
   );
 }
