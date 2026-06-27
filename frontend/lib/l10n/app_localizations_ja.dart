@@ -305,6 +305,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get typeMessage => 'メッセージを入力...';
 
   @override
+  String get messageAction => 'メッセージ';
+
+  @override
   String get openInMaps => 'マップで開く';
 
   @override

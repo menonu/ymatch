@@ -632,6 +632,12 @@ abstract class AppLocalizations {
   /// **'Type a message...'**
   String get typeMessage;
 
+  /// Button label on a match card to open the chat thread
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get messageAction;
+
   /// Link label for opening a map URL
   ///
   /// In en, this message translates to:

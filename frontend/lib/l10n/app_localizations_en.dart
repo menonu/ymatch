@@ -306,6 +306,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get typeMessage => 'Type a message...';
 
   @override
+  String get messageAction => 'Message';
+
+  @override
   String get openInMaps => 'Open in Maps';
 
   @override

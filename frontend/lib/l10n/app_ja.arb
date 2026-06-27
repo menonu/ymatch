@@ -97,6 +97,7 @@
   "failedToSend": "送信に失敗しました: {error}",
   "noMessagesYet": "まだメッセージがありません。挨拶してみましょう！",
   "typeMessage": "メッセージを入力...",
+  "messageAction": "メッセージ",
   "openInMaps": "マップで開く",
   "openLink": "リンクを開く",
 
