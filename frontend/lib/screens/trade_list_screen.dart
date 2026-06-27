@@ -307,11 +307,14 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                     ),
                   ),
                   if (tab != TradeTab.completed)
-                    TextButton(
+                    FilledButton.tonal(
                       onPressed: () =>
                           context.go('/matches/chat/${match.id}'),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         minimumSize: const Size(0, 36),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
