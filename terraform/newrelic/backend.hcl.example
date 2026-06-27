@@ -1,0 +1,11 @@
+# OCI Object Storage backend config for terraform/newrelic (#307).
+# Copy to backend.hcl and fill in real values. backend.hcl is gitignored.
+#
+# These values complete the partial `backend "oci"` block in main.tf and are
+# passed at init time: `terraform init -backend-config=backend.hcl`.
+#
+# namespace  your tenancy's Object Storage namespace
+#            get it with:  oci os ns get
+# region     the OCI region of the ymatch-tfstate bucket
+namespace = "YOUR_OBJECT_STORAGE_NAMESPACE"
+region    = "ap-osaka-1"
