@@ -191,10 +191,15 @@ tasks:
         set -a && . ./.env && set +a && terraform apply -input=false
 
   tf:oci:init:
-    desc: terraform init (oci) — run once
+    desc: terraform init (oci) — run once (needs backend.hcl for the remote OCI state backend)
     dir: terraform/oci
     cmds:
-      - terraform init -input=false
+      - |
+        if [ ! -f backend.hcl ]; then
+          echo "::error::terraform/oci/backend.hcl not found. Copy backend.hcl.example to backend.hcl and fill in namespace/region." >&2
+          exit 1
+        fi
+        terraform init -input=false -backend-config=backend.hcl
 
   tf:oci:plan:
     desc: terraform plan (oci) — sources .env for TF_VAR_* secrets
