@@ -132,6 +132,43 @@ void main() {
   );
 
   testWidgets(
+    'match card "Message" affordance is a filled button, not bare text '
+    '(#310 follow-up)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The Message affordance must read as a button — a filled (tonal)
+      // background — not a borderless TextButton that looks like a link.
+      expect(
+        find.ancestor(
+          of: find.text('Message'),
+          matching: find.byType(FilledButton),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.text('Message'),
+          matching: find.byType(TextButton),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
     'match card shows the "メッセージ" button under ja locale (#310)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
