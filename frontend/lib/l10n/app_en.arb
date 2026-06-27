@@ -364,6 +364,18 @@
       }
     }
   },
+  "failedToUpdateItem": "Failed to update \"{name}\": {error}",
+  "@failedToUpdateItem": {
+    "description": "Snackbar message when updating an item (e.g. renaming) fails, such as a duplicate-name 400 from #299",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "selectGroup": "Select Group",
   "@selectGroup": {
     "description": "Section title for group selection"

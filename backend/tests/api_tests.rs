@@ -1524,6 +1524,142 @@ async fn test_create_and_list_merch(pool: PgPool) {
     assert_eq!(items[0]["name"].as_str().unwrap(), "Test Item");
 }
 
+// --- Merchandise name uniqueness (Issue #299) ---
+
+#[sqlx::test]
+async fn test_create_merch_duplicate_name_in_same_group_rejected(pool: PgPool) {
+    let (_user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "dup-name-user", "Dup Name Event").await;
+
+    // First "a" in group G succeeds.
+    let _ = create_merch(&pool, event_id, "a", "G").await;
+
+    // Second "a" in the SAME group G must be rejected with 400.
+    let body = r#"{"name": "a", "groupName": "G"}"#;
+    let resp = post_json(&pool, &format!("/api/v1/events/{}/merch", event_id), body).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    let msg = body_to_string(resp.into_body()).await;
+    assert!(
+        msg.contains("already exists"),
+        "expected duplicate-name message, got: {msg}"
+    );
+}
+
+#[sqlx::test]
+async fn test_create_merch_same_name_across_different_groups_succeeds(pool: PgPool) {
+    let (_user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "cross-group-user", "Cross Group Event").await;
+
+    // "a" in group G1 succeeds.
+    let _ = create_merch(&pool, event_id, "a", "G1").await;
+
+    // The same name "a" in a DIFFERENT group G2 must also succeed.
+    let merch_id = create_merch(&pool, event_id, "a", "G2").await;
+    assert!(merch_id > 0);
+}
+
+#[sqlx::test]
+async fn test_create_merch_duplicate_name_after_soft_delete_reusable(pool: PgPool) {
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "softdel-reuse-user", "SoftDel Reuse Event").await;
+
+    // Create "a" (owned by the user so we can later manage it).
+    let body = format!(
+        r#"{{"name": "a", "groupName": "G", "creatorId": {}}}"#,
+        user_id
+    );
+    let resp = post_json(&pool, &format!("/api/v1/events/{}/merch", event_id), &body).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let merch_id = merch["id"].as_i64().unwrap();
+
+    // Add inventory so delete takes the soft-delete branch (is_deleted = true).
+    set_inventory(&pool, user_id, merch_id, "HAVE", 1).await;
+
+    // Soft-delete the merch.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // The soft-deleted row must not occupy the name: re-creating "a" succeeds.
+    let merch_id2 = create_merch(&pool, event_id, "a", "G").await;
+    assert!(merch_id2 > 0);
+}
+
+#[sqlx::test]
+async fn test_update_merch_rename_to_existing_name_rejected(pool: PgPool) {
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "rename-user", "Rename Event").await;
+
+    // Create "a" and "b" in the same group, both owned by the user so the
+    // update-merch ownership check passes.
+    for name in ["a", "b"] {
+        let body = format!(
+            r#"{{"name": "{}", "groupName": "G", "creatorId": {}}}"#,
+            name, user_id
+        );
+        let resp = post_json(&pool, &format!("/api/v1/events/{}/merch", event_id), &body).await;
+        assert_eq!(resp.status(), StatusCode::OK, "create {name} failed");
+    }
+
+    // List to find the merch id for "b".
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/events/{}/merch?user_id={}",
+                    event_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let b_id = items
+        .iter()
+        .find(|m| m["name"].as_str() == Some("b"))
+        .expect("item 'b' should exist")["id"]
+        .as_i64()
+        .unwrap();
+
+    // Rename "b" → "a" (collides with the existing "a" in group G) → 400.
+    let body = format!(r#"{{"userId": {}, "name": "a"}}"#, user_id);
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}/merch/{}", event_id, b_id))
+                .header("content-type", "application/json")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    let msg = body_to_string(resp.into_body()).await;
+    assert!(
+        msg.contains("already exists"),
+        "expected duplicate-name message, got: {msg}"
+    );
+}
+
 // --- Inventory ---
 
 #[sqlx::test]

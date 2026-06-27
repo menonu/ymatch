@@ -22,6 +22,26 @@ use crate::generated::ymatch::{CreateMerchRequest, Merchandise, UpdateMerchReque
 use crate::handlers::mappers::merch_from_row;
 use sqlx::{PgPool, Row};
 
+/// Whether a `sqlx::Error` is a Postgres unique-violation (SQLSTATE 23505).
+fn is_unique_violation(e: &sqlx::Error) -> bool {
+    matches!(e, sqlx::Error::Database(db) if db.code().as_deref() == Some("23505"))
+}
+
+/// Map an INSERT/UPDATE error to a `400` when it is a duplicate-name
+/// unique-violation from `uq_merchandise_live_name_per_group`; any other
+/// database error falls through to the blanket `From<sqlx::Error>` impl
+/// (500). Used as a race-condition backstop behind the application-level
+/// pre-check in [`MerchandiseRepository::create`] / [`update`].
+fn map_name_conflict(e: sqlx::Error, name: &str, group: &str) -> AppError {
+    if is_unique_violation(&e) {
+        AppError::bad_request(format!(
+            "a merch item named '{name}' already exists in group '{group}'"
+        ))
+    } else {
+        AppError::from(e)
+    }
+}
+
 /// Outcome of [`MerchandiseRepository::delete_merch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeleteOutcome {
@@ -142,6 +162,27 @@ impl MerchandiseRepository {
             .await?;
         }
 
+        // Issue #299: reject a duplicate name within the same (event_id,
+        // group_name) among live rows. The partial unique index
+        // uq_merchandise_live_name_per_group is the race-condition backstop
+        // (mapped via map_name_conflict on the INSERT below); this pre-check
+        // gives a clean, specific 400 in the common case.
+        let name_taken: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM merchandise \
+             WHERE event_id = $1 AND group_name = $2 AND name = $3 AND is_deleted = false)",
+        )
+        .bind(event_id)
+        .bind(group_name)
+        .bind(&req.name)
+        .fetch_one(&self.pool)
+        .await?;
+        if name_taken {
+            return Err(AppError::bad_request(format!(
+                "a merch item named '{}' already exists in group '{}'",
+                req.name, group_name
+            )));
+        }
+
         let sql = format!(
             r#"INSERT INTO merchandise (event_id, name, photo_url, group_name, creator_id, status)
                VALUES ($1, $2, $3, $4, $5, $6)
@@ -156,7 +197,8 @@ impl MerchandiseRepository {
             .bind(req.creator_id)
             .bind(status)
             .fetch_one(&self.pool)
-            .await?;
+            .await
+            .map_err(|e| map_name_conflict(e, &req.name, group_name))?;
 
         // Fetch the description separately so we can return it in the
         // same response shape that the LEFT JOIN would produce.
@@ -201,6 +243,49 @@ impl MerchandiseRepository {
             return Err(AppError::bad_request("No fields to update"));
         }
 
+        // Issue #299: a rename and/or group move must not collide with another
+        // live row in the target (event_id, group_name, name). Resolve the
+        // effective name/group (new value if patched, else the row's current
+        // value) and pre-check against every other live row. The partial
+        // unique index is the race backstop (mapped via map_name_conflict on
+        // the UPDATE below).
+        let mut conflict_name: Option<String> = None;
+        let mut conflict_group: Option<String> = None;
+        if req.name.is_some() || req.group_name.is_some() {
+            let existing: Option<(String, Option<String>)> = sqlx::query_as(
+                "SELECT name, group_name FROM merchandise \
+                 WHERE id = $1 AND event_id = $2 AND is_deleted = false",
+            )
+            .bind(merch_id)
+            .bind(event_id)
+            .fetch_optional(&self.pool)
+            .await?;
+            if let Some((cur_name, cur_group)) = existing {
+                let effective_name = req.name.clone().unwrap_or(cur_name);
+                let effective_group = req.group_name.clone().or(cur_group);
+                if let Some(ref g) = effective_group {
+                    let name_taken: bool = sqlx::query_scalar(
+                        "SELECT EXISTS(SELECT 1 FROM merchandise \
+                         WHERE event_id = $1 AND group_name = $2 AND name = $3 \
+                         AND id <> $4 AND is_deleted = false)",
+                    )
+                    .bind(event_id)
+                    .bind(g)
+                    .bind(&effective_name)
+                    .bind(merch_id)
+                    .fetch_one(&self.pool)
+                    .await?;
+                    if name_taken {
+                        return Err(AppError::bad_request(format!(
+                            "a merch item named '{effective_name}' already exists in group '{g}'"
+                        )));
+                    }
+                }
+                conflict_name = Some(effective_name);
+                conflict_group = effective_group;
+            }
+        }
+
         let sql = format!(
             "UPDATE merchandise SET {} WHERE id = $1 AND event_id = $2 RETURNING {}, '' AS group_description",
             sets.join(", "),
@@ -218,7 +303,14 @@ impl MerchandiseRepository {
             q = q.bind(group_name);
         }
 
-        let row = q.fetch_optional(&self.pool).await?;
+        let row = q.fetch_optional(&self.pool).await.map_err(|e| {
+            // Race backstop for #299: a concurrent insert/rename hit the
+            // partial unique index between our pre-check and this UPDATE.
+            match (&conflict_name, &conflict_group) {
+                (Some(n), Some(g)) => map_name_conflict(e, n, g),
+                _ => AppError::from(e),
+            }
+        })?;
         let Some(row) = row else {
             return Ok(None);
         };

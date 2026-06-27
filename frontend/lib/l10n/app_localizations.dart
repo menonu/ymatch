@@ -530,6 +530,12 @@ abstract class AppLocalizations {
   /// **'Failed to add \"{name}\": {error}'**
   String failedToAdd(String name, String error);
 
+  /// Snackbar message when updating an item (e.g. renaming) fails, such as a duplicate-name 400 from #299
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update \"{name}\": {error}'**
+  String failedToUpdateItem(String name, String error);
+
   /// Section title for group selection
   ///
   /// In en, this message translates to:

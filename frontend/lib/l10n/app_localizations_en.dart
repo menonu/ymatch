@@ -251,6 +251,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String failedToUpdateItem(String name, String error) {
+    return 'Failed to update \"$name\": $error';
+  }
+
+  @override
   String get selectGroup => 'Select Group';
 
   @override

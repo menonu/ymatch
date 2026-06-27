@@ -79,6 +79,7 @@
   "selectGroupFirst": "まずアイテムグループを選択または作成してください。",
   "addedSuccessfully": "「{name}」を追加しました。",
   "failedToAdd": "「{name}」の追加に失敗しました: {error}",
+  "failedToUpdateItem": "「{name}」の更新に失敗しました: {error}",
   "selectGroup": "グループを選択",
   "newGroup": "新規グループ",
   "itemName": "アイテム名",
