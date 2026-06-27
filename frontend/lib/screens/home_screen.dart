@@ -203,6 +203,11 @@ class HomeScreen extends ConsumerWidget {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SegmentedButton<EventFilter>(
+                // Suppress the default selected check icon so each segment's
+                // width is identical in its selected and unselected states
+                // (issue #324). Selection is still conveyed by the segmented
+                // button's selected background color.
+                showSelectedIcon: false,
                 segments: [
                   ButtonSegment(
                     value: EventFilter.all,
