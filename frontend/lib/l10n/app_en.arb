@@ -289,11 +289,11 @@
   "@howToTrade": {
     "description": "Title of the how-to-trade instructions card"
   },
-  "tradeStep1": "Go to the Events tab and find your event.",
+  "tradeStep1": "Go to the Items tab and find your event.",
   "@tradeStep1": {
     "description": "How-to-trade step 1"
   },
-  "tradeStep2": "Use + and - to set your HAVE and WANT items.",
+  "tradeStep2": "Use + and - to enter the quantities of items you want to exchange. Matching is performed within an item group based on your Wish / For Trade quantities.",
   "@tradeStep2": {
     "description": "How-to-trade step 2"
   },
