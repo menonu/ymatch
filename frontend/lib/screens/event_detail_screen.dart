@@ -1,8 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
@@ -1388,59 +1385,13 @@ class _EditMerchDialogState extends ConsumerState<_EditMerchDialog> {
   }
 
   Future<void> _pickImage() async {
-    final l10n = AppLocalizations.of(context)!;
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(l10n.selectImageSource),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, ImageSource.gallery),
-            child: Row(
-              children: [
-                const Icon(Icons.photo_library),
-                const SizedBox(width: 12),
-                Text(l10n.gallery),
-              ],
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, ImageSource.camera),
-            child: Row(
-              children: [
-                const Icon(Icons.camera_alt),
-                const SizedBox(width: 12),
-                Text(l10n.camera),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-    if (source == null) return;
-
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(
-        source: source,
-        maxWidth: 256,
-        maxHeight: 256,
-        imageQuality: 85,
-      );
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _pickedImageBytes = bytes;
-          _pickedImageName = image.name;
-          _previewUrl = 'data:image/png;base64,${base64Encode(bytes)}';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.failedToPickImage(e.toString()))),
-        );
-      }
+    final picked = await pickMerchImage(context);
+    if (picked != null) {
+      setState(() {
+        _pickedImageBytes = picked.bytes;
+        _pickedImageName = picked.name;
+        _previewUrl = picked.previewUrl;
+      });
     }
   }
 
@@ -1498,7 +1449,7 @@ class _EditMerchDialogState extends ConsumerState<_EditMerchDialog> {
         ? widget.item.photoUrl
         : null;
     return AlertDialog(
-      title: Text(l10n.editItemName),
+      title: Text(l10n.editItem),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
