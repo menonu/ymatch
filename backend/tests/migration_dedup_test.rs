@@ -170,6 +170,55 @@ async fn migration_dedups_duplicate_live_merch_names_before_unique_index(pool: P
             .unwrap();
     }
 
+    // Three LIVE merch rows colliding on (event_id, group_name='H', name='c')
+    // (S2 + D2a + D2b). This exercises two cases the 'a'/'G' group does not:
+    //   - >2 dups in one group, and
+    //   - a dup-only collision (no inventory on the survivor itself): both dups
+    //     carry HAVE for the same user, the survivor carries none, so the sum
+    //     must land on a repointed row -> survivor HAVE = 20 + 30 = 50.
+    for _ in 0..3 {
+        sqlx::query("INSERT INTO merchandise (event_id, name, group_name) VALUES ($1, 'c', 'H')")
+            .bind(event_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    let group_h_ids: Vec<i32> = sqlx::query_scalar(
+        "SELECT id FROM merchandise \
+         WHERE event_id = $1 AND name = 'c' AND group_name = 'H' \
+         ORDER BY id",
+    )
+    .bind(event_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        group_h_ids.len(),
+        3,
+        "expected 3 duplicate live rows seeded in H"
+    );
+    let survivor_h = group_h_ids[0];
+    let dup_h_a = group_h_ids[1];
+    let dup_h_b = group_h_ids[2];
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) \
+         VALUES ($1, $2, 'HAVE', 20)",
+    )
+    .bind(user_id)
+    .bind(dup_h_a)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) \
+         VALUES ($1, $2, 'HAVE', 30)",
+    )
+    .bind(user_id)
+    .bind(dup_h_b)
+    .execute(&pool)
+    .await
+    .unwrap();
+
     // 3. Apply the target migration (the one under test).
     full.run(&pool).await.expect("target migration applies");
 
@@ -277,6 +326,56 @@ async fn migration_dedups_duplicate_live_merch_names_before_unique_index(pool: P
     assert_eq!(
         mi_on_dup, 0,
         "no match_items may reference the hard-deleted duplicate"
+    );
+
+    // Group H: >2 dups collapsed to one survivor; the dup-only collision (no
+    // inventory on the survivor) summed onto the survivor; both dups hard-deleted.
+    let live_c: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM merchandise \
+         WHERE event_id = $1 AND name = 'c' AND group_name = 'H' AND is_deleted = false",
+    )
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        live_c, 1,
+        "three duplicate live 'c' rows must collapse to one survivor"
+    );
+    let have_h_qty: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory \
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'HAVE'",
+    )
+    .bind(user_id)
+    .bind(survivor_h)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        have_h_qty, 50,
+        "dup-only HAVE inventory must sum (20 + 30) onto the survivor with no own inventory"
+    );
+    let h_dups_gone: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM merchandise WHERE id IN ($1, $2)")
+            .bind(dup_h_a)
+            .bind(dup_h_b)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        h_dups_gone, 0,
+        "both group-H duplicate rows must be hard-deleted"
+    );
+    let inv_on_h_dups: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM inventory WHERE merch_id IN ($1, $2)")
+            .bind(dup_h_a)
+            .bind(dup_h_b)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        inv_on_h_dups, 0,
+        "no inventory may reference the hard-deleted group-H duplicates"
     );
 
     // The partial unique index now blocks a new live duplicate in group 'G'.
