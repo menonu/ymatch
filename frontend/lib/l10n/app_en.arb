@@ -584,6 +584,10 @@
   "@youCreatedThisItem": {
     "description": "Tooltip on the creator badge of an item"
   },
+  "editItem": "Edit Item",
+  "@editItem": {
+    "description": "Long-press menu entry to edit an item's name and image"
+  },
   "editItemName": "Edit Item Name",
   "@editItemName": {
     "description": "Dialog title for editing an item name"

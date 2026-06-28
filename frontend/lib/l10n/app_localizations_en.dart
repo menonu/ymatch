@@ -406,6 +406,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get youCreatedThisItem => 'You created this item';
 
   @override
+  String get editItem => 'Edit Item';
+
+  @override
   String get editItemName => 'Edit Item Name';
 
   @override

@@ -19,9 +19,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 
-ApiClient _apiWith({
-  required http.Client client,
-}) {
+ApiClient _apiWith({required http.Client client}) {
   final config = ConfigService();
   config.setBaseUrlForTest('http://localhost:3000');
   return ApiClient(config, client: client);
@@ -31,31 +29,35 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('UserInventoryNotifier.updateItem', () {
-    test('rethrows when the POST fails (error is visible to the caller)',
-        () async {
-      // GET succeeds (empty inventory); POST returns 500.
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' &&
-              request.url.path == '/api/v1/user/inventory') {
-            return http.Response('Internal Server Error', 500);
-          }
-          return http.Response(jsonEncode([]), 200);
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+    test(
+      'rethrows when the POST fails (error is visible to the caller)',
+      () async {
+        // GET succeeds (empty inventory); POST returns 500.
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/user/inventory') {
+              return http.Response('Internal Server Error', 500);
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      // Prime the notifier so build() completes and state has a value.
-      await container.read(inventoryProvider(1).future);
+        // Prime the notifier so build() completes and state has a value.
+        await container.read(inventoryProvider(1).future);
 
-      await expectLater(
-        container.read(inventoryProvider(1).notifier).updateItem(42, 'WANT', 1),
-        throwsA(isA<Exception>()),
-      );
-    });
+        await expectLater(
+          container
+              .read(inventoryProvider(1).notifier)
+              .updateItem(42, 'WANT', 1),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
 
     test('rolls back optimistic state when the POST fails', () async {
       final api = _apiWith(
@@ -82,8 +84,11 @@ void main() {
         throwsA(isA<Exception>()),
       );
 
-      expect(notifier.state.value, before.value,
-          reason: 'optimistic state should be rolled back on failure');
+      expect(
+        notifier.state.value,
+        before.value,
+        reason: 'optimistic state should be rolled back on failure',
+      );
     });
   });
 
@@ -136,65 +141,67 @@ void main() {
   // pin that contract so the payloads can't silently regress to hand-written
   // snake_case maps.
   group('Proto3 JSON payloads (#215)', () {
-    test('addEvent sends camelCase proto3 JSON (creatorId, not creator_id)',
-        () async {
-      String? capturedBody;
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' && request.url.path == '/api/v1/events') {
-            capturedBody = request.body;
-            return http.Response(jsonEncode({'id': 1, 'name': 'n'}), 201);
-          }
-          return http.Response(jsonEncode([]), 200);
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+    test(
+      'addEvent sends camelCase proto3 JSON (creatorId, not creator_id)',
+      () async {
+        String? capturedBody;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/events') {
+              capturedBody = request.body;
+              return http.Response(jsonEncode({'id': 1, 'name': 'n'}), 201);
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      await container
-          .read(eventsControllerProvider.notifier)
-          .addEvent('My Event', 5, status: 'draft');
+        await container
+            .read(eventsControllerProvider.notifier)
+            .addEvent('My Event', 5, status: 'draft');
 
-      final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
-      expect(decoded, containsPair('name', 'My Event'));
-      expect(decoded, containsPair('creatorId', 5));
-      expect(decoded, containsPair('status', 'draft'));
-      // The whole point of #215: no snake_case keys leak into the wire body.
-      expect(decoded, isNot(contains('creator_id')));
-      expect(decoded, isNot(contains('user_id')));
-    });
+        final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(decoded, containsPair('name', 'My Event'));
+        expect(decoded, containsPair('creatorId', 5));
+        expect(decoded, containsPair('status', 'draft'));
+        // The whole point of #215: no snake_case keys leak into the wire body.
+        expect(decoded, isNot(contains('creator_id')));
+        expect(decoded, isNot(contains('user_id')));
+      },
+    );
 
-    test('banUser sends camelCase proto3 JSON (bannedUntil, not banned_until)',
-        () async {
-      String? capturedBody;
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' && request.url.path.endsWith('/ban')) {
-            capturedBody = request.body;
-            return http.Response('', 200);
-          }
-          return http.Response(jsonEncode([]), 200);
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+    test(
+      'banUser sends camelCase proto3 JSON (bannedUntil, not banned_until)',
+      () async {
+        String? capturedBody;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' && request.url.path.endsWith('/ban')) {
+              capturedBody = request.body;
+              return http.Response('', 200);
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      await container.read(adminControllerProvider.notifier).banUser(
-        2,
-        1,
-        reason: 'spam',
-        bannedUntil: '2026-12-31T00:00:00Z',
-      );
+        await container
+            .read(adminControllerProvider.notifier)
+            .banUser(2, 1, reason: 'spam', bannedUntil: '2026-12-31T00:00:00Z');
 
-      final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
-      expect(decoded, containsPair('reason', 'spam'));
-      expect(decoded, containsPair('bannedUntil', '2026-12-31T00:00:00Z'));
-      expect(decoded, isNot(contains('banned_until')));
-    });
+        final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(decoded, containsPair('reason', 'spam'));
+        expect(decoded, containsPair('bannedUntil', '2026-12-31T00:00:00Z'));
+        expect(decoded, isNot(contains('banned_until')));
+      },
+    );
 
     test('addMerch preserves an empty photoUrl on the wire (#215)', () async {
       // photo_url is an `optional string`; setting it to '' must still emit
@@ -225,6 +232,52 @@ void main() {
       expect(decoded, containsPair('name', 'Photo Card #1'));
       expect(decoded, containsPair('photoUrl', ''));
       expect(decoded, containsPair('groupName', 'Photo Cards'));
+      expect(decoded, isNot(contains('group_name')));
+    });
+
+    test('updateMerch sends name + photoUrl on the wire (#205)', () async {
+      // The "Edit Item" dialog lets a creator change an item's image as well
+      // as its name. The provider must PUT both fields (camelCase proto3 JSON)
+      // and must OMIT groupName when the caller does not supply it, so an
+      // edit that only touches name+image does not clobber the group. The
+      // userId is always present (required by the backend auth check).
+      String? capturedBody;
+      String? capturedMethod;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'PUT' &&
+              RegExp(
+                r'/api/v1/events/\d+/merch/\d+$',
+              ).hasMatch(request.url.path)) {
+            capturedMethod = request.method;
+            capturedBody = request.body;
+            return http.Response(jsonEncode({'id': 1}), 200);
+          }
+          return http.Response(jsonEncode([]), 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(merchControllerProvider.notifier)
+          .updateMerch(
+            1,
+            7,
+            42,
+            name: 'Renamed Card',
+            photoUrl: 'uploads/abc.png',
+          );
+
+      expect(capturedMethod, 'PUT');
+      final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(decoded, containsPair('userId', 42));
+      expect(decoded, containsPair('name', 'Renamed Card'));
+      expect(decoded, containsPair('photoUrl', 'uploads/abc.png'));
+      // groupName was not supplied — it must not be sent (no group clobber).
+      expect(decoded, isNot(contains('groupName')));
       expect(decoded, isNot(contains('group_name')));
     });
   });
