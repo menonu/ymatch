@@ -704,6 +704,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     $core.String? merchName,
     $core.String? photoUrl,
     $core.String? groupName,
+    $core.String? eventName,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -714,6 +715,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     if (merchName != null) result.merchName = merchName;
     if (photoUrl != null) result.photoUrl = photoUrl;
     if (groupName != null) result.groupName = groupName;
+    if (eventName != null) result.eventName = eventName;
     return result;
   }
 
@@ -738,6 +740,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'merchName')
     ..aOS(7, _omitFieldNames ? '' : 'photoUrl')
     ..aOS(8, _omitFieldNames ? '' : 'groupName')
+    ..aOS(9, _omitFieldNames ? '' : 'eventName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -830,6 +833,15 @@ class InventoryItem extends $pb.GeneratedMessage {
   $core.bool hasGroupName() => $_has(7);
   @$pb.TagNumber(8)
   void clearGroupName() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get eventName => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set eventName($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasEventName() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearEventName() => $_clearField(9);
 }
 
 class TradeMatch extends $pb.GeneratedMessage {
@@ -1001,6 +1013,8 @@ class MatchItem extends $pb.GeneratedMessage {
     $core.int? quantity,
     $core.String? merchName,
     $core.String? photoUrl,
+    $core.String? groupName,
+    $core.String? eventName,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -1010,6 +1024,8 @@ class MatchItem extends $pb.GeneratedMessage {
     if (quantity != null) result.quantity = quantity;
     if (merchName != null) result.merchName = merchName;
     if (photoUrl != null) result.photoUrl = photoUrl;
+    if (groupName != null) result.groupName = groupName;
+    if (eventName != null) result.eventName = eventName;
     return result;
   }
 
@@ -1033,6 +1049,8 @@ class MatchItem extends $pb.GeneratedMessage {
     ..aI(6, _omitFieldNames ? '' : 'quantity')
     ..aOS(7, _omitFieldNames ? '' : 'merchName')
     ..aOS(8, _omitFieldNames ? '' : 'photoUrl')
+    ..aOS(9, _omitFieldNames ? '' : 'groupName')
+    ..aOS(10, _omitFieldNames ? '' : 'eventName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1115,6 +1133,24 @@ class MatchItem extends $pb.GeneratedMessage {
   $core.bool hasPhotoUrl() => $_has(6);
   @$pb.TagNumber(8)
   void clearPhotoUrl() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get groupName => $_getSZ(7);
+  @$pb.TagNumber(9)
+  set groupName($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(9)
+  $core.bool hasGroupName() => $_has(7);
+  @$pb.TagNumber(9)
+  void clearGroupName() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get eventName => $_getSZ(8);
+  @$pb.TagNumber(10)
+  set eventName($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(10)
+  $core.bool hasEventName() => $_has(8);
+  @$pb.TagNumber(10)
+  void clearEventName() => $_clearField(10);
 }
 
 /// Request/Response Models

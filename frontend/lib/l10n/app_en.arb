@@ -752,6 +752,28 @@
       "count": {"type": "int"}
     }
   },
+  "itemContextBoth": "{event}: {group}",
+  "@itemContextBoth": {
+    "description": "Event and group context shown after an item name in the match UI, when both are present (#322)",
+    "placeholders": {
+      "event": {"type": "String"},
+      "group": {"type": "String"}
+    }
+  },
+  "itemContextEventOnly": "{event}",
+  "@itemContextEventOnly": {
+    "description": "Event-only context shown after an item name in the match UI, when the item has no group (#322)",
+    "placeholders": {
+      "event": {"type": "String"}
+    }
+  },
+  "itemContextGroupOnly": "{group}",
+  "@itemContextGroupOnly": {
+    "description": "Group-only context shown after an item name in the match UI, when the item has no event name (#322)",
+    "placeholders": {
+      "group": {"type": "String"}
+    }
+  },
   "sendOfferItems": "Send Offer ({count} items)",
   "@sendOfferItems": {
     "description": "Submit button on the offer dialog with the selected item count",

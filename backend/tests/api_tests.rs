@@ -4096,12 +4096,19 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
         .find(|i| i["merchId"].as_i64() == Some(merch_a_id))
         .unwrap();
     assert_eq!(have_a["quantity"].as_i64().unwrap(), 1);
+    // event:group context is surfaced on userHaves (#322): the merch was
+    // created with groupName "Cards" under event "Qty Cap Trade Event".
+    assert_eq!(have_a["groupName"].as_str().unwrap(), "Cards");
+    assert_eq!(have_a["eventName"].as_str().unwrap(), "Qty Cap Trade Event");
     let wants = matches[0]["userWants"].as_array().unwrap();
     let want_b = wants
         .iter()
         .find(|i| i["merchId"].as_i64() == Some(merch_b_id))
         .unwrap();
     assert_eq!(want_b["quantity"].as_i64().unwrap(), 1);
+    // Same context on userWants (#322).
+    assert_eq!(want_b["groupName"].as_str().unwrap(), "Cards");
+    assert_eq!(want_b["eventName"].as_str().unwrap(), "Qty Cap Trade Event");
 
     // GIVE Card A x2 (giver=user1) exceeds user2's WANT of Card A (x1) -> 400.
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -4310,6 +4317,84 @@ async fn test_trade_negotiation_counter_offer_and_balance(pool: PgPool) {
     );
     let m = fetch_matches(&pool, user1_id).await;
     assert_eq!(m["status"], "ACCEPTED");
+}
+
+/// #322: the event:group context must travel end-to-end to every item the
+/// match UI renders — userHaves, userWants, and the selected_items legs
+/// persisted by an offer. `setup_pending_trade_match_quantities` creates both
+/// merch rows under event "Qty Cap Trade Event" with group "Cards", so every
+/// surfaced item must carry groupName="Cards" and eventName="Qty Cap Trade
+/// Event".
+#[sqlx::test]
+async fn test_match_items_carry_event_group_context(pool: PgPool) {
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    // Post a balanced 2:2 proposal so two legs persist as match_items.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 2}},
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 2}}
+                    ]}}"#,
+                    user1_id, merch_a_id, user1_id, merch_b_id, user2_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Fetch the match; userHaves/userWants/selectedItems must all carry the
+    // event:group context (#322).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let m = &matches[0];
+
+    let assert_ctx = |item: &serde_json::Value| {
+        assert_eq!(item["groupName"].as_str().unwrap(), "Cards");
+        assert_eq!(item["eventName"].as_str().unwrap(), "Qty Cap Trade Event");
+    };
+
+    let haves = m["userHaves"].as_array().unwrap();
+    assert_ctx(
+        haves
+            .iter()
+            .find(|i| i["merchId"].as_i64() == Some(merch_a_id))
+            .unwrap(),
+    );
+    let wants = m["userWants"].as_array().unwrap();
+    assert_ctx(
+        wants
+            .iter()
+            .find(|i| i["merchId"].as_i64() == Some(merch_b_id))
+            .unwrap(),
+    );
+
+    // Two legs persisted: give A (giver=u1) + receive B (giver=u2). Each must
+    // carry the event:group context (#322).
+    let legs = m["selectedItems"].as_array().unwrap();
+    assert_eq!(legs.len(), 2);
+    for leg in legs {
+        assert_ctx(leg);
+    }
 }
 
 /// The accept gate re-validates the FULL accumulated leg set against the

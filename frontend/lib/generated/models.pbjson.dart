@@ -385,11 +385,21 @@ const InventoryItem$json = {
       '10': 'groupName',
       '17': true
     },
+    {
+      '1': 'event_name',
+      '3': 9,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'eventName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_merch_name'},
     {'1': '_photo_url'},
     {'1': '_group_name'},
+    {'1': '_event_name'},
   ],
 };
 
@@ -399,8 +409,9 @@ final $typed_data.Uint8List inventoryItemDescriptor = $convert.base64Decode(
     'QSGQoIbWVyY2hfaWQYAyABKAVSB21lcmNoSWQSFgoGc3RhdHVzGAQgASgJUgZzdGF0dXMSGgoI'
     'cXVhbnRpdHkYBSABKAVSCHF1YW50aXR5EiIKCm1lcmNoX25hbWUYBiABKAlIAFIJbWVyY2hOYW'
     '1liAEBEiAKCXBob3RvX3VybBgHIAEoCUgBUghwaG90b1VybIgBARIiCgpncm91cF9uYW1lGAgg'
-    'ASgJSAJSCWdyb3VwTmFtZYgBAUINCgtfbWVyY2hfbmFtZUIMCgpfcGhvdG9fdXJsQg0KC19ncm'
-    '91cF9uYW1l');
+    'ASgJSAJSCWdyb3VwTmFtZYgBARIiCgpldmVudF9uYW1lGAkgASgJSANSCWV2ZW50TmFtZYgBAU'
+    'INCgtfbWVyY2hfbmFtZUIMCgpfcGhvdG9fdXJsQg0KC19ncm91cF9uYW1lQg0KC19ldmVudF9u'
+    'YW1l');
 
 @$core.Deprecated('Use tradeMatchDescriptor instead')
 const TradeMatch$json = {
@@ -516,10 +527,30 @@ const MatchItem$json = {
       '10': 'photoUrl',
       '17': true
     },
+    {
+      '1': 'group_name',
+      '3': 9,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'groupName',
+      '17': true
+    },
+    {
+      '1': 'event_name',
+      '3': 10,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'eventName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_merch_name'},
     {'1': '_photo_url'},
+    {'1': '_group_name'},
+    {'1': '_event_name'},
   ],
   '9': [
     {'1': 5, '2': 6},
@@ -531,8 +562,10 @@ final $typed_data.Uint8List matchItemDescriptor = $convert.base64Decode(
     'CglNYXRjaEl0ZW0SDgoCaWQYASABKAVSAmlkEhkKCG1hdGNoX2lkGAIgASgFUgdtYXRjaElkEh'
     'kKCG1lcmNoX2lkGAMgASgFUgdtZXJjaElkEiIKDWdpdmVyX3VzZXJfaWQYBCABKAVSC2dpdmVy'
     'VXNlcklkEhoKCHF1YW50aXR5GAYgASgFUghxdWFudGl0eRIiCgptZXJjaF9uYW1lGAcgASgJSA'
-    'BSCW1lcmNoTmFtZYgBARIgCglwaG90b191cmwYCCABKAlIAVIIcGhvdG9VcmyIAQFCDQoLX21l'
-    'cmNoX25hbWVCDAoKX3Bob3RvX3VybEoECAUQBg==');
+    'BSCW1lcmNoTmFtZYgBARIgCglwaG90b191cmwYCCABKAlIAVIIcGhvdG9VcmyIAQESIgoKZ3Jv'
+    'dXBfbmFtZRgJIAEoCUgCUglncm91cE5hbWWIAQESIgoKZXZlbnRfbmFtZRgKIAEoCUgDUglldm'
+    'VudE5hbWWIAQFCDQoLX21lcmNoX25hbWVCDAoKX3Bob3RvX3VybEINCgtfZ3JvdXBfbmFtZUIN'
+    'CgtfZXZlbnRfbmFtZUoECAUQBg==');
 
 @$core.Deprecated('Use guestLoginRequestDescriptor instead')
 const GuestLoginRequest$json = {

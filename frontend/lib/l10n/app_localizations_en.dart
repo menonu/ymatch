@@ -532,6 +532,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String itemContextBoth(String event, String group) {
+    return '$event: $group';
+  }
+
+  @override
+  String itemContextEventOnly(String event) {
+    return '$event';
+  }
+
+  @override
+  String itemContextGroupOnly(String group) {
+    return '$group';
+  }
+
+  @override
   String sendOfferItems(int count) {
     return 'Send Offer ($count items)';
   }

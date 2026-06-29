@@ -123,6 +123,9 @@ pub struct InventoryItem {
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "8")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// parent event name, for context rendering (#322)
+    #[prost(string, optional, tag = "9")]
+    pub event_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -173,6 +176,12 @@ pub struct MatchItem {
     pub merch_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "8")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    /// merchandise.group_name, for context (#322)
+    #[prost(string, optional, tag = "9")]
+    pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// parent event name, for context (#322)
+    #[prost(string, optional, tag = "10")]
+    pub event_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// Request/Response Models
 #[allow(clippy::derive_partial_eq_without_eq)]

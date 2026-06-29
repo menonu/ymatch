@@ -30,6 +30,46 @@ TradeMatch _pendingMatch() => TradeMatch()
   ..userHaves.add(_item(10, 'Give Pen', 3, 1))
   ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
+InventoryItem _itemWithCtx(
+  int merchId,
+  String name,
+  int qty,
+  int userId, {
+  String? event,
+  String? group,
+}) {
+  final item = InventoryItem()
+    ..merchId = merchId
+    ..merchName = name
+    ..quantity = qty
+    ..userId = userId
+    ..status = 'HAVE';
+  if (event != null) item.eventName = event;
+  if (group != null) item.groupName = group;
+  return item;
+}
+
+// Match whose haves/wants carry event:group context (#322).
+TradeMatch _ctxMatch() => TradeMatch()
+  ..id = 101
+  ..user1Id = 1
+  ..user2Id = 2
+  ..status = 'PENDING'
+  ..userHaves.add(
+    _itemWithCtx(10, 'Give Pen', 3, 1, event: 'TokyoFest', group: 'BoosterBox'),
+  )
+  ..userWants.add(
+    _itemWithCtx(20, 'Recv Notebook', 2, 2, event: 'TokyoFest', group: 'BoosterBox'),
+  );
+
+// Match whose item has no event/group — must render with no separator.
+TradeMatch _noCtxMatch() => TradeMatch()
+  ..id = 102
+  ..user1Id = 1
+  ..user2Id = 2
+  ..status = 'PENDING'
+  ..userHaves.add(_itemWithCtx(11, 'Loose Card', 1, 1));
+
 void main() {
   testWidgets(
     'offer dialog shows no mode switcher and both sections (#303)',
@@ -234,6 +274,90 @@ void main() {
       expect(matchFetchCount, 2);
       // The PENDING match is gone on reload, so the Match tab badge is gone.
       expect(find.text('1'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'item chips show event:group context after the name in en (#322)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_ctxMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Give Pen ×3  ·  TokyoFest: BoosterBox'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Recv Notebook ×2  ·  TokyoFest: BoosterBox'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'item chips show localized event：group context under ja (#322)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_ctxMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const TradeListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Fullwidth colon under ja.
+      expect(
+        find.text('Give Pen ×3  ·  TokyoFest：BoosterBox'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'items without event/group render no separator and no empty colon '
+    '(#322)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_noCtxMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Plain label, no context suffix.
+      expect(find.text('Loose Card ×1'), findsOneWidget);
+      // No separator dot rendered when neither event nor group is set —
+      // i.e. the helper emits no trailing `·` or empty placeholder.
+      expect(find.textContaining('·'), findsNothing);
     },
   );
 }
