@@ -130,6 +130,7 @@
   "jumpToGroup": "グループにジャンプ",
   "noItemsMatchFilter": "このフィルターに一致するアイテムはありません。",
   "youCreatedThisItem": "あなたが作成したアイテム",
+  "editItem": "アイテムを編集",
   "editItemName": "アイテム名を編集",
   "editItemNameHint": "アイテム名",
   "deleteItem": "アイテムを削除",

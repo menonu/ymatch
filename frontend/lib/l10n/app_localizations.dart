@@ -818,6 +818,12 @@ abstract class AppLocalizations {
   /// **'You created this item'**
   String get youCreatedThisItem;
 
+  /// Long-press menu entry to edit an item's name and image
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Item'**
+  String get editItem;
+
   /// Dialog title for editing an item name
   ///
   /// In en, this message translates to:

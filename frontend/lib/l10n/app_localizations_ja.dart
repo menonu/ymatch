@@ -405,6 +405,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get youCreatedThisItem => 'あなたが作成したアイテム';
 
   @override
+  String get editItem => 'アイテムを編集';
+
+  @override
   String get editItemName => 'アイテム名を編集';
 
   @override
