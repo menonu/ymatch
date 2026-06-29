@@ -1052,6 +1052,24 @@ abstract class AppLocalizations {
   /// **'Qty: {count}'**
   String qtyLabel(int count);
 
+  /// Event and group context shown after an item name in the match UI, when both are present (#322)
+  ///
+  /// In en, this message translates to:
+  /// **'{event}: {group}'**
+  String itemContextBoth(String event, String group);
+
+  /// Event-only context shown after an item name in the match UI, when the item has no group (#322)
+  ///
+  /// In en, this message translates to:
+  /// **'{event}'**
+  String itemContextEventOnly(String event);
+
+  /// Group-only context shown after an item name in the match UI, when the item has no event name (#322)
+  ///
+  /// In en, this message translates to:
+  /// **'{group}'**
+  String itemContextGroupOnly(String group);
+
   /// Submit button on the offer dialog with the selected item count
   ///
   /// In en, this message translates to:

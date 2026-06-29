@@ -68,6 +68,7 @@ message InventoryItem {
   optional string merch_name = 6;
   optional string photo_url = 7;
   optional string group_name = 8;
+  optional string event_name = 9; // parent event name, for context rendering (#322)
 }
 
 message TradeMatch {
@@ -94,6 +95,8 @@ message MatchItem {
   int32 quantity = 6;
   optional string merch_name = 7;
   optional string photo_url = 8;
+  optional string group_name = 9;  // merchandise.group_name, for context (#322)
+  optional string event_name = 10; // parent event name, for context (#322)
 }
 
 // Request/Response Models

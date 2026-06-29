@@ -1300,6 +1300,9 @@ impl serde::Serialize for InventoryItem {
         if self.group_name.is_some() {
             len += 1;
         }
+        if self.event_name.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.InventoryItem", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -1325,6 +1328,9 @@ impl serde::Serialize for InventoryItem {
         if let Some(v) = self.group_name.as_ref() {
             struct_ser.serialize_field("groupName", v)?;
         }
+        if let Some(v) = self.event_name.as_ref() {
+            struct_ser.serialize_field("eventName", v)?;
+        }
         struct_ser.end()
     }
 }
@@ -1348,6 +1354,8 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
             "photoUrl",
             "group_name",
             "groupName",
+            "event_name",
+            "eventName",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1360,6 +1368,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
             MerchName,
             PhotoUrl,
             GroupName,
+            EventName,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1389,6 +1398,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                             "merchName" | "merch_name" => Ok(GeneratedField::MerchName),
                             "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
+                            "eventName" | "event_name" => Ok(GeneratedField::EventName),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1416,6 +1426,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                 let mut merch_name__ = None;
                 let mut photo_url__ = None;
                 let mut group_name__ = None;
+                let mut event_name__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -1474,6 +1485,12 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                             }
                             group_name__ = map_.next_value()?;
                         }
+                        GeneratedField::EventName => {
+                            if event_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("eventName"));
+                            }
+                            event_name__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(InventoryItem {
@@ -1485,6 +1502,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                     merch_name: merch_name__,
                     photo_url: photo_url__,
                     group_name: group_name__,
+                    event_name: event_name__,
                 })
             }
         }
@@ -1719,6 +1737,12 @@ impl serde::Serialize for MatchItem {
         if self.photo_url.is_some() {
             len += 1;
         }
+        if self.group_name.is_some() {
+            len += 1;
+        }
+        if self.event_name.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.MatchItem", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -1740,6 +1764,12 @@ impl serde::Serialize for MatchItem {
         }
         if let Some(v) = self.photo_url.as_ref() {
             struct_ser.serialize_field("photoUrl", v)?;
+        }
+        if let Some(v) = self.group_name.as_ref() {
+            struct_ser.serialize_field("groupName", v)?;
+        }
+        if let Some(v) = self.event_name.as_ref() {
+            struct_ser.serialize_field("eventName", v)?;
         }
         struct_ser.end()
     }
@@ -1763,6 +1793,10 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
             "merchName",
             "photo_url",
             "photoUrl",
+            "group_name",
+            "groupName",
+            "event_name",
+            "eventName",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1774,6 +1808,8 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
             Quantity,
             MerchName,
             PhotoUrl,
+            GroupName,
+            EventName,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1802,6 +1838,8 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                             "quantity" => Ok(GeneratedField::Quantity),
                             "merchName" | "merch_name" => Ok(GeneratedField::MerchName),
                             "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
+                            "groupName" | "group_name" => Ok(GeneratedField::GroupName),
+                            "eventName" | "event_name" => Ok(GeneratedField::EventName),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1828,6 +1866,8 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                 let mut quantity__ = None;
                 let mut merch_name__ = None;
                 let mut photo_url__ = None;
+                let mut group_name__ = None;
+                let mut event_name__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -1882,6 +1922,18 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                             }
                             photo_url__ = map_.next_value()?;
                         }
+                        GeneratedField::GroupName => {
+                            if group_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("groupName"));
+                            }
+                            group_name__ = map_.next_value()?;
+                        }
+                        GeneratedField::EventName => {
+                            if event_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("eventName"));
+                            }
+                            event_name__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(MatchItem {
@@ -1892,6 +1944,8 @@ impl<'de> serde::Deserialize<'de> for MatchItem {
                     quantity: quantity__.unwrap_or_default(),
                     merch_name: merch_name__,
                     photo_url: photo_url__,
+                    group_name: group_name__,
+                    event_name: event_name__,
                 })
             }
         }

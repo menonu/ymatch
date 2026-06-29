@@ -424,7 +424,47 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     );
   }
 
+  /// Builds the localized `event:group` context suffix shown after an item
+  /// name in the match UI (#322). Returns an empty string when neither event
+  /// nor group is present, so no separator or empty `:` placeholder renders.
+  String _itemContextSuffix(
+    AppLocalizations l10n, {
+    required bool hasEvent,
+    required bool hasGroup,
+    required String event,
+    required String group,
+  }) {
+    if (hasEvent && hasGroup) return l10n.itemContextBoth(event, group);
+    if (hasEvent) return l10n.itemContextEventOnly(event);
+    if (hasGroup) return l10n.itemContextGroupOnly(group);
+    return '';
+  }
+
+  /// Renders an item's label as `Name ×qty` plus the `· event:group` context
+  /// suffix when available. Works for both [InventoryItem] and [MatchItem]
+  /// since they expose the same proto getters — callers pass the primitives.
+  String _itemLabel(
+    AppLocalizations l10n, {
+    required String merchName,
+    required int quantity,
+    required bool hasEvent,
+    required bool hasGroup,
+    required String event,
+    required String group,
+  }) {
+    final base = '$merchName ×$quantity';
+    final ctx = _itemContextSuffix(
+      l10n,
+      hasEvent: hasEvent,
+      hasGroup: hasGroup,
+      event: event,
+      group: group,
+    );
+    return ctx.isEmpty ? base : '$base  ·  $ctx';
+  }
+
   Widget _buildItemChips(List<InventoryItem> items, Color color) {
+    final l10n = AppLocalizations.of(context)!;
     return Wrap(
       spacing: 6,
       runSpacing: 4,
@@ -437,7 +477,15 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
             border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Text(
-            '${item.merchName} ×${item.quantity}',
+            _itemLabel(
+              l10n,
+              merchName: item.merchName,
+              quantity: item.quantity,
+              hasEvent: item.hasEventName(),
+              hasGroup: item.hasGroupName(),
+              event: item.eventName,
+              group: item.groupName,
+            ),
             style: TextStyle(
               fontSize: 12,
               color: color,
@@ -550,6 +598,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
   }
 
   Widget _buildMatchItemRow(MatchItem item, Color color) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -570,7 +619,15 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '${item.merchName} ×${item.quantity}',
+              _itemLabel(
+                l10n,
+                merchName: item.merchName,
+                quantity: item.quantity,
+                hasEvent: item.hasEventName(),
+                hasGroup: item.hasGroupName(),
+                event: item.eventName,
+                group: item.groupName,
+              ),
               style: TextStyle(fontSize: 13, color: color),
             ),
           ),
@@ -952,6 +1009,15 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     required ValueChanged<int> onQty,
   }) {
     final l10n = AppLocalizations.of(context)!;
+    // event:group context after the name (#322); empty when neither is set.
+    final ctx = _itemContextSuffix(
+      l10n,
+      hasEvent: item.hasEventName(),
+      hasGroup: item.hasGroupName(),
+      event: item.eventName,
+      group: item.groupName,
+    );
+    final name = ctx.isEmpty ? item.merchName : '${item.merchName}  ·  $ctx';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -967,7 +1033,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.merchName, style: const TextStyle(fontSize: 14)),
+                Text(name, style: const TextStyle(fontSize: 14)),
                 Text(
                   l10n.qtyLabel(item.quantity),
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
