@@ -2,14 +2,13 @@
 
 - **Status**: Accepted
 - **Date**: 2026-06-29
-- **Supersedes**: _(none)_
 
 ## Context
 
 `ymatch` organizes tradeable merchandise into **item groups** (a.k.a. merchandise
 groups). A group is the first-class entity `merchandise_groups`, uniquely identified
 by `(event_id, group_name)` (see migration `20250609000000_merchandise_groups.sql`).
-Each `merchandise` row carries a `group_name` (migration `20250118000000_merch_item_groups.sql`)
+Each `merchandise` row carries a `group_name` (migration `20250118000004_merch_item_groups.sql`)
 that places it in exactly one group within its event.
 
 A **match** is the unit of negotiation between two users: it is the entity on which
@@ -109,6 +108,7 @@ rules that `NULL`-grouped merchandise does not participate in matching at all.
 
 **Required follow-up (out of scope for this ADR):**
 
+- Implementation tracked in #341.
 - Migration adding group scoping to `matches` and a backfill/cutover plan.
 - Rewrite of `matching.rs` dedup to `(user1, user2, group)` and removal of the
   `NULL`-to-`NULL` matching branch.
