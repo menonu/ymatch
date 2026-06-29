@@ -100,10 +100,30 @@ impl MatchLifecycleService {
             locked.offered_by,
         )?;
 
+        // ADR 0001: every offered leg must belong to the match's group. A
+        // match is group-scoped, so offer/counter-offer is confined to that
+        // group by construction; this gate enforces it against direct API
+        // calls that try to add a leg from another group.
+        let merch_ids: Vec<i32> = offer.items.iter().map(|i| i.merch_id).collect();
+        let distinct_merch: usize = offer
+            .items
+            .iter()
+            .map(|i| i.merch_id)
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        let in_group = self
+            .matches
+            .count_merch_in_group(&mut *tx, &merch_ids, locked.event_id, &locked.group_name)
+            .await?;
+        if (in_group as usize) != distinct_merch {
+            return Err(AppError::bad_request(
+                "All offered items must belong to the match's group",
+            ));
+        }
+
         // Issue #294/#297: cap each leg's quantity by the receiver's WANT
         // quantity. The receiver of a leg is the non-giver, so we need both
         // participants' want quantities.
-        let merch_ids: Vec<i32> = offer.items.iter().map(|i| i.merch_id).collect();
         let user1_wants = self
             .inventory
             .want_quantities(&mut *tx, locked.user1_id, &merch_ids)
@@ -140,8 +160,7 @@ impl MatchLifecycleService {
     /// Validate a state transition and apply it. Possible transitions:
     ///
     /// - PENDING/OFFERED -> REJECTED  (cascades to delete match_items)
-    /// - OFFERED         -> ACCEPTED  (non-proposer + balanced only; purges
-    ///   other PENDING matches between the same pair)
+    /// - OFFERED         -> ACCEPTED  (non-proposer + balanced only)
     /// - ACCEPTED        -> COMPLETED
     ///
     /// `user_id` is the acting user (carried by `UpdateMatchStatusRequest`
@@ -224,10 +243,10 @@ impl MatchLifecycleService {
             self.matches
                 .set_status(&mut *tx, match_id, new_status)
                 .await?;
-            // Purge other PENDING matches between the same pair.
-            self.matches
-                .purge_other_pending(&mut *tx, match_id, locked.user1_id, locked.user2_id)
-                .await?;
+            // ADR 0001: a match is group-scoped and independent per group, so
+            // accepting this match must not touch the pair's other (e.g.
+            // different-group) matches — they may still be negotiated. The old
+            // "purge other PENDING matches between the same pair" step is gone.
         } else {
             self.matches
                 .set_status(&mut *tx, match_id, new_status)

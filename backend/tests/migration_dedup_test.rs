@@ -119,12 +119,16 @@ async fn migration_dedups_duplicate_live_merch_names_before_unique_index(pool: P
     // match_items: a pending match referencing both survivor and dup by the same
     // giver (collides after repoint -> must sum), plus a non-colliding leg on
     // the dup by the peer (plain repoint).
-    sqlx::query("INSERT INTO matches (user1_id, user2_id) VALUES ($1, $2)")
-        .bind(user_id)
-        .bind(peer_id)
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name) \
+         VALUES ($1, $2, $3, 'G')",
+    )
+    .bind(user_id)
+    .bind(peer_id)
+    .bind(event_id)
+    .execute(&pool)
+    .await
+    .unwrap();
     let match_id: i32 = sqlx::query_scalar("SELECT max(id) FROM matches")
         .fetch_one(&pool)
         .await
