@@ -145,6 +145,17 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.trades),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: l10n.refresh,
+            onPressed: () {
+              ref.invalidate(matchesProvider(user.id));
+              ref.invalidate(notificationCountsProvider(user.id));
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: matchesAsync.when(
