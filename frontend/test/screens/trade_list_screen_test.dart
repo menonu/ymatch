@@ -198,15 +198,17 @@ void main() {
   testWidgets(
     'match screen AppBar has a reload button that refetches matches (#335)',
     (WidgetTester tester) async {
-      int fetchCount = 0;
+      int matchFetchCount = 0;
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
+            // First fetch returns one PENDING match; the reload returns none.
+            // This lets us observe both the refetch and the tab-badge update.
             matchesProvider(1).overrideWith((ref) async {
-              fetchCount++;
-              return [_pendingMatch()];
+              matchFetchCount++;
+              return matchFetchCount == 1 ? [_pendingMatch()] : const [];
             }),
             notificationCountsProvider(1).overrideWith(
               (ref) async => NotificationCounts(),
@@ -217,17 +219,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Initial load fetches the matches once.
-      expect(fetchCount, 1);
+      // Initial load fetches the matches once; the Match tab shows a "1" badge.
+      expect(matchFetchCount, 1);
+      expect(find.text('1'), findsOneWidget);
 
       // The AppBar shows a refresh/reload icon (parity with the events screen).
       expect(find.byIcon(Icons.refresh), findsOneWidget);
       expect(find.byTooltip('Refresh'), findsOneWidget);
 
-      // Tapping it invalidates the provider and reloads the list.
+      // Tapping it invalidates the provider, reloading the list and the
+      // tab-badge counts (which derive from the matches list).
       await tester.tap(find.byIcon(Icons.refresh));
       await tester.pumpAndSettle();
-      expect(fetchCount, 2);
+      expect(matchFetchCount, 2);
+      // The PENDING match is gone on reload, so the Match tab badge is gone.
+      expect(find.text('1'), findsNothing);
     },
   );
 }
