@@ -445,9 +445,13 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     required String event,
     required String group,
   }) {
-    if (hasEvent && hasGroup) return l10n.itemContextBoth(event, group);
-    if (hasEvent) return l10n.itemContextEventOnly(event);
-    if (hasGroup) return l10n.itemContextGroupOnly(group);
+    // Treat empty-string names as absent so an event/group whose name is """
+    // never renders an empty `: group` placeholder (#322 acceptance criterion).
+    final useEvent = hasEvent && event.isNotEmpty;
+    final useGroup = hasGroup && group.isNotEmpty;
+    if (useEvent && useGroup) return l10n.itemContextBoth(event, group);
+    if (useEvent) return l10n.itemContextEventOnly(event);
+    if (useGroup) return l10n.itemContextGroupOnly(group);
     return '';
   }
 

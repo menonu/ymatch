@@ -360,6 +360,40 @@ void main() {
       expect(find.textContaining('·'), findsNothing);
     },
   );
+
+  testWidgets(
+    'an empty-string event name is treated as absent — no empty colon '
+    '(#322)',
+    (WidgetTester tester) async {
+      // event_name is set but empty (allowed by the backend, which rejects
+      // None but not ""). The helper must fall back to group-only rather than
+      // render `: BoosterBox`.
+      final match = TradeMatch()
+        ..id = 103
+        ..user1Id = 1
+        ..user2Id = 2
+        ..status = 'PENDING'
+        ..userHaves
+            .add(_itemWithCtx(12, 'Pikachu', 2, 1, event: '', group: 'BoosterBox'));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [match]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Group-only suffix; no empty-left `: ` placeholder.
+      expect(find.text('Pikachu ×2  ·  BoosterBox'), findsOneWidget);
+      expect(find.textContaining(': '), findsNothing);
+    },
+  );
 }
 
 User _user() => User()..id = 1..username = 'me';
