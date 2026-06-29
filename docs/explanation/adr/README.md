@@ -65,3 +65,4 @@ Record every ADR in the index below, newest last.
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [0001](0001-match-scoped-to-item-group.md) | Matches Are Scoped to a Single Item Group | Accepted | 2026-06-29 |
+| [0002](0002-negotiation-state-machine.md) | Balanced Negotiation State Machine | Accepted | 2026-06-29 |
