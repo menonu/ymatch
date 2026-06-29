@@ -194,6 +194,42 @@ void main() {
       expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
     },
   );
+
+  testWidgets(
+    'match screen AppBar has a reload button that refetches matches (#335)',
+    (WidgetTester tester) async {
+      int fetchCount = 0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async {
+              fetchCount++;
+              return [_pendingMatch()];
+            }),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initial load fetches the matches once.
+      expect(fetchCount, 1);
+
+      // The AppBar shows a refresh/reload icon (parity with the events screen).
+      expect(find.byIcon(Icons.refresh), findsOneWidget);
+      expect(find.byTooltip('Refresh'), findsOneWidget);
+
+      // Tapping it invalidates the provider and reloads the list.
+      await tester.tap(find.byIcon(Icons.refresh));
+      await tester.pumpAndSettle();
+      expect(fetchCount, 2);
+    },
+  );
 }
 
 User _user() => User()..id = 1..username = 'me';
