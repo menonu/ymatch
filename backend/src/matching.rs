@@ -2,15 +2,18 @@ use sqlx::{PgPool, Row};
 
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     // 1. Fetch all 'WANT' items, joining with merchandise to get group_name
-    // Skip items from deleted/trade-disabled merchandise and banned users
+    // Skip items from deleted/trade-disabled merchandise and banned users.
+    // ADR 0001: NULL-grouped merchandise is not matchable, so filter it out here
+    // (no later NULL<->NULL matching branch).
     let rows = sqlx::query(
         r#"
-        SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity, m.group_name 
+        SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity, m.group_name, m.event_id
         FROM inventory i
         JOIN merchandise m ON i.merch_id = m.id
         JOIN users u ON i.user_id = u.id
-        WHERE i.status = 'WANT' 
+        WHERE i.status = 'WANT'
           AND m.is_deleted = false AND m.trade_enabled = true
+          AND m.group_name IS NOT NULL
           AND u.is_banned = false
           AND NOT EXISTS (
             SELECT 1 FROM match_items mi
@@ -31,7 +34,10 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     for want_row in rows {
         let want_user_id: i32 = want_row.get("user_id");
         let want_merch_id: i32 = want_row.get("merch_id");
-        let want_group_name: Option<String> = want_row.get("group_name");
+        // group_name is NOT NULL here (filtered above); event_id pins the group
+        // identity since group_name is only unique per event.
+        let want_group_name: String = want_row.get("group_name");
+        let want_event_id: i32 = want_row.get("event_id");
 
         // Potential partners who are TRADING what User A wants (exclude banned users)
         let potential_partners = sqlx::query(
@@ -56,17 +62,19 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         for partner_row in potential_partners {
             let partner_id: i32 = partner_row.get("user_id");
 
-            // Does Partner (User B) WANT anything that User A is TRADING, AND is it in the same group?
+            // Does Partner (User B) WANT anything that User A is TRADING, AND
+            // is it in the same group (same (event_id, group_name))? ADR 0001.
             let user_a_trades = sqlx::query(
                 r#"
-                SELECT i.merch_id 
+                SELECT i.merch_id
                 FROM inventory i
                 JOIN merchandise m ON i.merch_id = m.id
                 WHERE i.user_id = $1 AND i.status = 'TRADE'
-                  AND (m.group_name = $2 OR ($2 IS NULL AND m.group_name IS NULL))
+                  AND m.event_id = $2 AND m.group_name = $3
                 "#,
             )
             .bind(want_user_id)
+            .bind(want_event_id)
             .bind(&want_group_name)
             .fetch_all(pool)
             .await
@@ -85,22 +93,32 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
                 if partner_want.is_some() {
                     // MATCH FOUND!
-                    // Check if match already exists to avoid duplicates
+                    // Check if a match already exists for this (pair, group) to
+                    // avoid duplicates. ADR 0001: one match per (user1, user2,
+                    // group), so the same pair may have a separate match in a
+                    // different group — dedup only within the same group.
                     let existing_match = sqlx::query(
-                        "SELECT id FROM matches WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)"
+                        "SELECT id FROM matches
+                         WHERE event_id = $3 AND group_name = $4
+                           AND ((user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1))",
                     )
                     .bind(want_user_id)
                     .bind(partner_id)
+                    .bind(want_event_id)
+                    .bind(&want_group_name)
                     .fetch_optional(pool)
                     .await
                     .map_err(|e| e.to_string())?;
 
                     if existing_match.is_none() {
                         sqlx::query(
-                            "INSERT INTO matches (user1_id, user2_id, status, created_at) VALUES ($1, $2, 'PENDING', NOW())"
+                            "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name, created_at)
+                             VALUES ($1, $2, 'PENDING', $3, $4, NOW())",
                         )
                         .bind(want_user_id)
                         .bind(partner_id)
+                        .bind(want_event_id)
+                        .bind(&want_group_name)
                         .execute(pool)
                         .await
                         .map_err(|e| e.to_string())?;

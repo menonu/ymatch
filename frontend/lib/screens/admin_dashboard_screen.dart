@@ -412,7 +412,7 @@ class _AdminItemsTab extends ConsumerWidget {
                       item.photoUrl,
                       width: 50,
                       height: 50,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) =>
                           const Icon(Icons.image_not_supported),
                     )

@@ -207,10 +207,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get howToTrade => 'How to Trade';
 
   @override
-  String get tradeStep1 => 'Go to the Events tab and find your event.';
+  String get tradeStep1 => 'Go to the Items tab and find your event.';
 
   @override
-  String get tradeStep2 => 'Use + and - to set your HAVE and WANT items.';
+  String get tradeStep2 =>
+      'Use + and - to enter the quantities of items you want to exchange. Matching is performed within an item group based on your Wish / For Trade quantities.';
 
   @override
   String get tradeStep3 => 'Go to Matches to see who wants to trade with you.';
@@ -403,6 +404,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get youCreatedThisItem => 'You created this item';
+
+  @override
+  String get editItem => 'Edit Item';
 
   @override
   String get editItemName => 'Edit Item Name';

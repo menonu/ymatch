@@ -144,6 +144,43 @@ void main() {
   );
 
   testWidgets(
+    'match card "Message" affordance is a filled button, not bare text '
+    '(#310 follow-up)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The Message affordance must read as a button — a filled (tonal)
+      // background — not a borderless TextButton that looks like a link.
+      expect(
+        find.ancestor(
+          of: find.text('Message'),
+          matching: find.byType(FilledButton),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.text('Message'),
+          matching: find.byType(TextButton),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
     'match card shows the "メッセージ" button under ja locale (#310)',
         (WidgetTester tester) async {
       await tester.pumpWidget(
@@ -171,8 +208,50 @@ void main() {
   );
 
   testWidgets(
+    'match screen AppBar has a reload button that refetches matches (#335)',
+    (WidgetTester tester) async {
+      int matchFetchCount = 0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            // First fetch returns one PENDING match; the reload returns none.
+            // This lets us observe both the refetch and the tab-badge update.
+            matchesProvider(1).overrideWith((ref) async {
+              matchFetchCount++;
+              return matchFetchCount == 1 ? [_pendingMatch()] : const [];
+            }),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initial load fetches the matches once; the Match tab shows a "1" badge.
+      expect(matchFetchCount, 1);
+      expect(find.text('1'), findsOneWidget);
+
+      // The AppBar shows a refresh/reload icon (parity with the events screen).
+      expect(find.byIcon(Icons.refresh), findsOneWidget);
+      expect(find.byTooltip('Refresh'), findsOneWidget);
+
+      // Tapping it invalidates the provider, reloading the list and the
+      // tab-badge counts (which derive from the matches list).
+      await tester.tap(find.byIcon(Icons.refresh));
+      await tester.pumpAndSettle();
+      expect(matchFetchCount, 2);
+      // The PENDING match is gone on reload, so the Match tab badge is gone.
+      expect(find.text('1'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'match card shows event:group context next to each item (#322)',
-        (WidgetTester tester) async {
+    (WidgetTester tester) async {
       final match = TradeMatch()
         ..id = 200
         ..user1Id = 1
@@ -193,7 +272,7 @@ void main() {
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [match]),
             notificationCountsProvider(1).overrideWith(
-                  (ref) async => NotificationCounts(),
+              (ref) async => NotificationCounts(),
             ),
           ],
           child: _localized(const TradeListScreen()),
@@ -209,7 +288,7 @@ void main() {
 
   testWidgets(
     'match card hides context when neither event nor group is set (#322)',
-        (WidgetTester tester) async {
+    (WidgetTester tester) async {
       // No event/group → no context line and no empty ":" placeholder.
       await tester.pumpWidget(
         ProviderScope(
@@ -217,7 +296,7 @@ void main() {
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
             notificationCountsProvider(1).overrideWith(
-                  (ref) async => NotificationCounts(),
+              (ref) async => NotificationCounts(),
             ),
           ],
           child: _localized(const TradeListScreen()),

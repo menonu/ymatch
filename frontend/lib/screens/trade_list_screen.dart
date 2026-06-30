@@ -145,6 +145,17 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.trades),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: l10n.refresh,
+            onPressed: () {
+              ref.invalidate(matchesProvider(user.id));
+              ref.invalidate(notificationCountsProvider(user.id));
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: matchesAsync.when(
@@ -307,11 +318,14 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                     ),
                   ),
                   if (tab != TradeTab.completed)
-                    TextButton(
+                    FilledButton.tonal(
                       onPressed: () =>
                           context.go('/matches/chat/${match.id}'),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         minimumSize: const Size(0, 36),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -598,7 +612,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                 item.hasPhotoUrl() ? item.photoUrl : null,
                 width: 28,
                 height: 28,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
               ),
             ),
           ),

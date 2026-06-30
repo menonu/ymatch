@@ -461,13 +461,13 @@ abstract class AppLocalizations {
   /// How-to-trade step 1
   ///
   /// In en, this message translates to:
-  /// **'Go to the Events tab and find your event.'**
+  /// **'Go to the Items tab and find your event.'**
   String get tradeStep1;
 
   /// How-to-trade step 2
   ///
   /// In en, this message translates to:
-  /// **'Use + and - to set your HAVE and WANT items.'**
+  /// **'Use + and - to enter the quantities of items you want to exchange. Matching is performed within an item group based on your Wish / For Trade quantities.'**
   String get tradeStep2;
 
   /// How-to-trade step 3
@@ -817,6 +817,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You created this item'**
   String get youCreatedThisItem;
+
+  /// Long-press menu entry to edit an item's name and image
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Item'**
+  String get editItem;
 
   /// Dialog title for editing an item name
   ///

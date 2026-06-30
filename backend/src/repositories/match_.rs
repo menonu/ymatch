@@ -47,6 +47,10 @@ pub struct MatchStatusSnapshot {
     pub user2_id: i32,
     pub status: String,
     pub offered_by: Option<i32>,
+    /// ADR 0001: the group a match is scoped to. Both are NOT NULL on the
+    /// table (see migration 20260629000000), so they are read as non-nullable.
+    pub event_id: i32,
+    pub group_name: String,
     pub user1_applied: bool,
     pub user2_applied: bool,
 }
@@ -78,9 +82,16 @@ impl MatchRepository {
         // Query 1 of 4: matches joined to the "other user" (the participant
         // who is not the requesting user). The CASE picks u.id and
         // u.username without a subquery — single round trip.
+        // ADR 0001 / #348: a match is scoped to one (event_id, group_name)
+        // (both NOT NULL on `matches` — migration 20260629000000). We read
+        // them here so the candidate-item lookup below can be keyed by
+        // `(other_id, event_id, group_name)` instead of `other_id` only,
+        // which keeps each match's `user_haves`/`user_wants` scoped to its
+        // own group (the read-path half of #344; the write path already
+        // enforced the invariant).
         let match_sql = r#"SELECT m.id, m.user1_id, m.user2_id, m.status, m.offered_by,
                       m.user1_inventory_applied_at, m.user2_inventory_applied_at,
-                      m.created_at,
+                      m.created_at, m.event_id, m.group_name,
                       CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END AS other_id,
                       u.username AS other_username
                FROM matches m
@@ -106,11 +117,15 @@ impl MatchRepository {
         // so the trade-offer dialog never shows (or submits) more units than
         // the receiving side actually wants — issue #294. The server-side
         // `offer` path enforces the same cap independently.
+        // ADR 0001 / #348: select the merch row's `event_id` and `group_name`
+        // so each candidate item can be keyed by its group below. The match's
+        // group comes from the `matches` row; only items whose merch group
+        // equals the match's group are attached to that match.
         let have_sql = r#"
             SELECT i.id, i.user_id, i.merch_id, i.status,
                    LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
-                   m.group_name AS group_name,
+                   m.event_id AS event_id, m.group_name AS group_name,
                    e.name AS event_name,
                    w.user_id AS peer_user_id
             FROM inventory i
@@ -139,7 +154,7 @@ impl MatchRepository {
             SELECT i.id, i.user_id, i.merch_id, i.status,
                    LEAST(i.quantity, w.quantity) AS quantity,
                    m.name AS merch_name, m.photo_url,
-                   m.group_name AS group_name,
+                   m.event_id AS event_id, m.group_name AS group_name,
                    e.name AS event_name,
                    i.user_id AS peer_user_id
             FROM inventory i
@@ -175,12 +190,23 @@ impl MatchRepository {
             .fetch_all(&self.pool)
             .await?;
 
-        let mut haves_by_peer: HashMap<i32, Vec<crate::generated::ymatch::InventoryItem>> =
-            HashMap::new();
+        // ADR 0001 / #348: key candidate items by `(peer, event_id,
+        // group_name)` so a match only receives the items that belong to its
+        // own group. `merchandise.group_name` is nullable (only non-NULL merch
+        // is matchable under ADR 0001, but this read path is independent of
+        // the matcher), so decode it as `Option<String>`; a `None` group can
+        // never equal a match's NOT NULL group, so such rows are simply never
+        // attached to a match — no need to filter them out here.
+        let mut haves_by_peer: HashMap<
+            (i32, i32, Option<String>),
+            Vec<crate::generated::ymatch::InventoryItem>,
+        > = HashMap::new();
         for r in &have_rows {
             let peer: i32 = r.get("peer_user_id");
+            let event_id: i32 = r.get("event_id");
+            let group_name: Option<String> = r.get::<Option<String>, _>("group_name");
             haves_by_peer
-                .entry(peer)
+                .entry((peer, event_id, group_name.clone()))
                 .or_default()
                 .push(crate::generated::ymatch::InventoryItem {
                     id: r.get("id"),
@@ -194,20 +220,22 @@ impl MatchRepository {
                     // (issue #224). The proto field is `optional string`, so
                     // this matches the wire format.
                     photo_url: r.get::<Option<String>, _>("photo_url"),
-                    // #322: merchandise.group_name is nullable (TEXT); decode
-                    // as Option<String> so NULL is preserved as None.
-                    group_name: r.get::<Option<String>, _>("group_name"),
-                    // #322: events.name is NOT NULL, but decode via Option for
-                    // uniformity with the proto `optional string` field.
+                    // #348: populated from the merch row (was hardcoded None).
+                    group_name,
+                    // #322: carry the parent event name for the match UI.
                     event_name: Some(r.get("event_name")),
                 });
         }
-        let mut wants_by_peer: HashMap<i32, Vec<crate::generated::ymatch::InventoryItem>> =
-            HashMap::new();
+        let mut wants_by_peer: HashMap<
+            (i32, i32, Option<String>),
+            Vec<crate::generated::ymatch::InventoryItem>,
+        > = HashMap::new();
         for r in &want_rows {
             let peer: i32 = r.get("peer_user_id");
+            let event_id: i32 = r.get("event_id");
+            let group_name: Option<String> = r.get::<Option<String>, _>("group_name");
             wants_by_peer
-                .entry(peer)
+                .entry((peer, event_id, group_name.clone()))
                 .or_default()
                 .push(crate::generated::ymatch::InventoryItem {
                     id: r.get("id"),
@@ -218,8 +246,9 @@ impl MatchRepository {
                     merch_name: Some(r.get("merch_name")),
                     // See #224. Decode as Option<String>.
                     photo_url: r.get::<Option<String>, _>("photo_url"),
-                    // See #322 note above.
-                    group_name: r.get::<Option<String>, _>("group_name"),
+                    // #348: populated from the merch row (was hardcoded None).
+                    group_name,
+                    // #322: carry the parent event name for the match UI.
                     event_name: Some(r.get("event_name")),
                 });
         }
@@ -246,6 +275,10 @@ impl MatchRepository {
             let mut m = match_from_row(row);
             let other_id: i32 = row.get("other_id");
             let other_username: String = row.get("other_username");
+            // ADR 0001 / #348: the match's group (NOT NULL on `matches`) picks
+            // out only this match's candidate items from the per-group maps.
+            let event_id: i32 = row.get("event_id");
+            let group_name: String = row.get("group_name");
             m.other_user = Some(User {
                 id: other_id,
                 username: other_username,
@@ -257,8 +290,14 @@ impl MatchRepository {
                 ban_reason: None,
                 banned_until: None,
             });
-            m.user_haves = haves_by_peer.get(&other_id).cloned().unwrap_or_default();
-            m.user_wants = wants_by_peer.get(&other_id).cloned().unwrap_or_default();
+            m.user_haves = haves_by_peer
+                .get(&(other_id, event_id, Some(group_name.clone())))
+                .cloned()
+                .unwrap_or_default();
+            m.user_wants = wants_by_peer
+                .get(&(other_id, event_id, Some(group_name)))
+                .cloned()
+                .unwrap_or_default();
             m.selected_items = items_by_match.get(&m.id).cloned().unwrap_or_default();
             m.inventory_applied = if m.user1_id == user_id {
                 row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
@@ -279,7 +318,7 @@ impl MatchRepository {
         match_id: i32,
     ) -> Result<Option<MatchStatusSnapshot>, AppError> {
         let row = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by,
+            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
                     user1_inventory_applied_at, user2_inventory_applied_at
              FROM matches WHERE id = $1",
         )
@@ -291,6 +330,8 @@ impl MatchRepository {
             user2_id: r.get("user2_id"),
             status: r.get("status"),
             offered_by: r.get("offered_by"),
+            event_id: r.get("event_id"),
+            group_name: r.get("group_name"),
             user1_applied: r
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
                 .is_some(),
@@ -412,7 +453,7 @@ impl MatchRepository {
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
         let row = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by,
+            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
                     user1_inventory_applied_at, user2_inventory_applied_at
              FROM matches WHERE id = $1 FOR UPDATE",
         )
@@ -424,6 +465,8 @@ impl MatchRepository {
             user2_id: r.get("user2_id"),
             status: r.get("status"),
             offered_by: r.get("offered_by"),
+            event_id: r.get("event_id"),
+            group_name: r.get("group_name"),
             user1_applied: r
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
                 .is_some(),
@@ -467,6 +510,31 @@ impl MatchRepository {
             .execute(exec)
             .await?;
         Ok(())
+    }
+
+    /// Count how many of the given merch ids belong to a given group
+    /// (ADR 0001). Used by the offer/counter-offer path to validate that
+    /// every proposed leg is within the match's group before upserting.
+    pub async fn count_merch_in_group<'c, E>(
+        &self,
+        exec: E,
+        merch_ids: &[i32],
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<i64, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM merchandise
+             WHERE id = ANY($1) AND event_id = $2 AND group_name = $3",
+        )
+        .bind(merch_ids)
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_one(exec)
+        .await?;
+        Ok(row.0)
     }
 
     /// Upsert the positive-quantity legs of a proposal (#297).
@@ -572,30 +640,6 @@ impl MatchRepository {
             .bind(match_id)
             .execute(exec)
             .await?;
-        Ok(())
-    }
-
-    /// Delete all other PENDING matches between the same pair of
-    /// users. Used when a match is accepted.
-    pub async fn purge_other_pending<'c, E>(
-        &self,
-        exec: E,
-        skip_match_id: i32,
-        user1_id: i32,
-        user2_id: i32,
-    ) -> Result<(), AppError>
-    where
-        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
-    {
-        sqlx::query(
-            "DELETE FROM matches WHERE status = 'PENDING' AND id != $1
-             AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))",
-        )
-        .bind(skip_match_id)
-        .bind(user1_id)
-        .bind(user2_id)
-        .execute(exec)
-        .await?;
         Ok(())
     }
 

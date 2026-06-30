@@ -44,10 +44,15 @@ The API will be available at `http://localhost:3000`.
 
 ```bash
 cd frontend
-flutter run -d web-server --web-port 8081
+flutter run -d web-server --web-port 8081 --release
 ```
 
 The web app will be available at `http://localhost:8081`.
+
+> `--release` avoids the DWDS injected debug client, which under some Flutter
+> SDK versions throws an unhandled `built_value` `TypeError` in the browser
+> console and can block the app from loading. Drop `--release` if you need hot
+> reload / hot restart during development (and your SDK isn't affected).
 
 ## Service Ports
 
