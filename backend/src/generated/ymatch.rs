@@ -154,6 +154,12 @@ pub struct TradeMatch {
     /// true if inventory update already executed
     #[prost(bool, tag = "11")]
     pub inventory_applied: bool,
+    /// the match's single item group (ADR 0001, #322)
+    #[prost(string, optional, tag = "12")]
+    pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// parent event name of the match's group (#322)
+    #[prost(string, optional, tag = "13")]
+    pub event_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

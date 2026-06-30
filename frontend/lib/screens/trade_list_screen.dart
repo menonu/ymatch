@@ -314,6 +314,23 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                         ),
                         const SizedBox(height: 2),
                         _statusChip(context, match.status),
+                        // #322 / ADR 0001: a match is scoped to one item group,
+                        // so show `event:group` once on the card instead of per
+                        // item. Both fields are NOT NULL on a real match; guard
+                        // so synthetic/test matches without them render nothing.
+                        if (match.hasGroupName() && match.hasEventName()) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.matchGroupLabel(
+                              match.eventName,
+                              match.groupName,
+                            ),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

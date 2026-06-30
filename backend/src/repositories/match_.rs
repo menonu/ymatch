@@ -89,14 +89,18 @@ impl MatchRepository {
         // which keeps each match's `user_haves`/`user_wants` scoped to its
         // own group (the read-path half of #344; the write path already
         // enforced the invariant).
+        // #322: also read the parent event's name so the match card can show
+        // `event:group` once. `matches.event_id` is NOT NULL FK → the JOIN
+        // always hits a row, and `events.name` is NOT NULL → always Some.
         let match_sql = r#"SELECT m.id, m.user1_id, m.user2_id, m.status, m.offered_by,
                       m.user1_inventory_applied_at, m.user2_inventory_applied_at,
-                      m.created_at, m.event_id, m.group_name,
+                      m.created_at, m.event_id, m.group_name, e.name AS event_name,
                       CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END AS other_id,
                       u.username AS other_username
                FROM matches m
                JOIN users u
                  ON u.id = (CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END)
+               JOIN events e ON e.id = m.event_id
                WHERE (m.user1_id = $1 OR m.user2_id = $1) AND m.status != 'REJECTED'
                ORDER BY m.created_at DESC"#;
         let match_rows = sqlx::query(match_sql)
@@ -265,6 +269,10 @@ impl MatchRepository {
             // out only this match's candidate items from the per-group maps.
             let event_id: i32 = row.get("event_id");
             let group_name: String = row.get("group_name");
+            // #322: surface the match's `event:group` on the TradeMatch so the
+            // card can show it once (both NOT NULL on matches/events).
+            m.group_name = Some(group_name.clone());
+            m.event_name = Some(row.get("event_name"));
             m.other_user = Some(User {
                 id: other_id,
                 username: other_username,
@@ -668,5 +676,9 @@ fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
         user_haves: vec![],
         user_wants: vec![],
         selected_items: vec![],
+        // #322: populated by `list_for_user` (which joins events); None on the
+        // admin `list_all` path (MATCH_COLUMNS does not select event/group).
+        group_name: None,
+        event_name: None,
     }
 }
