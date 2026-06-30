@@ -5358,6 +5358,94 @@ async fn test_offer_rejects_leg_outside_match_group(pool: PgPool) {
     );
 }
 
+// ADR 0001 / #348: `list_for_user` must scope each match's pre-loaded
+// `user_haves`/`user_wants` to the match's group. For a pair with matches in
+// two groups, the G1 match must list only G1 candidate items (and F1 only F1),
+// and each item's `group_name` must be populated (no longer null).
+#[sqlx::test]
+async fn test_list_for_user_scopes_haves_wants_to_match_group(pool: PgPool) {
+    let u1 = login_guest(&pool, "adr0001-list-u1", "t1").await;
+    let u2 = login_guest(&pool, "adr0001-list-u2", "t2").await;
+    let event_id = create_event(&pool, "ADR0001 List Event", u1).await;
+
+    // Group G1: u1 TRADE g1 / WANT g2 ; u2 TRADE g2 / WANT g1.
+    let g1 = create_merch(&pool, event_id, "g1", "G1").await;
+    let g2 = create_merch(&pool, event_id, "g2", "G1").await;
+    // Group F1: u1 TRADE f1 / WANT f2 ; u2 TRADE f2 / WANT f1.
+    let f1 = create_merch(&pool, event_id, "f1", "F1").await;
+    let f2 = create_merch(&pool, event_id, "f2", "F1").await;
+
+    for (uid, mid, status) in [
+        (u1, g1, "TRADE"),
+        (u1, g2, "WANT"),
+        (u2, g2, "TRADE"),
+        (u2, g1, "WANT"),
+        (u1, f1, "TRADE"),
+        (u1, f2, "WANT"),
+        (u2, f2, "TRADE"),
+        (u2, f1, "WANT"),
+    ] {
+        set_inventory(&pool, uid, mid, status, 1).await;
+    }
+
+    backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matching failed");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(matches.len(), 2, "expected one match per shared group");
+
+    fn group_of(m: &serde_json::Value) -> String {
+        // The match's group is not on the TradeMatch proto; derive it from the
+        // group shared by every leg's candidate item.
+        let haves = m["userHaves"].as_array().unwrap();
+        haves
+            .iter()
+            .map(|i| i["groupName"].as_str().unwrap().to_string())
+            .next()
+            .unwrap()
+    }
+
+    let by_group: std::collections::HashMap<String, &serde_json::Value> =
+        matches.iter().map(|m| (group_of(m), m)).collect();
+    assert_eq!(by_group.len(), 2, "expected both G1 and F1 matches");
+    let g1_match = by_group["G1"];
+    let f1_match = by_group["F1"];
+
+    // G1 match: userHaves (u1 TRADEs) must be only G1 items; userWants (peer
+    // TRADEs) only G1 items. Each item's groupName must be populated.
+    let g1_haves = g1_match["userHaves"].as_array().unwrap();
+    assert_eq!(g1_haves.len(), 1, "G1 match should have one have");
+    assert_eq!(g1_haves[0]["merchId"].as_i64().unwrap(), g1);
+    assert_eq!(g1_haves[0]["groupName"].as_str().unwrap(), "G1");
+    let g1_wants = g1_match["userWants"].as_array().unwrap();
+    assert_eq!(g1_wants.len(), 1, "G1 match should have one want");
+    assert_eq!(g1_wants[0]["merchId"].as_i64().unwrap(), g2);
+    assert_eq!(g1_wants[0]["groupName"].as_str().unwrap(), "G1");
+
+    // F1 match: only F1 items.
+    let f1_haves = f1_match["userHaves"].as_array().unwrap();
+    assert_eq!(f1_haves.len(), 1, "F1 match should have one have");
+    assert_eq!(f1_haves[0]["merchId"].as_i64().unwrap(), f1);
+    assert_eq!(f1_haves[0]["groupName"].as_str().unwrap(), "F1");
+    let f1_wants = f1_match["userWants"].as_array().unwrap();
+    assert_eq!(f1_wants.len(), 1, "F1 match should have one want");
+    assert_eq!(f1_wants[0]["merchId"].as_i64().unwrap(), f2);
+    assert_eq!(f1_wants[0]["groupName"].as_str().unwrap(), "F1");
+}
+
 async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
     let body = format!(
         r#"{{"uuid": "{}", "deviceToken": "{}"}}"#,
