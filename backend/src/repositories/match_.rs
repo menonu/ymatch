@@ -223,7 +223,7 @@ impl MatchRepository {
                     // #348: populated from the merch row (was hardcoded None).
                     group_name,
                     // #322: carry the parent event name for the match UI.
-                    event_name: Some(r.get("event_name")),
+                    event_name: r.get::<Option<String>, _>("event_name"),
                 });
         }
         let mut wants_by_peer: HashMap<
@@ -249,7 +249,7 @@ impl MatchRepository {
                     // #348: populated from the merch row (was hardcoded None).
                     group_name,
                     // #322: carry the parent event name for the match UI.
-                    event_name: Some(r.get("event_name")),
+                    event_name: r.get::<Option<String>, _>("event_name"),
                 });
         }
         let mut items_by_match: HashMap<i32, Vec<MatchItem>> = HashMap::new();
@@ -266,7 +266,7 @@ impl MatchRepository {
                 photo_url: r.get::<Option<String>, _>("photo_url"),
                 // #322: carry group + event context for the match UI.
                 group_name: r.get::<Option<String>, _>("group_name"),
-                event_name: Some(r.get("event_name")),
+                event_name: r.get::<Option<String>, _>("event_name"),
             });
         }
 
@@ -393,7 +393,7 @@ impl MatchRepository {
                 photo_url: r.get::<Option<String>, _>("photo_url"),
                 // #322: carry group + event context for the match UI.
                 group_name: r.get::<Option<String>, _>("group_name"),
-                event_name: Some(r.get("event_name")),
+                event_name: r.get::<Option<String>, _>("event_name"),
             })
             .collect())
     }

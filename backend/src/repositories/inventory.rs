@@ -102,7 +102,7 @@ impl InventoryRepository {
                 merch_name: Some(row.get("merch_name")),
                 photo_url: row.get("photo_url"),
                 group_name: row.get("group_name"),
-                event_name: Some(row.get("event_name")),
+                event_name: row.get::<Option<String>, _>("event_name"),
             })
             .collect())
     }
