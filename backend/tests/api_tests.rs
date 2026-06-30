@@ -2014,12 +2014,21 @@ async fn test_messages_empty_list(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let u2_id = u2["id"].as_i64().unwrap();
 
-    // Insert match directly
+    // Insert match directly. ADR 0001: matches carry (event_id, group_name).
+    let event_row: (i32,) = sqlx::query_as(
+        "INSERT INTO events (name, creator_id) VALUES ('Match Msg Event', $1) RETURNING id",
+    )
+    .bind(u1_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     let match_row = sqlx::query(
-        "INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING') RETURNING id",
+        "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
+         VALUES ($1, $2, 'PENDING', $3, 'MsgGroup') RETURNING id",
     )
     .bind(u1_id as i32)
     .bind(u2_id as i32)
+    .bind(event_row.0)
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -2899,12 +2908,15 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
         merch_ids.push(merch_id as i32);
     }
 
-    // Insert a PENDING match between the two users.
+    // Insert a PENDING match between the two users. ADR 0001: scope to the
+    // group the merch belongs to ("G", same event_id as the merch above).
     let row: (i32,) = sqlx::query_as(
-        "INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING') RETURNING id",
+        "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
+         VALUES ($1, $2, 'PENDING', $3, 'G') RETURNING id",
     )
     .bind(u1 as i32)
     .bind(u2 as i32)
+    .bind(event_id as i32)
     .fetch_one(pool)
     .await
     .unwrap();
@@ -3065,77 +3077,6 @@ async fn test_match_delete_match_items_removes_all(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_match_purge_other_pending_keeps_unrelated(pool: PgPool) {
-    let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
-
-    // Seed two extra PENDING matches between the same pair.
-    sqlx::query("INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING'), ($1, $2, 'PENDING')")
-        .bind(u1 as i32)
-        .bind(u2 as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-    // Plus one unrelated PENDING match (must create the users too —
-    // matches has a FK to users).
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/guest")
-                .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "unrelated-user-a"}"#))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let u_a: i32 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap() as i32;
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/guest")
-                .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "unrelated-user-b"}"#))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let u_b: i32 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap() as i32;
-    sqlx::query("INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING')")
-        .bind(u_a)
-        .bind(u_b)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-    let mut tx = pool.begin().await.unwrap();
-    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
-    matches
-        .purge_other_pending(&mut *tx, match_id as i32, u1 as i32, u2 as i32)
-        .await
-        .unwrap();
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM matches WHERE status = 'PENDING'")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
-    // The original (u1, u2) PENDING match AND the unrelated (u_a,
-    // u_b) PENDING match should survive. The two extra (u1, u2)
-    // matches were purged.
-    assert_eq!(count.0, 2);
-}
-
-#[sqlx::test]
 async fn test_match_mark_inventory_applied_sets_user1_column(pool: PgPool) {
     let (_, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
@@ -3257,7 +3198,7 @@ async fn test_multiple_conn_calls_share_one_transaction(pool: PgPool) {
         .await
         .unwrap();
     matches
-        .purge_other_pending(&mut *tx, match_id as i32, u1 as i32, u2 as i32)
+        .delete_match_items(&mut *tx, match_id as i32)
         .await
         .unwrap();
 
@@ -3285,8 +3226,8 @@ async fn test_multiple_conn_calls_share_one_transaction(pool: PgPool) {
 // is the behavioral contract for #174's repository refactor. It
 // exercises every new `_in_tx` method transitively through
 // `MatchLifecycleService`: offer -> set_status + insert_match_items
-// -> set_offered_by; accept -> set_status + purge_other_pending;
-// complete -> set_status; apply -> get_status_snapshot (read) +
+// -> set_offered_by; accept -> set_status; complete -> set_status; apply
+// -> get_status_snapshot (read) +
 // list_match_items (read) + apply_trade_delta_in_tx + mark_inventory_applied_in_tx.
 // Direct unit-style tests for the new methods hit a known NLL /
 // `Transaction: Drop` interaction in the borrow checker, so the
@@ -4848,12 +4789,15 @@ async fn test_notification_counts_values(pool: PgPool) {
     }
 
     // Insert match directly (the matching algorithm is out of scope for
-    // integration tests; it runs in a background task).
+    // integration tests; it runs in a background task). ADR 0001: scope the
+    // match to the "cards" group of the merch above.
     let match_id: i32 = sqlx::query_scalar(
-        "INSERT INTO matches (user1_id, user2_id, status) VALUES ($1, $2, 'PENDING') RETURNING id",
+        "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
+         VALUES ($1, $2, 'PENDING', $3, 'cards') RETURNING id",
     )
     .bind(u1)
     .bind(u2)
+    .bind(event_id as i32)
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -5259,6 +5203,160 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
 }
 
 // --- Test helpers used by `test_apply_inventory_handles_null_photo_url` ---
+
+// ADR 0001 / #341: two users with reciprocal inventory in TWO shared groups
+// get two independent matches, one per group (not one per user pair).
+#[sqlx::test]
+async fn test_matching_creates_one_match_per_shared_group(pool: PgPool) {
+    let u1 = login_guest(&pool, "adr0001-u1", "t1").await;
+    let u2 = login_guest(&pool, "adr0001-u2", "t2").await;
+    let event_id = create_event(&pool, "ADR0001 Event", u1).await;
+
+    // Group G1: u1 TRADE g1 / WANT g2 ; u2 TRADE g2 / WANT g1.
+    let g1 = create_merch(&pool, event_id, "g1", "G1").await;
+    let g2 = create_merch(&pool, event_id, "g2", "G1").await;
+    // Group F1: u1 TRADE f1 / WANT f2 ; u2 TRADE f2 / WANT f1.
+    let f1 = create_merch(&pool, event_id, "f1", "F1").await;
+    let f2 = create_merch(&pool, event_id, "f2", "F1").await;
+
+    for (uid, mid, status) in [
+        (u1, g1, "TRADE"),
+        (u1, g2, "WANT"),
+        (u2, g2, "TRADE"),
+        (u2, g1, "WANT"),
+        (u1, f1, "TRADE"),
+        (u1, f2, "WANT"),
+        (u2, f2, "TRADE"),
+        (u2, f1, "WANT"),
+    ] {
+        set_inventory(&pool, uid, mid, status, 1).await;
+    }
+
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matching failed");
+    assert_eq!(
+        created, 2,
+        "expected exactly 2 matches (one per shared group)"
+    );
+
+    // Two PENDING matches between u1 and u2, scoped to distinct groups.
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT group_name FROM matches
+         WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+         ORDER BY group_name",
+    )
+    .bind(u1 as i32)
+    .bind(u2 as i32)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let groups: Vec<String> = rows.into_iter().map(|r| r.0).collect();
+    assert_eq!(groups, vec!["F1".to_string(), "G1".to_string()]);
+}
+
+// ADR 0001 / #341: NULL-grouped merchandise does not participate in matching.
+#[sqlx::test]
+async fn test_matching_skips_null_grouped_merch(pool: PgPool) {
+    let u1 = login_guest(&pool, "adr0001-null-u1", "t1").await;
+    let u2 = login_guest(&pool, "adr0001-null-u2", "t2").await;
+    let event_id = create_event(&pool, "ADR0001 Null Group Event", u1).await;
+
+    // Two merch rows left without a group (NULL group_name) by inserting
+    // directly, bypassing the group-required merch API.
+    let a: (i32,) = sqlx::query_as(
+        "INSERT INTO merchandise (event_id, name) VALUES ($1, 'null-a') RETURNING id",
+    )
+    .bind(event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let b: (i32,) = sqlx::query_as(
+        "INSERT INTO merchandise (event_id, name) VALUES ($1, 'null-b') RETURNING id",
+    )
+    .bind(event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    for (uid, mid, status) in [
+        (u1, a.0 as i64, "TRADE"),
+        (u1, b.0 as i64, "WANT"),
+        (u2, b.0 as i64, "TRADE"),
+        (u2, a.0 as i64, "WANT"),
+    ] {
+        set_inventory(&pool, uid, mid, status, 1).await;
+    }
+
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matching failed");
+    assert_eq!(created, 0, "NULL-grouped merch must not match");
+
+    let count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM matches
+         WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)",
+    )
+    .bind(u1 as i32)
+    .bind(u2 as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(count.0, 0);
+}
+
+// ADR 0001 / #341: an offer leg whose merch is outside the match's group is
+// rejected (400), so the invariant cannot be violated via the API.
+#[sqlx::test]
+async fn test_offer_rejects_leg_outside_match_group(pool: PgPool) {
+    let u1 = login_guest(&pool, "adr0001-offer-u1", "t1").await;
+    let u2 = login_guest(&pool, "adr0001-offer-u2", "t2").await;
+    let event_id = create_event(&pool, "ADR0001 Offer Event", u1).await;
+
+    // G1: reciprocal → a PENDING match scoped to G1.
+    let g1a = create_merch(&pool, event_id, "g1a", "G1").await;
+    let g1b = create_merch(&pool, event_id, "g1b", "G1").await;
+    // G2: a single merch that u1 TRADES but which is NOT in the match's group.
+    let g2c = create_merch(&pool, event_id, "g2c", "G2").await;
+
+    for (uid, mid, status) in [
+        (u1, g1a, "TRADE"),
+        (u1, g1b, "WANT"),
+        (u2, g1b, "TRADE"),
+        (u2, g1a, "WANT"),
+        (u1, g2c, "TRADE"),
+    ] {
+        set_inventory(&pool, uid, mid, status, 1).await;
+    }
+
+    backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matching failed");
+
+    // Find the G1 match between u1 and u2.
+    let match_row: (i32,) = sqlx::query_as(
+        "SELECT id FROM matches
+         WHERE group_name = 'G1'
+           AND ((user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1))",
+    )
+    .bind(u1 as i32)
+    .bind(u2 as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let match_id = match_row.0 as i64;
+
+    // Offer a leg whose merch (g2c) belongs to G2, not the match's G1.
+    let body = format!(
+        r#"{{"userId": {}, "items": [{{"merchId": {}, "giverUserId": {}, "quantity": 1}}]}}"#,
+        u1, g2c, u1
+    );
+    let resp = post_json(&pool, &format!("/api/v1/matches/{}/offer", match_id), &body).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "out-of-group offer leg must be rejected"
+    );
+}
 
 async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
     let body = format!(

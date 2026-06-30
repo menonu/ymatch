@@ -47,6 +47,10 @@ pub struct MatchStatusSnapshot {
     pub user2_id: i32,
     pub status: String,
     pub offered_by: Option<i32>,
+    /// ADR 0001: the group a match is scoped to. Both are NOT NULL on the
+    /// table (see migration 20260629000000), so they are read as non-nullable.
+    pub event_id: i32,
+    pub group_name: String,
     pub user1_applied: bool,
     pub user2_applied: bool,
 }
@@ -260,7 +264,7 @@ impl MatchRepository {
         match_id: i32,
     ) -> Result<Option<MatchStatusSnapshot>, AppError> {
         let row = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by,
+            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
                     user1_inventory_applied_at, user2_inventory_applied_at
              FROM matches WHERE id = $1",
         )
@@ -272,6 +276,8 @@ impl MatchRepository {
             user2_id: r.get("user2_id"),
             status: r.get("status"),
             offered_by: r.get("offered_by"),
+            event_id: r.get("event_id"),
+            group_name: r.get("group_name"),
             user1_applied: r
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
                 .is_some(),
@@ -387,7 +393,7 @@ impl MatchRepository {
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
         let row = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by,
+            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
                     user1_inventory_applied_at, user2_inventory_applied_at
              FROM matches WHERE id = $1 FOR UPDATE",
         )
@@ -399,6 +405,8 @@ impl MatchRepository {
             user2_id: r.get("user2_id"),
             status: r.get("status"),
             offered_by: r.get("offered_by"),
+            event_id: r.get("event_id"),
+            group_name: r.get("group_name"),
             user1_applied: r
                 .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
                 .is_some(),
@@ -442,6 +450,31 @@ impl MatchRepository {
             .execute(exec)
             .await?;
         Ok(())
+    }
+
+    /// Count how many of the given merch ids belong to a given group
+    /// (ADR 0001). Used by the offer/counter-offer path to validate that
+    /// every proposed leg is within the match's group before upserting.
+    pub async fn count_merch_in_group<'c, E>(
+        &self,
+        exec: E,
+        merch_ids: &[i32],
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<i64, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM merchandise
+             WHERE id = ANY($1) AND event_id = $2 AND group_name = $3",
+        )
+        .bind(merch_ids)
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_one(exec)
+        .await?;
+        Ok(row.0)
     }
 
     /// Upsert the positive-quantity legs of a proposal (#297).
@@ -547,30 +580,6 @@ impl MatchRepository {
             .bind(match_id)
             .execute(exec)
             .await?;
-        Ok(())
-    }
-
-    /// Delete all other PENDING matches between the same pair of
-    /// users. Used when a match is accepted.
-    pub async fn purge_other_pending<'c, E>(
-        &self,
-        exec: E,
-        skip_match_id: i32,
-        user1_id: i32,
-        user2_id: i32,
-    ) -> Result<(), AppError>
-    where
-        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
-    {
-        sqlx::query(
-            "DELETE FROM matches WHERE status = 'PENDING' AND id != $1
-             AND ((user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2))",
-        )
-        .bind(skip_match_id)
-        .bind(user1_id)
-        .bind(user2_id)
-        .execute(exec)
-        .await?;
         Ok(())
     }
 
