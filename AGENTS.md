@@ -98,4 +98,4 @@ gh # for github related operation
 ```
 
 ### protobuf
-edit `proto/models.proto` first, then run `./scripts/generate_protos.sh`
+edit `proto/models.proto` first, then run `scripts/proto-gen.sh` (Docker; regenerates backend Rust + frontend Dart proto bindings). Localization files (`frontend/lib/l10n/app_localizations*.dart`) are regenerated separately via `flutter gen-l10n` from the `.arb` files (config in `frontend/l10n.yaml`).
