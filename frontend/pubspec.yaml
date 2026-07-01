@@ -98,6 +98,7 @@ flutter:
   # the engine. The WOFF2 is a committed (~1.5 MB) subset of the full Noto
   # Sans JP (kana + ASCII + JIS L1/2/3 kanji + symbols, metadata retained),
   # pre-built by ixkaito/NotoSansJP-subset (OFL-1.1); see ADR 0003.
+  # OFL-1.1 notice shipped alongside: fonts/LICENSE-OFL.txt.
   fonts:
     - family: NotoSansJP
       fonts:

@@ -32,7 +32,9 @@ shrink it dramatically and remove the build-time download friction.
 Replace the full gitignored TTF with a **committed subset WOFF2** of Noto Sans
 JP, ~1.5 MB, with font metadata (kerning, etc.) retained:
 
-- Commit `frontend/fonts/NotoSansJP-Regular.woff2` to the repo.
+- Commit `frontend/fonts/NotoSansJP-Regular.woff2` to the repo, with the OFL-1.1
+  notice shipped alongside it as `frontend/fonts/LICENSE-OFL.txt` (Noto Sans JP
+  is OFL-1.1; the notice must accompany redistribution).
 - Use the pre-built subset from
   [`ixkaito/NotoSansJP-subset`](https://github.com/ixkaito/NotoSansJP-subset)
   (`subset/` variant, OFL-1.1 — redistribution permitted), pinned to commit
