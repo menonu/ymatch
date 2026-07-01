@@ -44,4 +44,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 flutter.log
+# Japanese font is committed as a subset WOFF2 (#353); the full TTF is no
+# longer used. If a raw TTF is ever staged locally, keep it out of git.
 /fonts/*.ttf
