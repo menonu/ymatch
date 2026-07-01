@@ -552,4 +552,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get noCompletedTrades => '完了した取引はまだありません。';
+
+  @override
+  String get howToHint => 'ymatch初めてですか？取引ガイドはプロフィールタブにあります — 下をタップして確認しましょう。';
 }

@@ -84,4 +84,31 @@ void main() {
       }
     },
   );
+
+  testWidgets(
+    'HomeScreen AppBar info icon opens the how-to guide sheet (#336)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController()),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The AppBar exposes a help/info icon that opens the guide inline.
+      expect(find.byTooltip('How to Trade'), findsOneWidget);
+      await tester.tap(find.byTooltip('How to Trade'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('How to Trade'), findsOneWidget);
+      expect(
+        find.text('Go to the Items tab and find your event.'),
+        findsOneWidget,
+      );
+    },
+  );
 }

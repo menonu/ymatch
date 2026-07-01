@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
+import '../widgets/how_to_trade.dart';
 
 enum EventSort { recent, popular, alphabetical }
 
@@ -57,6 +58,11 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: l10n.howToTrade,
+            onPressed: () => showHowToTradeSheet(context),
+          ),
           if (searchQuery.isEmpty) ...[
             IconButton(
               icon: const Icon(Icons.refresh),

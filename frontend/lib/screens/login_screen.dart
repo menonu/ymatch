@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
+import '../widgets/how_to_trade.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -160,6 +161,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       onPressed: () => setState(() => _isRestoring = true),
+                    ),
+                    const SizedBox(height: 32),
+                    // Point brand-new users at the How to Trade guide, which
+                    // otherwise lives buried behind the Profile tab (#336).
+                    HowToTradePreview(
+                      onTap: () => showHowToTradeSheet(context),
                     ),
                   ],
                 ],

@@ -786,5 +786,9 @@
   "noCompletedTrades": "No completed trades yet.",
   "@noCompletedTrades": {
     "description": "Empty state for the Done tab"
+  },
+  "howToHint": "New to ymatch? The How to Trade guide lives in the Profile tab — tap below to preview it.",
+  "@howToHint": {
+    "description": "Hint shown on the login screen pointing new users to the how-to guide via a virtual Profile tab preview"
   }
 }

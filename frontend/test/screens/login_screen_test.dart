@@ -103,6 +103,52 @@ void main() {
       expect(find.text('Start as New User'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'LoginScreen shows a how-to preview pointing at the Profile tab (#336)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authProvider.overrideWith((ref) => MockAuthController())],
+          child: _localized(const LoginScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The virtual "Profile" tab preview + hint are rendered for new users.
+      expect(find.byKey(const ValueKey('howToPreviewButton')), findsOneWidget);
+      expect(find.text('Profile'), findsOneWidget);
+      // The guide sheet is not open yet.
+      expect(find.text('How to Trade'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'LoginScreen how-to preview opens the guide sheet when tapped (#336)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authProvider.overrideWith((ref) => MockAuthController())],
+          child: _localized(const LoginScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('howToPreviewButton')));
+      await tester.pumpAndSettle();
+
+      // The shared how-to guide content is shown without logging in.
+      expect(find.text('How to Trade'), findsOneWidget);
+      expect(
+        find.text('Go to the Items tab and find your event.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Go to Matches to see who wants to trade with you.'),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 class MockAuthController extends StateNotifier<AsyncValue<User?>>

@@ -1099,6 +1099,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No completed trades yet.'**
   String get noCompletedTrades;
+
+  /// Hint shown on the login screen pointing new users to the how-to guide via a virtual Profile tab preview
+  ///
+  /// In en, this message translates to:
+  /// **'New to ymatch? The How to Trade guide lives in the Profile tab — tap below to preview it.'**
+  String get howToHint;
 }
 
 class _AppLocalizationsDelegate
