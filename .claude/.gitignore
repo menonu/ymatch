@@ -1,0 +1,4 @@
+# Agent-local state — not shared across contributors.
+settings.local.json
+worktrees/
+.dev-up/
