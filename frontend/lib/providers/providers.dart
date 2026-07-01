@@ -174,6 +174,38 @@ final currentUserProvider = Provider<User?>((ref) {
   return ref.watch(authProvider).value;
 });
 
+// --- How-to hint (first-login emphasis, #336) ---
+// Persists whether the user has already seen / opened the How to Trade guide
+// via the AppBar help icon, so the icon can be emphasized only on the first
+// login after which it becomes a plain icon. Stored locally in
+// SharedPreferences ("how_to_hint_seen") — no backend state involved.
+class HowToHintSeenController extends StateNotifier<bool> {
+  // Default to "seen" (plain icon) until the persisted value has loaded, so a
+  // returning user who already opened the guide does not see a one-frame
+  // first-login emphasis flash before _load() resolves. A genuinely-new user
+  // flips to "not seen" (emphasized) once the persisted value is read.
+  HowToHintSeenController() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('how_to_hint_seen') ?? false;
+  }
+
+  Future<void> markSeen() async {
+    if (state) return;
+    state = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('how_to_hint_seen', true);
+  }
+}
+
+final howToHintSeenProvider =
+    StateNotifierProvider<HowToHintSeenController, bool>(
+  (ref) => HowToHintSeenController(),
+);
+
 // --- Events ---
 final eventsProvider = FutureProvider<List<Event>>((ref) async {
   final client = ref.watch(apiClientProvider);

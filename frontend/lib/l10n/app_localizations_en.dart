@@ -555,4 +555,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noCompletedTrades => 'No completed trades yet.';
+
+  @override
+  String get howToHint =>
+      'The How to Trade guide is in the Profile tab — tap it after logging in to read it.';
+
+  @override
+  String get howToPreviewTabHint => 'Available after login';
 }

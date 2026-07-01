@@ -16,6 +16,7 @@ import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wraps [child] with the localization delegates so screens that call
 /// `AppLocalizations.of(context)` resolve strings in widget tests.
@@ -82,6 +83,13 @@ class _MockAuthController extends StateNotifier<AsyncValue<User?>>
 }
 
 void main() {
+  // The AppBar help icon watches howToHintSeenProvider, which reads
+  // SharedPreferences — provide the in-memory mock so widget tests don't hit
+  // the platform channel.
+  setUp(() async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
   testWidgets(
     'creator long-press shows the Edit Item menu and a Change Image dialog '
     '(#205)',
@@ -158,6 +166,37 @@ void main() {
       // No edit/delete menu appears for a non-creator.
       expect(find.text('Edit Item'), findsNothing);
       expect(find.text('Delete'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'EventDetailScreen AppBar help icon opens the how-to guide sheet (#336)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            // Non-empty merch so the main AppBar (with the help icon) renders.
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('How to Trade'), findsOneWidget);
+      await tester.tap(find.byTooltip('How to Trade'));
+      await tester.pumpAndSettle();
+
+      // The shared how-to guide sheet is shown.
+      expect(find.text('How to Trade'), findsOneWidget);
+      expect(
+        find.text('Go to the Items tab and find your event.'),
+        findsOneWidget,
+      );
     },
   );
 }

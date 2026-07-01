@@ -177,5 +177,7 @@
   "noOutgoingOffers": "送信中のオファーはありません。",
   "noIncomingOffers": "受信したオファーはありません。",
   "noActiveTrades": "進行中の取引はありません。",
-  "noCompletedTrades": "完了した取引はまだありません。"
+  "noCompletedTrades": "完了した取引はまだありません。",
+  "howToHint": "取引ガイドはプロフィールタブにあります。ログイン後にタップして確認しましょう。",
+  "howToPreviewTabHint": "ログイン後に使用できます"
 }

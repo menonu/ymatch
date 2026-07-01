@@ -8,12 +8,15 @@
 
 ### Bottom Navigation Bar (`BottomNavBar`)
 
-| Tab | Icon | Screen | Description |
-|-----|------|--------|-------------|
-| Items | `event_outlined` | `HomeScreen` | Event list, search, favorites |
-| Matches | `swap_horiz_outlined` | `TradeListScreen` | Trade matches with badge count |
-| Profile | `person_outlined` | `ProfileScreen` | User profile, UUID, settings |
-| Admin | `admin_panel_settings_outlined` | `AdminDashboardScreen` | Admin/moderator only, conditional |
+| Tab | JA label | Icon | Screen | Description |
+|-----|----------|------|--------|-------------|
+| Items | アイテム | `event_outlined` | `HomeScreen` | Event list, search, favorites |
+| Matches | マッチ | `swap_horiz_outlined` | `TradeListScreen` | Trade matches with badge count |
+| Profile | プロフィール | `person_outlined` | `ProfileScreen` | User profile, UUID, settings |
+| Admin | 管理 | `admin_panel_settings_outlined` | `AdminDashboardScreen` | Admin/moderator only, conditional |
+
+> **Terminology:** the first tab is labeled **Items / アイテム** in the UI but
+> is the `HomeScreen` (event list) in code — there is no tab labeled "Home".
 
 ### Screen Stack
 
@@ -43,10 +46,18 @@ BottomNavBar
 - **Primary Actions**:
   - "Start as New User" — creates guest session
   - "Restore Existing Account" — shows UUID input form
+- **How-to pointer (#336)**: in the default new-user state, a hint line
+  (`howToHint`) + a long down arrow + a `VirtualProfileTabBar` (a dashed
+  "virtual" Profile tab) rendered in the bottom-nav area — the same area the
+  real nav bar occupies after login. Only the Profile tab is shown (Items /
+  Matches hidden), in its real rightmost position. Tapping it does **not**
+  open the guide; it shows the `howToPreviewTabHint` snackbar ("Available
+  after login" / ログイン後に使用できます). Hidden during backend error /
+  loading / restore.
 
 ### HomeScreen (Items Tab)
 
-- **AppBar**: Search bar (events/groups), refresh button, sort popup menu (Newest / Most Popular / Alphabetical)
+- **AppBar**: Search bar (events/groups), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh button, sort popup menu (Newest / Most Popular / Alphabetical)
 - **Favorite Shortcuts**: Horizontal scrollable row of `ActionChip` widgets for favorited events and groups
 - **Filter Bar**: `SegmentedButton` — All Events, Favorites, My Items
 - **Event List**: `ListView.builder` of event cards with:
@@ -60,7 +71,7 @@ BottomNavBar
 
 ### EventDetailScreen
 
-- **AppBar**: Search bar (items), refresh, popup menus:
+- **AppBar**: Search bar (items), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
   - Inventory display: Just HAVE / WANT & TRADE / All
   - View mode: Detailed / Grid / Compact List
   - Overflow: Want All Missing

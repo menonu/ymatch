@@ -5,6 +5,7 @@ import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wraps [child] with the localization delegates so screens that call
 /// `AppLocalizations.of(context)` resolve strings in widget tests.
@@ -50,6 +51,13 @@ class _MockAuthController extends StateNotifier<AsyncValue<User?>>
 }
 
 void main() {
+  // The AppBar help icon watches howToHintSeenProvider, which reads
+  // SharedPreferences — provide the in-memory mock so widget tests don't hit
+  // the platform channel.
+  setUp(() async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
   testWidgets(
     'filter tab button keeps a fixed width regardless of selection (#324)',
     (WidgetTester tester) async {
@@ -82,6 +90,61 @@ void main() {
           reason: 'width changed after selecting "$label"',
         );
       }
+    },
+  );
+
+  testWidgets(
+    'HomeScreen AppBar info icon opens the how-to guide sheet (#336)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController()),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The AppBar exposes a help/info icon that opens the guide inline.
+      expect(find.byTooltip('How to Trade'), findsOneWidget);
+      await tester.tap(find.byTooltip('How to Trade'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('How to Trade'), findsOneWidget);
+      expect(
+        find.text('Go to the Items tab and find your event.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'HomeScreen help icon is emphasized on first login and plain after '
+    'opened (#336)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController()),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // First login ("not seen"): the help icon is emphasized with a badge.
+      expect(find.byType(Badge), findsOneWidget);
+      expect(find.byTooltip('How to Trade'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('How to Trade'));
+      await tester.pumpAndSettle();
+
+      // Opening the guide marks it seen → the emphasis (badge) is removed.
+      expect(find.byType(Badge), findsNothing);
+      expect(find.text('How to Trade'), findsOneWidget);
     },
   );
 }

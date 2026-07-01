@@ -1099,6 +1099,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No completed trades yet.'**
   String get noCompletedTrades;
+
+  /// Hint shown on the login screen pointing new users to the how-to guide, which lives behind the Profile tab (available after login)
+  ///
+  /// In en, this message translates to:
+  /// **'The How to Trade guide is in the Profile tab — tap it after logging in to read it.'**
+  String get howToHint;
+
+  /// Shown when the virtual Profile tab preview on the login screen is tapped — the tab is not usable until after login
+  ///
+  /// In en, this message translates to:
+  /// **'Available after login'**
+  String get howToPreviewTabHint;
 }
 
 class _AppLocalizationsDelegate
