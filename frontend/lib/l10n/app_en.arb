@@ -787,8 +787,12 @@
   "@noCompletedTrades": {
     "description": "Empty state for the Done tab"
   },
-  "howToHint": "New to ymatch? The How to Trade guide lives in the Profile tab — tap below to preview it.",
+  "howToHint": "The How to Trade guide is in the Profile tab — tap it after logging in to read it.",
   "@howToHint": {
-    "description": "Hint shown on the login screen pointing new users to the how-to guide via a virtual Profile tab preview"
+    "description": "Hint shown on the login screen pointing new users to the how-to guide, which lives behind the Profile tab (available after login)"
+  },
+  "howToPreviewTabHint": "Available after login",
+  "@howToPreviewTabHint": {
+    "description": "Shown when the virtual Profile tab preview on the login screen is tapped — the tab is not usable until after login"
   }
 }

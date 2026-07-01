@@ -554,5 +554,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get noCompletedTrades => '完了した取引はまだありません。';
 
   @override
-  String get howToHint => 'ymatch初めてですか？取引ガイドはプロフィールタブにあります — 下をタップして確認しましょう。';
+  String get howToHint => '取引ガイドはプロフィールタブにあります。ログイン後にタップして確認しましょう。';
+
+  @override
+  String get howToPreviewTabHint => 'ログイン後に使用できます';
 }

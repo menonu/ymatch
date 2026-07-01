@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import '../utils/image_helper.dart';
+import '../widgets/how_to_trade.dart';
 import 'add_merch_screen.dart';
 
 enum ViewMode { detailed, grid, list }
@@ -180,6 +181,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
               ),
               actions: [
+                // How-to guide entry point (#336) — emphasized on first login.
+                const HowToTradeIconButton(),
                 // Refresh button
                 IconButton(
                   icon: const Icon(Icons.refresh),

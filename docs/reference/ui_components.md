@@ -2,6 +2,40 @@
 
 Component identifiers for consistent communication across the team.
 
+> **Naming note (EN ↔ JA):** the code identifier often differs from the label a
+> user sees. In particular, **`HomeScreen` is the "Items" tab** (JA: アイテム) —
+> the event list a user lands on after login — **not** a tab literally called
+> "Home". See the [Terminology](#terminology-en--ja) table below.
+
+## Terminology (EN ↔ JA)
+
+User-facing labels (what appears in the UI) for screens, tabs, and key
+components, in English and Japanese. The `Identifier` column is the code symbol
+used throughout this document.
+
+### Screens
+
+| Identifier | EN UI label | JA UI label |
+|------------|-------------|-------------|
+| `LoginScreen` | Login (initial screen) | ログイン（初期画面） |
+| `HomeScreen` | Items tab — event list | アイテムタブ — イベント一覧 |
+| `EventDetailScreen` | Event detail (within Items tab) | イベント詳細（アイテムタブ内） |
+| `AddMerchScreen` | Add Merch (new item form) | アイテム追加 |
+| `TradeListScreen` | Matches tab — trade list | マッチタブ — 取引一覧 |
+| `ChatScreen` | Chat (within a match) | チャット（マッチ内） |
+| `MapPickerScreen` | Location picker | 位置選択 |
+| `ProfileScreen` | Profile tab | プロフィールタブ |
+| `AdminDashboardScreen` | Admin tab (admin/mod only) | 管理タブ（管理者/モデレータのみ） |
+
+### Bottom-nav tabs
+
+| Identifier | EN label | JA label |
+|------------|----------|----------|
+| Items tab | Items | アイテム |
+| Matches tab | Matches | マッチ |
+| Profile tab | Profile | プロフィール |
+| Admin tab | Admin | 管理 |
+
 ## Screens
 
 | Identifier | File | Description |
@@ -221,6 +255,7 @@ Component identifiers for consistent communication across the team.
 | `backendHealthProvider` | `FutureProvider<bool>` | BottomNavBar |
 | `searchQueryProvider` | `StateProvider<String>` | HomeScreen |
 | `searchProvider` | `FutureProvider<List<SearchResult>>` | HomeScreen |
+| `howToHintSeenProvider` | `StateNotifierProvider<HowToHintSeenController, bool>` | HowToTradeIconButton (HomeScreen, EventDetailScreen) |
 
 ### Local Providers (defined in screen files)
 
@@ -233,3 +268,34 @@ Component identifiers for consistent communication across the team.
 | `inventoryDisplayModeProvider` | `EventDetailScreen` | Just HAVE / WANT & TRADE / All |
 | `itemSearchQueryProvider` | `EventDetailScreen` | Item search query |
 | `messagesProvider` | `ChatScreen` | Chat messages for a match |
+
+## How-to Guide Components (#336)
+
+The "How to Trade" guide (3 steps, l10n keys `howToTrade` / `tradeStep1–3`) is
+the single source of truth in `widgets/how_to_trade.dart` and is surfaced in
+three places so new users can find it without digging into the Profile tab.
+
+| Identifier | File | EN UI label | JA UI label | Where it appears |
+|------------|------|-------------|-------------|------------------|
+| `HowToTradeContent` | `widgets/how_to_trade.dart` | "How to Trade" guide (title + 3 steps) | 「取引方法」ガイド（見出し＋3ステップ） | `ProfileScreen` (`InstructionsCard`), `HowToTradeSheet` |
+| `showHowToTradeSheet` | `widgets/how_to_trade.dart` | Guide bottom sheet | 取引ガイド シート | Opened by `HowToTradeIconButton` |
+| `HowToTradeIconButton` | `widgets/how_to_trade.dart` | AppBar help (?) icon | AppBarヘルプ（？）アイコン | `HomeScreen`, `EventDetailScreen` AppBar |
+| `VirtualProfileTabBar` | `widgets/how_to_trade.dart` | Virtual Profile tab preview | 仮想プロフィールタブ | `LoginScreen` bottom-nav area |
+| `LongDownArrow` | `widgets/how_to_trade.dart` | Long pointer arrow | 長い矢印ポインタ | `LoginScreen` (points at `VirtualProfileTabBar`) |
+| `HowToTradeStep` | `widgets/how_to_trade.dart` | One numbered guide step | ガイドの1ステップ | Inside `HowToTradeContent` |
+
+### Behavior notes
+
+- **Login screen (`VirtualProfileTabBar`)**: a *pointer*, not an entry point.
+  Only the Profile tab is shown (Items/Matches hidden), in its real rightmost
+  position; a long arrow points down at it. Tapping it does **not** open the
+  guide — it shows the `howToPreviewTabHint` snackbar ("Available after login" /
+  ログイン後に使用できます). It is only rendered in the default new-user state
+  (hidden during backend error / loading / restore).
+- **Home & Event Detail (`HowToTradeIconButton`)**: opens `showHowToTradeSheet`.
+  On a user's first login (before they open the guide) the icon is emphasized
+  — primary color + a badge dot; once opened, it becomes a plain icon. The
+  "seen" state persists across sessions via `howToHintSeenProvider`
+  (SharedPreferences key `how_to_hint_seen`).
+- **Profile (`InstructionsCard`)**: renders `HowToTradeContent` inline — the
+  guide's original home, unchanged.

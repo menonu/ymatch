@@ -5,6 +5,7 @@ import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/models/models.dart';
+import 'package:frontend/widgets/how_to_trade.dart';
 
 /// Wraps [child] with the same localization delegates [MyApp] uses so
 /// screens that call `AppLocalizations.of(context)` resolve strings in
@@ -105,7 +106,8 @@ void main() {
   );
 
   testWidgets(
-    'LoginScreen shows a how-to preview pointing at the Profile tab (#336)',
+    'LoginScreen shows a virtual Profile tab + long arrow pointing to it '
+    '(#336)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -115,16 +117,30 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // The virtual "Profile" tab preview + hint are rendered for new users.
-      expect(find.byKey(const ValueKey('howToPreviewButton')), findsOneWidget);
+      // Hint points the user to the Profile tab (read after login).
+      expect(
+        find.text(
+          'The How to Trade guide is in the Profile tab — tap it after '
+          'logging in to read it.',
+        ),
+        findsOneWidget,
+      );
+      // A long arrow draws the eye down toward the bottom-nav area.
+      expect(find.byType(LongDownArrow), findsOneWidget);
+      // The virtual Profile tab is rendered where the real nav bar will be.
+      expect(find.byType(VirtualProfileTabBar), findsOneWidget);
       expect(find.text('Profile'), findsOneWidget);
-      // The guide sheet is not open yet.
+      // The Items / Matches tabs are irrelevant here and are hidden.
+      expect(find.text('Items'), findsNothing);
+      expect(find.text('Matches'), findsNothing);
+      // The guide itself is NOT shown on the login screen.
       expect(find.text('How to Trade'), findsNothing);
     },
   );
 
   testWidgets(
-    'LoginScreen how-to preview opens the guide sheet when tapped (#336)',
+    'LoginScreen virtual Profile tab is disabled — tapping shows '
+    '"Available after login" and does not open the guide (#336)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -134,19 +150,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('howToPreviewButton')));
+      await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
 
-      // The shared how-to guide content is shown without logging in.
-      expect(find.text('How to Trade'), findsOneWidget);
-      expect(
-        find.text('Go to the Items tab and find your event.'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Go to Matches to see who wants to trade with you.'),
-        findsOneWidget,
-      );
+      // Tapping the virtual tab tells the user it is available after login…
+      expect(find.text('Available after login'), findsOneWidget);
+      // …and does NOT open the how-to guide.
+      expect(find.text('How to Trade'), findsNothing);
     },
   );
 }

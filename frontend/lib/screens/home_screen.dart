@@ -58,11 +58,7 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: l10n.howToTrade,
-            onPressed: () => showHowToTradeSheet(context),
-          ),
+          const HowToTradeIconButton(),
           if (searchQuery.isEmpty) ...[
             IconButton(
               icon: const Icon(Icons.refresh),

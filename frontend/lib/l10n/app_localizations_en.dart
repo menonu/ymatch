@@ -558,5 +558,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get howToHint =>
-      'New to ymatch? The How to Trade guide lives in the Profile tab — tap below to preview it.';
+      'The How to Trade guide is in the Profile tab — tap it after logging in to read it.';
+
+  @override
+  String get howToPreviewTabHint => 'Available after login';
 }
