@@ -180,7 +180,11 @@ final currentUserProvider = Provider<User?>((ref) {
 // login after which it becomes a plain icon. Stored locally in
 // SharedPreferences ("how_to_hint_seen") — no backend state involved.
 class HowToHintSeenController extends StateNotifier<bool> {
-  HowToHintSeenController() : super(false) {
+  // Default to "seen" (plain icon) until the persisted value has loaded, so a
+  // returning user who already opened the guide does not see a one-frame
+  // first-login emphasis flash before _load() resolves. A genuinely-new user
+  // flips to "not seen" (emphasized) once the persisted value is read.
+  HowToHintSeenController() : super(true) {
     _load();
   }
 
