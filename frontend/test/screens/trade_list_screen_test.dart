@@ -303,13 +303,24 @@ void main() {
   );
 
   testWidgets(
-    'match card without group/event renders no context label (#322)',
+    'match card guard: a group without an event renders no label (#322)',
     (WidgetTester tester) async {
+      // hasGroupName() && hasEventName() guard: a group-only match (no event)
+      // must NOT render the label, so the group name is not shown standalone.
+      // Asserting on the specific group name (not a `: ` substring) keeps this
+      // robust against future l10n strings that happen to contain a colon.
+      final match = TradeMatch()
+        ..id = 104
+        ..user1Id = 1
+        ..user2Id = 2
+        ..status = 'PENDING'
+        ..groupName = 'BoosterBox'
+        ..userHaves.add(_item(10, 'Give Pen', 3, 1));
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+            matchesProvider(1).overrideWith((ref) async => [match]),
             notificationCountsProvider(1).overrideWith(
               (ref) async => NotificationCounts(),
             ),
@@ -319,8 +330,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // _pendingMatch() has no event/group → no label rendered.
-      expect(find.textContaining(': '), findsNothing);
+      // No `event:group` label and no standalone group name.
+      expect(find.textContaining('BoosterBox'), findsNothing);
       // Items still render plainly.
       expect(find.text('Give Pen ×3'), findsOneWidget);
     },
