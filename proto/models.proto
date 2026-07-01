@@ -83,6 +83,8 @@ message TradeMatch {
   optional int32 offered_by = 9;
   repeated MatchItem selected_items = 10; // items selected in offer/accept
   bool inventory_applied = 11; // true if inventory update already executed
+  optional string group_name = 12; // the match's single item group (ADR 0001, #322)
+  optional string event_name = 13; // parent event name of the match's group (#322)
 }
 
 message MatchItem {

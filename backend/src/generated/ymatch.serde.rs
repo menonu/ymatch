@@ -3651,6 +3651,12 @@ impl serde::Serialize for TradeMatch {
         if self.inventory_applied {
             len += 1;
         }
+        if self.group_name.is_some() {
+            len += 1;
+        }
+        if self.event_name.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.TradeMatch", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -3685,6 +3691,12 @@ impl serde::Serialize for TradeMatch {
         if self.inventory_applied {
             struct_ser.serialize_field("inventoryApplied", &self.inventory_applied)?;
         }
+        if let Some(v) = self.group_name.as_ref() {
+            struct_ser.serialize_field("groupName", v)?;
+        }
+        if let Some(v) = self.event_name.as_ref() {
+            struct_ser.serialize_field("eventName", v)?;
+        }
         struct_ser.end()
     }
 }
@@ -3715,6 +3727,10 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             "selectedItems",
             "inventory_applied",
             "inventoryApplied",
+            "group_name",
+            "groupName",
+            "event_name",
+            "eventName",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -3730,6 +3746,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             OfferedBy,
             SelectedItems,
             InventoryApplied,
+            GroupName,
+            EventName,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -3762,6 +3780,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             "offeredBy" | "offered_by" => Ok(GeneratedField::OfferedBy),
                             "selectedItems" | "selected_items" => Ok(GeneratedField::SelectedItems),
                             "inventoryApplied" | "inventory_applied" => Ok(GeneratedField::InventoryApplied),
+                            "groupName" | "group_name" => Ok(GeneratedField::GroupName),
+                            "eventName" | "event_name" => Ok(GeneratedField::EventName),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3792,6 +3812,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                 let mut offered_by__ = None;
                 let mut selected_items__ = None;
                 let mut inventory_applied__ = None;
+                let mut group_name__ = None;
+                let mut event_name__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -3868,6 +3890,18 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             }
                             inventory_applied__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::GroupName => {
+                            if group_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("groupName"));
+                            }
+                            group_name__ = map_.next_value()?;
+                        }
+                        GeneratedField::EventName => {
+                            if event_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("eventName"));
+                            }
+                            event_name__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(TradeMatch {
@@ -3882,6 +3916,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                     offered_by: offered_by__,
                     selected_items: selected_items__.unwrap_or_default(),
                     inventory_applied: inventory_applied__.unwrap_or_default(),
+                    group_name: group_name__,
+                    event_name: event_name__,
                 })
             }
         }

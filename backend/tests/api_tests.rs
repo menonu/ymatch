@@ -4253,6 +4253,39 @@ async fn test_trade_negotiation_counter_offer_and_balance(pool: PgPool) {
     assert_eq!(m["status"], "ACCEPTED");
 }
 
+/// #322 / ADR 0001: a match is scoped to one (event_id, group_name), and the
+/// match card shows `event:group` once. The listing must surface the match's
+/// `groupName`/`eventName` on the TradeMatch (not per item). The setup helper
+/// creates the merch under event "Qty Cap Trade Event" with group "Cards", so
+/// the match must carry those.
+#[sqlx::test]
+async fn test_match_carries_event_group_context(pool: PgPool) {
+    let (_match_id, user1_id, _user2_id, _merch_a_id, _merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!matches.is_empty());
+
+    // The match-level context the card renders.
+    assert_eq!(matches[0]["groupName"].as_str().unwrap(), "Cards");
+    assert_eq!(
+        matches[0]["eventName"].as_str().unwrap(),
+        "Qty Cap Trade Event",
+    );
+}
+
 /// The accept gate re-validates the FULL accumulated leg set against the
 /// receiver's CURRENT want quantity (#297 review). A leg that was within
 /// the cap when proposed can become over-capacity if the receiver lowers

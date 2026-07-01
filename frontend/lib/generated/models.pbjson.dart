@@ -469,11 +469,31 @@ const TradeMatch$json = {
       '5': 8,
       '10': 'inventoryApplied'
     },
+    {
+      '1': 'group_name',
+      '3': 12,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'groupName',
+      '17': true
+    },
+    {
+      '1': 'event_name',
+      '3': 13,
+      '4': 1,
+      '5': 9,
+      '9': 4,
+      '10': 'eventName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_created_at'},
     {'1': '_other_user'},
     {'1': '_offered_by'},
+    {'1': '_group_name'},
+    {'1': '_event_name'},
   ],
 };
 
@@ -486,8 +506,10 @@ final $typed_data.Uint8List tradeMatchDescriptor = $convert.base64Decode(
     'SW52ZW50b3J5SXRlbVIJdXNlckhhdmVzEjQKCnVzZXJfd2FudHMYCCADKAsyFS55bWF0Y2guSW'
     '52ZW50b3J5SXRlbVIJdXNlcldhbnRzEiIKCm9mZmVyZWRfYnkYCSABKAVIAlIJb2ZmZXJlZEJ5'
     'iAEBEjgKDnNlbGVjdGVkX2l0ZW1zGAogAygLMhEueW1hdGNoLk1hdGNoSXRlbVINc2VsZWN0ZW'
-    'RJdGVtcxIrChFpbnZlbnRvcnlfYXBwbGllZBgLIAEoCFIQaW52ZW50b3J5QXBwbGllZEINCgtf'
-    'Y3JlYXRlZF9hdEINCgtfb3RoZXJfdXNlckINCgtfb2ZmZXJlZF9ieQ==');
+    'RJdGVtcxIrChFpbnZlbnRvcnlfYXBwbGllZBgLIAEoCFIQaW52ZW50b3J5QXBwbGllZBIiCgpn'
+    'cm91cF9uYW1lGAwgASgJSANSCWdyb3VwTmFtZYgBARIiCgpldmVudF9uYW1lGA0gASgJSARSCW'
+    'V2ZW50TmFtZYgBAUINCgtfY3JlYXRlZF9hdEINCgtfb3RoZXJfdXNlckINCgtfb2ZmZXJlZF9i'
+    'eUINCgtfZ3JvdXBfbmFtZUINCgtfZXZlbnRfbmFtZQ==');
 
 @$core.Deprecated('Use matchItemDescriptor instead')
 const MatchItem$json = {

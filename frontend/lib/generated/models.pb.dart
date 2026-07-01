@@ -845,6 +845,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     $core.int? offeredBy,
     $core.Iterable<MatchItem>? selectedItems,
     $core.bool? inventoryApplied,
+    $core.String? groupName,
+    $core.String? eventName,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -858,6 +860,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (offeredBy != null) result.offeredBy = offeredBy;
     if (selectedItems != null) result.selectedItems.addAll(selectedItems);
     if (inventoryApplied != null) result.inventoryApplied = inventoryApplied;
+    if (groupName != null) result.groupName = groupName;
+    if (eventName != null) result.eventName = eventName;
     return result;
   }
 
@@ -888,6 +892,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     ..pPM<MatchItem>(10, _omitFieldNames ? '' : 'selectedItems',
         subBuilder: MatchItem.create)
     ..aOB(11, _omitFieldNames ? '' : 'inventoryApplied')
+    ..aOS(12, _omitFieldNames ? '' : 'groupName')
+    ..aOS(13, _omitFieldNames ? '' : 'eventName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -990,6 +996,24 @@ class TradeMatch extends $pb.GeneratedMessage {
   $core.bool hasInventoryApplied() => $_has(10);
   @$pb.TagNumber(11)
   void clearInventoryApplied() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get groupName => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set groupName($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasGroupName() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearGroupName() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.String get eventName => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set eventName($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasEventName() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearEventName() => $_clearField(13);
 }
 
 class MatchItem extends $pb.GeneratedMessage {

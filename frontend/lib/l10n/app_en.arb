@@ -752,6 +752,14 @@
       "count": {"type": "int"}
     }
   },
+  "matchGroupLabel": "{event}: {group}",
+  "@matchGroupLabel": {
+    "description": "The match's single event:group context, shown once on the match card header (#322, ADR 0001). Both are always present on a real match.",
+    "placeholders": {
+      "event": {"type": "String"},
+      "group": {"type": "String"}
+    }
+  },
   "sendOfferItems": "Send Offer ({count} items)",
   "@sendOfferItems": {
     "description": "Submit button on the offer dialog with the selected item count",

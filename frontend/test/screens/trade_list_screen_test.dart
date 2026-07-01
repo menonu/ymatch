@@ -236,6 +236,106 @@ void main() {
       expect(find.text('1'), findsNothing);
     },
   );
+
+  // #322 / ADR 0001: a match is scoped to one item group, so the card shows
+  // `event:group` once on the header; items render as plain `Name ×qty`.
+  TradeMatch _groupMatch() => TradeMatch()
+    ..id = 101
+    ..user1Id = 1
+    ..user2Id = 2
+    ..status = 'PENDING'
+    ..eventName = 'TokyoFest'
+    ..groupName = 'BoosterBox'
+    ..userHaves.add(_item(10, 'Give Pen', 3, 1))
+    ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
+
+  testWidgets(
+    'match card shows event:group on the header and plain item chips (#322)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Card-level context label.
+      expect(find.text('TokyoFest: BoosterBox'), findsOneWidget);
+      // Items are plain — no per-item `·` suffix.
+      expect(find.text('Give Pen ×3'), findsOneWidget);
+      expect(find.text('Recv Notebook ×2'), findsOneWidget);
+      expect(find.textContaining('·'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'match card shows localized event：group under ja (#322)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const TradeListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Fullwidth colon under ja.
+      expect(find.text('TokyoFest：BoosterBox'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'match card guard: a group without an event renders no label (#322)',
+    (WidgetTester tester) async {
+      // hasGroupName() && hasEventName() guard: a group-only match (no event)
+      // must NOT render the label, so the group name is not shown standalone.
+      // Asserting on the specific group name (not a `: ` substring) keeps this
+      // robust against future l10n strings that happen to contain a colon.
+      final match = TradeMatch()
+        ..id = 104
+        ..user1Id = 1
+        ..user2Id = 2
+        ..status = 'PENDING'
+        ..groupName = 'BoosterBox'
+        ..userHaves.add(_item(10, 'Give Pen', 3, 1));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [match]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No `event:group` label and no standalone group name.
+      expect(find.textContaining('BoosterBox'), findsNothing);
+      // Items still render plainly.
+      expect(find.text('Give Pen ×3'), findsOneWidget);
+    },
+  );
 }
 
 User _user() => User()..id = 1..username = 'me';
