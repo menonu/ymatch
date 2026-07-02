@@ -119,3 +119,26 @@ jobs:
 
       - name: Build web
         run: flutter build web
+
+  frontend-nginx:
+    # Regression guard for the prod web-server config (frontend/nginx/default.conf)
+    # — gzip compression + SPA routing + Cache-Control. Builds a minimal image
+    # on the same nginx base as frontend.Dockerfile.prod with dummy assets (no
+    # Flutter build needed) and asserts the headers. A broken nginx.conf would
+    # silently 502 the next deploy, so the config lives in a committed file and
+    # is exercised here. See scripts/test_frontend_nginx.sh.
+    name: Frontend Nginx Config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to GHCR
+        # Private base image ghcr.io/menonu/ymatch/nginx:alpine (mirrored from
+        # public.ecr.aws; see mirror-images.yml). GITHUB_TOKEN reads packages
+        # in this repo via the workflow-level `packages: read` permission.
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Run nginx config smoke test
+        run: scripts/test_frontend_nginx.sh
