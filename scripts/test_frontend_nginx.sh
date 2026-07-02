@@ -57,7 +57,7 @@ RUN mkdir -p /usr/share/nginx/html/assets/fonts \
     # Pre-compress .gz sidecars so gzip_static (the prod path) is exercised,
     # not just the dynamic fallback. Mirrors frontend.Dockerfile.prod.
     && find /usr/share/nginx/html -type f \
-         \( -name '*.js' -o -name '*.wasm' -o -name '*.css' \) \
+         \( -name '*.js' -o -name '*.wasm' -o -name '*.css' -o -name '*.woff2' \) \
        -exec gzip -kf {} \;
 EOF
 
