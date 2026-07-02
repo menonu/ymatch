@@ -35,18 +35,11 @@ COPY frontend/pubspec.yaml frontend/pubspec.lock ./
 RUN --mount=type=cache,target=/root/.pub-cache \
     flutter pub get
 
-# Copy source code and proto files
+# Copy source code and proto files. The Japanese font
+# (frontend/fonts/NotoSansJP-Regular.woff2) is committed to the repo as a
+# subset WOFF2 (#353), so it arrives via this COPY — no build-time download.
 COPY frontend ./
 COPY proto /proto
-COPY scripts/download_font.sh /tmp/download_font.sh
-
-# Download Noto Sans JP font (#291). The font file is gitignored to keep
-# the repo small — it is fetched from Google Fonts CDN at build time.
-# CanvasKit (Flutter Web's renderer) does NOT use CSS <link>-loaded fonts;
-# it needs the TTF in the asset bundle (declared in pubspec.yaml fonts:).
-# Pass /app/fonts explicitly since the script is copied to /tmp/ (its
-# BASH_SOURCE-based default would resolve to /frontend/fonts, not /app/fonts).
-RUN bash /tmp/download_font.sh /app/fonts
 
 # Build Flutter Web app
 # API_BASE_URL can be set at build time (e.g., for OCI deployment behind reverse proxy)

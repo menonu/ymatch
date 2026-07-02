@@ -21,13 +21,13 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      // Japanese font (#291). Bundled as a TTF in fonts/ and declared in
-      // pubspec.yaml so Flutter Web's CanvasKit renderer loads it from the
-      // asset bundle (FontManifest.json). CanvasKit does NOT use CSS
-      // <link>-loaded fonts — it needs the font file registered via the
-      // engine. This forces Japanese glyph variants for kanji/kana on every
-      // platform, avoiding 中華フォント (Chinese-style glyphs) on Android
-      // browsers without a Japanese system font.
+      // Japanese font (#291, subsetted to WOFF2 in #353). Bundled in fonts/
+      // and declared in pubspec.yaml so Flutter Web's CanvasKit renderer
+      // loads it from the asset bundle (FontManifest.json). CanvasKit does
+      // NOT use CSS <link>-loaded fonts — it needs the font file registered
+      // via the engine. This forces Japanese glyph variants for kanji/kana
+      // on every platform, avoiding 中華フォント (Chinese-style glyphs) on
+      // Android browsers without a Japanese system font.
       fontFamily: 'NotoSansJP',
       fontFamilyFallback: const ['Yu Gothic', 'Hiragino Sans', 'Meiryo', 'sans-serif'],
       colorScheme: ColorScheme.fromSeed(
