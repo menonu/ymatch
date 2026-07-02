@@ -60,6 +60,17 @@ FROM ghcr.io/menonu/ymatch/nginx:alpine
 # Copy the built web assets from the builder stage
 COPY --from=builder /app/build/web /usr/share/nginx/html
 
+# Pre-compress the large static assets (.js / .wasm / .css / .json / .svg /
+# .xml) into `.gz` sidecars. `gzip_static on` in default.conf serves these
+# verbatim so nginx never re-compresses the multi-MB bundle at request time
+# — a real per-request CPU saving on the small ARM prod VM (#353 Option B /
+# #356). Already-compressed formats (woff2/woff) are skipped. busybox gzip
+# supports -k (keep original).
+RUN find /usr/share/nginx/html -type f \
+      \( -name '*.js' -o -name '*.wasm' -o -name '*.css' \
+         -o -name '*.json' -o -name '*.svg' -o -name '*.xml' \) \
+    -exec gzip -kf {} \;
+
 # Expose port 80
 EXPOSE 80
 

@@ -53,7 +53,12 @@ RUN mkdir -p /usr/share/nginx/html/assets/fonts \
     && yes "body { color: black; } " | head -c 1200 > /usr/share/nginx/html/styles.css \
     && yes "wasm-payload" | head -c 1200 > /usr/share/nginx/html/canvaskit.wasm \
     && yes "woff2-payload" | head -c 1200 > /usr/share/nginx/html/assets/fonts/NotoSansJP-Regular.woff2 \
-    && printf '<!DOCTYPE html><html><head><title>ymatch</title></head><body><div id="app"></div></body></html>\n' > /usr/share/nginx/html/index.html
+    && printf '<!DOCTYPE html><html><head><title>ymatch</title></head><body><div id="app"></div></body></html>\n' > /usr/share/nginx/html/index.html \
+    # Pre-compress .gz sidecars so gzip_static (the prod path) is exercised,
+    # not just the dynamic fallback. Mirrors frontend.Dockerfile.prod.
+    && find /usr/share/nginx/html -type f \
+         \( -name '*.js' -o -name '*.wasm' -o -name '*.css' \) \
+       -exec gzip -kf {} \;
 EOF
 
 echo "▶ Building test image $IMAGE_TAG …"
@@ -98,7 +103,7 @@ assert_contains() { # label haystack needle
     fi
 }
 
-hdr() { # url extra_curl_args...  →  "<value>\n<status>" of header + status
+hdr() { # url extra_curl_args...  →  full response headers (status line + headers), one per line
     local url="$1"; shift
     curl -s -o /dev/null -D - "$@" "$BASE$url" | tr -d '\r'
 }
@@ -111,6 +116,13 @@ for asset in /main.dart.js /canvaskit.wasm /styles.css /assets/fonts/NotoSansJP-
     assert_eq "$asset gzip Content-Encoding" "gzip" "$enc"
     assert_eq "$asset Vary: Accept-Encoding" "Accept-Encoding" "$vary"
 done
+
+# --- gzip_static serves the pre-built .gz sidecar, not dynamic gzip ---
+# The on-the-wire gzipped body must be byte-identical to the sidecar file
+# baked into the image (dynamic gzip at comp_level 5 would differ).
+sidecar_bytes="$(docker exec "$CTR" sh -c 'wc -c < /usr/share/nginx/html/main.dart.js.gz' | tr -d ' \r\n')"
+wire_bytes="$(curl -s -H 'Accept-Encoding: gzip' "$BASE/main.dart.js" | wc -c | tr -d ' \r\n')"
+assert_eq "gzip_static serves pre-built .gz sidecar (wire bytes == sidecar bytes)" "$sidecar_bytes" "$wire_bytes"
 
 # --- no compression when client doesn't request it ---
 H="$(hdr /main.dart.js)"
