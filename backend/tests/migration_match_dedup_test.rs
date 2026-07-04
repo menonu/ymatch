@@ -99,7 +99,11 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
     .fetch_all(&pool)
     .await
     .unwrap();
-    assert_eq!(card_ids.len(), 3, "expected 3 duplicate (pair, group) matches seeded");
+    assert_eq!(
+        card_ids.len(),
+        3,
+        "expected 3 duplicate (pair, group) matches seeded"
+    );
     let survivor = card_ids[0];
     let doomed_a = card_ids[1];
     let doomed_b = card_ids[2];
@@ -143,7 +147,10 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(cards_left, 1, "three duplicate 'Cards' matches must collapse to one survivor");
+    assert_eq!(
+        cards_left, 1,
+        "three duplicate 'Cards' matches must collapse to one survivor"
+    );
 
     let survivor_alive: i64 = sqlx::query_scalar("SELECT count(*) FROM matches WHERE id = $1")
         .bind(survivor)
@@ -152,13 +159,12 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
         .unwrap();
     assert_eq!(survivor_alive, 1, "lowest-id survivor must be retained");
 
-    let doomed_gone: i64 =
-        sqlx::query_scalar("SELECT count(*) FROM matches WHERE id IN ($1, $2)")
-            .bind(doomed_a)
-            .bind(doomed_b)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let doomed_gone: i64 = sqlx::query_scalar("SELECT count(*) FROM matches WHERE id IN ($1, $2)")
+        .bind(doomed_a)
+        .bind(doomed_b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(doomed_gone, 0, "duplicate matches must be hard-deleted");
 
     let stickers_left: i64 = sqlx::query_scalar(
@@ -168,13 +174,19 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(stickers_left, 1, "a different-group match for the same pair must not be deduped");
+    assert_eq!(
+        stickers_left, 1,
+        "a different-group match for the same pair must not be deduped"
+    );
     let sticker_alive: i64 = sqlx::query_scalar("SELECT count(*) FROM matches WHERE id = $1")
         .bind(sticker_id)
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(sticker_alive, 1, "the different-group match row must be retained");
+    assert_eq!(
+        sticker_alive, 1,
+        "the different-group match row must be retained"
+    );
 
     // messages on the doomed match were cleared (no ON DELETE clause).
     let msgs_on_doomed: i64 =
@@ -183,7 +195,10 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(msgs_on_doomed, 0, "messages on a doomed match must be cleared before deletion");
+    assert_eq!(
+        msgs_on_doomed, 0,
+        "messages on a doomed match must be cleared before deletion"
+    );
 
     // match_items cascaded with the doomed match.
     let items_on_doomed: i64 =
@@ -192,7 +207,10 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(items_on_doomed, 0, "match_items on a doomed match must cascade-delete");
+    assert_eq!(
+        items_on_doomed, 0,
+        "match_items on a doomed match must cascade-delete"
+    );
 
     // The unique index now blocks a new duplicate in 'Cards' (symmetric ordering).
     let dup = sqlx::query(
@@ -235,5 +253,8 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(cards_again, 1, "idempotent re-run must not change the dedup state");
+    assert_eq!(
+        cards_again, 1,
+        "idempotent re-run must not change the dedup state"
+    );
 }
