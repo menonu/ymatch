@@ -195,6 +195,73 @@ void main() {
     },
   );
 
+  // #314: a completed match stays conversable — the Message button and card
+  // tap remain available on the Done tab, just like on the other tabs.
+  TradeMatch _completedMatch() => TradeMatch()
+    ..id = 200
+    ..user1Id = 1
+    ..user2Id = 2
+    ..status = 'COMPLETED'
+    ..inventoryApplied = true
+    ..userHaves.add(_item(10, 'Give Pen', 3, 1))
+    ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
+
+  testWidgets(
+    'completed match card shows the Message button (#314)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to the Done (completed) tab — the only place completed matches
+      // surface.
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
+      // The Message affordance is present on a completed match too (#314).
+      expect(find.text('Message'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'completed match card shows the メッセージ button under ja (#314)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
+            notificationCountsProvider(1).overrideWith(
+              (ref) async => NotificationCounts(),
+            ),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const TradeListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('完了'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('メッセージ'), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'match screen AppBar has a reload button that refetches matches (#335)',
     (WidgetTester tester) async {
