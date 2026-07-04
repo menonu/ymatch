@@ -224,8 +224,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to the Done (completed) tab — the only place completed matches
-      // surface.
-      await tester.tap(find.text('Done'));
+      // surface. Scope the tab text to the TabBar so the finder stays
+      // unambiguous even if a future l10n string collides with a card label.
+      await tester.tap(
+        find.descendant(of: find.byType(TabBar), matching: find.text('Done')),
+      );
       await tester.pumpAndSettle();
 
       // The Message affordance is present on a completed match too (#314).
@@ -255,7 +258,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('完了'));
+      // Under ja, `tabDone` and `statusCompleted` are both "完了", so scope
+      // to the TabBar to avoid matching the status chip on the completed card.
+      await tester.tap(
+        find.descendant(of: find.byType(TabBar), matching: find.text('完了')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('メッセージ'), findsOneWidget);
