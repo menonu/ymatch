@@ -24,6 +24,10 @@
 --    rows: `match_items` is ON DELETE CASCADE and clears with the match;
 --    `messages` has no ON DELETE clause to matches, so clear them first
 --    (same pattern as 20260629000000_match_group_scope.sql).
+--
+--    The `dupes` CTE is repeated for each DELETE because a single CTE cannot
+--    drive two separate DELETE statements in one SQL statement (a CTE's scope
+--    is the single statement that defines it).
 WITH dupes AS (
   SELECT id,
          ROW_NUMBER() OVER (
