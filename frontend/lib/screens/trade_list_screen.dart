@@ -278,9 +278,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: (tab != TradeTab.completed)
-            ? () => context.go('/matches/chat/${match.id}')
-            : null,
+        // #314: completed matches stay conversable — the card opens the chat
+        // thread on every tab, same as while trading.
+        onTap: () => context.go('/matches/chat/${match.id}'),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -334,20 +334,21 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                       ],
                     ),
                   ),
-                  if (tab != TradeTab.completed)
-                    FilledButton.tonal(
-                      onPressed: () =>
-                          context.go('/matches/chat/${match.id}'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        minimumSize: const Size(0, 36),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  // #314: the Message affordance is shown on every tab,
+                  // including completed matches (chat remains open after a
+                  // trade is done, same as while trading).
+                  FilledButton.tonal(
+                    onPressed: () => context.go('/matches/chat/${match.id}'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-                      child: Text(l10n.messageAction),
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: Text(l10n.messageAction),
+                  ),
                 ],
               ),
 
