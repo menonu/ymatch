@@ -126,7 +126,16 @@ CREATE TABLE IF NOT EXISTS user_roles (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     -- NULLS NOT DISTINCT so the global scope (scope_id NULL) still enforces
     -- one row per (user, role) and ON CONFLICT can dedupe global re-grants.
-    UNIQUE NULLS NOT DISTINCT (user_id, role_id, scope_id)
+    UNIQUE NULLS NOT DISTINCT (user_id, role_id, scope_id),
+    -- Row-level invariant: the global scope always has a NULL scope_id, any
+    -- other scope always has a non-NULL scope_id. This does NOT enumerate
+    -- scope_type literals, so adding a future scope (e.g. 'team') needs no
+    -- change here -- only the global-vs-non-global shape is enforced at the
+    -- DB level; the set of valid scope_types stays app-validated.
+    CHECK (
+        (scope_type = 'global' AND scope_id IS NULL)
+        OR (scope_type <> 'global' AND scope_id IS NOT NULL)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_roles_scope ON user_roles (scope_type, scope_id);
