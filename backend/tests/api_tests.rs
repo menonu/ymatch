@@ -4286,6 +4286,70 @@ async fn test_match_carries_event_group_context(pool: PgPool) {
     );
 }
 
+/// #346: defense-in-depth DB constraint. ADR 0001 scopes a match to one
+/// (event_id, group_name) and the matcher dedups per (pair, group) at the
+/// application level (`matching.rs` `existing_match`). A direct INSERT that
+/// bypasses the matcher must still be rejected by the DB when it would create
+/// a second row for the same canonical (pair, group) — including the symmetric
+/// `(user2, user1)` ordering, which the canonicalization (`LEAST`/`GREATEST`)
+/// must collapse. A separate group for the same pair remains allowed.
+#[sqlx::test]
+async fn test_match_unique_canonical_pair_group_enforced_by_db(pool: PgPool) {
+    let (u1,): (i32,) = sqlx::query_as(
+        "INSERT INTO users (username, password_hash) VALUES ('uniq-u1', 'x') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (u2,): (i32,) = sqlx::query_as(
+        "INSERT INTO users (username, password_hash) VALUES ('uniq-u2', 'x') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (event_id,): (i32,) = sqlx::query_as(
+        "INSERT INTO events (name, creator_id) VALUES ('Uniq Pair Event', $1) RETURNING id",
+    )
+    .bind(u1)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let insert_match = |ua: i32, ub: i32, group: &'static str| {
+        sqlx::query(
+            "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
+             VALUES ($1, $2, 'PENDING', $3, $4)",
+        )
+        .bind(ua)
+        .bind(ub)
+        .bind(event_id)
+        .bind(group)
+        .execute(&pool)
+    };
+
+    // Baseline: one match for (u1, u2) in "Cards".
+    insert_match(u1, u2, "Cards").await.unwrap();
+
+    // Same pair, swapped column ordering, same group -> canonical collision.
+    let dup = insert_match(u2, u1, "Cards").await;
+    assert!(
+        dup.is_err(),
+        "DB must reject a duplicate (canonical pair, group) match, got: {dup:?}",
+    );
+
+    // Same pair, different group -> allowed (ADR 0001: one match per group).
+    insert_match(u2, u1, "Stickers").await.unwrap();
+
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM matches WHERE event_id = $1 AND group_name IN ('Cards', 'Stickers')",
+    )
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(count, 2, "expected one match per group, got {count}");
+}
+
 /// The accept gate re-validates the FULL accumulated leg set against the
 /// receiver's CURRENT want quantity (#297 review). A leg that was within
 /// the cap when proposed can become over-capacity if the receiver lowers
