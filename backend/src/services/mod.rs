@@ -7,4 +7,6 @@
 //! here too (e.g. a `MatchLifecycleService` in Phase 4).
 pub mod match_lifecycle;
 pub mod merch_permissions;
+pub mod permission_catalog;
 pub mod permissions;
+pub mod rbac;

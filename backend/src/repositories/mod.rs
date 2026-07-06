@@ -41,4 +41,5 @@ pub mod inventory;
 pub mod match_;
 pub mod merch;
 pub mod message;
+pub mod rbac;
 pub mod user;
