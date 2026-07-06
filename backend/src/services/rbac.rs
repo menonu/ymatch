@@ -521,7 +521,8 @@ mod tests {
                 .await
                 .unwrap();
 
-        // An event created by the admin (so it gets an event/creator row too).
+        // An event the editor is a member of (created by admin; the creator
+        // role is assigned explicitly below rather than auto-derived).
         sqlx::query("INSERT INTO events (name, creator_id) VALUES ('RBAC Event', $1)")
             .bind(admin_id)
             .execute(&pool)
@@ -531,9 +532,12 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        // A second event the editor is NOT a member of.
+        // A second event owned by user_id, which admin is NOT a member of.
+        // This isolates the admin superuser bypass: EventMemberManage is a
+        // creator-only permission, and user_id (not admin) is the creator, so
+        // admin can only pass via the bypass -- not via an event role.
         sqlx::query("INSERT INTO events (name, creator_id) VALUES ('Other Event', $1)")
-            .bind(admin_id)
+            .bind(user_id)
             .execute(&pool)
             .await
             .unwrap();
@@ -546,12 +550,14 @@ mod tests {
         // Assign global roles.
         assign(&pool, admin_id, "global", None, "admin").await;
         assign(&pool, mod_id, "global", None, "moderator").await;
-        // user_id intentionally gets NO user_roles row (implicit 'user').
+        // user_id is the creator of Other Event (so the bypass test below is
+        // against a real creator, not an ownerless event).
+        assign(&pool, user_id, "event", Some(other_event_id), "creator").await;
         // editor is scoped to event_id only.
         assign(&pool, editor_id, "event", Some(event_id), "editor").await;
 
-        // Admin superuser bypass: passes everything, including event-scoped
-        // member management on an event they "own" and one they don't.
+        // Admin superuser bypass: passes a global permission and a creator-only
+        // event permission on an event admin does NOT own (user_id does).
         assert!(
             service
                 .check(&verified(admin_id), &Scope::Global, Permission::UserBan)
@@ -614,8 +620,9 @@ mod tests {
                 .is_err()
         );
 
-        // Plain user (no assignment): cannot create events (event.create is
-        // moderator/admin only), cannot ban, cannot edit.
+        // Plain user: no global role, so cannot create events or ban. They are
+        // the creator of Other Event (but not event_id), so they can manage
+        // members on Other Event and are denied on event_id.
         assert!(
             service
                 .check(&verified(user_id), &Scope::Global, Permission::EventCreate)
@@ -637,6 +644,17 @@ mod tests {
                 )
                 .await
                 .is_err()
+        );
+        // user_id is the creator of Other Event -> creator-only permission passes.
+        assert!(
+            service
+                .check(
+                    &verified(user_id),
+                    &Scope::Event(other_event_id),
+                    Permission::EventMemberManage
+                )
+                .await
+                .is_ok()
         );
 
         // Editor: can edit and delete merch on their event, cannot delete the
