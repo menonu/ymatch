@@ -32,10 +32,12 @@ use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::MatchRepository;
 use crate::repositories::merch::MerchandiseRepository;
 use crate::repositories::message::MessageRepository;
+use crate::repositories::rbac::RbacRepository;
 use crate::repositories::user::UserRepository;
 use crate::services::match_lifecycle::MatchLifecycleService;
 use crate::services::merch_permissions::MerchPermissionPolicy;
 use crate::services::permissions::PermissionPolicy;
+use crate::services::rbac::RbacService;
 use crate::storage::ImageStorage;
 
 type IpLimiter = DefaultKeyedRateLimiter<IpAddr>;
@@ -82,6 +84,8 @@ pub struct AppState {
     pub policy: Arc<PermissionPolicy>,
     pub merch_policy: Arc<MerchPermissionPolicy>,
     pub match_lifecycle: Arc<MatchLifecycleService>,
+    pub rbac: Arc<RbacRepository>,
+    pub rbac_service: Arc<RbacService>,
 }
 
 impl FromRef<AppState> for PgPool {
@@ -174,6 +178,18 @@ impl FromRef<AppState> for Arc<GroupFavoritesRepository> {
     }
 }
 
+impl FromRef<AppState> for Arc<RbacRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.rbac.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<RbacService> {
+    fn from_ref(input: &AppState) -> Self {
+        input.rbac_service.clone()
+    }
+}
+
 pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let users: Arc<UserRepository> = Arc::new(UserRepository::new(pool.clone()));
     let policy = Arc::new(PermissionPolicy::new(users.clone()));
@@ -195,6 +211,13 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         matches.clone(),
         inventory.clone(),
     ));
+    let rbac: Arc<RbacRepository> = Arc::new(RbacRepository::new(pool.clone()));
+    // The PermissionCatalog is loaded lazily on the first authorization
+    // check (RbacService holds a OnceCell) rather than awaited here, so
+    // `create_router` can stay synchronous — it is called from ~150 sync
+    // call sites in the integration tests. A misconfigured (unseeded) DB
+    // surfaces as a 500 on the first check instead of at startup.
+    let rbac_service = Arc::new(RbacService::new(rbac.clone(), pool.clone()));
     let state = AppState {
         pool,
         storage,
@@ -211,6 +234,8 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         policy,
         merch_policy,
         match_lifecycle,
+        rbac,
+        rbac_service,
     };
 
     let cors = tower_http::cors::CorsLayer::new()
