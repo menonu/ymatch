@@ -35,7 +35,6 @@ use crate::repositories::message::MessageRepository;
 use crate::repositories::rbac::RbacRepository;
 use crate::repositories::user::UserRepository;
 use crate::services::match_lifecycle::MatchLifecycleService;
-use crate::services::merch_permissions::MerchPermissionPolicy;
 use crate::services::permissions::PermissionPolicy;
 use crate::services::rbac::RbacService;
 use crate::storage::ImageStorage;
@@ -82,7 +81,6 @@ pub struct AppState {
     pub event_views: Arc<EventViewsRepository>,
     pub group_favorites: Arc<GroupFavoritesRepository>,
     pub policy: Arc<PermissionPolicy>,
-    pub merch_policy: Arc<MerchPermissionPolicy>,
     pub match_lifecycle: Arc<MatchLifecycleService>,
     pub rbac: Arc<RbacRepository>,
     pub rbac_service: Arc<RbacService>,
@@ -121,12 +119,6 @@ impl FromRef<AppState> for Arc<MerchandiseGroupRepository> {
 impl FromRef<AppState> for Arc<PermissionPolicy> {
     fn from_ref(input: &AppState) -> Self {
         input.policy.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<MerchPermissionPolicy> {
-    fn from_ref(input: &AppState) -> Self {
-        input.merch_policy.clone()
     }
 }
 
@@ -205,7 +197,6 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let event_views: Arc<EventViewsRepository> = Arc::new(EventViewsRepository::new(pool.clone()));
     let group_favorites: Arc<GroupFavoritesRepository> =
         Arc::new(GroupFavoritesRepository::new(pool.clone()));
-    let merch_policy = Arc::new(MerchPermissionPolicy::new(policy.clone(), merch.clone()));
     let match_lifecycle = Arc::new(MatchLifecycleService::new(
         pool.clone(),
         matches.clone(),
@@ -232,7 +223,6 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         event_views,
         group_favorites,
         policy,
-        merch_policy,
         match_lifecycle,
         rbac,
         rbac_service,

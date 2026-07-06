@@ -14,6 +14,7 @@ use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
 use crate::repositories::group_favorites::GroupFavoritesRepository;
 use crate::routes::AppState;
+use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
     extract::{Path, State},
@@ -82,11 +83,33 @@ pub async fn create_event(
     State(state): State<AppState>,
     Json(payload): Json<CreateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
-    state.policy.verify_active(payload.creator_id).await?;
+    // ADR 0004 §4: event creation requires the global `event.create`
+    // permission, granted to `moderator` and `admin` (not `user`).
+    let user = state.policy.verify_active(payload.creator_id).await?;
+    state
+        .rbac_service
+        .check(&user, &Scope::Global, Permission::EventCreate)
+        .await?;
+    // ADR 0004 §5: the event row and the auto-assigned `event/creator`
+    // `user_roles` row are written in one transaction so the creator can
+    // never end up with a persisted event they cannot edit/publish (the
+    // `EventEdit` check on their own event would otherwise fail if the
+    // role assignment were lost to a mid-flight failure).
+    let mut tx = state.pool.begin().await?;
     let event = state
         .events
-        .create(&payload.name, payload.creator_id, payload.status.as_deref())
+        .create(
+            &mut *tx,
+            &payload.name,
+            payload.creator_id,
+            payload.status.as_deref(),
+        )
         .await?;
+    state
+        .rbac
+        .assign_event_creator(&mut tx, payload.creator_id, event.id)
+        .await?;
+    tx.commit().await?;
     Ok(Json(event))
 }
 
@@ -96,15 +119,20 @@ pub async fn update_event(
     Json(payload): Json<UpdateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
     let user = state.policy.verify_active(payload.user_id).await?;
-    let creator = state
+    // Confirm the event exists (404) before the RBAC check so a missing
+    // event is not leaked as a 403 to a caller who lacks the event role.
+    let _ = state
         .events
         .get_creator(event_id)
         .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?
-        .unwrap_or(-1);
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    // ADR 0004 §3: `event.edit` (event scope) is granted to the event
+    // `creator` and `editor`; the admin bypass and `event.edit.any`
+    // (moderator) overlap are resolved inside RbacService::check.
     state
-        .policy
-        .require_owner_or_role(&user, creator, &["admin", "moderator"])?;
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::EventEdit)
+        .await?;
 
     let name = payload
         .name
@@ -123,15 +151,17 @@ pub async fn publish_event(
     Json(payload): Json<UserActionRequest>,
 ) -> Result<StatusCode, AppError> {
     let user = state.policy.verify_active(payload.user_id).await?;
-    let creator = state
+    let _ = state
         .events
         .get_creator(event_id)
         .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?
-        .unwrap_or(-1);
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    // Publishing is an edit operation (ADR 0004: `event.edit` = "Edit this
+    // event (rename, publish)"), gated by the same EventEdit permission.
     state
-        .policy
-        .require_owner_or_role(&user, creator, &["admin", "moderator"])?;
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::EventEdit)
+        .await?;
     state.events.publish(event_id).await?;
     Ok(StatusCode::OK)
 }

@@ -96,12 +96,21 @@ impl EventRepository {
     }
 
     /// Create a new event. `status` defaults to `"published"` if `None`.
-    pub async fn create(
+    ///
+    /// Takes a generic [`sqlx::Executor`] so the caller can run the insert
+    /// inside an open transaction (the `create_event` handler does this so
+    /// the event row and the auto-assigned `event/creator` `user_roles` row
+    /// commit atomically — ADR 0004 §5).
+    pub async fn create<'c, E>(
         &self,
+        exec: E,
         name: &str,
         creator_id: i32,
         status: Option<&str>,
-    ) -> Result<Event, AppError> {
+    ) -> Result<Event, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let status = status.unwrap_or("published");
         let row = sqlx::query(
             "INSERT INTO events (name, creator_id, status) VALUES ($1, $2, $3)
@@ -110,7 +119,7 @@ impl EventRepository {
         .bind(name)
         .bind(creator_id)
         .bind(status)
-        .fetch_one(&self.pool)
+        .fetch_one(exec)
         .await?;
         // The create path returns a default-shaped Event; the
         // caller (handler) does not depend on stats here.

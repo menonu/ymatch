@@ -187,19 +187,60 @@ impl UserRepository {
         }
     }
 
-    /// Set a user's role. Returns `None` if the user does not exist.
+    /// Set a user's *global* role. Returns `None` if the user does not exist.
+    ///
+    /// ADR 0004 §2: `user_roles` (scope_type='global', scope_id=NULL) is the
+    /// authoritative global role, and `users.role` is kept as a denormalized
+    /// mirror so the proto `User.role` field and the frontend admin gate keep
+    /// working. This method writes both in **one transaction** so they cannot
+    /// drift: it updates `users.role`, removes the user's prior global
+    /// `user_roles` assignment, and inserts the new `global/<role>` row. If
+    /// `role` is not a known global role in the `roles` catalog, the
+    /// transaction rolls back and the caller gets `AppError::bad_request`.
     pub async fn set_role(&self, id: i32, role: &str) -> Result<Option<()>, AppError> {
+        let mut tx = self.pool.begin().await?;
         let affected = sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
             .bind(role)
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?
             .rows_affected();
         if affected == 0 {
-            Ok(None)
-        } else {
-            Ok(Some(()))
+            // Roll back the empty tx before returning; nothing was changed.
+            tx.rollback().await?;
+            return Ok(None);
         }
+        let role_id: Option<i32> =
+            sqlx::query_scalar("SELECT id FROM roles WHERE scope_type = 'global' AND name = $1")
+                .bind(role)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let Some(role_id) = role_id else {
+            tx.rollback().await?;
+            return Err(AppError::bad_request(format!(
+                "Invalid role: {role}. Must be one of: user, moderator, admin"
+            )));
+        };
+        // Replace the user's prior global assignment with the new one. A user
+        // holds at most one global role, so delete-then-insert is correct.
+        sqlx::query(
+            "DELETE FROM user_roles
+             WHERE user_id = $1 AND scope_type = 'global' AND scope_id IS NULL",
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+             VALUES ($1, $2, 'global', NULL)
+             ON CONFLICT (user_id, role_id, scope_id) DO NOTHING",
+        )
+        .bind(id)
+        .bind(role_id)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Some(()))
     }
 
     /// Set a user's ban state. `banned_until: None` means a permanent ban

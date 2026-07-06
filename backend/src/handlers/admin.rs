@@ -1,7 +1,9 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::repositories::user::VerifiedUser;
 use crate::routes::AppState;
 use crate::services::permissions::PermissionPolicy;
+use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
     extract::{Path, State},
@@ -13,10 +15,15 @@ pub struct AdminQuery {
     pub user_id: Option<i32>,
 }
 
+/// Resolve the caller from the `user_id` query param and confirm they are an
+/// active (non-banned) `admin` or `moderator`. Used for the admin endpoints
+/// whose permission the ADR 0004 matrix does not model as an RBAC permission
+/// (today: only `delete_match`, which has no `match.*` permission in the
+/// catalog). RBAC-gated admin endpoints use [`require_global`] instead.
 async fn require_admin_or_mod(
     policy: &PermissionPolicy,
     query_user_id: Option<i32>,
-) -> Result<crate::repositories::user::VerifiedUser, AppError> {
+) -> Result<VerifiedUser, AppError> {
     let uid =
         query_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
     let user = policy.verify(uid).await?;
@@ -25,12 +32,34 @@ async fn require_admin_or_mod(
     Ok(user)
 }
 
+/// Resolve the caller from the `user_id` query param and require they hold
+/// `permission` in the global scope (ADR 0004 §3). This is the RBAC entry
+/// point for the admin endpoints whose permission is in the catalog:
+/// `event.delete.any`, `merch.delete.any`, `user.ban`, `user.unban`,
+/// `user.role.manage`. The admin superuser bypass is handled inside
+/// [`RbacService::check`].
+async fn require_global(
+    state: &AppState,
+    query_user_id: Option<i32>,
+    permission: Permission,
+) -> Result<VerifiedUser, AppError> {
+    let uid =
+        query_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
+    let user = state.policy.verify(uid).await?;
+    state.policy.require_not_banned(&user)?;
+    state
+        .rbac_service
+        .check(&user, &Scope::Global, permission)
+        .await?;
+    Ok(user)
+}
+
 pub async fn delete_event(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
-    require_admin_or_mod(&state.policy, query.user_id).await?;
+    require_global(&state, query.user_id, Permission::EventDeleteAny).await?;
     state.events.delete(id).await?;
     Ok(StatusCode::OK)
 }
@@ -40,7 +69,7 @@ pub async fn delete_merch(
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
-    require_admin_or_mod(&state.policy, query.user_id).await?;
+    require_global(&state, query.user_id, Permission::MerchDeleteAny).await?;
 
     // The merch_id is also the only thing we have. The repository needs
     // (event_id, merch_id) to construct its SQL, so we look up the event
@@ -66,6 +95,8 @@ pub async fn delete_match(
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
+    // No `match.*` permission in the ADR 0004 catalog; match deletion stays
+    // an admin/moderator moderation action via the role-based check.
     require_admin_or_mod(&state.policy, query.user_id).await?;
 
     // The matches table is owned by `MatchRepository` in Phase 4, but
@@ -85,7 +116,7 @@ pub async fn ban_user(
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
     Json(payload): Json<BanUserRequest>,
 ) -> Result<StatusCode, AppError> {
-    require_admin_or_mod(&state.policy, query.user_id).await?;
+    require_global(&state, query.user_id, Permission::UserBan).await?;
 
     let banned_until = payload
         .banned_until
@@ -107,7 +138,7 @@ pub async fn unban_user(
     Path(target_id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
-    require_admin_or_mod(&state.policy, query.user_id).await?;
+    require_global(&state, query.user_id, Permission::UserUnban).await?;
 
     state
         .users
@@ -124,13 +155,8 @@ pub async fn update_user_role(
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
     Json(payload): Json<UpdateUserRoleRequest>,
 ) -> Result<StatusCode, AppError> {
-    let uid = query
-        .user_id
-        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
-    let user = state.policy.verify(uid).await?;
-    state.policy.require_not_banned(&user)?;
-    // Only admin can change roles
-    state.policy.require_role(&user, &["admin"])?;
+    // Only admin can change roles (ADR 0004: `user.role.manage` -> admin).
+    require_global(&state, query.user_id, Permission::UserRoleManage).await?;
 
     let valid_roles = ["user", "moderator", "admin"];
     if !valid_roles.contains(&payload.role.as_str()) {

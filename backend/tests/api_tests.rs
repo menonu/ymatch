@@ -235,6 +235,9 @@ async fn test_create_and_list_events(pool: PgPool) {
     let user: serde_json::Value = serde_json::from_str(&body).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
+
     // Create event
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -599,6 +602,8 @@ async fn test_event_view_per_user_and_per_event(pool: PgPool) {
             .as_i64()
             .unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_b, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -783,6 +788,9 @@ async fn test_publish_draft_event_transitions_to_published(pool: PgPool) {
             ["id"]
             .as_i64()
             .unwrap();
+
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
 
     // Create a DRAFT event explicitly.
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -1184,11 +1192,7 @@ async fn test_admin_update_user_role_invalid_role_rejected(pool: PgPool) {
     // Use an admin to make the role change.
     let (admin_id, _eid) =
         create_test_user_and_event(pool.clone(), "admin-role-admin", "Admin Role Event").await;
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
-        .bind(admin_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, admin_id, "admin").await;
 
     // Create a target user.
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -1232,11 +1236,7 @@ async fn test_admin_update_user_role_moderator_forbidden(pool: PgPool) {
     // Create two users: a "moderator" trying to change roles, and a target.
     let (mod_id, _eid) =
         create_test_user_and_event(pool.clone(), "admin-role-mod", "Admin Mod Event").await;
-    sqlx::query("UPDATE users SET role = 'moderator' WHERE id = $1")
-        .bind(mod_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, mod_id, "moderator").await;
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1278,11 +1278,7 @@ async fn test_admin_update_user_role_moderator_forbidden(pool: PgPool) {
 async fn test_admin_update_user_role_succeeds(pool: PgPool) {
     let (admin_id, _eid) =
         create_test_user_and_event(pool.clone(), "admin-role-ok", "Admin Role Ok").await;
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
-        .bind(admin_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, admin_id, "admin").await;
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1414,11 +1410,7 @@ async fn test_admin_delete_merch_succeeds(pool: PgPool) {
             .unwrap();
 
     // Promote user to admin for the delete.
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
-        .bind(user_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, user_id, "admin").await;
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -1466,6 +1458,8 @@ async fn test_create_and_list_merch(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1682,6 +1676,8 @@ async fn test_inventory_upsert(pool: PgPool) {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event + merch
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1819,6 +1815,8 @@ async fn test_search_returns_results(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
         Request::builder()
@@ -1875,6 +1873,8 @@ async fn test_search_excludes_draft_events(pool: PgPool) {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create a draft event
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(
         Request::builder()
@@ -1934,11 +1934,7 @@ async fn test_admin_delete_event(pool: PgPool) {
     let user_id = user["id"].as_i64().unwrap();
 
     // Promote user to admin
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
-        .bind(user_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, user_id, "admin").await;
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -2132,11 +2128,7 @@ async fn test_admin_ban_unban_user(pool: PgPool) {
     let admin: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let admin_id = admin["id"].as_i64().unwrap();
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
-        .bind(admin_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, admin_id, "admin").await;
 
     // Create target user
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -2265,11 +2257,7 @@ async fn test_update_user_role(pool: PgPool) {
     let admin: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let admin_id = admin["id"].as_i64().unwrap();
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = $1")
-        .bind(admin_id as i32)
-        .execute(&pool)
-        .await
-        .unwrap();
+    grant_global_role(&pool, admin_id, "admin").await;
 
     // Create target
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -2352,6 +2340,8 @@ async fn test_draft_event_visibility(pool: PgPool) {
     let viewer_id = viewer["id"].as_i64().unwrap();
 
     // Create draft event
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, creator_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -2454,6 +2444,8 @@ async fn test_draft_merch_visibility(pool: PgPool) {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -2554,6 +2546,8 @@ async fn test_soft_delete_merch_with_inventory(pool: PgPool) {
     let user_id = user["id"].as_i64().unwrap();
 
     // Create event + merch
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -2670,6 +2664,8 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -2774,6 +2770,12 @@ async fn test_banned_user_cannot_create_event(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // Promote to moderator so the user would otherwise pass the new
+    // `event.create` permission check (ADR 0004 §4). This isolates the ban
+    // check: the 403 below must come from being banned, not from lacking
+    // event.create.
+    grant_global_role(&pool, user_id, "moderator").await;
+
     // Ban the user
     sqlx::query("UPDATE users SET is_banned = true WHERE id = $1")
         .bind(user_id as i32)
@@ -2853,6 +2855,8 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
             .as_i64()
             .unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, u1, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3277,6 +3281,8 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
     let user2_id = user2["id"].as_i64().unwrap();
 
     // 2. Create event + 2 merch items
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user1_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3717,6 +3723,8 @@ async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user2_id = user2["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user1_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -3906,6 +3914,8 @@ async fn setup_pending_trade_match_quantities(
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user2_id = user2["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only.
+    grant_global_role(&pool, user1_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -4502,6 +4512,11 @@ async fn create_test_user_and_event(pool: PgPool, uuid: &str, event_name: &str) 
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
+    // ADR 0004 §4: event creation is moderator/admin-only, so promote the
+    // guest before creating the event. The handler auto-assigns the
+    // `event/creator` role to the creator.
+    grant_global_role(&pool, user_id, "moderator").await;
+
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -4641,9 +4656,11 @@ async fn test_update_group_description(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(group["description"].as_str().unwrap(), "updated by creator");
 
-    // Non-creator cannot update
-    let (other_id, _) =
-        create_test_user_and_event(pool.clone(), "group-updater-other", "Other").await;
+    // Non-creator cannot update. Use a plain guest (not the
+    // `create_test_user_and_event` helper, which now promotes its user to
+    // moderator so they can create the event — that moderator role would
+    // satisfy the group-update admin/mod check and mask the 403).
+    let other_id = login_guest(&pool, "group-updater-other", "tok").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -5543,6 +5560,508 @@ async fn test_list_for_user_scopes_haves_wants_to_match_group(pool: PgPool) {
     assert_eq!(f1_wants[0]["groupName"].as_str().unwrap(), "F1");
 }
 
+// --- RBAC wiring (ADR 0004, #228 PR3a) ---
+//
+// These tests pin the authorization boundaries that PR3a wires through
+// RbacService: event.create (mod/admin only), event.edit (event creator +
+// editor + admin bypass + moderator via event.edit.any), the admin
+// moderation permissions, the merch-delete ownership-or-RBAC rule, and the
+// users.role <-> user_roles mirror sync.
+
+#[sqlx::test]
+async fn test_rbac_event_create_requires_moderator_or_admin(pool: PgPool) {
+    let plain = login_guest(&pool, "rbac-create-plain", "t").await;
+
+    // Plain user cannot create an event (ADR 0004 §4).
+    let resp = post_json(
+        &pool,
+        "/api/v1/events",
+        &format!(r#"{{"name": "Plain Event", "creatorId": {}}}"#, plain),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Moderator can.
+    grant_global_role(&pool, plain, "moderator").await;
+    let resp = post_json(
+        &pool,
+        "/api/v1/events",
+        &format!(r#"{{"name": "Mod Event", "creatorId": {}}}"#, plain),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Admin can.
+    let admin = login_guest(&pool, "rbac-create-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let resp = post_json(
+        &pool,
+        "/api/v1/events",
+        &format!(r#"{{"name": "Admin Event", "creatorId": {}}}"#, admin),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn test_rbac_event_create_auto_assigns_creator_role(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "rbac-auto-creator", "Auto Creator Event").await;
+
+    // The creator is auto-assigned the event/creator role scoped to the new
+    // event (ADR 0004 §5), so they pass EventEdit on their own event.
+    let row: Option<(i32,)> = sqlx::query_as(
+        "SELECT 1 FROM user_roles ur
+         JOIN roles r ON r.id = ur.role_id
+         WHERE ur.user_id = $1 AND r.scope_type = 'event' AND r.name = 'creator'
+           AND ur.scope_type = 'event' AND ur.scope_id = $2",
+    )
+    .bind(creator_id as i32)
+    .bind(event_id as i32)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    assert!(row.is_some(), "event/creator role was not auto-assigned");
+
+    // And the creator can publish (EventEdit) their own draft event.
+    sqlx::query("UPDATE events SET status = 'draft' WHERE id = $1")
+        .bind(event_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/publish", event_id),
+        &format!(r#"{{"userId": {}}}"#, creator_id),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn test_rbac_event_update_editor_succeeds_plain_user_forbidden(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "rbac-upd-creator", "Editor Event").await;
+
+    // An editor (event-scoped editor role) can update the event.
+    let editor = login_guest(&pool, "rbac-upd-editor", "t").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "name": "Editor Renamed"}}"#,
+                    editor
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A plain user (no event role, not moderator) is denied.
+    let plain = login_guest(&pool, "rbac-upd-plain", "t").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "name": "Pwned"}}"#,
+                    plain
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // The creator (event/creator) can also update.
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "name": "Creator Renamed"}}"#,
+                    creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn test_rbac_admin_delete_event_permission(pool: PgPool) {
+    let (_creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "rbac-del-creator", "To Be Deleted").await;
+
+    // A separate moderator can delete any event via event.delete.any.
+    let moderator = login_guest(&pool, "rbac-del-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}?user_id={}",
+                    event_id, moderator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A plain user cannot delete an event.
+    let (_creator2_id, event2_id) =
+        create_test_user_and_event(pool.clone(), "rbac-del-creator2", "To Be Deleted 2").await;
+    let plain = login_guest(&pool, "rbac-del-plain", "t").await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}?user_id={}",
+                    event2_id, plain
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test]
+async fn test_rbac_ban_unban_permission(pool: PgPool) {
+    let moderator = login_guest(&pool, "rbac-ban-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let target = login_guest(&pool, "rbac-ban-target", "t").await;
+
+    // Moderator can ban.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/ban?user_id={}",
+                    target, moderator
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"reason": "spam"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Moderator can unban.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/unban?user_id={}",
+                    target, moderator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A plain user cannot ban.
+    let plain = login_guest(&pool, "rbac-ban-plain", "t").await;
+    let other = login_guest(&pool, "rbac-ban-other", "t").await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/ban?user_id={}",
+                    other, plain
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"reason": "nope"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test]
+async fn test_rbac_update_user_role_admin_only_and_mirror_sync(pool: PgPool) {
+    let admin = login_guest(&pool, "rbac-role-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let target = login_guest(&pool, "rbac-role-target", "t").await;
+
+    // Admin can change a role.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target, admin
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "moderator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // ADR 0004 §2 mirror sync: users.role AND the user_roles global row both
+    // reflect the new role.
+    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+        .bind(target as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(role, "moderator");
+    let has_row: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM user_roles ur
+         JOIN roles r ON r.id = ur.role_id
+         WHERE ur.user_id = $1 AND r.scope_type = 'global' AND r.name = 'moderator'
+           AND ur.scope_type = 'global' AND ur.scope_id IS NULL",
+    )
+    .bind(target as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(has_row, 1, "user_roles global/moderator row must exist");
+
+    // Demotion path: set_role must remove the prior elevated global row when
+    // the role changes (delete-then-insert in one tx), so a demoted user
+    // cannot retain elevated RBAC access via a stale user_roles row.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target, admin
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "user"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+        .bind(target as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(role, "user");
+    let elevated: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM user_roles ur
+         JOIN roles r ON r.id = ur.role_id
+         WHERE ur.user_id = $1 AND r.scope_type = 'global'
+           AND ur.scope_type = 'global' AND ur.scope_id IS NULL
+           AND r.name IN ('moderator', 'admin')",
+    )
+    .bind(target as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(elevated, 0, "demotion must remove the elevated global row");
+
+    // A moderator cannot change roles (user.role.manage is admin-only).
+    let moderator = login_guest(&pool, "rbac-role-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let other = login_guest(&pool, "rbac-role-other", "t").await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    other, moderator
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "admin"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test]
+async fn test_rbac_delete_merch_ownership_and_roles(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "rbac-merch-creator", "Merch RBAC Event").await;
+
+    // Create a merch row owned by a plain user (the merch creator).
+    let merch_creator = login_guest(&pool, "rbac-merch-owner", "t").await;
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "Pin", "groupName": "G", "creatorId": {}}}"#,
+            merch_creator
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    // Merch creator can delete their own merch (ownership short-circuit).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, merch_creator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A second merch, owned by nobody (creator_id NULL), to exercise the
+    // RBAC paths.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        r#"{"name": "Sticker", "groupName": "G"}"#,
+    )
+    .await;
+    let merch2: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    // Plain non-owner cannot delete.
+    let plain = login_guest(&pool, "rbac-merch-plain", "t").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch2, plain
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Event editor can delete (merch.delete, event scope).
+    let editor = login_guest(&pool, "rbac-merch-editor", "t").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch2, editor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A third merch: a moderator can delete via merch.delete.any.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        r#"{"name": "Poster", "groupName": "G"}"#,
+    )
+    .await;
+    let merch3: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+    let moderator = login_guest(&pool, "rbac-merch-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch3, moderator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // The event creator (event/creator) can also delete merch.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        r#"{"name": "Banner", "groupName": "G"}"#,
+    )
+    .await;
+    let merch4: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch4, creator_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
 async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
     let body = format!(
         r#"{{"uuid": "{}", "deviceToken": "{}"}}"#,
@@ -5555,7 +6074,78 @@ async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
     v["id"].as_i64().unwrap()
 }
 
+/// Grant `user_id` a *global* role the way the production `set_role` path
+/// does (ADR 0004 §2): write `users.role` **and** the `user_roles` global
+/// row in one transaction, so RBAC checks (which read `user_roles`) see the
+/// role. Replaces any prior global role. Used by tests that need an
+/// admin/moderator actor and by the event-creation helpers (event creation
+/// now requires `event.create`, granted to moderator/admin only).
+async fn grant_global_role(pool: &PgPool, user_id: i64, role: &str) {
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(role)
+        .bind(user_id as i32)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let role_id: i32 =
+        sqlx::query_scalar("SELECT id FROM roles WHERE scope_type = 'global' AND name = $1")
+            .bind(role)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    sqlx::query(
+        "DELETE FROM user_roles
+         WHERE user_id = $1 AND scope_type = 'global' AND scope_id IS NULL",
+    )
+    .bind(user_id as i32)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+         VALUES ($1, $2, 'global', NULL)
+         ON CONFLICT (user_id, role_id, scope_id) DO NOTHING",
+    )
+    .bind(user_id as i32)
+    .bind(role_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// Assign an event-scoped role (`creator` or `editor`) to `user_id` for
+/// `event_id` directly, mirroring what the (deferred) event-member API will
+/// do for `editor` and what `RbacRepository::assign_event_creator` does for
+/// `creator`. Used by the RBAC boundary tests to set up event-scoped actors
+/// without the member API.
+async fn assign_event_role(pool: &PgPool, user_id: i64, event_id: i64, role_name: &str) {
+    let role_id: i32 =
+        sqlx::query_scalar("SELECT id FROM roles WHERE scope_type = 'event' AND name = $1")
+            .bind(role_name)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    sqlx::query(
+        "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+         VALUES ($1, $2, 'event', $3)
+         ON CONFLICT (user_id, role_id, scope_id) DO NOTHING",
+    )
+    .bind(user_id as i32)
+    .bind(role_id)
+    .bind(event_id as i32)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
 async fn create_event(pool: &PgPool, name: &str, creator_id: i64) -> i64 {
+    // ADR 0004 §4: event creation requires `event.create` (moderator/admin).
+    // The helpers' callers pass a freshly-logged-in guest, so promote them
+    // to moderator for the create to pass; the handler then auto-assigns the
+    // `event/creator` role.
+    grant_global_role(pool, creator_id, "moderator").await;
     let body = format!(r#"{{"name": "{}", "creatorId": {}}}"#, name, creator_id);
     let resp = post_json(pool, "/api/v1/events", &body).await;
     assert_eq!(resp.status(), StatusCode::OK, "create event failed");
