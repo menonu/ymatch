@@ -6373,7 +6373,7 @@ async fn test_event_member_revoke_editor(pool: PgPool) {
     let target = login_guest(&pool, "mem-revoke-target", "tok").await;
 
     // Assign via the API, then revoke.
-    post_json(
+    let resp = post_json(
         &pool,
         &format!(
             "/api/v1/events/{}/members/{}?user_id={}",
@@ -6382,6 +6382,7 @@ async fn test_event_member_revoke_editor(pool: PgPool) {
         "",
     )
     .await;
+    assert_eq!(resp.status(), StatusCode::OK, "assign editor failed");
     assert!(has_event_role(&pool, target, event_id, "editor").await);
 
     let resp = delete_request(
