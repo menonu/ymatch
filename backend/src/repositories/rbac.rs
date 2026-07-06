@@ -16,7 +16,7 @@
 //! later PR alongside the event-member endpoints that consume it.
 
 use crate::error::AppError;
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 
 pub struct RbacRepository {
     pool: PgPool,
@@ -69,22 +69,29 @@ impl RbacRepository {
     }
 
     /// Assign the `event/creator` role to `user_id` scoped to `event_id`
-    /// (ADR 0004 §5). Called by `events::create_event` immediately after the
-    /// event row is inserted, so the creator passes the `EventEdit` /
-    /// `EventDelete` / `EventMemberManage` checks on their own event without a
-    /// separate grant step. Idempotent: re-running (e.g. on a retry) is a
-    /// no-op via `ON CONFLICT DO NOTHING`.
+    /// (ADR 0004 §5). Called by `events::create_event` inside the same
+    /// transaction that inserts the event row, so the creator can edit/publish
+    /// their own event (`EventEdit`) and manage its editors
+    /// (`EventMemberManage`) without a separate grant step, and the event +
+    /// its creator role commit atomically. The catalog also grants
+    /// `event.delete` to `event/creator`; enforcing a creator-facing delete
+    /// is a separate, future endpoint. Idempotent: re-running (e.g. on a
+    /// retry) is a no-op via `ON CONFLICT DO NOTHING`.
     ///
-    /// The scope_type is denormalized from the referenced role (matches the
-    /// migration's `user_roles.scope_type` invariant). The role id is looked
-    /// up inside the same transaction so a missing `event/creator` row
-    /// (unseeded catalog) surfaces as a 500 here rather than a silent no-op.
-    pub async fn assign_event_creator(&self, user_id: i32, event_id: i32) -> Result<(), AppError> {
-        let mut tx = self.pool.begin().await?;
+    /// Takes a `&mut PgConnection` from the caller's open transaction so the
+    /// role assignment commits with the event row. The role id is looked up
+    /// on the same connection so a missing `event/creator` row (unseeded
+    /// catalog) surfaces as a 500 here rather than a silent no-op.
+    pub async fn assign_event_creator(
+        &self,
+        exec: &mut PgConnection,
+        user_id: i32,
+        event_id: i32,
+    ) -> Result<(), AppError> {
         let role_id: i32 = sqlx::query_scalar(
             "SELECT id FROM roles WHERE scope_type = 'event' AND name = 'creator'",
         )
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut *exec)
         .await?;
         sqlx::query(
             "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
@@ -94,9 +101,8 @@ impl RbacRepository {
         .bind(user_id)
         .bind(role_id)
         .bind(event_id)
-        .execute(&mut *tx)
+        .execute(&mut *exec)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 }

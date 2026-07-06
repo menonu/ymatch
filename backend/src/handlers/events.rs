@@ -90,17 +90,26 @@ pub async fn create_event(
         .rbac_service
         .check(&user, &Scope::Global, Permission::EventCreate)
         .await?;
+    // ADR 0004 §5: the event row and the auto-assigned `event/creator`
+    // `user_roles` row are written in one transaction so the creator can
+    // never end up with a persisted event they cannot edit/publish (the
+    // `EventEdit` check on their own event would otherwise fail if the
+    // role assignment were lost to a mid-flight failure).
+    let mut tx = state.pool.begin().await?;
     let event = state
         .events
-        .create(&payload.name, payload.creator_id, payload.status.as_deref())
+        .create(
+            &mut *tx,
+            &payload.name,
+            payload.creator_id,
+            payload.status.as_deref(),
+        )
         .await?;
-    // ADR 0004 §5: the creator is auto-assigned the `event/creator` role so
-    // they can edit/publish/delete their own event under the new EventEdit /
-    // EventDelete checks without a separate grant step.
     state
         .rbac
-        .assign_event_creator(payload.creator_id, event.id)
+        .assign_event_creator(&mut tx, payload.creator_id, event.id)
         .await?;
+    tx.commit().await?;
     Ok(Json(event))
 }
 
