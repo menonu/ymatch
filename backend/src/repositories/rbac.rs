@@ -10,9 +10,10 @@
 //!
 //! See `docs/explanation/adr/0004-rbac-permission-model.md` for the model.
 //!
-//! PR 2 of #228 adds the read path only (`role_ids_for_user`); the write
-//! path (assign/revoke/list members) is added in a later PR alongside the
-//! event-member endpoints that consume it.
+//! PR 2 of #228 added the read path (`role_ids_for_user`). PR 3a adds the
+//! `event/creator` auto-assignment used at event creation (ADR 0004 §5); the
+//! remaining write path (assign/revoke `editor`, list members) is added in a
+//! later PR alongside the event-member endpoints that consume it.
 
 use crate::error::AppError;
 use sqlx::PgPool;
@@ -65,5 +66,37 @@ impl RbacRepository {
             }
         };
         Ok(rows)
+    }
+
+    /// Assign the `event/creator` role to `user_id` scoped to `event_id`
+    /// (ADR 0004 §5). Called by `events::create_event` immediately after the
+    /// event row is inserted, so the creator passes the `EventEdit` /
+    /// `EventDelete` / `EventMemberManage` checks on their own event without a
+    /// separate grant step. Idempotent: re-running (e.g. on a retry) is a
+    /// no-op via `ON CONFLICT DO NOTHING`.
+    ///
+    /// The scope_type is denormalized from the referenced role (matches the
+    /// migration's `user_roles.scope_type` invariant). The role id is looked
+    /// up inside the same transaction so a missing `event/creator` row
+    /// (unseeded catalog) surfaces as a 500 here rather than a silent no-op.
+    pub async fn assign_event_creator(&self, user_id: i32, event_id: i32) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await?;
+        let role_id: i32 = sqlx::query_scalar(
+            "SELECT id FROM roles WHERE scope_type = 'event' AND name = 'creator'",
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+             VALUES ($1, $2, 'event', $3)
+             ON CONFLICT (user_id, role_id, scope_id) DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(event_id)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }

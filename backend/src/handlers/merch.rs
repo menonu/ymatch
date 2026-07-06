@@ -11,6 +11,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::routes::AppState;
+use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
     extract::{Path, State},
@@ -101,20 +102,27 @@ pub async fn delete_merch_by_creator(
         .user_id
         .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
 
-    // 3-way permission check (merch creator OR event creator OR admin/moderator).
-    // The event_creator_id comes from a quick pool query — Phase 5 will lift
-    // this into EventRepository. For now we keep the raw SQL here because it
-    // is one read of a single column and EventRepository is scheduled for
-    // Phase 5.
-    let event_creator_id: Option<i32> =
-        sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
-            .bind(event_id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let user = state.policy.verify_active(requester_id).await?;
 
+    // ADR 0004: the prior 3-way rule (merch creator OR event creator OR
+    // admin/moderator) is now expressed as ownership + RBAC. The merch
+    // creator is an ownership check (ordinary trading is ownership-checked,
+    // not role-checked); the event creator / editor / admin / moderator path
+    // is the `merch.delete` permission (event scope), with the admin bypass
+    // and `merch.delete.any` (moderator) overlap resolved inside
+    // RbacService::check.
+    let merch_creator_id: Option<i32> = state
+        .merch
+        .get_creator(event_id, merch_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
+    if Some(user.id) == merch_creator_id {
+        state.merch.delete_merch(event_id, merch_id).await?;
+        return Ok(StatusCode::OK);
+    }
     state
-        .merch_policy
-        .require_can_modify(requester_id, event_id, merch_id, event_creator_id)
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::MerchDelete)
         .await?;
 
     state.merch.delete_merch(event_id, merch_id).await?;

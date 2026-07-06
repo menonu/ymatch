@@ -402,7 +402,8 @@ impl MerchandiseRepository {
     }
 
     /// Fetch the `creator_id` of a merch row, or `None` if the row does
-    /// not exist. Used by `MerchPermissionPolicy` for ownership checks.
+    /// not exist. Used by `delete_merch_by_creator` for the merch-creator
+    /// ownership short-circuit (ADR 0004).
     pub async fn get_creator(
         &self,
         event_id: i32,
