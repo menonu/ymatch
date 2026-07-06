@@ -5852,6 +5852,41 @@ async fn test_rbac_update_user_role_admin_only_and_mirror_sync(pool: PgPool) {
     .unwrap();
     assert_eq!(has_row, 1, "user_roles global/moderator row must exist");
 
+    // Demotion path: set_role must remove the prior elevated global row when
+    // the role changes (delete-then-insert in one tx), so a demoted user
+    // cannot retain elevated RBAC access via a stale user_roles row.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/admin/users/{}/role?user_id={}", target, admin))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "user"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+        .bind(target as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(role, "user");
+    let elevated: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM user_roles ur
+         JOIN roles r ON r.id = ur.role_id
+         WHERE ur.user_id = $1 AND r.scope_type = 'global'
+           AND ur.scope_type = 'global' AND ur.scope_id IS NULL
+           AND r.name IN ('moderator', 'admin')",
+    )
+    .bind(target as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(elevated, 0, "demotion must remove the elevated global row");
+
     // A moderator cannot change roles (user.role.manage is admin-only).
     let moderator = login_guest(&pool, "rbac-role-mod", "t").await;
     grant_global_role(&pool, moderator, "moderator").await;
