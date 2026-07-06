@@ -67,3 +67,4 @@ Record every ADR in the index below, newest last.
 | [0001](0001-match-scoped-to-item-group.md) | Matches Are Scoped to a Single Item Group | Accepted | 2026-06-29 |
 | [0002](0002-negotiation-state-machine.md) | Balanced Negotiation State Machine | Accepted | 2026-06-29 |
 | [0003](0003-subset-woff2-japanese-font.md) | Subset WOFF2 Japanese Font Bundled in Repo | Accepted | 2026-07-01 |
+| [0004](0004-rbac-permission-model.md) | Role-Based Access Control (RBAC) Permission Model | Accepted | 2026-07-05 |
