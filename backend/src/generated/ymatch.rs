@@ -452,3 +452,23 @@ pub struct ListGroupsResponse {
     #[prost(message, repeated, tag = "1")]
     pub groups: ::prost::alloc::vec::Vec<MerchandiseGroup>,
 }
+/// Event-member API (ADR 0004 §5, #228 PR3b): event-scoped role assignments
+/// for an event. `role` is "creator" or "editor". Used by the
+/// GET /api/v1/events/:id/members endpoint.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EventMember {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    /// "creator" or "editor"
+    #[prost(string, tag = "2")]
+    pub role: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "3")]
+    pub username: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListEventMembersResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub members: ::prost::alloc::vec::Vec<EventMember>,
+}
