@@ -5860,7 +5860,10 @@ async fn test_rbac_update_user_role_admin_only_and_mirror_sync(pool: PgPool) {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/v1/admin/users/{}/role?user_id={}", target, admin))
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target, admin
+                ))
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"role": "user"}"#))
                 .unwrap(),
