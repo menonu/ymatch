@@ -44,9 +44,28 @@ pub async fn create_merch(
     Path(event_id): Path<i32>,
     Json(payload): Json<CreateMerchRequest>,
 ) -> Result<Json<Merchandise>, AppError> {
-    if let Some(creator_id) = payload.creator_id {
-        state.policy.verify_active(creator_id).await?;
-    }
+    // ADR 0005: `creator_id` is the caller identity (the merch creator = the
+    // caller) and is required for authorization. Previously creation was open
+    // to any active user; it is now a curated action gated by `merch.create`
+    // (event scope), granted to the event creator + editor, with the admin
+    // superuser bypass and `merch.create.any` (moderator) overlap resolved
+    // inside RbacService::check.
+    let creator_id = payload
+        .creator_id
+        .ok_or_else(|| AppError::bad_request("creator_id is required"))?;
+    let user = state.policy.verify_active(creator_id).await?;
+    // Confirm the event exists (404) before the RBAC check so a missing event
+    // is not leaked as a 403 to a caller who lacks the event role — matches
+    // `update_event`'s convention.
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    state
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::MerchCreate)
+        .await?;
     let item = state.merch.create(event_id, payload).await?;
     Ok(Json(item))
 }

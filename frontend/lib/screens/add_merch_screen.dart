@@ -78,7 +78,13 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
 
       await ref
           .read(merchControllerProvider.notifier)
-          .addMerch(widget.eventId, name, photoUrl, _selectedGroup);
+          .addMerch(
+            widget.eventId,
+            name,
+            photoUrl,
+            _selectedGroup,
+            ref.read(currentUserProvider)?.id,
+          );
 
       // Clear inputs for continuous adding, but KEEP the selected group!
       _nameController.clear();

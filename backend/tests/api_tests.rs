@@ -1326,7 +1326,7 @@ async fn test_admin_update_user_role_succeeds(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_admin_list_all_merch_returns_array(pool: PgPool) {
-    let (_user_id, event_id) =
+    let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "admin-listmerch", "Admin ListMerch").await;
     // Add one piece of merch so the list is non-empty.
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -1336,9 +1336,10 @@ async fn test_admin_list_all_merch_returns_array(pool: PgPool) {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"name": "Listed Merch", "groupName": "Group A"}"#,
-                ))
+                .body(Body::from(format!(
+                    r#"{{"name": "Listed Merch", "groupName": "Group A", "creatorId": {}}}"#,
+                    user_id
+                )))
                 .unwrap(),
         )
         .await
@@ -1395,9 +1396,10 @@ async fn test_admin_delete_merch_succeeds(pool: PgPool) {
                 .method("POST")
                 .uri(format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"name": "To Delete", "groupName": "Group A"}"#,
-                ))
+                .body(Body::from(format!(
+                    r#"{{"name": "To Delete", "groupName": "Group A", "creatorId": {}}}"#,
+                    user_id
+                )))
                 .unwrap(),
         )
         .await
@@ -1487,9 +1489,10 @@ async fn test_create_and_list_merch(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"name": "Test Item", "groupName": "Group A"}"#,
-                ))
+                .body(Body::from(format!(
+                    r#"{{"name": "Test Item", "groupName": "Group A", "creatorId": {}}}"#,
+                    user_id
+                )))
                 .unwrap(),
         )
         .await
@@ -1522,15 +1525,20 @@ async fn test_create_and_list_merch(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_create_merch_duplicate_name_in_same_group_rejected(pool: PgPool) {
-    let (_user_id, event_id) =
+    let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "dup-name-user", "Dup Name Event").await;
 
     // First "a" in group G succeeds.
     let _ = create_merch(&pool, event_id, "a", "G").await;
 
-    // Second "a" in the SAME group G must be rejected with 400.
-    let body = r#"{"name": "a", "groupName": "G"}"#;
-    let resp = post_json(&pool, &format!("/api/v1/events/{}/merch", event_id), body).await;
+    // Second "a" in the SAME group G must be rejected with 400. Post as the
+    // event creator so the ADR 0005 create gate passes and the rejection is
+    // the duplicate-name error (not the creator_id-required 400).
+    let body = format!(
+        r#"{{"name": "a", "groupName": "G", "creatorId": {}}}"#,
+        user_id
+    );
+    let resp = post_json(&pool, &format!("/api/v1/events/{}/merch", event_id), &body).await;
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     let msg = body_to_string(resp.into_body()).await;
     assert!(
@@ -1704,7 +1712,10 @@ async fn test_inventory_upsert(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"name": "Inv Item", "groupName": "Test"}"#))
+                .body(Body::from(format!(
+                    r#"{{"name": "Inv Item", "groupName": "Test", "creatorId": {}}}"#,
+                    user_id
+                )))
                 .unwrap(),
         )
         .await
@@ -2879,6 +2890,10 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
             .unwrap();
 
     // One merch per user + a TRADE inventory row of qty 5.
+    // ADR 0005: merch creation is gated by `merch.create` (event scope). u1 is
+    // the event creator (authorized); grant u2 the event/editor role so it can
+    // create its own merch (creator_id = u2) for the match fixture below.
+    assign_event_role(&pool, u2, event_id, "editor").await;
     let mut merch_ids = Vec::new();
     for creator in [u1, u2] {
         let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -2889,7 +2904,7 @@ async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i
                     .uri(format!("/api/v1/events/{}/merch", event_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"name": "M{creator}", "groupName": "G"}}"#
+                        r#"{{"name": "M{creator}", "groupName": "G", "creatorId": {creator}}}"#
                     )))
                     .unwrap(),
             )
@@ -3310,9 +3325,10 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"name": "Card A", "photoUrl": "", "groupName": "Cards"}"#,
-                ))
+                .body(Body::from(format!(
+                    r#"{{"name": "Card A", "photoUrl": "", "groupName": "Cards", "creatorId": {}}}"#,
+                    user1_id
+                )))
                 .unwrap(),
         )
         .await
@@ -3329,9 +3345,10 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
                 .method("POST")
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"name": "Card B", "photoUrl": "", "groupName": "Cards"}"#,
-                ))
+                .body(Body::from(format!(
+                    r#"{{"name": "Card B", "photoUrl": "", "groupName": "Cards", "creatorId": {}}}"#,
+                    user1_id
+                )))
                 .unwrap(),
         )
         .await
@@ -3746,6 +3763,15 @@ async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
     let event_id = event["id"].as_i64().unwrap();
 
     async fn create_merch(pool: &PgPool, event_id: i64, name: &str) -> i64 {
+        // ADR 0005: merch creation is gated by `merch.create` (event scope);
+        // post as the event creator (event/creator role), resolved from the DB.
+        let creator_id: Option<i32> =
+            sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+                .bind(event_id as i32)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        let creator_id = creator_id.expect("test event must have a creator to create merch");
         let app = backend::routes::create_router(pool.clone(), test_storage());
         let resp = app
             .oneshot(
@@ -3754,8 +3780,8 @@ async fn setup_pending_trade_match(pool: PgPool) -> (i64, i64, i64, i64, i64) {
                     .uri(&format!("/api/v1/events/{}/merch", event_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"name": "{}", "photoUrl": "", "groupName": "Cards"}}"#,
-                        name
+                        r#"{{"name": "{}", "photoUrl": "", "groupName": "Cards", "creatorId": {}}}"#,
+                        name, creator_id
                     )))
                     .unwrap(),
             )
@@ -3937,6 +3963,15 @@ async fn setup_pending_trade_match_quantities(
     let event_id = event["id"].as_i64().unwrap();
 
     async fn create_merch(pool: &PgPool, event_id: i64, name: &str) -> i64 {
+        // ADR 0005: merch creation is gated by `merch.create` (event scope);
+        // post as the event creator (event/creator role), resolved from the DB.
+        let creator_id: Option<i32> =
+            sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+                .bind(event_id as i32)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        let creator_id = creator_id.expect("test event must have a creator to create merch");
         let app = backend::routes::create_router(pool.clone(), test_storage());
         let resp = app
             .oneshot(
@@ -3945,8 +3980,8 @@ async fn setup_pending_trade_match_quantities(
                     .uri(&format!("/api/v1/events/{}/merch", event_id))
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"name": "{}", "photoUrl": "", "groupName": "Cards"}}"#,
-                        name
+                        r#"{{"name": "{}", "photoUrl": "", "groupName": "Cards", "creatorId": {}}}"#,
+                        name, creator_id
                     )))
                     .unwrap(),
             )
@@ -5917,23 +5952,33 @@ async fn test_rbac_delete_merch_ownership_and_roles(pool: PgPool) {
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "rbac-merch-creator", "Merch RBAC Event").await;
 
-    // Create a merch row owned by a plain user (the merch creator).
+    // Insert a merch row directly with a controlled creator_id. This test
+    // exercises DELETE authorization (ownership vs RBAC roles), not the ADR
+    // 0005 create gate (which requires the caller to be an authorized
+    // creator/editor/mod/admin); seeding via SQL lets a plain user own a
+    // merch row, which the gated create endpoint can no longer produce.
+    async fn insert_merch(
+        pool: &PgPool,
+        event_id: i64,
+        name: &str,
+        creator_id: Option<i64>,
+    ) -> i64 {
+        let row: (i32,) = sqlx::query_as(
+            "INSERT INTO merchandise (event_id, name, photo_url, group_name, creator_id, status)
+             VALUES ($1, $2, NULL, 'G', $3, 'published') RETURNING id",
+        )
+        .bind(event_id as i32)
+        .bind(name)
+        .bind(creator_id.map(|v| v as i32))
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        row.0 as i64
+    }
+
+    // merch1: owned by a plain user -> ownership delete path.
     let merch_creator = login_guest(&pool, "rbac-merch-owner", "t").await;
-    let resp = post_json(
-        &pool,
-        &format!("/api/v1/events/{}/merch", event_id),
-        &format!(
-            r#"{{"name": "Pin", "groupName": "G", "creatorId": {}}}"#,
-            merch_creator
-        ),
-    )
-    .await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    let merch_id: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
+    let merch_id = insert_merch(&pool, event_id, "Pin", Some(merch_creator)).await;
 
     // Merch creator can delete their own merch (ownership short-circuit).
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -5952,19 +5997,8 @@ async fn test_rbac_delete_merch_ownership_and_roles(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // A second merch, owned by nobody (creator_id NULL), to exercise the
-    // RBAC paths.
-    let resp = post_json(
-        &pool,
-        &format!("/api/v1/events/{}/merch", event_id),
-        r#"{"name": "Sticker", "groupName": "G"}"#,
-    )
-    .await;
-    let merch2: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
+    // merch2: owned by nobody (creator_id NULL) -> RBAC paths.
+    let merch2 = insert_merch(&pool, event_id, "Sticker", None).await;
 
     // Plain non-owner cannot delete.
     let plain = login_guest(&pool, "rbac-merch-plain", "t").await;
@@ -6004,17 +6038,7 @@ async fn test_rbac_delete_merch_ownership_and_roles(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::OK);
 
     // A third merch: a moderator can delete via merch.delete.any.
-    let resp = post_json(
-        &pool,
-        &format!("/api/v1/events/{}/merch", event_id),
-        r#"{"name": "Poster", "groupName": "G"}"#,
-    )
-    .await;
-    let merch3: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
+    let merch3 = insert_merch(&pool, event_id, "Poster", None).await;
     let moderator = login_guest(&pool, "rbac-merch-mod", "t").await;
     grant_global_role(&pool, moderator, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -6034,17 +6058,7 @@ async fn test_rbac_delete_merch_ownership_and_roles(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::OK);
 
     // The event creator (event/creator) can also delete merch.
-    let resp = post_json(
-        &pool,
-        &format!("/api/v1/events/{}/merch", event_id),
-        r#"{"name": "Banner", "groupName": "G"}"#,
-    )
-    .await;
-    let merch4: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
+    let merch4 = insert_merch(&pool, event_id, "Banner", None).await;
     let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
@@ -6060,6 +6074,122 @@ async fn test_rbac_delete_merch_ownership_and_roles(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn test_rbac_create_merch_roles(pool: PgPool) {
+    // ADR 0005: merch creation is gated by `merch.create` (event scope),
+    // granted to the event creator + editor, plus the admin superuser bypass
+    // and `merch.create.any` (moderator) global override.
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "merch-create-creator", "Merch Create Event")
+            .await;
+
+    // The event creator (event/creator) can create merch.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "By Creator", "groupName": "G", "creatorId": {}}}"#,
+            creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // An event editor can create merch (event/merch.create).
+    let editor = login_guest(&pool, "merch-create-editor", "t").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "By Editor", "groupName": "G", "creatorId": {}}}"#,
+            editor
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A plain non-member user is denied (no event role, no global override).
+    let plain = login_guest(&pool, "merch-create-plain", "t").await;
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "By Plain", "groupName": "G", "creatorId": {}}}"#,
+            plain
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // A moderator can create merch in any event via merch.create.any.
+    let moderator = login_guest(&pool, "merch-create-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "By Mod", "groupName": "G", "creatorId": {}}}"#,
+            moderator
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // An admin can create merch via the superuser bypass.
+    let admin = login_guest(&pool, "merch-create-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "By Admin", "groupName": "G", "creatorId": {}}}"#,
+            admin
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // A banned user is rejected by verify_active before the RBAC check.
+    let banned = login_guest(&pool, "merch-create-banned", "t").await;
+    sqlx::query("UPDATE users SET is_banned = true WHERE id = $1")
+        .bind(banned as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        &format!(
+            r#"{{"name": "By Banned", "groupName": "G", "creatorId": {}}}"#,
+            banned
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // A missing event is 404 (reported before the RBAC check, not leaked as 403).
+    let resp = post_json(
+        &pool,
+        "/api/v1/events/999999/merch",
+        &format!(
+            r#"{{"name": "No Event", "groupName": "G", "creatorId": {}}}"#,
+            creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // Omitting creator_id is a 400 (it is the caller identity the gate requires).
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/merch", event_id),
+        r#"{"name": "No Caller", "groupName": "G"}"#,
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
 async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
@@ -6155,9 +6285,21 @@ async fn create_event(pool: &PgPool, name: &str, creator_id: i64) -> i64 {
 }
 
 async fn create_merch(pool: &PgPool, event_id: i64, name: &str, group_name: &str) -> i64 {
-    // Note: NO photoUrl, so photo_url stays NULL — this is the
-    // exact scenario that triggered the #224 panic.
-    let body = format!(r#"{{"name": "{}", "groupName": "{}"}}"#, name, group_name);
+    // ADR 0005: merch creation is gated by `merch.create` (event scope). The
+    // event creator (event/creator role) satisfies it, so post as them —
+    // resolve the event's creator_id from the DB. Note: NO photoUrl, so
+    // photo_url stays NULL — this is the exact scenario that triggered the
+    // #224 panic.
+    let creator_id: Option<i32> = sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let creator_id = creator_id.expect("test event must have a creator to create merch");
+    let body = format!(
+        r#"{{"name": "{}", "groupName": "{}", "creatorId": {}}}"#,
+        name, group_name, creator_id
+    );
     let resp = post_json(pool, &format!("/api/v1/events/{}/merch", event_id), &body).await;
     assert_eq!(resp.status(), StatusCode::OK, "create merch failed");
     let v: serde_json::Value =
