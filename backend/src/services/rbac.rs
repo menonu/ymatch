@@ -61,6 +61,9 @@ pub enum Permission {
     EventDeleteAny,
     /// Delete any merch (global override of `MerchDelete`). Admin + moderator.
     MerchDeleteAny,
+    /// Create merch in any event (global override of `MerchCreate`).
+    /// Moderator + admin.
+    MerchCreateAny,
     /// Toggle service kill-switches. Admin.
     SystemKillSwitch,
     // --- event scope ---
@@ -72,6 +75,8 @@ pub enum Permission {
     EventMemberManage,
     /// Delete merch in a specific event. Event creator + editor.
     MerchDelete,
+    /// Create merch in a specific event. Event creator + editor.
+    MerchCreate,
 }
 
 impl Permission {
@@ -85,11 +90,13 @@ impl Permission {
             Permission::EventEditAny => "event.edit.any",
             Permission::EventDeleteAny => "event.delete.any",
             Permission::MerchDeleteAny => "merch.delete.any",
+            Permission::MerchCreateAny => "merch.create.any",
             Permission::SystemKillSwitch => "system.kill_switch",
             Permission::EventEdit => "event.edit",
             Permission::EventDelete => "event.delete",
             Permission::EventMemberManage => "event.member.manage",
             Permission::MerchDelete => "merch.delete",
+            Permission::MerchCreate => "merch.create",
         }
     }
 
@@ -106,6 +113,7 @@ impl Permission {
             Permission::EventEdit => &["event.edit", "event.edit.any"],
             Permission::EventDelete => &["event.delete", "event.delete.any"],
             Permission::MerchDelete => &["merch.delete", "merch.delete.any"],
+            Permission::MerchCreate => &["merch.create", "merch.create.any"],
             Permission::UserBan => &["user.ban"],
             Permission::UserUnban => &["user.unban"],
             Permission::UserRoleManage => &["user.role.manage"],
@@ -113,6 +121,7 @@ impl Permission {
             Permission::EventEditAny => &["event.edit.any"],
             Permission::EventDeleteAny => &["event.delete.any"],
             Permission::MerchDeleteAny => &["merch.delete.any"],
+            Permission::MerchCreateAny => &["merch.create.any"],
             Permission::SystemKillSwitch => &["system.kill_switch"],
             Permission::EventMemberManage => &["event.member.manage"],
         }
@@ -250,6 +259,7 @@ mod tests {
                 "event.edit.any",
                 "event.delete.any",
                 "merch.delete.any",
+                "merch.create.any",
                 "system.kill_switch",
             ]),
         );
@@ -262,6 +272,7 @@ mod tests {
                 "event.edit.any",
                 "event.delete.any",
                 "merch.delete.any",
+                "merch.create.any",
             ]),
         );
         perms_by_role.insert(USER, HashSet::new());
@@ -272,9 +283,10 @@ mod tests {
                 "event.delete",
                 "event.member.manage",
                 "merch.delete",
+                "merch.create",
             ]),
         );
-        perms_by_role.insert(EDITOR, set(&["event.edit", "merch.delete"]));
+        perms_by_role.insert(EDITOR, set(&["event.edit", "merch.delete", "merch.create"]));
         PermissionCatalog::new(ADMIN, perms_by_role)
     }
 
@@ -309,6 +321,10 @@ mod tests {
         assert_eq!(
             Permission::MerchDelete.satisfying_names(),
             &["merch.delete", "merch.delete.any"]
+        );
+        assert_eq!(
+            Permission::MerchCreate.satisfying_names(),
+            &["merch.create", "merch.create.any"]
         );
     }
 
@@ -349,6 +365,7 @@ mod tests {
         ok(&[ADMIN], Permission::EventEdit);
         ok(&[ADMIN], Permission::EventMemberManage);
         ok(&[ADMIN], Permission::MerchDelete);
+        ok(&[ADMIN], Permission::MerchCreate);
     }
 
     #[test]
@@ -363,6 +380,7 @@ mod tests {
         ok(&[MODERATOR], Permission::EventEdit);
         ok(&[MODERATOR], Permission::EventDelete);
         ok(&[MODERATOR], Permission::MerchDelete);
+        ok(&[MODERATOR], Permission::MerchCreate);
     }
 
     #[test]
@@ -388,6 +406,7 @@ mod tests {
         ok(&[CREATOR], Permission::EventDelete);
         ok(&[CREATOR], Permission::EventMemberManage);
         ok(&[CREATOR], Permission::MerchDelete);
+        ok(&[CREATOR], Permission::MerchCreate);
     }
 
     #[test]
@@ -402,6 +421,7 @@ mod tests {
     fn editor_can_edit_but_not_delete_or_manage_members() {
         ok(&[EDITOR], Permission::EventEdit);
         ok(&[EDITOR], Permission::MerchDelete);
+        ok(&[EDITOR], Permission::MerchCreate);
         denied(&[EDITOR], Permission::EventDelete);
         denied(&[EDITOR], Permission::EventMemberManage);
         denied(&[EDITOR], Permission::UserBan);
@@ -415,6 +435,7 @@ mod tests {
         denied(&[USER], Permission::EventCreate);
         denied(&[USER], Permission::EventEdit);
         denied(&[USER], Permission::MerchDelete);
+        denied(&[USER], Permission::MerchCreate);
     }
 
     #[test]
@@ -675,6 +696,50 @@ mod tests {
                     &verified(editor_id),
                     &Scope::Event(event_id),
                     Permission::MerchDelete
+                )
+                .await
+                .is_ok()
+        );
+        // Editor can create merch on their event (event/merch.create).
+        assert!(
+            service
+                .check(
+                    &verified(editor_id),
+                    &Scope::Event(event_id),
+                    Permission::MerchCreate
+                )
+                .await
+                .is_ok()
+        );
+        // Moderator can create merch on any event via merch.create.any.
+        assert!(
+            service
+                .check(
+                    &verified(mod_id),
+                    &Scope::Event(event_id),
+                    Permission::MerchCreate
+                )
+                .await
+                .is_ok()
+        );
+        // Plain user cannot create merch (no event role, no global override).
+        assert!(
+            service
+                .check(
+                    &verified(user_id),
+                    &Scope::Event(event_id),
+                    Permission::MerchCreate
+                )
+                .await
+                .is_err()
+        );
+        // Admin superuser bypass: create merch on an event admin does not own.
+        assert!(
+            service
+                .check(
+                    &verified(admin_id),
+                    &Scope::Event(other_event_id),
+                    Permission::MerchCreate
                 )
                 .await
                 .is_ok()

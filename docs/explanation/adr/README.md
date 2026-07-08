@@ -68,3 +68,4 @@ Record every ADR in the index below, newest last.
 | [0002](0002-negotiation-state-machine.md) | Balanced Negotiation State Machine | Accepted | 2026-06-29 |
 | [0003](0003-subset-woff2-japanese-font.md) | Subset WOFF2 Japanese Font Bundled in Repo | Accepted | 2026-07-01 |
 | [0004](0004-rbac-permission-model.md) | Role-Based Access Control (RBAC) Permission Model | Accepted | 2026-07-05 |
+| [0005](0005-merch-create-permission.md) | Gate Merch Creation Behind `merch.create` | Accepted | 2026-07-08 |
