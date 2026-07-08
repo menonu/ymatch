@@ -7,7 +7,7 @@
 # it writes `users.role` AND the `user_roles` global row in one atomic
 # operation so the denormalized `users.role` mirror and the authoritative
 # `user_roles` table cannot drift (ADR 0004 §2). Re-running with the same
-# (username, role) is a no-op.
+# (username, role) leaves the user's state unchanged.
 #
 # Usage:
 #   ./scripts/grant_role.sh <username> <role>
@@ -32,7 +32,8 @@
 # is gitignored for this purpose. Granting a role is an admin/operator action;
 # run it only against the environment you intend to change.
 #
-# Idempotent: re-granting the same role is a no-op. Granting `user` DEMOTES
+# Idempotent: re-granting the same role leaves the user's state unchanged.
+# Granting `user` DEMOTES
 # from moderator/admin (mirrors `set_role`), which is how you revoke an
 # elevated global role.
 

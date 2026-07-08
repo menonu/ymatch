@@ -19,7 +19,8 @@ operation, mirroring the production `UserRepository::set_role` path:
   global role assignment read by `RbacService`.
 
 Keeping both in one transaction means they cannot drift (ADR 0004 §2). The
-script is **idempotent**: re-granting the same role is a no-op. Granting
+script is **idempotent**: re-granting the same role leaves the user's state
+unchanged. Granting
 `user` **demotes** from `moderator`/`admin` — that is how you revoke an
 elevated global role.
 
@@ -73,9 +74,12 @@ The DB password is a secret — read it from the environment, never hardcode it
   your own username), it **must** be git-ignored. `scripts/*local*` is
   gitignored for this purpose; name your wrapper `scripts/grant_role.local.sh`
   (or any `*local*` name) so it is never tracked.
-- The script validates the role (`user|moderator|admin`) and the username
-  charset (`[A-Za-z0-9_.@-]`) before running SQL, and uses psql parameter
-  substitution, so it is not vulnerable to SQL injection.
+- The script validates the role (`user|moderator|admin`) and restricts the
+  username to `[A-Za-z0-9_.@-]` before interpolating either value into the
+  SQL, so neither can contain a quote or SQL metacharacter. The script does
+  **not** rely on psql parameter substitution (`:'var`), which cannot be used
+  inside a dollar-quoted `DO` body — the charset + role-enum checks are the
+  injection guard.
 - Granting a role is an admin/operator action — run it only against the
   environment you intend to change. Prefer granting `moderator` over `admin`
   unless full superuser access is required.
