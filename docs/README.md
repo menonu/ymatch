@@ -37,6 +37,7 @@ Practical steps to help you get started and learn how to develop with `ymatch`.
 Direct, action-oriented instructions to solve specific problems or accomplish key deployment/operation tasks.
 
 * [Development Workflow Guide](how_to/development_workflow.md): Step-by-step workflow for branches, pull requests, local lints, and tests.
+* [Granting Global Roles](how_to/grant_roles.md): Run `scripts/grant_role.sh <username> <role>` per environment to grant `user`/`moderator`/`admin` (ADR 0004 §6, #228) without committing a username.
 * [OCI Production Deployment (Always Free ARM)](how_to/oci_deployment.md): Steps to provision infrastructure with Terraform and deploy the full stack on OCI.
 * [Applying Terraform with Secrets (TF_VAR_ + .env)](how_to/terraform_apply.md): Run `terraform plan`/`apply` for the newrelic + oci modules without committing secrets or host identifiers (#284).
 * [OCI Credentials Management](how_to/oci_credentials.md): API key generation, rotation, and loss-recovery procedure for the RSA 2048 key used by Terraform and the OCI CLI.

@@ -156,10 +156,16 @@ members is deferred** to a later issue; the backend is ready for it.
 ### 6. Moderator grant is a per-environment script, not a migration
 
 The migration builds the schema and backfills existing roles only. Granting a
-specific person the `moderator` role is done by an **idempotent,
-git-ignored script** (`scripts/grant_role.sh <username> <role>`) run against each
-environment, so that no personal identifier is committed to the public repo
-(per the repository security policy).
+specific person a global role (`user`, `moderator`, or `admin`) is done with
+**`scripts/grant_role.sh <username> <role>`** — an idempotent, per-environment
+operator tool run against each environment's `ymatch_db`. It mirrors the
+production `set_role` path (`users.role` + the `user_roles` global row in one
+transaction) so the denormalized mirror and the authoritative assignment
+cannot drift. The script is a generic, parameterized tool that takes the
+username as a **runtime argument**, so no personal identifier is committed to
+the public repo (per the repository security policy); any per-env wrapper an
+operator keeps for convenience is git-ignored (`scripts/*local*`). See
+[Granting Global Roles](../../how_to/grant_roles.md) for usage.
 
 ## Consequences
 
