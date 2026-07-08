@@ -3126,6 +3126,137 @@ class ListGroupsResponse extends $pb.GeneratedMessage {
   $pb.PbList<MerchandiseGroup> get groups => $_getList(0);
 }
 
+/// Event-member API (ADR 0004 §5, #228 PR3b): event-scoped role assignments
+/// for an event. `role` is "creator" or "editor". Used by the
+/// GET /api/v1/events/:id/members endpoint.
+class EventMember extends $pb.GeneratedMessage {
+  factory EventMember({
+    $core.int? userId,
+    $core.String? role,
+    $core.String? username,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (role != null) result.role = role;
+    if (username != null) result.username = username;
+    return result;
+  }
+
+  EventMember._();
+
+  factory EventMember.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EventMember.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EventMember',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'role')
+    ..aOS(3, _omitFieldNames ? '' : 'username')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EventMember clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EventMember copyWith(void Function(EventMember) updates) =>
+      super.copyWith((message) => updates(message as EventMember))
+          as EventMember;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EventMember create() => EventMember._();
+  @$core.override
+  EventMember createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EventMember getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EventMember>(create);
+  static EventMember? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get role => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set role($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRole() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRole() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get username => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set username($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUsername() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUsername() => $_clearField(3);
+}
+
+class ListEventMembersResponse extends $pb.GeneratedMessage {
+  factory ListEventMembersResponse({
+    $core.Iterable<EventMember>? members,
+  }) {
+    final result = create();
+    if (members != null) result.members.addAll(members);
+    return result;
+  }
+
+  ListEventMembersResponse._();
+
+  factory ListEventMembersResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ListEventMembersResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListEventMembersResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..pPM<EventMember>(1, _omitFieldNames ? '' : 'members',
+        subBuilder: EventMember.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListEventMembersResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListEventMembersResponse copyWith(
+          void Function(ListEventMembersResponse) updates) =>
+      super.copyWith((message) => updates(message as ListEventMembersResponse))
+          as ListEventMembersResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ListEventMembersResponse create() => ListEventMembersResponse._();
+  @$core.override
+  ListEventMembersResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ListEventMembersResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListEventMembersResponse>(create);
+  static ListEventMembersResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<EventMember> get members => $_getList(0);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

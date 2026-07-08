@@ -9,6 +9,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::admin::AdminQuery;
 use crate::repositories::event::EventRepository;
 use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
@@ -164,4 +165,85 @@ pub async fn publish_event(
         .await?;
     state.events.publish(event_id).await?;
     Ok(StatusCode::OK)
+}
+
+/// Resolve the caller from the `?user_id=` query param and require they hold
+/// `event.member.manage` on `event_id` (ADR 0004 §5): the event `creator`, or
+/// the admin superuser bypass. There is deliberately no `*.any` override for
+/// this permission, so a global moderator cannot manage an event's members.
+///
+/// The event's existence is confirmed (404) **before** the RBAC check, so a
+/// missing event is reported as 404 rather than leaked as a 403 to a caller
+/// who lacks the event role — matches `update_event`'s convention.
+async fn require_event_member_manage(
+    state: &AppState,
+    caller_user_id: Option<i32>,
+    event_id: i32,
+) -> Result<(), AppError> {
+    let uid =
+        caller_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
+    let user = state.policy.verify_active(uid).await?;
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    state
+        .rbac_service
+        .check(
+            &user,
+            &Scope::Event(event_id),
+            Permission::EventMemberManage,
+        )
+        .await?;
+    Ok(())
+}
+
+/// Assign the `event/editor` role to `target_id` for `event_id`
+/// (`POST /api/v1/events/:id/members/:target_id`). Guarded by
+/// `event.member.manage` (event creator) + admin bypass. Idempotent.
+pub async fn assign_event_member(
+    State(state): State<AppState>,
+    Path((event_id, target_id)): Path<(i32, i32)>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<StatusCode, AppError> {
+    require_event_member_manage(&state, query.user_id, event_id).await?;
+    // Target must exist (404) — checked after the RBAC guard so an
+    // unauthorized caller cannot probe user ids.
+    state
+        .users
+        .get_by_id(target_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Target user not found"))?;
+    state.rbac.assign_event_editor(target_id, event_id).await?;
+    Ok(StatusCode::OK)
+}
+
+/// Revoke the `event/editor` role from `target_id` for `event_id`
+/// (`DELETE /api/v1/events/:id/members/:target_id`). Guarded by
+/// `event.member.manage` (event creator) + admin bypass. Idempotent: a no-op
+/// if the user holds no editor role. The event `creator` role is never
+/// removed here — the underlying SQL filters `role_id` to `editor`.
+pub async fn revoke_event_member(
+    State(state): State<AppState>,
+    Path((event_id, target_id)): Path<(i32, i32)>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<StatusCode, AppError> {
+    require_event_member_manage(&state, query.user_id, event_id).await?;
+    state.rbac.revoke_event_editor(target_id, event_id).await?;
+    Ok(StatusCode::OK)
+}
+
+/// List the event-scoped role assignments for `event_id`
+/// (`GET /api/v1/events/:id/members`). Guarded by `event.member.manage`
+/// (event creator) + admin bypass — only the creator (or an admin) can see
+/// who holds roles on their event.
+pub async fn list_event_members(
+    State(state): State<AppState>,
+    Path(event_id): Path<i32>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<Json<ListEventMembersResponse>, AppError> {
+    require_event_member_manage(&state, query.user_id, event_id).await?;
+    let members = state.rbac.list_event_members(event_id).await?;
+    Ok(Json(ListEventMembersResponse { members }))
 }

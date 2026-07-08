@@ -1170,3 +1170,50 @@ const ListGroupsResponse$json = {
 final $typed_data.Uint8List listGroupsResponseDescriptor = $convert.base64Decode(
     'ChJMaXN0R3JvdXBzUmVzcG9uc2USMAoGZ3JvdXBzGAEgAygLMhgueW1hdGNoLk1lcmNoYW5kaX'
     'NlR3JvdXBSBmdyb3Vwcw==');
+
+@$core.Deprecated('Use eventMemberDescriptor instead')
+const EventMember$json = {
+  '1': 'EventMember',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'role', '3': 2, '4': 1, '5': 9, '10': 'role'},
+    {
+      '1': 'username',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'username',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_username'},
+  ],
+};
+
+/// Descriptor for `EventMember`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List eventMemberDescriptor = $convert.base64Decode(
+    'CgtFdmVudE1lbWJlchIXCgd1c2VyX2lkGAEgASgFUgZ1c2VySWQSEgoEcm9sZRgCIAEoCVIEcm'
+    '9sZRIfCgh1c2VybmFtZRgDIAEoCUgAUgh1c2VybmFtZYgBAUILCglfdXNlcm5hbWU=');
+
+@$core.Deprecated('Use listEventMembersResponseDescriptor instead')
+const ListEventMembersResponse$json = {
+  '1': 'ListEventMembersResponse',
+  '2': [
+    {
+      '1': 'members',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.ymatch.EventMember',
+      '10': 'members'
+    },
+  ],
+};
+
+/// Descriptor for `ListEventMembersResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listEventMembersResponseDescriptor =
+    $convert.base64Decode(
+        'ChhMaXN0RXZlbnRNZW1iZXJzUmVzcG9uc2USLQoHbWVtYmVycxgBIAMoCzITLnltYXRjaC5Fdm'
+        'VudE1lbWJlclIHbWVtYmVycw==');

@@ -253,3 +253,16 @@ message UpdateGroupRequest {
 message ListGroupsResponse {
   repeated MerchandiseGroup groups = 1;
 }
+
+// Event-member API (ADR 0004 §5, #228 PR3b): event-scoped role assignments
+// for an event. `role` is "creator" or "editor". Used by the
+// GET /api/v1/events/:id/members endpoint.
+message EventMember {
+  int32 user_id = 1;
+  string role = 2; // "creator" or "editor"
+  optional string username = 3;
+}
+
+message ListEventMembersResponse {
+  repeated EventMember members = 1;
+}
