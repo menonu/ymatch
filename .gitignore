@@ -2332,3 +2332,9 @@ frontend/.env
 **/.env
 !.env.example
 !backend/.env.example
+
+# Per-environment operator wrappers (e.g. a local grant_role wrapper that
+# hardcodes a username). The generic tools under scripts/ are tracked; only
+# *local* convenience wrappers are ignored so a personal identifier can never
+# be committed. See scripts/grant_role.sh and docs/how_to/grant_roles.md.
+scripts/*local*

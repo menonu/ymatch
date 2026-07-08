@@ -44,6 +44,7 @@ or code:
 | OCI CLI / Terraform auth | `~/.oci/config`, `terraform/oci/terraform.tfvars` (both gitignored) | local only |
 | Terraform inputs | `terraform/oci/terraform.tfvars.example` (placeholders only) | template, no real values |
 | VM cron env (cost exporters) | root-owned env file sourced before the cron, or `${VAR}` required | scripts fail fast with `:?` if missing |
+| Role-grant username (operator) | runtime arg to `scripts/grant_role.sh <username> <role>`; per-env wrappers gitignored via `scripts/*local*` | the username is never written into a tracked file, so no PII is committed (ADR 0004 §6; see [Granting Global Roles](../how_to/grant_roles.md)) |
 
 Scripts that need a secret must read it from an environment variable
 and fail loudly if it is absent — never embed a real default. See
