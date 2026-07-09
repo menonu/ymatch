@@ -36,6 +36,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
   final config = ConfigService();
@@ -76,12 +77,10 @@ void main() {
       isTrue,
       reason: 'Backend not reachable; start the e2e stack first',
     );
-    // Create a single user used by all the tests in this file.
-    final r = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_events_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-events',
-    });
-    userId = (r as Map)['id'] as int;
+    // Create a single user used by all the tests in this file. Use the
+    // seeded moderator so `addEvent` (which needs `event.create`) and
+    // `updateEvent` (creator-only on the moderator's events) pass.
+    userId = await loginE2EModerator(api);
   });
 
   ProviderContainer makeContainer() {

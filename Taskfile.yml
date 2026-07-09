@@ -106,6 +106,8 @@ tasks:
         done
         echo "E2E backend did not come up in 60s"
         exit 1
+      - |
+        docker exec -i ymatch_e2e_db psql -U ymatch_user -d ymatch_e2e < scripts/e2e-seed.sql
 
   e2e:down:
     desc: Tear down the E2E stack and wipe its volume

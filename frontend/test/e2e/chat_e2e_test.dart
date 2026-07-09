@@ -25,6 +25,7 @@ import 'package:frontend/screens/chat_screen.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
   final config = ConfigService();
@@ -75,29 +76,22 @@ void main() {
     // inventory setup. The auto-matcher will create a PENDING match
     // between user1 and user2 because user1 TRADEs cardA + WANTs
     // cardB, and user2 TRADEs cardB + WANTs cardA.
-    final u1 = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_chat_u1_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-chat',
-    });
-    user1Id = (u1 as Map)['id'] as int;
-
-    final u2 = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_chat_u2_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-chat',
-    });
-    user2Id = (u2 as Map)['id'] as int;
-    expect(user2Id, isNot(user1Id));
-
+    //
+    // The event + merch are created by the seeded moderator (the only
+    // actor that passes the `event.create` / `merch.create` gates); the
+    // two FRESH guests cross-trade them, so the match forms between the
+    // two distinct-per-file guests (race-free under concurrent e2e files).
+    final modId = await loginE2EModerator(api);
     final e = await api.post('/api/v1/events', {
       'name': 'E2E chat event',
-      'creatorId': user1Id,
+      'creatorId': modId,
     });
     eventId = (e as Map)['id'] as int;
 
     Future<int> createMerch(String tag) async {
       final r = await api.post('/api/v1/events/$eventId/merch', {
         'name': _uniqueName('e2e_chat_$tag'),
-        'creatorId': user1Id,
+        'creatorId': modId,
         'groupName': 'e2e-chat',
       });
       return (r as Map)['id'] as int;
@@ -105,6 +99,16 @@ void main() {
 
     cardA = await createMerch('cardA');
     cardB = await createMerch('cardB');
+
+    user1Id = await createE2EGuest(
+      api,
+      'e2e_chat_u1_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    user2Id = await createE2EGuest(
+      api,
+      'e2e_chat_u2_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    expect(user2Id, isNot(user1Id));
 
     Future<void> setInventory(int userId, int merchId, String status) async {
       await api.post('/api/v1/user/inventory', {
