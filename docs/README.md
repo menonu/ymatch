@@ -52,6 +52,7 @@ Fact-based, technical specifications describing the machinery, endpoints, schema
 
 * [API Specification](reference/api_spec.md): REST endpoints, request/response formats, parameters, and headers.
 * [Database Schema](reference/db_schema.md): Database tables, fields, constraints, indexes, and entity-relationship mapping.
+* [RBAC Permissions Reference](reference/permissions.md): Catalog of every RBAC role and permission — scope, granting roles, `*.any` overlap, and the handler that enforces each (ADR 0004 / 0005).
 * [UI Specifications](reference/ui_specs.md): Layout structures, screens, navigation specs, and views.
 * [UI Components Reference](reference/ui_components.md): Component identifiers for screens, dialogs, cards, forms, and providers.
 

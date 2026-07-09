@@ -6192,6 +6192,373 @@ async fn test_rbac_create_merch_roles(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
+#[sqlx::test]
+async fn test_rbac_update_and_publish_merch_roles(pool: PgPool) {
+    // #370: update_merch / publish_merch are gated by ownership (the merch
+    // creator) OR `merch.edit` (event scope; event creator + editor), with the
+    // admin superuser bypass and `merch.edit.any` (moderator) overlap resolved
+    // inside RbacService::check. Merch is seeded via SQL so a plain user can
+    // own a row (the gated create endpoint can no longer produce that).
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "merch-edit-creator", "Merch Edit Event").await;
+
+    async fn insert_merch(
+        pool: &PgPool,
+        event_id: i64,
+        name: &str,
+        creator_id: Option<i64>,
+    ) -> i64 {
+        let row: (i32,) = sqlx::query_as(
+            "INSERT INTO merchandise (event_id, name, photo_url, group_name, creator_id, status)
+             VALUES ($1, $2, NULL, 'G', $3, 'draft') RETURNING id",
+        )
+        .bind(event_id as i32)
+        .bind(name)
+        .bind(creator_id.map(|v| v as i32))
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        row.0 as i64
+    }
+
+    async fn update_merch(pool: &PgPool, event_id: i64, merch_id: i64, user_id: i64) -> StatusCode {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/api/v1/events/{}/merch/{}", event_id, merch_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"userId": {}, "photoUrl": "https://updated"}}"#,
+                        user_id
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        resp.status()
+    }
+
+    async fn publish_merch(
+        pool: &PgPool,
+        event_id: i64,
+        merch_id: i64,
+        user_id: i64,
+    ) -> StatusCode {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!(
+                        "/api/v1/events/{}/merch/{}/publish",
+                        event_id, merch_id
+                    ))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(r#"{{"userId": {}}}"#, user_id)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        resp.status()
+    }
+
+    // The merch creator (a plain user who owns the row via SQL) can update +
+    // publish via the ownership short-circuit, with no event/global role.
+    let owner = login_guest(&pool, "merch-edit-owner", "t").await;
+    let m = insert_merch(&pool, event_id, "Owner Pin", Some(owner)).await;
+    assert_eq!(
+        update_merch(&pool, event_id, m, owner).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        publish_merch(&pool, event_id, m, owner).await,
+        StatusCode::OK
+    );
+
+    // An event editor can update + publish merch they do not own (event/merch.edit).
+    let editor = login_guest(&pool, "merch-edit-editor", "t").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+    let m = insert_merch(&pool, event_id, "Editor Pin", None).await;
+    assert_eq!(
+        update_merch(&pool, event_id, m, editor).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        publish_merch(&pool, event_id, m, editor).await,
+        StatusCode::OK
+    );
+
+    // The event creator can update + publish (event/merch.edit).
+    let m = insert_merch(&pool, event_id, "Creator Pin", None).await;
+    assert_eq!(
+        update_merch(&pool, event_id, m, creator_id).await,
+        StatusCode::OK
+    );
+
+    // A plain non-owner non-editor is denied.
+    let plain = login_guest(&pool, "merch-edit-plain", "t").await;
+    let m = insert_merch(&pool, event_id, "Plain Pin", None).await;
+    assert_eq!(
+        update_merch(&pool, event_id, m, plain).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        publish_merch(&pool, event_id, m, plain).await,
+        StatusCode::FORBIDDEN
+    );
+
+    // A moderator can update + publish any merch via merch.edit.any.
+    let moderator = login_guest(&pool, "merch-edit-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let m = insert_merch(&pool, event_id, "Mod Pin", None).await;
+    assert_eq!(
+        update_merch(&pool, event_id, m, moderator).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        publish_merch(&pool, event_id, m, moderator).await,
+        StatusCode::OK
+    );
+
+    // An admin can update + publish via the superuser bypass.
+    let admin = login_guest(&pool, "merch-edit-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let m = insert_merch(&pool, event_id, "Admin Pin", None).await;
+    assert_eq!(
+        update_merch(&pool, event_id, m, admin).await,
+        StatusCode::OK
+    );
+
+    // 404-before-403: a missing merch is 404 even for a caller who lacks the
+    // event role (not leaked as 403).
+    assert_eq!(
+        update_merch(&pool, event_id, 999999, plain).await,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        publish_merch(&pool, event_id, 999999, plain).await,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[sqlx::test]
+async fn test_rbac_update_group_roles(pool: PgPool) {
+    // #370: group update is gated by ownership (the group creator) OR
+    // `group.edit` (event scope; event creator + editor), with the admin bypass
+    // and `group.edit.any` (moderator) overlap. Mirrors the merch model.
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-edit-creator", "Group Edit Event").await;
+
+    // Group creation is not gated, so a plain user can create a group and own
+    // it (created_by = user_id).
+    let owner = login_guest(&pool, "group-edit-owner", "t").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "orig"}}"#,
+                    event_id, owner
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    async fn update_group(pool: &PgPool, event_id: i64, user_id: i64, desc: &str) -> StatusCode {
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/api/v1/events/{}/groups/Pins", event_id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "{}"}}"#,
+                        event_id, user_id, desc
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        resp.status()
+    }
+
+    // The group creator (owner) can update via the ownership short-circuit.
+    assert_eq!(
+        update_group(&pool, event_id, owner, "by owner").await,
+        StatusCode::OK
+    );
+
+    // An event editor can update a group they did not create (event/group.edit).
+    let editor = login_guest(&pool, "group-edit-editor", "t").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+    assert_eq!(
+        update_group(&pool, event_id, editor, "by editor").await,
+        StatusCode::OK
+    );
+
+    // The event creator can update (event/group.edit).
+    assert_eq!(
+        update_group(&pool, event_id, creator_id, "by creator").await,
+        StatusCode::OK
+    );
+
+    // A plain non-owner non-editor is denied.
+    let plain = login_guest(&pool, "group-edit-plain", "t").await;
+    assert_eq!(
+        update_group(&pool, event_id, plain, "hostile").await,
+        StatusCode::FORBIDDEN
+    );
+
+    // A moderator can update any group via group.edit.any.
+    let moderator = login_guest(&pool, "group-edit-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    assert_eq!(
+        update_group(&pool, event_id, moderator, "by mod").await,
+        StatusCode::OK
+    );
+
+    // An admin can update via the superuser bypass.
+    let admin = login_guest(&pool, "group-edit-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    assert_eq!(
+        update_group(&pool, event_id, admin, "by admin").await,
+        StatusCode::OK
+    );
+
+    // 404-before-403: updating a missing group is 404 even for a plain user
+    // (the existence check runs before the RBAC check).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}/groups/Missing", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Missing", "description": "x"}}"#,
+                    event_id, plain
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn test_rbac_delete_match_permission(pool: PgPool) {
+    // #370: admin match deletion is gated by the global `match.delete`
+    // permission (granted to moderator + admin, plus the admin superuser
+    // bypass), replacing the old require_admin_or_mod role-list check.
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "match-del-creator", "Match Del Event").await;
+    // A second user so we can seed a real matches row (user1_id != user2_id).
+    let other = login_guest(&pool, "match-del-other", "t").await;
+
+    async fn seed_match(pool: &PgPool, event_id: i64, u1: i64, u2: i64) -> i64 {
+        let m: (i32,) = sqlx::query_as(
+            "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+             VALUES ($1, $2, $3, 'G', 'PENDING') RETURNING id",
+        )
+        .bind(u1 as i32)
+        .bind(u2 as i32)
+        .bind(event_id as i32)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        m.0 as i64
+    }
+
+    async fn row_exists(pool: &PgPool, match_id: i64) -> bool {
+        sqlx::query_scalar::<_, Option<i32>>("SELECT id FROM matches WHERE id = $1")
+            .bind(match_id as i32)
+            .fetch_optional(pool)
+            .await
+            .unwrap()
+            .is_some()
+    }
+
+    // A plain user (creator_id is a moderator here, so demote it to a plain
+    // user first) cannot delete a match.
+    grant_global_role(&pool, creator_id, "user").await;
+    let match_id = seed_match(&pool, event_id, creator_id, other).await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/matches/{}?user_id={}",
+                    match_id, creator_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    assert!(
+        row_exists(&pool, match_id).await,
+        "plain user must not delete the match"
+    );
+
+    // A moderator can delete (global/match.delete).
+    let moderator = login_guest(&pool, "match-del-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/matches/{}?user_id={}",
+                    match_id, moderator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(
+        !row_exists(&pool, match_id).await,
+        "moderator should have deleted the match"
+    );
+
+    // An admin can delete via the superuser bypass (seed a fresh row: the
+    // prior one is gone, so the canonical-pair unique index does not collide).
+    let match_id2 = seed_match(&pool, event_id, creator_id, other).await;
+    let admin = login_guest(&pool, "match-del-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/matches/{}?user_id={}",
+                    match_id2, admin
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(
+        !row_exists(&pool, match_id2).await,
+        "admin should have deleted the match"
+    );
+}
+
 async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
     let body = format!(
         r#"{{"uuid": "{}", "deviceToken": "{}"}}"#,

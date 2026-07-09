@@ -7,6 +7,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::routes::AppState;
+use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
     extract::{Path, State},
@@ -50,23 +51,26 @@ pub async fn update_event_group(
         ));
     }
 
-    // Permission check: group creator or elevated role.
+    // Resolve the group (and 404 if it does not exist) BEFORE the RBAC check,
+    // so a missing group is not leaked as a 403 — matches `update_event` /
+    // `create_merch`.
     let group = state
         .groups
         .get(event_id, &group_name)
         .await?
         .ok_or_else(|| AppError::not_found("Group not found. Create it first via POST /groups"))?;
-    let group_creator = group.created_by;
+    let group_creator_id = group.created_by;
     let user = state.policy.verify_active(payload.user_id).await?;
-    let allowed = group_creator == Some(user.id)
-        || state
-            .policy
-            .require_role(&user, &["admin", "moderator"])
-            .is_ok();
-    if !allowed {
-        return Err(AppError::forbidden(
-            "Only the group creator or an admin/moderator can edit this group",
-        ));
+    // #370: the prior `group_creator OR require_role(&["admin","moderator"])`
+    // is now ownership + RBAC. The group creator is an ownership check; the
+    // event creator / editor / admin / moderator path is the `group.edit`
+    // permission (event scope), with the admin bypass and `group.edit.any`
+    // (moderator) overlap resolved inside `RbacService::check`.
+    if group_creator_id != Some(user.id) {
+        state
+            .rbac_service
+            .check(&user, &Scope::Event(event_id), Permission::GroupEdit)
+            .await?;
     }
 
     let updated = state
