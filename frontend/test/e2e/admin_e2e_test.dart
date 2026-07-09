@@ -30,6 +30,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
   final config = ConfigService();
@@ -54,33 +55,6 @@ Future<bool> _waitForBackend(ApiClient api) async {
 String _uniqueName(String prefix) =>
     '${prefix}_${DateTime.now().microsecondsSinceEpoch}';
 
-/// Promote a freshly-created user to admin by updating the e2e DB
-/// directly. The admin endpoints require an existing admin caller,
-/// and there is no public "bootstrap admin" API, so this mirrors the
-/// approach used in the backend integration tests
-/// (`backend/tests/api_tests.rs` updates `users.role` directly).
-Future<void> _promoteToAdmin(int userId) async {
-  final result = await Process.run(
-    'docker',
-    [
-      'exec',
-      'ymatch_e2e_db',
-      'psql',
-      '-U',
-      'ymatch_user',
-      '-d',
-      'ymatch_e2e',
-      '-c',
-      "UPDATE users SET role = 'admin' WHERE id = $userId;",
-    ],
-  );
-  expect(
-    result.exitCode,
-    0,
-    reason: 'failed to promote user $userId to admin: ${result.stderr}',
-  );
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = null;
@@ -98,16 +72,11 @@ void main() {
       reason: 'Backend not reachable; start the e2e stack first',
     );
 
-    // Create a user and promote it to admin in the DB. Admin endpoints
-    // require an existing admin caller; this bootstrap step is the
-    // same direct UPDATE used by the backend integration tests.
-    final r = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_admin_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-admin',
-    });
-    adminUserId = (r as Map)['id'] as int;
-
-    await _promoteToAdmin(adminUserId);
+    // Log in as the seeded admin (scripts/e2e-seed.sql). The admin
+    // endpoints require an admin caller; RBAC checks the `user_roles`
+    // table (not `users.role`), so the seed installs the global/admin
+    // row — a plain `users.role` UPDATE is a no-op for authz.
+    adminUserId = await loginE2EAdmin(api);
   });
 
   ProviderContainer makeContainer() {
@@ -125,13 +94,12 @@ void main() {
     return (r as Map)['id'] as int;
   }
 
-  /// Create a user and an event with no merch.
+  /// Create an event (no merch) owned by the seeded moderator, for the
+  /// admin-delete-event test. The moderator has `event.create`, so the
+  /// fixture passes the ADR 0004 gate; the admin then deletes the
+  /// moderator's event (a "delete another user's resource" path).
   Future<({int userId, int eventId})> createEventOnly() async {
-    final user = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_admin_evt_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-admin-evt',
-    });
-    final userId = (user as Map)['id'] as int;
+    final userId = await loginE2EModerator(api);
 
     final event = await api.post('/api/v1/events', {
       'name': _uniqueName('e2e_admin_event'),
@@ -142,13 +110,13 @@ void main() {
     return (userId: userId, eventId: eventId);
   }
 
-  /// Create a user, event, and merch item; return their IDs.
+  /// Create an event + merch owned by the seeded moderator, for the
+  /// admin-delete-merch test. The moderator has `event.create` +
+  /// `merch.create.any` (and auto-becomes the event creator), so the
+  /// fixtures pass the ADR 0004/0005 gates; the admin then deletes the
+  /// moderator's merch.
   Future<({int userId, int eventId, int merchId})> createEventAndMerch() async {
-    final user = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_admin_evt_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-admin-evt',
-    });
-    final userId = (user as Map)['id'] as int;
+    final userId = await loginE2EModerator(api);
 
     final event = await api.post('/api/v1/events', {
       'name': _uniqueName('e2e_admin_event'),

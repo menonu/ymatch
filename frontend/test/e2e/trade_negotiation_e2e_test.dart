@@ -55,6 +55,7 @@ import 'package:frontend/generated/models.pb.dart' as pb;
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:http/http.dart' as http;
+import 'helpers/e2e_users.dart';
 
 /// HTTP base URL for the E2E backend (`docker-compose.e2e.yml` exposes
 /// the backend on localhost:3000).
@@ -187,10 +188,14 @@ Future<int> _createMerch(
   ApiClient api, {
   required int eventId,
   required String name,
+  required int creatorId,
   required String groupName,
 }) async {
+  // ADR 0005: `creatorId` is the caller identity the `merch.create` gate
+  // authorizes against (the moderator / event creator).
   final r = await api.post('/api/v1/events/$eventId/merch', {
     'name': name,
+    'creatorId': creatorId,
     'groupName': groupName,
   });
   return (r as Map)['id'] as int;
@@ -238,27 +243,35 @@ Future<_Match> _provisionPendingMatch(
   int u2TradeBQty = 1,
   int u2WantAQty = 1,
 }) async {
-  final u1 = await _guestLogin(api, tag: '${tag}_u1');
-  final u2 = await _guestLogin(api, tag: '${tag}_u2');
-  expect(u2, isNot(u1));
-
+  // The event + merch are created by the seeded moderator (the only
+  // actor that passes the `event.create` / `merch.create` gates); the two
+  // FRESH guests (distinct uuids per scenario) cross-trade them, so the
+  // match forms between u1 and u2 — race-free under concurrent e2e files
+  // even though the moderator is shared.
+  final modId = await loginE2EModerator(api);
   final eventId = await _createEvent(
     api,
     name: 'neg-event-$tag-$_nonce',
-    creatorId: u1,
+    creatorId: modId,
   );
   final cardA = await _createMerch(
     api,
     eventId: eventId,
     name: 'A-$tag',
+    creatorId: modId,
     groupName: 'neg-$tag',
   );
   final cardB = await _createMerch(
     api,
     eventId: eventId,
     name: 'B-$tag',
+    creatorId: modId,
     groupName: 'neg-$tag',
   );
+
+  final u1 = await _guestLogin(api, tag: '${tag}_u1');
+  final u2 = await _guestLogin(api, tag: '${tag}_u2');
+  expect(u2, isNot(u1));
 
   await _setInventory(api, userId: u1, merchId: cardA, status: 'TRADE', quantity: u1TradeAQty);
   await _setInventory(api, userId: u1, merchId: cardB, status: 'WANT', quantity: u1WantBQty);

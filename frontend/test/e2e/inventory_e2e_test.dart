@@ -29,6 +29,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
   final config = ConfigService();
@@ -87,12 +88,10 @@ void main() {
       isTrue,
       reason: 'Backend not reachable; start the e2e stack first',
     );
-    // Single user + event used by all the tests in this file.
-    final r = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_inventory_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-inventory',
-    });
-    userId = (r as Map)['id'] as int;
+    // Single user + event used by all the tests in this file. Use the
+    // seeded moderator so the `event.create` + `merch.create` gates pass
+    // (it auto-becomes the event creator).
+    userId = await loginE2EModerator(api);
 
     final e = await api.post('/api/v1/events', {
       'name': 'E2E inventory event',

@@ -138,6 +138,15 @@ jobs:
           docker compose -f docker-compose.e2e.yml logs e2e_backend
           exit 1
 
+      - name: Seed E2E RBAC users
+        # The RBAC gates (#228/#365) reject event/merch creation and admin
+        # endpoints from the plain guests the E2E tests create. Seed a known
+        # admin + moderator (with `user_roles` rows — `users.role` alone is a
+        # no-op for authz) so the tests can log in as them via the idempotent
+        # guest-login-by-uuid path. E2E-only; the E2E DB is on tmpfs.
+        run: |
+          docker exec -i ymatch_e2e_db psql -U ymatch_user -d ymatch_e2e < scripts/e2e-seed.sql
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

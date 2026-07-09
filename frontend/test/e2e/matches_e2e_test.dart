@@ -35,6 +35,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
   final config = ConfigService();
@@ -81,33 +82,24 @@ void main() {
       reason: 'Backend not reachable; start the e2e stack first',
     );
 
-    // Two users, one event, two merch items, and a cross-trade
-    // inventory setup. The auto-matcher will create a PENDING match
-    // between user1 and user2 because user1 TRADEs cardA + WANTs
-    // cardB, and user2 TRADEs cardB + WANTs cardA.
-    final u1 = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_matches_u1_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-matches',
-    });
-    user1Id = (u1 as Map)['id'] as int;
-
-    final u2 = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_matches_u2_${DateTime.now().microsecondsSinceEpoch}',
-      'deviceToken': 'e2e-matches',
-    });
-    user2Id = (u2 as Map)['id'] as int;
-    expect(user2Id, isNot(user1Id));
-
+    // One event + two merch items (created by the seeded moderator, the
+    // only actor that can pass the `event.create` / `merch.create` gates),
+    // then two FRESH guests cross-trade them. The match forms between the
+    // two fresh guests (distinct uuids per file), not the moderator, so
+    // the "first PENDING match for user1" probe below is race-free even
+    // though `flutter test` runs e2e files concurrently against this one
+    // shared backend.
+    final modId = await loginE2EModerator(api);
     final e = await api.post('/api/v1/events', {
       'name': 'E2E matches event',
-      'creatorId': user1Id,
+      'creatorId': modId,
     });
     eventId = (e as Map)['id'] as int;
 
     Future<int> createMerch(String tag) async {
       final r = await api.post('/api/v1/events/$eventId/merch', {
         'name': _uniqueName('e2e_matches_$tag'),
-        'creatorId': user1Id,
+        'creatorId': modId,
         'groupName': 'e2e-matches',
       });
       return (r as Map)['id'] as int;
@@ -115,6 +107,16 @@ void main() {
 
     cardA = await createMerch('cardA');
     cardB = await createMerch('cardB');
+
+    user1Id = await createE2EGuest(
+      api,
+      'e2e_matches_u1_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    user2Id = await createE2EGuest(
+      api,
+      'e2e_matches_u2_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    expect(user2Id, isNot(user1Id));
 
     Future<void> setInventory(int userId, int merchId, String status) async {
       await api.post('/api/v1/user/inventory', {

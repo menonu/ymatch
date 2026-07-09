@@ -46,6 +46,7 @@ import 'package:frontend/generated/models.pb.dart' as pb;
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:http/http.dart' as http;
+import 'helpers/e2e_users.dart';
 
 /// HTTP base URL for the E2E backend. The docker-compose.e2e.yml
 /// stack exposes the backend on localhost:3000.
@@ -144,6 +145,7 @@ Future<int> _createMerch(
   ApiClient api, {
   required int eventId,
   required String name,
+  required int creatorId,
   String? groupName,
   String? photoUrl,
 }) async {
@@ -151,7 +153,11 @@ Future<int> _createMerch(
   // the body). CreateMerchRequest has: name, photoUrl, groupName,
   // creatorId, status. No `quantity` or `isTradeable` — those are
   // inventory concepts, not merch concepts.
-  final body = <String, dynamic>{'name': name};
+  //
+  // ADR 0005: `creatorId` is the caller identity the `merch.create` gate
+  // authorizes against, so it is required here (the moderator / event
+  // creator).
+  final body = <String, dynamic>{'name': name, 'creatorId': creatorId};
   if (groupName != null) body['groupName'] = groupName;
   if (photoUrl != null) body['photoUrl'] = photoUrl;
   final r = await api.post('/api/v1/events/$eventId/merch', body);
@@ -221,29 +227,33 @@ void main() {
     final ready = await _waitForBackend(api);
     expect(ready, isTrue, reason: 'Backend not reachable at $_baseUrl');
 
-    // 2. Login two users (guest auth — no signup required).
-    final u1Id = await _guestLogin(api);
-    final u2Id = await _guestLogin(api);
-    expect(u1Id, isNot(u2Id));
-
-    // 3. Create one event, then two pieces of merch in it.
+    // 2. The event + merch are created by the seeded moderator (the only
+    //    actor that passes the `event.create` / `merch.create` gates); two
+    //    FRESH guests cross-trade them, so the match forms between the
+    //    distinct-per-file guests (race-free under concurrent e2e files).
+    final modId = await loginE2EModerator(api);
     final eventId = await _createEvent(
       api,
       name: 'E2E event ${DateTime.now().millisecondsSinceEpoch}',
-      creatorId: u1Id,
+      creatorId: modId,
     );
     final cardA = await _createMerch(
       api,
       eventId: eventId,
       name: 'Card A',
+      creatorId: modId,
       groupName: 'e2e-cards',
     );
     final cardB = await _createMerch(
       api,
       eventId: eventId,
       name: 'Card B',
+      creatorId: modId,
       groupName: 'e2e-cards',
     );
+    final u1Id = await _guestLogin(api);
+    final u2Id = await _guestLogin(api);
+    expect(u1Id, isNot(u2Id));
 
     // 4. Set up the cross-trade inventory. The auto-matcher
     //    (backend/src/matching.rs) looks for users with status

@@ -29,6 +29,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _makeApi() {
   final config = ConfigService();
@@ -72,14 +73,11 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // 3. Create a user + event via the (live) API. Use a unique
-      //    uuid so re-runs on the same DB don't collide.
-      final userResp = await api.post('/api/v1/auth/guest', {
-        'uuid':
-            'e2e-227-${DateTime.now().microsecondsSinceEpoch}-${api.hashCode}',
-        'deviceToken': 'e2e-device',
-      });
-      final userId = (userResp as Map)['id'] as int;
+      // 3. Create a user + event via the (live) API. Use the seeded
+      //    moderator so the ADR 0004 `event.create` + ADR 0005
+      //    `merch.create` gates pass (the moderator auto-becomes the
+      //    event/creator, so addMerch below is authorized).
+      final userId = await loginE2EModerator(api);
       final eventResp = await api.post('/api/v1/events', {
         'name': 'E2E 227 event ${DateTime.now().millisecondsSinceEpoch}',
         'creatorId': userId,
