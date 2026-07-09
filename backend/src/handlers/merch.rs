@@ -76,15 +76,26 @@ pub async fn update_merch(
     Json(payload): Json<UpdateMerchRequest>,
 ) -> Result<Json<Merchandise>, AppError> {
     let user = state.policy.verify_active(payload.user_id).await?;
-    let creator = state
+    // Resolve the merch creator (and 404 if the merch does not exist) BEFORE
+    // the RBAC check, so a missing merch is not leaked as a 403 to a caller who
+    // lacks the event role — matches `update_event` / `create_merch`.
+    let merch_creator_id: Option<i32> = state
         .merch
         .get_creator(event_id, merch_id)
         .await?
-        .ok_or_else(|| AppError::not_found("Merchandise not found"))?
-        .unwrap_or(-1);
-    state
-        .policy
-        .require_owner_or_role(&user, creator, &["admin", "moderator"])?;
+        .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
+    // #370: the prior `require_owner_or_role(creator, &["admin","moderator"])`
+    // is now ownership + RBAC. The merch creator is an ownership check
+    // (ordinary trading is ownership-checked, not role-checked); the event
+    // creator / editor / admin / moderator path is the `merch.edit` permission
+    // (event scope), with the admin bypass and `merch.edit.any` (moderator)
+    // overlap resolved inside `RbacService::check`.
+    if Some(user.id) != merch_creator_id {
+        state
+            .rbac_service
+            .check(&user, &Scope::Event(event_id), Permission::MerchEdit)
+            .await?;
+    }
     let item = state
         .merch
         .update(event_id, merch_id, payload)
@@ -99,15 +110,18 @@ pub async fn publish_merch(
     Json(payload): Json<UserActionRequest>,
 ) -> Result<StatusCode, AppError> {
     let user = state.policy.verify_active(payload.user_id).await?;
-    let creator = state
+    let merch_creator_id: Option<i32> = state
         .merch
         .get_creator(event_id, merch_id)
         .await?
-        .ok_or_else(|| AppError::not_found("Merchandise not found"))?
-        .unwrap_or(-1);
-    state
-        .policy
-        .require_owner_or_role(&user, creator, &["admin", "moderator"])?;
+        .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
+    // #370: same ownership + `merch.edit` rule as `update_merch` (see above).
+    if Some(user.id) != merch_creator_id {
+        state
+            .rbac_service
+            .check(&user, &Scope::Event(event_id), Permission::MerchEdit)
+            .await?;
+    }
     state.merch.publish(event_id, merch_id).await?;
     Ok(StatusCode::OK)
 }

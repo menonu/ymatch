@@ -2,7 +2,6 @@ use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::repositories::user::VerifiedUser;
 use crate::routes::AppState;
-use crate::services::permissions::PermissionPolicy;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
@@ -15,29 +14,11 @@ pub struct AdminQuery {
     pub user_id: Option<i32>,
 }
 
-/// Resolve the caller from the `user_id` query param and confirm they are an
-/// active (non-banned) `admin` or `moderator`. Used for the admin endpoints
-/// whose permission the ADR 0004 matrix does not model as an RBAC permission
-/// (today: only `delete_match`, which has no `match.*` permission in the
-/// catalog). RBAC-gated admin endpoints use [`require_global`] instead.
-async fn require_admin_or_mod(
-    policy: &PermissionPolicy,
-    query_user_id: Option<i32>,
-) -> Result<VerifiedUser, AppError> {
-    let uid =
-        query_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
-    let user = policy.verify(uid).await?;
-    policy.require_not_banned(&user)?;
-    policy.require_role(&user, &["admin", "moderator"])?;
-    Ok(user)
-}
-
 /// Resolve the caller from the `user_id` query param and require they hold
 /// `permission` in the global scope (ADR 0004 §3). This is the RBAC entry
-/// point for the admin endpoints whose permission is in the catalog:
-/// `event.delete.any`, `merch.delete.any`, `user.ban`, `user.unban`,
-/// `user.role.manage`. The admin superuser bypass is handled inside
-/// [`RbacService::check`].
+/// point for the admin endpoints: `event.delete.any`, `merch.delete.any`,
+/// `user.ban`, `user.unban`, `user.role.manage`, and `match.delete`. The
+/// admin superuser bypass is handled inside [`RbacService::check`].
 async fn require_global(
     state: &AppState,
     query_user_id: Option<i32>,
@@ -95,9 +76,10 @@ pub async fn delete_match(
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
-    // No `match.*` permission in the ADR 0004 catalog; match deletion stays
-    // an admin/moderator moderation action via the role-based check.
-    require_admin_or_mod(&state.policy, query.user_id).await?;
+    // #370: match deletion is now modeled as the global `match.delete`
+    // permission (granted to moderator + admin, plus the admin superuser
+    // bypass), replacing the old `require_admin_or_mod` role-list check.
+    require_global(&state, query.user_id, Permission::MatchDelete).await?;
 
     // The matches table is owned by `MatchRepository` in Phase 4, but
     // the admin path here is the only consumer of a "delete" method on

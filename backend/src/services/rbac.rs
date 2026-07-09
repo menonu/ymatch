@@ -26,8 +26,8 @@
 //! [`RbacService::check`] takes a [`VerifiedUser`] that the caller has already
 //! run through [`crate::services::permissions::PermissionPolicy::verify_active`]
 //! (which checks existence and ban state). The service does not re-check ban
-//! status — that is the caller's contract, matching the existing
-//! `require_role` / `require_owner_or_role` pattern.
+//! status — that is the caller's contract, matching how the removed
+//! `require_role` / `require_owner_or_role` role-list checks used to work.
 
 use crate::error::AppError;
 use crate::repositories::rbac::RbacRepository;
@@ -64,6 +64,14 @@ pub enum Permission {
     /// Create merch in any event (global override of `MerchCreate`).
     /// Moderator + admin.
     MerchCreateAny,
+    /// Edit any merch (global override of `MerchEdit`). Admin + moderator.
+    MerchEditAny,
+    /// Edit any group in any event (global override of `GroupEdit`).
+    /// Admin + moderator.
+    GroupEditAny,
+    /// Delete a match (global moderation action). Admin + moderator.
+    /// Has no `*.any` form — it is itself the global-scope permission.
+    MatchDelete,
     /// Toggle service kill-switches. Admin.
     SystemKillSwitch,
     // --- event scope ---
@@ -77,6 +85,14 @@ pub enum Permission {
     MerchDelete,
     /// Create merch in a specific event. Event creator + editor.
     MerchCreate,
+    /// Edit merch in a specific event (update, publish). Event creator +
+    /// editor. The merch *creator* passes via an ownership short-circuit in
+    /// the handler, not via this permission.
+    MerchEdit,
+    /// Edit a group in a specific event. Event creator + editor. The group
+    /// *creator* passes via an ownership short-circuit in the handler, not via
+    /// this permission.
+    GroupEdit,
 }
 
 impl Permission {
@@ -91,12 +107,17 @@ impl Permission {
             Permission::EventDeleteAny => "event.delete.any",
             Permission::MerchDeleteAny => "merch.delete.any",
             Permission::MerchCreateAny => "merch.create.any",
+            Permission::MerchEditAny => "merch.edit.any",
+            Permission::GroupEditAny => "group.edit.any",
+            Permission::MatchDelete => "match.delete",
             Permission::SystemKillSwitch => "system.kill_switch",
             Permission::EventEdit => "event.edit",
             Permission::EventDelete => "event.delete",
             Permission::EventMemberManage => "event.member.manage",
             Permission::MerchDelete => "merch.delete",
             Permission::MerchCreate => "merch.create",
+            Permission::MerchEdit => "merch.edit",
+            Permission::GroupEdit => "group.edit",
         }
     }
 
@@ -114,6 +135,8 @@ impl Permission {
             Permission::EventDelete => &["event.delete", "event.delete.any"],
             Permission::MerchDelete => &["merch.delete", "merch.delete.any"],
             Permission::MerchCreate => &["merch.create", "merch.create.any"],
+            Permission::MerchEdit => &["merch.edit", "merch.edit.any"],
+            Permission::GroupEdit => &["group.edit", "group.edit.any"],
             Permission::UserBan => &["user.ban"],
             Permission::UserUnban => &["user.unban"],
             Permission::UserRoleManage => &["user.role.manage"],
@@ -122,6 +145,9 @@ impl Permission {
             Permission::EventDeleteAny => &["event.delete.any"],
             Permission::MerchDeleteAny => &["merch.delete.any"],
             Permission::MerchCreateAny => &["merch.create.any"],
+            Permission::MerchEditAny => &["merch.edit.any"],
+            Permission::GroupEditAny => &["group.edit.any"],
+            Permission::MatchDelete => &["match.delete"],
             Permission::SystemKillSwitch => &["system.kill_switch"],
             Permission::EventMemberManage => &["event.member.manage"],
         }
@@ -260,6 +286,9 @@ mod tests {
                 "event.delete.any",
                 "merch.delete.any",
                 "merch.create.any",
+                "merch.edit.any",
+                "group.edit.any",
+                "match.delete",
                 "system.kill_switch",
             ]),
         );
@@ -273,6 +302,9 @@ mod tests {
                 "event.delete.any",
                 "merch.delete.any",
                 "merch.create.any",
+                "merch.edit.any",
+                "group.edit.any",
+                "match.delete",
             ]),
         );
         perms_by_role.insert(USER, HashSet::new());
@@ -284,9 +316,20 @@ mod tests {
                 "event.member.manage",
                 "merch.delete",
                 "merch.create",
+                "merch.edit",
+                "group.edit",
             ]),
         );
-        perms_by_role.insert(EDITOR, set(&["event.edit", "merch.delete", "merch.create"]));
+        perms_by_role.insert(
+            EDITOR,
+            set(&[
+                "event.edit",
+                "merch.delete",
+                "merch.create",
+                "merch.edit",
+                "group.edit",
+            ]),
+        );
         PermissionCatalog::new(ADMIN, perms_by_role)
     }
 
@@ -325,6 +368,25 @@ mod tests {
         assert_eq!(
             Permission::MerchCreate.satisfying_names(),
             &["merch.create", "merch.create.any"]
+        );
+        assert_eq!(
+            Permission::MerchEdit.satisfying_names(),
+            &["merch.edit", "merch.edit.any"]
+        );
+        assert_eq!(
+            Permission::GroupEdit.satisfying_names(),
+            &["group.edit", "group.edit.any"]
+        );
+    }
+
+    #[test]
+    fn satisfying_names_for_match_delete_is_just_the_name() {
+        // `match.delete` is itself a global-scope permission (granted to admin
+        // + moderator), so it has no `*.any` override — its satisfying set is
+        // just itself.
+        assert_eq!(
+            Permission::MatchDelete.satisfying_names(),
+            &["match.delete"]
         );
     }
 
@@ -366,6 +428,9 @@ mod tests {
         ok(&[ADMIN], Permission::EventMemberManage);
         ok(&[ADMIN], Permission::MerchDelete);
         ok(&[ADMIN], Permission::MerchCreate);
+        ok(&[ADMIN], Permission::MerchEdit);
+        ok(&[ADMIN], Permission::GroupEdit);
+        ok(&[ADMIN], Permission::MatchDelete);
     }
 
     #[test]
@@ -381,6 +446,17 @@ mod tests {
         ok(&[MODERATOR], Permission::EventDelete);
         ok(&[MODERATOR], Permission::MerchDelete);
         ok(&[MODERATOR], Permission::MerchCreate);
+        ok(&[MODERATOR], Permission::MerchEdit);
+        ok(&[MODERATOR], Permission::GroupEdit);
+    }
+
+    #[test]
+    fn moderator_can_delete_any_match() {
+        // match.delete is global, granted to moderator + admin directly.
+        ok(&[MODERATOR], Permission::MatchDelete);
+        denied(&[CREATOR], Permission::MatchDelete);
+        denied(&[EDITOR], Permission::MatchDelete);
+        denied(&[USER], Permission::MatchDelete);
     }
 
     #[test]
@@ -407,6 +483,8 @@ mod tests {
         ok(&[CREATOR], Permission::EventMemberManage);
         ok(&[CREATOR], Permission::MerchDelete);
         ok(&[CREATOR], Permission::MerchCreate);
+        ok(&[CREATOR], Permission::MerchEdit);
+        ok(&[CREATOR], Permission::GroupEdit);
     }
 
     #[test]
@@ -422,9 +500,12 @@ mod tests {
         ok(&[EDITOR], Permission::EventEdit);
         ok(&[EDITOR], Permission::MerchDelete);
         ok(&[EDITOR], Permission::MerchCreate);
+        ok(&[EDITOR], Permission::MerchEdit);
+        ok(&[EDITOR], Permission::GroupEdit);
         denied(&[EDITOR], Permission::EventDelete);
         denied(&[EDITOR], Permission::EventMemberManage);
         denied(&[EDITOR], Permission::UserBan);
+        denied(&[EDITOR], Permission::MatchDelete);
     }
 
     // --- plain user / no assignment ---
@@ -436,6 +517,9 @@ mod tests {
         denied(&[USER], Permission::EventEdit);
         denied(&[USER], Permission::MerchDelete);
         denied(&[USER], Permission::MerchCreate);
+        denied(&[USER], Permission::MerchEdit);
+        denied(&[USER], Permission::GroupEdit);
+        denied(&[USER], Permission::MatchDelete);
     }
 
     #[test]
@@ -708,6 +792,91 @@ mod tests {
                     &Scope::Event(event_id),
                     Permission::MerchCreate
                 )
+                .await
+                .is_ok()
+        );
+        // Editor can edit merch on their event (event/merch.edit); the merch
+        // *creator* ownership short-circuit lives in the handler, not here.
+        assert!(
+            service
+                .check(
+                    &verified(editor_id),
+                    &Scope::Event(event_id),
+                    Permission::MerchEdit
+                )
+                .await
+                .is_ok()
+        );
+        // Editor can edit groups on their event (event/group.edit).
+        assert!(
+            service
+                .check(
+                    &verified(editor_id),
+                    &Scope::Event(event_id),
+                    Permission::GroupEdit
+                )
+                .await
+                .is_ok()
+        );
+        // A plain user cannot edit merch/groups on an event they have no role on.
+        assert!(
+            service
+                .check(
+                    &verified(user_id),
+                    &Scope::Event(event_id),
+                    Permission::MerchEdit
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .check(
+                    &verified(user_id),
+                    &Scope::Event(event_id),
+                    Permission::GroupEdit
+                )
+                .await
+                .is_err()
+        );
+        // A moderator edits any event's merch/groups via the `*.any` override.
+        assert!(
+            service
+                .check(
+                    &verified(mod_id),
+                    &Scope::Event(event_id),
+                    Permission::MerchEdit
+                )
+                .await
+                .is_ok()
+        );
+        assert!(
+            service
+                .check(
+                    &verified(mod_id),
+                    &Scope::Event(event_id),
+                    Permission::GroupEdit
+                )
+                .await
+                .is_ok()
+        );
+        // match.delete is a global moderation action: moderator ok, plain user
+        // denied, admin ok via the bypass.
+        assert!(
+            service
+                .check(&verified(mod_id), &Scope::Global, Permission::MatchDelete)
+                .await
+                .is_ok()
+        );
+        assert!(
+            service
+                .check(&verified(user_id), &Scope::Global, Permission::MatchDelete)
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .check(&verified(admin_id), &Scope::Global, Permission::MatchDelete)
                 .await
                 .is_ok()
         );
