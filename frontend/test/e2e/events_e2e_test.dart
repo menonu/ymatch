@@ -78,8 +78,10 @@ void main() {
       reason: 'Backend not reachable; start the e2e stack first',
     );
     // Create a single user used by all the tests in this file. Use the
-    // seeded moderator so `addEvent` (which needs `event.create`) and
-    // `updateEvent` (creator-only on the moderator's events) pass.
+    // seeded moderator so `addEvent` (needs `event.create`) and
+    // `updateEvent` pass — as the event creator AND via the moderator's
+    // `event.edit.any` override (this suite does not exclusively cover
+    // the creator-scoped path; that is a separate coverage concern).
     userId = await loginE2EModerator(api);
   });
 
