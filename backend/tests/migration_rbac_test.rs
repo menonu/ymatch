@@ -109,23 +109,24 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .unwrap();
-    // 14 = 12 from ADR 0004 (8 global + 4 event) + 2 from ADR 0005
-    // (merch.create event scope + merch.create.any global override).
+    // 19 = 14 from ADR 0004/0005 (9 global + 5 event) + 5 from #370
+    // (merch.edit event + merch.edit.any global, group.edit event +
+    // group.edit.any global, match.delete global).
     assert_eq!(
-        perms, 14,
-        "expected exactly 14 permissions (9 global + 5 event)"
+        perms, 19,
+        "expected exactly 19 permissions (12 global + 7 event)"
     );
 
     let rp: i64 = sqlx::query_scalar("SELECT count(*) FROM role_permissions")
         .fetch_one(&pool)
         .await
         .unwrap();
-    // 24 = 20 from ADR 0004 (8 admin + 6 moderator + 4 creator + 2 editor)
-    // + 4 from ADR 0005 (creator+editor -> merch.create, moderator+admin ->
-    // merch.create.any).
+    // 34 = 24 from ADR 0004/0005 (9 admin + 7 moderator + 5 creator + 3 editor)
+    // + 10 from #370 (creator+editor -> merch.edit, group.edit; moderator+admin
+    // -> merch.edit.any, group.edit.any, match.delete).
     assert_eq!(
-        rp, 24,
-        "expected exactly 24 role->permission rows (9 admin + 7 moderator + 5 creator + 3 editor)"
+        rp, 34,
+        "expected exactly 34 role->permission rows (12 admin + 10 moderator + 7 creator + 5 editor)"
     );
 
     // ADR 0005: the two new permissions and their four role grants exist.
@@ -164,6 +165,57 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         assert!(
             exists,
             "ADR 0005 must grant {r_scope}/{r_name} -> {p_scope}/{p_name}"
+        );
+    }
+
+    // #370: the five new permissions and their ten role grants exist.
+    for (scope_type, name) in [
+        ("event", "merch.edit"),
+        ("global", "merch.edit.any"),
+        ("event", "group.edit"),
+        ("global", "group.edit.any"),
+        ("global", "match.delete"),
+    ] {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM permissions WHERE scope_type = $1 AND name = $2)",
+        )
+        .bind(scope_type)
+        .bind(name)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(exists, "#370 must seed permission {scope_type}/{name}");
+    }
+    for (r_scope, r_name, p_scope, p_name) in [
+        ("event", "creator", "event", "merch.edit"),
+        ("event", "editor", "event", "merch.edit"),
+        ("event", "creator", "event", "group.edit"),
+        ("event", "editor", "event", "group.edit"),
+        ("global", "moderator", "global", "merch.edit.any"),
+        ("global", "admin", "global", "merch.edit.any"),
+        ("global", "moderator", "global", "group.edit.any"),
+        ("global", "admin", "global", "group.edit.any"),
+        ("global", "moderator", "global", "match.delete"),
+        ("global", "admin", "global", "match.delete"),
+    ] {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM role_permissions rp
+                JOIN roles r ON r.id = rp.role_id
+                JOIN permissions p ON p.id = rp.permission_id
+                WHERE r.scope_type = $1 AND r.name = $2
+                  AND p.scope_type = $3 AND p.name = $4)",
+        )
+        .bind(r_scope)
+        .bind(r_name)
+        .bind(p_scope)
+        .bind(p_name)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            exists,
+            "#370 must grant {r_scope}/{r_name} -> {p_scope}/{p_name}"
         );
     }
 
@@ -331,6 +383,17 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         .execute(&pool)
         .await
         .expect("re-running the ADR 0005 migration is idempotent");
+    // And re-run the #370 merch-edit/group-edit/match-delete migration
+    // (20260709000000).
+    let merch_edit = full
+        .migrations
+        .iter()
+        .find(|m| m.version == 20260709000000)
+        .expect("#370 migration present");
+    sqlx::raw_sql(merch_edit.sql.as_ref())
+        .execute(&pool)
+        .await
+        .expect("re-running the #370 migration is idempotent");
 
     let roles_again: i64 = sqlx::query_scalar("SELECT count(*) FROM roles")
         .fetch_one(&pool)
@@ -342,7 +405,7 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(
-        perms_again, 14,
+        perms_again, 19,
         "idempotent re-run must not add permissions"
     );
     let rp_again: i64 = sqlx::query_scalar("SELECT count(*) FROM role_permissions")
@@ -350,7 +413,7 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(
-        rp_again, 24,
+        rp_again, 34,
         "idempotent re-run must not add role->permission rows"
     );
     // 5 seeded users -> 4 known-role backfills (bogus dropped) + 1 editor grant
