@@ -247,3 +247,54 @@ pub async fn list_event_members(
     let members = state.rbac.list_event_members(event_id).await?;
     Ok(Json(ListEventMembersResponse { members }))
 }
+
+/// Report the caller's effective standing on `event_id`
+/// (`GET /api/v1/events/:id/my-role`). Unlike the creator-only
+/// [`list_event_members`], this is **not** gated by `event.member.manage`: any
+/// active caller may read their own role, so a plain viewer can pre-gate the
+/// Add Merch button (#366) instead of discovering the 403 on click.
+///
+/// The response carries the caller's event-scoped membership (`role`), whether
+/// a global admin/moderator role is in effect (`global_override`), and the
+/// **exact** `merch.create` decision the [`create_merch`](crate::handlers::merch)
+/// handler enforces (`can_create_merch`) — computed via the same
+/// [`RbacService::check`], so the frontend gate is not a re-derivation.
+///
+/// The event's existence is confirmed (404) before any role query, matching
+/// [`update_event`]'s 404-before-decide convention.
+pub async fn get_my_event_role(
+    State(state): State<AppState>,
+    Path(event_id): Path<i32>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<Json<MyEventRoleResponse>, AppError> {
+    let uid = query
+        .user_id
+        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
+    let user = state.policy.verify_active(uid).await?;
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+
+    let role = state
+        .rbac
+        .event_role_name(user.id, event_id)
+        .await?
+        .unwrap_or_else(|| "none".to_string());
+    let global_override = matches!(
+        state.rbac.global_role_name(user.id).await?,
+        Some(ref g) if g == "admin" || g == "moderator"
+    );
+    let can_create_merch = state
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::MerchCreate)
+        .await
+        .is_ok();
+
+    Ok(Json(MyEventRoleResponse {
+        role,
+        global_override,
+        can_create_merch,
+    }))
+}

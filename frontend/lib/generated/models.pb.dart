@@ -3257,6 +3257,92 @@ class ListEventMembersResponse extends $pb.GeneratedMessage {
   $pb.PbList<EventMember> get members => $_getList(0);
 }
 
+/// Current-user event-role API (#366): the caller's standing on a single
+/// event, used by the frontend to gate the Add Merch button without reading the
+/// denormalized `User.role`. Accessible to any active caller (no 403 for a plain
+/// viewer) — unlike the creator-only `members` list, this is the per-viewer gate.
+///
+/// `can_create_merch` is the exact decision `create_merch` enforces (via
+/// `RbacService::check(MerchCreate)`), so the frontend gate is the same check,
+/// not a re-derivation.
+class MyEventRoleResponse extends $pb.GeneratedMessage {
+  factory MyEventRoleResponse({
+    $core.String? role,
+    $core.bool? globalOverride,
+    $core.bool? canCreateMerch,
+  }) {
+    final result = create();
+    if (role != null) result.role = role;
+    if (globalOverride != null) result.globalOverride = globalOverride;
+    if (canCreateMerch != null) result.canCreateMerch = canCreateMerch;
+    return result;
+  }
+
+  MyEventRoleResponse._();
+
+  factory MyEventRoleResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MyEventRoleResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MyEventRoleResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'role')
+    ..aOB(2, _omitFieldNames ? '' : 'globalOverride')
+    ..aOB(3, _omitFieldNames ? '' : 'canCreateMerch')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MyEventRoleResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MyEventRoleResponse copyWith(void Function(MyEventRoleResponse) updates) =>
+      super.copyWith((message) => updates(message as MyEventRoleResponse))
+          as MyEventRoleResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MyEventRoleResponse create() => MyEventRoleResponse._();
+  @$core.override
+  MyEventRoleResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MyEventRoleResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MyEventRoleResponse>(create);
+  static MyEventRoleResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get role => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set role($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRole() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRole() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get globalOverride => $_getBF(1);
+  @$pb.TagNumber(2)
+  set globalOverride($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGlobalOverride() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGlobalOverride() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get canCreateMerch => $_getBF(2);
+  @$pb.TagNumber(3)
+  set canCreateMerch($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCanCreateMerch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCanCreateMerch() => $_clearField(3);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

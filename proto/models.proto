@@ -266,3 +266,17 @@ message EventMember {
 message ListEventMembersResponse {
   repeated EventMember members = 1;
 }
+
+// Current-user event-role API (#366): the caller's standing on a single
+// event, used by the frontend to gate the Add Merch button without reading the
+// denormalized `User.role`. Accessible to any active caller (no 403 for a plain
+// viewer) — unlike the creator-only `members` list, this is the per-viewer gate.
+//
+// `can_create_merch` is the exact decision `create_merch` enforces (via
+// `RbacService::check(MerchCreate)`), so the frontend gate is the same check,
+// not a re-derivation.
+message MyEventRoleResponse {
+  string role = 1;           // event-scoped membership: "creator", "editor", or "none"
+  bool global_override = 2;  // a global admin/moderator role is in effect on this event
+  bool can_create_merch = 3; // the caller may create merch on this event
+}

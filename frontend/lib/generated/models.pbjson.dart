@@ -1217,3 +1217,19 @@ final $typed_data.Uint8List listEventMembersResponseDescriptor =
     $convert.base64Decode(
         'ChhMaXN0RXZlbnRNZW1iZXJzUmVzcG9uc2USLQoHbWVtYmVycxgBIAMoCzITLnltYXRjaC5Fdm'
         'VudE1lbWJlclIHbWVtYmVycw==');
+
+@$core.Deprecated('Use myEventRoleResponseDescriptor instead')
+const MyEventRoleResponse$json = {
+  '1': 'MyEventRoleResponse',
+  '2': [
+    {'1': 'role', '3': 1, '4': 1, '5': 9, '10': 'role'},
+    {'1': 'global_override', '3': 2, '4': 1, '5': 8, '10': 'globalOverride'},
+    {'1': 'can_create_merch', '3': 3, '4': 1, '5': 8, '10': 'canCreateMerch'},
+  ],
+};
+
+/// Descriptor for `MyEventRoleResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List myEventRoleResponseDescriptor = $convert.base64Decode(
+    'ChNNeUV2ZW50Um9sZVJlc3BvbnNlEhIKBHJvbGUYASABKAlSBHJvbGUSJwoPZ2xvYmFsX292ZX'
+    'JyaWRlGAIgASgIUg5nbG9iYWxPdmVycmlkZRIoChBjYW5fY3JlYXRlX21lcmNoGAMgASgIUg5j'
+    'YW5DcmVhdGVNZXJjaA==');

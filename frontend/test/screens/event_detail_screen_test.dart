@@ -199,4 +199,63 @@ void main() {
       );
     },
   );
+
+  // --- Add Merch button gate (#366) ---
+  // The FAB is shown only when the caller's `my-role` says they can create
+  // merch, so non-editors no longer see a button that 403s on tap. The backend
+  // 403 remains the defense-in-depth backstop on the (now-hidden) tap path.
+
+  testWidgets(
+    'Add Merch button is shown when the caller can create merch (#366)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            myEventRoleProvider(
+              5,
+            ).overrideWith(
+              (ref) async => MyEventRoleResponse()..canCreateMerch = true,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(find.byIcon(Icons.add_photo_alternate), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Add Merch button is hidden when the caller cannot create merch (#366)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            myEventRoleProvider(
+              5,
+            ).overrideWith(
+              (ref) async => MyEventRoleResponse()..canCreateMerch = false,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.byIcon(Icons.add_photo_alternate), findsNothing);
+    },
+  );
 }
