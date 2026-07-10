@@ -265,3 +265,124 @@ async fn test_event_member_assign_404_missing_target(pool: PgPool) {
     .await;
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
+
+// --- GET /api/v1/events/:id/my-role (#366) --------------------------------
+//
+// Unlike the creator-only `members` list, `my-role` is readable by any active
+// caller — it is the per-viewer gate the frontend uses to show/hide the Add
+// Merch button. `can_create_merch` is the exact `merch.create` decision the
+// `create_merch` handler enforces; `role` is the caller's event-scoped
+// membership; `global_override` is true when a global admin/moderator role is
+// in effect.
+//
+// NOTE: `create_event` grants the creator the global `moderator` role (event
+// creation requires `event.create`), so the creator legitimately reports
+// `global_override = true` — matching production, where event creators are
+// always moderators/admins.
+
+/// Fetch `my-role` as the caller and return the parsed JSON body.
+async fn my_role(pool: &PgPool, event_id: i64, caller: i64) -> serde_json::Value {
+    let resp = get_request(
+        pool,
+        &format!("/api/v1/events/{}/my-role?user_id={}", event_id, caller),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK, "my-role should be 200");
+    serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap()
+}
+
+/// Read a proto3 bool field, treating an absent field (proto3 omits
+/// default-valued scalars, so `false` is not serialized) as `false`.
+fn bool_field(body: &serde_json::Value, key: &str) -> bool {
+    body[key].as_bool().unwrap_or(false)
+}
+
+#[sqlx::test]
+async fn test_my_role_creator(pool: PgPool) {
+    let creator = login_guest(&pool, "myrole-creator", "tok").await;
+    let event_id = create_event(&pool, "My Role Creator Event", creator).await;
+
+    // The creator is the event's `creator` member AND a global moderator (via
+    // the create_event helper), so they can create merch both ways.
+    let body = my_role(&pool, event_id, creator).await;
+    assert_eq!(body["role"], "creator");
+    assert!(bool_field(&body, "globalOverride"));
+    assert!(bool_field(&body, "canCreateMerch"));
+}
+
+#[sqlx::test]
+async fn test_my_role_editor(pool: PgPool) {
+    let creator = login_guest(&pool, "myrole-ed-creator", "tok").await;
+    let event_id = create_event(&pool, "My Role Editor Event", creator).await;
+    // A pure editor: only an event-scoped editor role, no global role.
+    let editor = login_guest(&pool, "myrole-editor", "tok").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+
+    let body = my_role(&pool, event_id, editor).await;
+    assert_eq!(body["role"], "editor");
+    assert!(!bool_field(&body, "globalOverride"));
+    assert!(bool_field(&body, "canCreateMerch"));
+}
+
+#[sqlx::test]
+async fn test_my_role_plain_viewer(pool: PgPool) {
+    let creator = login_guest(&pool, "myrole-pv-creator", "tok").await;
+    let event_id = create_event(&pool, "My Role Plain Event", creator).await;
+    // A viewer with no role on the event and no global role.
+    let viewer = login_guest(&pool, "myrole-viewer", "tok").await;
+
+    let body = my_role(&pool, event_id, viewer).await;
+    assert_eq!(body["role"], "none");
+    assert!(!bool_field(&body, "globalOverride"));
+    assert!(!bool_field(&body, "canCreateMerch"));
+}
+
+#[sqlx::test]
+async fn test_my_role_moderator_global_override(pool: PgPool) {
+    let creator = login_guest(&pool, "myrole-mod-creator", "tok").await;
+    let event_id = create_event(&pool, "My Role Mod Event", creator).await;
+    // A global moderator who is NOT a member of the event: power comes from
+    // `merch.create.any`, so role is "none" but can_create_merch is true.
+    let moderator = login_guest(&pool, "myrole-mod", "tok").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+
+    let body = my_role(&pool, event_id, moderator).await;
+    assert_eq!(body["role"], "none");
+    assert!(bool_field(&body, "globalOverride"));
+    assert!(bool_field(&body, "canCreateMerch"));
+}
+
+#[sqlx::test]
+async fn test_my_role_admin_bypass(pool: PgPool) {
+    let creator = login_guest(&pool, "myrole-adm-creator", "tok").await;
+    let event_id = create_event(&pool, "My Role Admin Event", creator).await;
+    // A global admin who is NOT a member: the superuser bypass grants every
+    // permission, including merch.create.
+    let admin = login_guest(&pool, "myrole-admin", "tok").await;
+    grant_global_role(&pool, admin, "admin").await;
+
+    let body = my_role(&pool, event_id, admin).await;
+    assert_eq!(body["role"], "none");
+    assert!(bool_field(&body, "globalOverride"));
+    assert!(bool_field(&body, "canCreateMerch"));
+}
+
+#[sqlx::test]
+async fn test_my_role_404_missing_event(pool: PgPool) {
+    let viewer = login_guest(&pool, "myrole-404-viewer", "tok").await;
+    let resp = get_request(
+        &pool,
+        &format!("/api/v1/events/999999/my-role?user_id={}", viewer),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn test_my_role_400_missing_user_id(pool: PgPool) {
+    let creator = login_guest(&pool, "myrole-400-creator", "tok").await;
+    let event_id = create_event(&pool, "My Role 400 Event", creator).await;
+
+    let resp = get_request(&pool, &format!("/api/v1/events/{}/my-role", event_id)).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}

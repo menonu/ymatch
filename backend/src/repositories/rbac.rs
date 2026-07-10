@@ -191,6 +191,55 @@ impl RbacRepository {
             })
             .collect())
     }
+
+    /// The caller's single event-scoped role on `event_id` (#366), or `None` if
+    /// they hold no event role. Used by `GET /events/:id/my-role` to report the
+    /// caller's direct membership (`creator` / `editor`) for the frontend role
+    /// badge — distinct from the `*.any` / admin-bypass *ability*, which is
+    /// reported separately. A user could in principle hold both a `creator`
+    /// and `editor` row; `creator` wins (the more privileged role), matching
+    /// [`Self::list_event_members`]'s creator-before-editor ordering.
+    pub async fn event_role_name(
+        &self,
+        user_id: i32,
+        event_id: i32,
+    ) -> Result<Option<String>, AppError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT r.name
+             FROM user_roles ur
+             JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = $1
+               AND ur.scope_type = 'event'
+               AND ur.scope_id = $2
+             ORDER BY CASE r.name WHEN 'creator' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END
+             LIMIT 1",
+        )
+        .bind(user_id)
+        .bind(event_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(name,)| name))
+    }
+
+    /// The caller's single global role name (`admin` / `moderator` / `user`) if
+    /// they hold one (#366), or `None` if unassigned. Used by
+    /// `GET /events/:id/my-role` to report `global_override` — whether the
+    /// caller's power on the event comes from a global role rather than event
+    /// membership. The seeded model assigns at most one global role per user;
+    /// `None` covers an unassigned guest.
+    pub async fn global_role_name(&self, user_id: i32) -> Result<Option<String>, AppError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT r.name
+             FROM user_roles ur
+             JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = $1 AND ur.scope_type = 'global' AND ur.scope_id IS NULL
+             LIMIT 1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(name,)| name))
+    }
 }
 
 #[cfg(test)]

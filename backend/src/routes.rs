@@ -301,6 +301,10 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             get(handlers::list_event_members),
         )
         .route(
+            "/api/v1/events/:id/my-role",
+            get(handlers::get_my_event_role),
+        )
+        .route(
             "/api/v1/events/:id/members/:target_id",
             post(handlers::assign_event_member).delete(handlers::revoke_event_member),
         )
