@@ -426,6 +426,27 @@ final merchProvider = FutureProvider.family<List<Merchandise>, int>((
       .toList();
 });
 
+// --- My event role (#366) ---
+// The caller's effective standing on a single event, used to gate the Add Merch
+// button without reading the denormalized `User.role`. `canCreateMerch` is the
+// exact `merch.create` decision the backend enforces, so the gate is not a
+// client-side re-derivation. Returns `null` when there is no logged-in user or
+// the fetch fails — both leave the button hidden (the safe default; the
+// backend 403 remains the defense-in-depth backstop on tap).
+final myEventRoleProvider =
+    FutureProvider.autoDispose.family<MyEventRoleResponse?, int>((ref, eventId) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return null;
+  final client = ref.watch(apiClientProvider);
+  try {
+    final json = await client.get('/api/v1/events/$eventId/my-role?user_id=${user.id}');
+    if (json is! Map<String, dynamic>) return null;
+    return MyEventRoleResponse()..mergeFromProto3Json(json);
+  } catch (_) {
+    return null;
+  }
+});
+
 class MerchController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
   MerchController(this.client) : super(const AsyncValue.data(null));

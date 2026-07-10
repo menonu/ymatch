@@ -72,20 +72,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           return Scaffold(
             appBar: AppBar(),
             body: _buildEmptyState(context, ref),
-            floatingActionButton: FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AddMerchScreen(eventId: widget.eventId),
-                    fullscreenDialog: true,
-                  ),
-                );
-              },
-              label: Text(l10n.addMerch),
-              icon: const Icon(Icons.add_photo_alternate),
-            ),
+            floatingActionButton: _buildAddMerchFab(context),
           );
         }
 
@@ -619,20 +606,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
               ],
             ),
-            floatingActionButton: FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AddMerchScreen(eventId: widget.eventId),
-                    fullscreenDialog: true,
-                  ),
-                );
-              },
-              label: Text(l10n.addMerch),
-              icon: const Icon(Icons.add_photo_alternate),
-            ),
+            floatingActionButton: _buildAddMerchFab(context),
           ),
         );
       },
@@ -640,6 +614,31 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, stack) =>
           Scaffold(body: Center(child: Text(l10n.errorPrefix(err.toString())))),
+    );
+  }
+
+  // --- Add Merch FAB (#366) ---
+  // Gate the Add Merch button on the caller's effective `merch.create` decision
+  // from `GET /events/:id/my-role`, so non-editors no longer see a button that
+  // 403s on tap. Returns `null` (no FAB) while the role is loading, on fetch
+  // failure, or when the caller cannot create merch — the backend 403 remains
+  // the defense-in-depth backstop on the (now-hidden) tap path.
+  Widget? _buildAddMerchFab(BuildContext context) {
+    final role = ref.watch(myEventRoleProvider(widget.eventId)).valueOrNull;
+    if (role == null || !role.canCreateMerch) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return FloatingActionButton.extended(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AddMerchScreen(eventId: widget.eventId),
+            fullscreenDialog: true,
+          ),
+        );
+      },
+      label: Text(l10n.addMerch),
+      icon: const Icon(Icons.add_photo_alternate),
     );
   }
 
