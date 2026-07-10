@@ -4,9 +4,9 @@
 # ADR 0004 §6 / #228 PR4. This is the per-environment operator tool for
 # granting the global `user` / `moderator` / `admin` role. It mirrors the
 # production `UserRepository::set_role` path (backend/src/repositories/user.rs):
-# it writes `users.role` AND the `user_roles` global row in one atomic
-# operation so the denormalized `users.role` mirror and the authoritative
-# `user_roles` table cannot drift (ADR 0004 §2). Re-running with the same
+# it writes the `user_roles` global row (the single source of truth since ADR
+# 0006 dropped the `users.role` mirror). `proto.User.role` is derived from that
+# row at read time, so no `users` column is written. Re-running with the same
 # (username, role) leaves the user's state unchanged.
 #
 # Usage:
@@ -89,17 +89,17 @@ fi
 
 echo "Granting global role '$ROLE' to user '$USERNAME'..."
 
-# Single atomic DO block: look up user + role, mirror-write users.role and
-# the user_roles global row. The values are interpolated by bash directly into
-# the SQL rather than via psql `:'var` variables, because psql does NOT
-# interpolate variables inside a dollar-quoted (`$$ ... $$`) body — it treats
-# the body as a string literal. This is safe ONLY because of the validation
-# above: <role> is one of three literals, and <username> matched
-# [A-Za-z0-9_.@-], so neither can contain a quote or other SQL metacharacter
-# that could break out of the string literals below. The heredoc is unquoted so
-# bash expands ${USERNAME}/${ROLE}, and `$$` is escaped as `\$\$` so bash does
-# not expand it to its PID. ON_ERROR_STOP makes psql exit non-zero if the DO
-# block raises (user/role not found), which `set -e` surfaces as a failure.
+# Single atomic DO block: look up user + role, then replace the user_roles
+# global row. The values are interpolated by bash directly into the SQL rather
+# than via psql `:'var` variables, because psql does NOT interpolate variables
+# inside a dollar-quoted (`$$ ... $$`) body — it treats the body as a string
+# literal. This is safe ONLY because of the validation above: <role> is one of
+# three literals, and <username> matched [A-Za-z0-9_.@-], so neither can contain
+# a quote or other SQL metacharacter that could break out of the string
+# literals below. The heredoc is unquoted so bash expands ${USERNAME}/${ROLE},
+# and `$$` is escaped as `\$\$` so bash does not expand it to its PID.
+# ON_ERROR_STOP makes psql exit non-zero if the DO block raises (user/role not
+# found), which `set -e` surfaces as a failure.
 "${PSQL[@]}" -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 DECLARE
@@ -114,9 +114,8 @@ BEGIN
   IF rid IS NULL THEN
     RAISE EXCEPTION 'role not found (global/${ROLE}); catalog not seeded?';
   END IF;
-  -- 1. Update the denormalized mirror (proto User.role / frontend admin gate).
-  UPDATE users SET role = '${ROLE}' WHERE id = uid;
-  -- 2. Replace the authoritative user_roles global row. A user holds at most
+  -- 1. Replace the authoritative user_roles global row (ADR 0006: the only
+  --    store of the global role; users.role was dropped). A user holds at most
   --    one global role, so delete-then-insert is correct; the insert is
   --    idempotent via ON CONFLICT (re-grant / demote both land here).
   DELETE FROM user_roles WHERE user_id = uid AND scope_type = 'global' AND scope_id IS NULL;
@@ -127,4 +126,4 @@ END
 \$\$;
 SQL
 
-echo "Done. '$USERNAME' now holds the global '$ROLE' role (users.role + user_roles mirrored)."
+echo "Done. '$USERNAME' now holds the global '$ROLE' role (user_roles global row)."

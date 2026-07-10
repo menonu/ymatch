@@ -18,14 +18,21 @@ use std::borrow::Cow;
 /// The version of the migration under test (20260705000000).
 const TARGET_VERSION: i64 = 20260705000000;
 
+/// The ADR 0006 / #371 migration that drops the `users.role` column
+/// (20260710000000). It is applied LAST, after the target migration's
+/// idempotency re-run, because the target's backfill reads `u.role` — a column
+/// it can only reference while it still exists.
+const DROP_ROLE_VERSION: i64 = 20260710000000;
+
 #[sqlx::test(migrations = false)]
 async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
     // 1. Apply every migration BEFORE the target, so the RBAC tables are absent
     //    and we can seed users/events with arbitrary roles directly via SQL.
     //    Only strictly-prior versions are applied here (not later migrations
     //    such as 20260708000000_merch_create_permission, which depend on the
-    //    RBAC tables the target creates); the target and all later migrations
-    //    are applied together by `full.run` below.
+    //    RBAC tables the target creates); the target and later migrations up
+    //    to (but excluding) the DROP_COLUMN migration are applied by
+    //    `before_drop.run` below, and the DROP migration is applied last.
     let full = sqlx::migrate!("./migrations");
     let prior = sqlx::migrate::Migrator {
         migrations: Cow::Owned(
@@ -38,6 +45,21 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         ..sqlx::migrate::Migrator::DEFAULT
     };
     prior.run(&pool).await.expect("prior migrations apply");
+
+    // Migrator that applies the target and every later migration EXCEPT the
+    // DROP_COLUMN migration. The DROP is delayed to the end of the test so the
+    // target migration's idempotency re-run (which reads `u.role` in its
+    // backfill) still finds the column.
+    let before_drop = sqlx::migrate::Migrator {
+        migrations: Cow::Owned(
+            full.migrations
+                .iter()
+                .filter(|m| m.version < DROP_ROLE_VERSION)
+                .cloned()
+                .collect(),
+        ),
+        ..sqlx::migrate::Migrator::DEFAULT
+    };
 
     // 2. Seed users with a mix of global roles, including one bogus value
     //    ('superuser') that must be silently dropped by the backfill JOIN, and
@@ -95,8 +117,12 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
             .await
             .unwrap();
 
-    // 3. Apply the target migration (the one under test).
-    full.run(&pool).await.expect("target migration applies");
+    // 3. Apply the target migration and every later migration up to (but
+    //    excluding) the DROP_COLUMN migration. The DROP is applied last.
+    before_drop
+        .run(&pool)
+        .await
+        .expect("target + later migrations (pre-DROP) apply");
 
     // 4. Assert the seeded catalog.
     let roles: i64 = sqlx::query_scalar("SELECT count(*) FROM roles")
@@ -426,4 +452,33 @@ async fn migration_builds_rbac_catalog_and_backfills_assignments(pool: PgPool) {
         ur_again, 6,
         "idempotent re-run must not duplicate user_roles rows (4 global + 1 creator + 1 editor)"
     );
+
+    // 10. Apply the ADR 0006 / #371 DROP_COLUMN migration LAST. It must apply
+    //     cleanly now that the target's backfill has already run, and the
+    //     `users.role` column the target reads must be gone afterward.
+    full.run(&pool)
+        .await
+        .expect("DROP_COLUMN migration applies after the target's idempotency re-run");
+    let role_cols: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM information_schema.columns
+         WHERE table_name = 'users' AND column_name = 'role'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        role_cols, 0,
+        "ADR 0006: the users.role column must be dropped"
+    );
+    // The DROP migration is idempotent (DROP COLUMN IF EXISTS): re-running it
+    // on a DB where the column is already gone is a no-op.
+    let drop_role = full
+        .migrations
+        .iter()
+        .find(|m| m.version == DROP_ROLE_VERSION)
+        .expect("DROP_COLUMN migration present");
+    sqlx::raw_sql(drop_role.sql.as_ref())
+        .execute(&pool)
+        .await
+        .expect("re-running the DROP_COLUMN migration is idempotent");
 }

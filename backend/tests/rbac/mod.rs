@@ -241,7 +241,7 @@ async fn test_rbac_ban_unban_permission(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_rbac_update_user_role_admin_only_and_mirror_sync(pool: PgPool) {
+async fn test_rbac_update_user_role_admin_only_and_single_source(pool: PgPool) {
     let admin = login_guest(&pool, "rbac-role-admin", "t").await;
     grant_global_role(&pool, admin, "admin").await;
     let target = login_guest(&pool, "rbac-role-target", "t").await;
@@ -264,14 +264,10 @@ async fn test_rbac_update_user_role_admin_only_and_mirror_sync(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // ADR 0004 §2 mirror sync: users.role AND the user_roles global row both
-    // reflect the new role.
-    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
-        .bind(target as i32)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(role, "moderator");
+    // ADR 0006: user_roles is the single source of truth for the global role
+    // (users.role was dropped). The derived role the API exposes as
+    // User.role must reflect the new role, and exactly one global row exists.
+    assert_eq!(global_role_of(&pool, target).await, "moderator");
     let has_row: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM user_roles ur
          JOIN roles r ON r.id = ur.role_id
@@ -303,12 +299,7 @@ async fn test_rbac_update_user_role_admin_only_and_mirror_sync(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
-        .bind(target as i32)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(role, "user");
+    assert_eq!(global_role_of(&pool, target).await, "user");
     let elevated: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM user_roles ur
          JOIN roles r ON r.id = ur.role_id

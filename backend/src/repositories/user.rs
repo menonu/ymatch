@@ -20,14 +20,19 @@ use sqlx::{PgPool, Row};
 /// Verified user aggregate used by [`crate::services::PermissionPolicy`].
 ///
 /// Distinct from the proto [`User`] message: it carries only the fields
-/// needed for permission checks (id, role, is_banned). The struct is
-/// constructed by [`UserRepository::get_verified`] and includes a resolved
-/// "is the user effectively banned right now" flag, including the
-/// temporary-ban-expiry logic.
+/// needed for permission checks (id, is_banned). The struct is constructed by
+/// [`UserRepository::get_verified`] and includes a resolved "is the user
+/// effectively banned right now" flag, including the temporary-ban-expiry
+/// logic.
+///
+/// The global role is intentionally **not** a field here. Authorization reads
+/// the authoritative role from `user_roles` via [`RbacService::check`]
+/// (`backend/src/services/rbac.rs`), which takes a `VerifiedUser` and uses
+/// only its `id`; no authz path ever needed the role on this struct (ADR 0006
+/// removed the `users.role` mirror that previously populated it).
 #[derive(Debug, Clone)]
 pub struct VerifiedUser {
     pub id: i32,
-    pub role: String,
     pub is_banned: bool,
 }
 
@@ -189,27 +194,18 @@ impl UserRepository {
 
     /// Set a user's *global* role. Returns `None` if the user does not exist.
     ///
-    /// ADR 0004 §2: `user_roles` (scope_type='global', scope_id=NULL) is the
-    /// authoritative global role, and `users.role` is kept as a denormalized
-    /// mirror so the proto `User.role` field and the frontend admin gate keep
-    /// working. This method writes both in **one transaction** so they cannot
-    /// drift: it updates `users.role`, removes the user's prior global
-    /// `user_roles` assignment, and inserts the new `global/<role>` row. If
-    /// `role` is not a known global role in the `roles` catalog, the
-    /// transaction rolls back and the caller gets `AppError::bad_request`.
+    /// ADR 0006: `user_roles` (scope_type='global', scope_id=NULL) is the single
+    /// source of truth for the global role — the `users.role` mirror was dropped.
+    /// `proto.User.role` is derived from this row at read time (`USER_COLUMNS`),
+    /// so this method writes only `user_roles`: it removes the user's prior
+    /// global assignment and inserts the new `global/<role>` row in one
+    /// transaction. If `role` is not a known global role in the `roles` catalog,
+    /// the transaction rolls back and the caller gets `AppError::bad_request`.
     pub async fn set_role(&self, id: i32, role: &str) -> Result<Option<()>, AppError> {
         let mut tx = self.pool.begin().await?;
-        let affected = sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
-            .bind(role)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?
-            .rows_affected();
-        if affected == 0 {
-            // Roll back the empty tx before returning; nothing was changed.
-            tx.rollback().await?;
-            return Ok(None);
-        }
+        // Validate the role exists in the catalog before mutating, so an
+        // unknown role rolls back cleanly. (The `roles` catalog is seeded by
+        // the RBAC migration and is static between migrations.)
         let role_id: Option<i32> =
             sqlx::query_scalar("SELECT id FROM roles WHERE scope_type = 'global' AND name = $1")
                 .bind(role)
@@ -221,8 +217,24 @@ impl UserRepository {
                 "Invalid role: {role}. Must be one of: user, moderator, admin"
             )));
         };
+        // Detect a non-existent user with an explicit existence check. The
+        // delete-then-insert row counts can't be used for this: a real user may
+        // have no prior global row to delete (the `user` default role is
+        // implicit, not a row), so "zero rows deleted" does not imply "missing
+        // user". A missing user must surface as `Ok(None)` (→ 404 at the call
+        // site) rather than a FK violation on the insert below.
+        let existed: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id = $1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if existed == 0 {
+            tx.rollback().await?;
+            return Ok(None);
+        }
         // Replace the user's prior global assignment with the new one. A user
-        // holds at most one global role, so delete-then-insert is correct.
+        // holds at most one global role, so delete-then-insert is correct; the
+        // insert is idempotent via ON CONFLICT (re-grant / demote both land
+        // here).
         sqlx::query(
             "DELETE FROM user_roles
              WHERE user_id = $1 AND scope_type = 'global' AND scope_id IS NULL",
@@ -280,8 +292,12 @@ impl UserRepository {
 
     /// Fetch a user and resolve the effective ban state (including
     /// temporary-ban expiry). Returns `None` if the user does not exist.
+    ///
+    /// ADR 0006: this no longer reads a role — `VerifiedUser` carries only the
+    /// `id` and resolved ban flag that authorization needs; the global role is
+    /// read from `user_roles` by `RbacService::check`, not here.
     pub async fn get_verified(&self, id: i32) -> Result<Option<VerifiedUser>, AppError> {
-        let row = sqlx::query("SELECT id, role, is_banned, banned_until FROM users WHERE id = $1")
+        let row = sqlx::query("SELECT id, is_banned, banned_until FROM users WHERE id = $1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
@@ -303,12 +319,30 @@ impl UserRepository {
 
         Ok(Some(VerifiedUser {
             id: row.get("id"),
-            role: row.get("role"),
             is_banned: effectively_banned,
         }))
     }
 }
 
 /// Standard SELECT list for the `users` table. Used by all read paths.
-const USER_COLUMNS: &str =
-    "id, username, uuid, device_token, created_at, role, is_banned, ban_reason, banned_until";
+///
+/// ADR 0006: the `users.role` column was dropped; `User.role` (proto field 6)
+/// is now **derived** from `user_roles` at read time via the correlated
+/// subquery below, aliased as `role` so [`user_from_row`] is unchanged. The
+/// derivation reads the user's single global role (`scope_type='global'`,
+/// `scope_id IS NULL`) with precedence `admin > moderator > user`, and falls
+/// back to `'user'` (via `COALESCE`) for a guest with no global assignment —
+/// preserving the old `DEFAULT 'user'` column semantics. `user_roles(user_id)`
+/// is indexed (`idx_user_roles_user`), so this is one indexed lookup per fetch.
+const USER_COLUMNS: &str = concat!(
+    "id, username, uuid, device_token, created_at, ",
+    "COALESCE((",
+    "  SELECT r.name FROM user_roles ur ",
+    "  JOIN roles r ON r.id = ur.role_id ",
+    "  WHERE ur.user_id = users.id ",
+    "    AND ur.scope_type = 'global' AND ur.scope_id IS NULL ",
+    "  ORDER BY CASE r.name WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END ",
+    "  LIMIT 1",
+    "), 'user') AS role, ",
+    "is_banned, ban_reason, banned_until"
+);

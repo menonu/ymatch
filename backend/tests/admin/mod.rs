@@ -167,13 +167,38 @@ async fn test_admin_update_user_role_succeeds(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Verify the role was actually changed in the DB.
-    let row: (String,) = sqlx::query_as("SELECT role FROM users WHERE id = $1")
-        .bind(target_id as i32)
-        .fetch_one(&pool)
+    // Verify the role was actually changed. ADR 0006: the role lives in
+    // user_roles (users.role was dropped), so derive it the way the API does.
+    assert_eq!(global_role_of(&pool, target_id).await, "moderator");
+}
+
+#[sqlx::test]
+async fn test_admin_update_user_role_nonexistent_returns_404(pool: PgPool) {
+    // ADR 0006: set_role detects a non-existent target via an explicit
+    // existence check (the delete-then-insert row counts can't, since a real
+    // user may have no prior global row) and returns Ok(None) → 404. Exercise
+    // that branch: a valid role on a user id that does not exist must 404,
+    // not 500 (FK violation) and not 200.
+    let (admin_id, _eid) =
+        create_test_user_and_event(pool.clone(), "admin-role-404", "Admin Role 404").await;
+    grant_global_role(&pool, admin_id, "admin").await;
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    999_999, admin_id
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "moderator"}"#))
+                .unwrap(),
+        )
         .await
         .unwrap();
-    assert_eq!(row.0, "moderator");
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
 #[sqlx::test]

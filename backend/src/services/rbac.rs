@@ -556,7 +556,6 @@ mod tests {
     fn verified(id: i32) -> VerifiedUser {
         VerifiedUser {
             id,
-            role: "user".to_string(),
             is_banned: false,
         }
     }
@@ -601,7 +600,7 @@ mod tests {
 
         // Four users: admin, moderator, plain user, and a future editor.
         for name in ["rbac-admin", "rbac-mod", "rbac-user", "rbac-editor"] {
-            sqlx::query("INSERT INTO users (username, role) VALUES ($1, 'user')")
+            sqlx::query("INSERT INTO users (username) VALUES ($1)")
                 .bind(name)
                 .execute(&pool)
                 .await
