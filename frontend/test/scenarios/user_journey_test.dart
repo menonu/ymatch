@@ -177,6 +177,19 @@ void main() {
             }
           }
 
+          // #366: the event creator's my-role — the Add Merch button is gated
+          // on canCreateMerch, so the mock must report the creator can create.
+          if (path.startsWith('/api/v1/events/') && path.contains('/my-role')) {
+            return http.Response(
+              jsonEncode({
+                'role': 'creator',
+                'globalOverride': false,
+                'canCreateMerch': true,
+              }),
+              200,
+            );
+          }
+
           if (path.startsWith('/api/v1/events/') && path.endsWith('/merch')) {
             if (method == 'GET') {
               return http.Response(jsonEncode(mockBackendState['merch']), 200);
