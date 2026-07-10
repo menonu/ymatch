@@ -472,3 +472,24 @@ pub struct ListEventMembersResponse {
     #[prost(message, repeated, tag = "1")]
     pub members: ::prost::alloc::vec::Vec<EventMember>,
 }
+/// Current-user event-role API (#366): the caller's standing on a single
+/// event, used by the frontend to gate the Add Merch button without reading the
+/// denormalized `User.role`. Accessible to any active caller (no 403 for a plain
+/// viewer) — unlike the creator-only `members` list, this is the per-viewer gate.
+///
+/// `can_create_merch` is the exact decision `create_merch` enforces (via
+/// `RbacService::check(MerchCreate)`), so the frontend gate is the same check,
+/// not a re-derivation.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MyEventRoleResponse {
+    /// event-scoped membership: "creator", "editor", or "none"
+    #[prost(string, tag = "1")]
+    pub role: ::prost::alloc::string::String,
+    /// a global admin/moderator role is in effect on this event
+    #[prost(bool, tag = "2")]
+    pub global_override: bool,
+    /// the caller may create merch on this event
+    #[prost(bool, tag = "3")]
+    pub can_create_merch: bool,
+}
