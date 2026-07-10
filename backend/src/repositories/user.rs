@@ -217,10 +217,12 @@ impl UserRepository {
                 "Invalid role: {role}. Must be one of: user, moderator, admin"
             )));
         };
-        // A user holds at most one global role, so delete-then-insert is
-        // correct. Detect "user does not exist" via the prior global row (a
-        // missing user has none); if no row existed and none is inserted for a
-        // genuinely missing user, fall back to an existence check.
+        // Detect a non-existent user with an explicit existence check. The
+        // delete-then-insert row counts can't be used for this: a real user may
+        // have no prior global row to delete (the `user` default role is
+        // implicit, not a row), so "zero rows deleted" does not imply "missing
+        // user". A missing user must surface as `Ok(None)` (→ 404 at the call
+        // site) rather than a FK violation on the insert below.
         let existed: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id = $1")
             .bind(id)
             .fetch_one(&mut *tx)
@@ -229,6 +231,10 @@ impl UserRepository {
             tx.rollback().await?;
             return Ok(None);
         }
+        // Replace the user's prior global assignment with the new one. A user
+        // holds at most one global role, so delete-then-insert is correct; the
+        // insert is idempotent via ON CONFLICT (re-grant / demote both land
+        // here).
         sqlx::query(
             "DELETE FROM user_roles
              WHERE user_id = $1 AND scope_type = 'global' AND scope_id IS NULL",
