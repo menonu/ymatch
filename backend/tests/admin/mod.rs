@@ -167,13 +167,9 @@ async fn test_admin_update_user_role_succeeds(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Verify the role was actually changed in the DB.
-    let row: (String,) = sqlx::query_as("SELECT role FROM users WHERE id = $1")
-        .bind(target_id as i32)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(row.0, "moderator");
+    // Verify the role was actually changed. ADR 0006: the role lives in
+    // user_roles (users.role was dropped), so derive it the way the API does.
+    assert_eq!(global_role_of(&pool, target_id).await, "moderator");
 }
 
 #[sqlx::test]

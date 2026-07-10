@@ -248,12 +248,30 @@ async fn test_update_user_role(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let row = sqlx::query("SELECT role FROM users WHERE id = $1")
-        .bind(target_id as i32)
-        .fetch_one(&pool)
+    // ADR 0006: the role lives in user_roles (users.role was dropped), so
+    // derive it the way the API does rather than reading a dropped column.
+    assert_eq!(global_role_of(&pool, target_id).await, "moderator");
+
+    // The derivation must also flow through the actual `User` payload the
+    // frontend admin gate reads. Re-guest-login the target (idempotent on
+    // uuid) and assert the returned `User.role` reflects the promotion.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "role-target-test"}"#))
+                .unwrap(),
+        )
         .await
         .unwrap();
-    assert_eq!(sqlx::Row::get::<String, _>(&row, "role"), "moderator");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(user["id"].as_i64().unwrap(), target_id);
+    assert_eq!(user["role"].as_str().unwrap(), "moderator");
 }
 
 #[sqlx::test]

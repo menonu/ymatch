@@ -64,12 +64,8 @@ mod tests {
     use sqlx::PgPool;
     use std::sync::Arc;
 
-    fn user(id: i32, role: &str, is_banned: bool) -> VerifiedUser {
-        VerifiedUser {
-            id,
-            role: role.to_string(),
-            is_banned,
-        }
+    fn user(id: i32, is_banned: bool) -> VerifiedUser {
+        VerifiedUser { id, is_banned }
     }
 
     /// Build a `PermissionPolicy` backed by a lazy `PgPool` for tests
@@ -85,17 +81,13 @@ mod tests {
 
     #[tokio::test]
     async fn require_not_banned_allows_active() {
-        assert!(
-            policy_lazy()
-                .require_not_banned(&user(1, "user", false))
-                .is_ok()
-        );
+        assert!(policy_lazy().require_not_banned(&user(1, false)).is_ok());
     }
 
     #[tokio::test]
     async fn require_not_banned_rejects_banned() {
         let err = policy_lazy()
-            .require_not_banned(&user(1, "user", true))
+            .require_not_banned(&user(1, true))
             .unwrap_err();
         assert_eq!(err, AppError::forbidden("User is banned"));
     }
@@ -112,7 +104,7 @@ mod tests {
 
     #[sqlx::test]
     async fn verify_returns_user_when_present(pool: PgPool) {
-        sqlx::query("INSERT INTO users (id, username, role) VALUES (1, 'test', 'admin')")
+        sqlx::query("INSERT INTO users (id, username) VALUES (1, 'test')")
             .execute(&pool)
             .await
             .unwrap();
@@ -120,17 +112,14 @@ mod tests {
         let policy = PermissionPolicy::new(users);
         let u = policy.verify(1).await.unwrap();
         assert_eq!(u.id, 1);
-        assert_eq!(u.role, "admin");
     }
 
     #[sqlx::test]
     async fn verify_active_rejects_banned(pool: PgPool) {
-        sqlx::query(
-            "INSERT INTO users (id, username, role, is_banned) VALUES (1, 'test', 'user', true)",
-        )
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO users (id, username, is_banned) VALUES (1, 'test', true)")
+            .execute(&pool)
+            .await
+            .unwrap();
         let users = Arc::new(UserRepository::new(pool));
         let policy = PermissionPolicy::new(users);
         let err = policy.verify_active(1).await.unwrap_err();
@@ -139,7 +128,7 @@ mod tests {
 
     #[sqlx::test]
     async fn verify_active_passes_for_active(pool: PgPool) {
-        sqlx::query("INSERT INTO users (id, username, role) VALUES (1, 'test', 'user')")
+        sqlx::query("INSERT INTO users (id, username) VALUES (1, 'test')")
             .execute(&pool)
             .await
             .unwrap();

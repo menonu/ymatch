@@ -6,11 +6,12 @@
 -- the E2E tests have API access only (no DB). Without these seeds, every E2E
 -- test that creates an event / merch or calls an admin endpoint 403s.
 --
--- RBAC authorization reads the `user_roles` table (RbacService::check), NOT
--- `users.role` (which is only the denormalized mirror the proto `User.role`
--- field and the frontend admin gate read). So each seed sets BOTH the
--- `users.role` mirror AND the `user_roles` global row — setting `users.role`
--- alone is a no-op for authz (the bug that left admin_e2e_test red).
+-- RBAC authorization reads the `user_roles` table (RbacService::check) — and
+-- since ADR 0006 / #371 dropped the `users.role` column, `user_roles` is the
+-- sole source of truth for the global role (the proto `User.role` field the
+-- frontend admin gate reads is derived from it at read time). So each seed
+-- inserts the `users` row AND the `user_roles` global row; the role is no
+-- longer a column on `users`.
 --
 -- Run after the backend is up (migrations applied), so the `roles` table is
 -- populated. Idempotent: re-running (e.g. `task e2e:up` on a persistent stack)
@@ -21,8 +22,8 @@
 -- on `down -v`).
 
 -- 1. Admin ---------------------------------------------------------------
-INSERT INTO users (username, uuid, role, device_token)
-VALUES ('e2e-bootstrap-admin', 'e2e-bootstrap-admin', 'admin', 'e2e-bootstrap')
+INSERT INTO users (username, uuid, device_token)
+VALUES ('e2e-bootstrap-admin', 'e2e-bootstrap-admin', 'e2e-bootstrap')
 ON CONFLICT (uuid) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
@@ -33,11 +34,10 @@ WHERE u.uuid = 'e2e-bootstrap-admin'
 ON CONFLICT (user_id, role_id, scope_id) DO NOTHING;
 
 -- 2. Moderator ----------------------------------------------------------
-INSERT INTO users (username, uuid, role, device_token)
+INSERT INTO users (username, uuid, device_token)
 VALUES (
     'e2e-bootstrap-moderator',
     'e2e-bootstrap-moderator',
-    'moderator',
     'e2e-bootstrap'
 )
 ON CONFLICT (uuid) DO NOTHING;

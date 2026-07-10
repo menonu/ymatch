@@ -32,6 +32,12 @@ pub fn empty_to_none(s: Option<String>) -> Option<String> {
 /// is_banned, ban_reason, banned_until`. `password_hash` is intentionally
 /// NOT included here; auth handlers that need it select it explicitly and
 /// drop it before calling this mapper (or return their own type).
+///
+/// ADR 0006: `role` is no longer a stored `users` column — it is the alias of
+/// the derivation subquery in [`crate::repositories::user::USER_COLUMNS`]
+/// (which selects the user's global role from `user_roles`). Callers must use
+/// the `USER_COLUMNS` select list (or otherwise provide a `role` alias); the
+/// `users.role` column was dropped by migration `20260710000000`.
 pub fn user_from_row(row: &sqlx::postgres::PgRow) -> User {
     User {
         id: row.get("id"),
