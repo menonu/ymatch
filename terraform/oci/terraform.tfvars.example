@@ -6,7 +6,8 @@
 # gitignored .env — see terraform/oci/.env.example and
 # docs/how_to/terraform_apply.md. (Terraform precedence: terraform.tfvars
 # overrides TF_VAR_ env, so a given variable must live in only one place.)
-# Secrets in .env: db_password, nr_license_key, nr_account_id, alert_email.
+# Secrets / sensitive in .env: db_password, nr_license_key, nr_account_id,
+# alert_email, db_backup_user_email.
 
 # OCI authentication
 tenancy_ocid     = "ocid1.tenancy.oc1..YOUR_TENANCY_OCID"

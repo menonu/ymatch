@@ -64,3 +64,13 @@ output "db_backup_region" {
   description = "Region of the db backup bucket (same as the OCI provider region)"
   value       = var.region
 }
+
+output "db_backup_user_ocid" {
+  description = "OCI user OCID for GitHub Actions backup uploads (set as OCI_CLI_USER)"
+  value       = oci_identity_user.db_backup.id
+}
+
+output "db_backup_user_name" {
+  description = "OCI user name for GitHub Actions backup uploads"
+  value       = oci_identity_user.db_backup.name
+}

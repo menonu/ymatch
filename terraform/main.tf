@@ -20,7 +20,7 @@ provider "google" {
 # Production workloads now run on OCI (see terraform/oci/).
 # Database backups moved to OCI Object Storage (#383) —
 # see terraform/oci/backup.tf. GCP remnants:
-#   - backup.tf — DEPRECATED (GCS path retired; resources may
-#     still exist if billing is restored for destroy only)
+#   - backup.tf — retired (config empty; destroy abandoned GCS
+#     resources from state only after billing is restored)
 #   - monitoring.tf — optional budget alert
 # ---------------------------------------------------

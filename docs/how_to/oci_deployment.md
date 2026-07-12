@@ -203,10 +203,10 @@ CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-o
 | `OCI_STAGING_VM_HOST` | `deploy-oci-staging.yml` (staging) | **Every time the staging VM's public IP changes** (recreates via Terraform) |
 | `OCI_STAGING_SSH_PRIVATE_KEY` | `deploy-oci-staging.yml` (staging) | When the staging SSH key pair is rotated |
 | `OCI_STAGING_DB_PASSWORD` | `deploy-oci-staging.yml` (staging) | When the staging database password changes |
-| `OCI_CLI_USER` | `db-backup.yml` | When the OCI API user for Object Storage upload changes |
+| `OCI_CLI_USER` | `db-backup.yml` | When the least-privilege `ymatch-db-backup` user changes |
 | `OCI_CLI_TENANCY` | `db-backup.yml` | When the tenancy OCID changes (rare) |
-| `OCI_CLI_FINGERPRINT` | `db-backup.yml` | When the OCI API key is rotated |
-| `OCI_CLI_KEY_CONTENT` | `db-backup.yml` | When the OCI API private key is rotated (PEM body) |
+| `OCI_CLI_FINGERPRINT` | `db-backup.yml` | When the backup user’s API key is rotated |
+| `OCI_CLI_KEY_CONTENT` | `db-backup.yml` | When the backup user’s API private key is rotated (PEM body) |
 | `OCI_CLI_REGION` | `db-backup.yml` | When the home region for Object Storage changes |
 | `NEW_RELIC_LICENSE_KEY` | NR deployment / backup report | When the NR license is rotated |
 | `NEW_RELIC_ACCOUNT_ID` | NR deployment / backup report | When the NR account changes |
@@ -334,22 +334,58 @@ This differs from the GCP deployment which uses Google Cloud Storage.
 
 ## Teardown
 
+**Danger:** `terraform/oci` manages **both** compute (VMs) **and** the off-VM
+backup bucket (`ymatch-db-backups`, with `lifecycle.prevent_destroy = true`).
+A full `terraform destroy` will **fail** while `prevent_destroy` is set — by
+design, so a stack teardown cannot silently delete DR retention.
+
+### 1. Download backups before any destroy that could touch Object Storage
+
+```bash
+NS="$(oci os ns get --query data --raw-output)"
+oci os object list --namespace "$NS" --bucket-name ymatch-db-backups --all
+# Pull what you need, e.g.:
+oci os object get \
+  --namespace "$NS" \
+  --bucket-name ymatch-db-backups \
+  --name daily/ymatch-YYYY-MM-DD.sql.gz \
+  --file backup.sql.gz
+```
+
+### 2. Destroy compute only (keep Object Storage backups)
+
+Use targeted destroy for VMs/network if you intend to keep dumps:
+
+```bash
+cd terraform/oci
+# Example — adjust targets to the resources you intend to remove
+terraform destroy \
+  -target=oci_core_instance.ymatch_v2 \
+  -target=oci_core_instance.ymatch_staging
+```
+
+### 3. Intentionally retire the backup bucket
+
+1. Download remaining objects (step 1).
+2. Remove the `lifecycle { prevent_destroy = true }` block from
+   `oci_objectstorage_bucket.db_backups` in `backup.tf`.
+3. `terraform apply` (accept the lifecycle change).
+4. `terraform destroy -target=oci_objectstorage_bucket.db_backups` (and related
+   lifecycle policy / upload IAM if retiring the whole feature).
+
+### 4. Full stack destroy (after step 3)
+
 ```bash
 cd terraform/oci
 terraform destroy
 ```
 
-This removes: VM, VCN, subnet, internet gateway, security list, and all associated resources.
+This removes VMs, VCN, subnet, internet gateway, security list, **and** (once
+unlocked) the backup bucket, lifecycle policy, and backup IAM user/group/policies.
 
-> **Note**: The boot volume and its data will be destroyed. Back up the database first if needed
-> (or restore from Object Storage — see [monitoring_setup.md](./monitoring_setup.md#5-database-backup-monitoring)):
-> ```bash
-> # One-off dump from the VM
-> ssh ubuntu@<IP> "docker exec ymatch_db pg_dump -U ymatch_user ymatch" > backup.sql
->
-> # Or pull the latest daily object from OCI Object Storage
-> oci os object get -bn ymatch-db-backups --name daily/ymatch-YYYY-MM-DD.sql.gz --file backup.sql.gz
-> ```
+> **Note**: Boot volumes and their data are destroyed with the instances. Prefer
+> Object Storage dumps for recovery — see
+> [monitoring_setup.md](./monitoring_setup.md#5-database-backup-monitoring).
 
 ## Database backups (Object Storage)
 
@@ -359,17 +395,44 @@ delete `daily/` after 7 days, `weekly/` after 28 days, and `monthly/` after 90 d
 
 ### One-time setup of OCI CLI secrets for the backup workflow
 
+Use the **least-privilege** `ymatch-db-backup` user created by Terraform (not the
+Terraform admin API key). After `terraform apply`:
+
 ```bash
-# Values from ~/.oci/config and the PEM private key used for Terraform/CLI
-gh secret set OCI_CLI_USER --body "$(grep '^user=' ~/.oci/config | cut -d= -f2-)"
-gh secret set OCI_CLI_TENANCY --body "$(grep '^tenancy=' ~/.oci/config | cut -d= -f2-)"
-gh secret set OCI_CLI_FINGERPRINT --body "$(grep '^fingerprint=' ~/.oci/config | cut -d= -f2-)"
-gh secret set OCI_CLI_REGION --body "$(grep '^region=' ~/.oci/config | cut -d= -f2-)"
-gh secret set OCI_CLI_KEY_CONTENT < "$(grep '^key_file=' ~/.oci/config | cut -d= -f2- | sed "s|^~|$HOME|")"
+cd terraform/oci
+USER_OCID="$(terraform output -raw db_backup_user_ocid)"
+TENANCY="$(grep '^tenancy_ocid' terraform.tfvars | cut -d'"' -f2)"
+REGION="$(grep '^region' terraform.tfvars | head -1 | cut -d'"' -f2)"
+
+# Generate a dedicated RSA key for this user only
+openssl genrsa -out ~/.oci/ymatch_db_backup.pem 2048
+chmod 600 ~/.oci/ymatch_db_backup.pem
+openssl rsa -pubout -in ~/.oci/ymatch_db_backup.pem \
+  -out ~/.oci/ymatch_db_backup_public.pem
+
+# Upload the public key (Console: Identity → Users → ymatch-db-backup → API Keys)
+# or via CLI:
+oci iam user api-key upload \
+  --user-id "$USER_OCID" \
+  --key-file ~/.oci/ymatch_db_backup_public.pem
+# Note the fingerprint from the command output / Console
+
+gh secret set OCI_CLI_USER --body "$USER_OCID"
+gh secret set OCI_CLI_TENANCY --body "$TENANCY"
+gh secret set OCI_CLI_FINGERPRINT --body "<fingerprint-from-upload>"
+gh secret set OCI_CLI_REGION --body "$REGION"
+gh secret set OCI_CLI_KEY_CONTENT < ~/.oci/ymatch_db_backup.pem
 ```
 
-After the first successful run, confirm objects with:
+The group policy only allows `read buckets` / `manage objects` on
+`ymatch-db-backups` in the app compartment — not tenancy-wide admin.
+
+After the first successful run, confirm the object exists:
 
 ```bash
-oci os object list --bucket-name ymatch-db-backups --all
+NS="$(oci os ns get --query data --raw-output)"
+oci os object head \
+  --namespace "$NS" \
+  --bucket-name ymatch-db-backups \
+  --name daily/ymatch-YYYY-MM-DD.sql.gz
 ```

@@ -151,11 +151,19 @@ recreate, restore the latest dump before or right after
 `oci_deploy_production.sh` if you need existing data:
 
 ```bash
-oci os object get -bn ymatch-db-backups \
-  --name daily/ymatch-YYYY-MM-DD.sql.gz --file backup.sql.gz
+NS="$(oci os ns get --query data --raw-output)"
+oci os object get \
+  --namespace "$NS" \
+  --bucket-name ymatch-db-backups \
+  --name daily/ymatch-YYYY-MM-DD.sql.gz \
+  --file backup.sql.gz
 # On the new VM, with postgres up:
 gunzip -c backup.sql.gz | docker exec -i ymatch_db psql -U ymatch_user ymatch
 ```
+
+> Do **not** run a full `terraform destroy` on `terraform/oci` to recover a
+> VM — that root also manages the backup bucket (with `prevent_destroy`).
+> Recreate the instance with targeted apply, then restore from Object Storage.
 
 See [how_to/monitoring_setup.md](../how_to/monitoring_setup.md#5-database-backup-monitoring).
 

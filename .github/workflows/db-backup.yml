@@ -14,8 +14,6 @@ on:
 env:
   # OCI Object Storage (Always Free) — see terraform/oci/backup.tf and issue #383
   OCI_BACKUP_BUCKET: ymatch-db-backups
-  # Tenancy Object Storage namespace (non-secret). Must match `oci os ns get`.
-  OCI_BACKUP_NAMESPACE: axsxw8hyxmch
   # OCI_HOST must be updated alongside the OCI_VM_HOST GitHub secret
   # when the VM is recreated. Both the deploy workflows and this
   # backup workflow should source from the same secret to avoid
@@ -25,6 +23,8 @@ env:
   DB_USER: ymatch_user
   DB_NAME: ymatch
   # Auth for oracle-actions/run-oci-cli-command
+  # Prefer the least-privilege ymatch-db-backup user (terraform/oci/backup.tf),
+  # not the Terraform admin API key.
   OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
   OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
   OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
@@ -67,6 +67,13 @@ jobs:
           echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
           echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
 
+      - name: Resolve Object Storage namespace
+        id: ns
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: os ns get
+          query: data
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -88,18 +95,18 @@ jobs:
             exit 1
           fi
 
+      # silent defaults to true — avoids publishing object inventory on public logs
       - name: Upload daily backup
         if: steps.types.outputs.daily == 'true'
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
           command: >-
             os object put
-            --namespace ${{ env.OCI_BACKUP_NAMESPACE }}
+            --namespace ${{ steps.ns.outputs.raw_output }}
             --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
             --name daily/ymatch-${{ steps.types.outputs.date }}.sql.gz
             --file backup.sql.gz
             --force
-          silent: false
 
       - name: Upload weekly backup
         if: steps.types.outputs.weekly == 'true'
@@ -107,12 +114,11 @@ jobs:
         with:
           command: >-
             os object put
-            --namespace ${{ env.OCI_BACKUP_NAMESPACE }}
+            --namespace ${{ steps.ns.outputs.raw_output }}
             --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
             --name weekly/ymatch-${{ steps.types.outputs.date }}.sql.gz
             --file backup.sql.gz
             --force
-          silent: false
 
       - name: Upload monthly backup
         if: steps.types.outputs.monthly == 'true'
@@ -120,22 +126,41 @@ jobs:
         with:
           command: >-
             os object put
-            --namespace ${{ env.OCI_BACKUP_NAMESPACE }}
+            --namespace ${{ steps.ns.outputs.raw_output }}
             --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
             --name monthly/ymatch-${{ steps.types.outputs.date }}.sql.gz
             --file backup.sql.gz
             --force
-          silent: false
 
-      - name: Verify uploads
+      - name: Verify daily object
+        if: steps.types.outputs.daily == 'true'
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
           command: >-
-            os object list
-            --namespace ${{ env.OCI_BACKUP_NAMESPACE }}
+            os object head
+            --namespace ${{ steps.ns.outputs.raw_output }}
             --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --all
-          silent: false
+            --name daily/ymatch-${{ steps.types.outputs.date }}.sql.gz
+
+      - name: Verify weekly object
+        if: steps.types.outputs.weekly == 'true'
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: >-
+            os object head
+            --namespace ${{ steps.ns.outputs.raw_output }}
+            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
+            --name weekly/ymatch-${{ steps.types.outputs.date }}.sql.gz
+
+      - name: Verify monthly object
+        if: steps.types.outputs.monthly == 'true'
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: >-
+            os object head
+            --namespace ${{ steps.ns.outputs.raw_output }}
+            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
+            --name monthly/ymatch-${{ steps.types.outputs.date }}.sql.gz
 
       - name: Report to New Relic
         if: always()
