@@ -23,4 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: New Relic Exporter
-        uses: newrelic-experimental/gha-new-relic-exporter@1.0.1
+        # v1.0.8+ pins ghapi==1.0.10 (sync). @1.0.1 had unpinned ghapi and
+        # broke when ghapi 2.0 made GhApi async by default (#382).
+        uses: newrelic-experimental/gha-new-relic-exporter@v1.0.8
