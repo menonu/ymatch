@@ -410,6 +410,85 @@ async fn test_admin_ban_unban_user(pool: PgPool) {
     assert!(!sqlx::Row::get::<bool, _>(&row, "is_banned"));
 }
 
+/// #266: a malformed `banned_until` must be 400, not a silent permanent ban.
+#[sqlx::test]
+async fn test_ban_user_invalid_banned_until_returns_400(pool: PgPool) {
+    let admin = login_guest(&pool, "admin-ban-until-266", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let target = login_guest(&pool, "target-ban-until-266", "t").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/ban?user_id={}",
+                    target, admin
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"reason": "temp", "bannedUntil": "not-a-date"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    let body = body_to_string(resp.into_body()).await;
+    assert!(
+        body.contains("banned_until") || body.contains("invalid"),
+        "expected invalid banned_until message, got: {body}"
+    );
+
+    // User must NOT have been banned (parse failed before set_ban).
+    let row = sqlx::query("SELECT is_banned FROM users WHERE id = $1")
+        .bind(target as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(
+        !sqlx::Row::get::<bool, _>(&row, "is_banned"),
+        "malformed banned_until must not ban the user"
+    );
+}
+
+/// #266: a valid RFC3339 `banned_until` is accepted and stored.
+#[sqlx::test]
+async fn test_ban_user_valid_banned_until_stored(pool: PgPool) {
+    let admin = login_guest(&pool, "admin-ban-until-ok-266", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let target = login_guest(&pool, "target-ban-until-ok-266", "t").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/ban?user_id={}",
+                    target, admin
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"reason": "temp", "bannedUntil": "2030-01-01T00:00:00Z"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row = sqlx::query("SELECT is_banned, banned_until FROM users WHERE id = $1")
+        .bind(target as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(sqlx::Row::get::<bool, _>(&row, "is_banned"));
+    let until: Option<chrono::DateTime<chrono::Utc>> = sqlx::Row::get(&row, "banned_until");
+    assert!(until.is_some(), "banned_until must be stored");
+}
+
 #[sqlx::test]
 async fn test_non_admin_cannot_ban(pool: PgPool) {
     // Create regular user

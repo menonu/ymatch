@@ -125,19 +125,31 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
                         matches_created += 1;
 
-                        // Notify both users
-                        let user1_row =
-                            sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
-                                .bind(want_user_id)
-                                .fetch_one(pool)
-                                .await
-                                .ok();
-                        let user2_row =
-                            sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
-                                .bind(partner_id)
-                                .fetch_one(pool)
-                                .await
-                                .ok();
+                        // Notify both users. Treat RowNotFound as "user
+                        // vanished"; log any other DB error so infra failures
+                        // are observable (#266).
+                        let load_notify_user = |user_id: i32| async move {
+                            match sqlx::query(
+                                "SELECT username, device_token FROM users WHERE id = $1",
+                            )
+                            .bind(user_id)
+                            .fetch_one(pool)
+                            .await
+                            {
+                                Ok(row) => Some(row),
+                                Err(sqlx::Error::RowNotFound) => None,
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        user_id,
+                                        "match notification: failed to load user"
+                                    );
+                                    None
+                                }
+                            }
+                        };
+                        let user1_row = load_notify_user(want_user_id).await;
+                        let user2_row = load_notify_user(partner_id).await;
 
                         if let (Some(u1), Some(u2)) = (user1_row, user2_row) {
                             let u1_token: Option<String> = u1.get("device_token");

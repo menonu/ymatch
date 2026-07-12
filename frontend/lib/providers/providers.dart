@@ -267,6 +267,9 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so callers (dialogs) can surface a SnackBar instead of
+      // closing as if the create succeeded.
+      rethrow;
     }
   }
 
@@ -338,6 +341,8 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the edit dialog can surface a failure SnackBar.
+      rethrow;
     }
   }
 
@@ -348,6 +353,8 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the delete confirm dialog can surface a failure SnackBar.
+      rethrow;
     }
   }
 
@@ -400,6 +407,8 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the debug tab does not show a success SnackBar on failure.
+      rethrow;
     }
   }
 }
@@ -527,6 +536,8 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the delete dialog can surface a failure SnackBar.
+      rethrow;
     }
   }
 }
@@ -697,6 +708,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the admin UI can show failure feedback.
+      rethrow;
     }
   }
 
@@ -710,6 +723,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the admin UI can show failure feedback.
+      rethrow;
     }
   }
 
@@ -728,6 +743,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266: rethrow so the admin UI can show failure feedback.
+      rethrow;
     }
   }
 
@@ -742,6 +759,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -756,6 +775,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -766,6 +787,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -776,6 +799,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -786,6 +811,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 }

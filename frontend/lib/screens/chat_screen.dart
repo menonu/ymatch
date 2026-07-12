@@ -235,8 +235,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         GestureDetector(
           onTap: () async {
             final uri = Uri.parse(url);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            try {
+              // #266: surface failure when the OS cannot open the URL.
+              final ok =
+                  await canLaunchUrl(uri) &&
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!ok && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.errorPrefix('Could not open link')),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                );
+              }
             }
           },
           child: Container(

@@ -1185,12 +1185,26 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (user != null) {
-                await ref
-                    .read(merchControllerProvider.notifier)
-                    .deleteMerchByCreator(item.eventId, item.id, user.id);
-                ref.invalidate(merchProvider(widget.eventId));
+                try {
+                  await ref
+                      .read(merchControllerProvider.notifier)
+                      .deleteMerchByCreator(item.eventId, item.id, user.id);
+                  ref.invalidate(merchProvider(widget.eventId));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                } catch (e) {
+                  // #266: surface delete failure; keep dialog open.
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.errorPrefix(e.toString())),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    );
+                  }
+                }
+              } else if (ctx.mounted) {
+                Navigator.pop(ctx);
               }
-              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(l10n.delete),
           ),

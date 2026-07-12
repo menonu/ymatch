@@ -5,6 +5,10 @@ import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/home_screen.dart';
+import 'package:frontend/services/api_client.dart';
+import 'package:frontend/services/config_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wraps [child] with the localization delegates so screens that call
@@ -16,11 +20,11 @@ Widget _localized(Widget child, {Locale? locale}) => MaterialApp(
   home: child,
 );
 
-/// A signed-out [AuthController] stand-in so [HomeScreen] does not trigger
+/// A [AuthController] stand-in so [HomeScreen] does not trigger
 /// network calls through `apiClientProvider`.
 class _MockAuthController extends StateNotifier<AsyncValue<User?>>
     implements AuthController {
-  _MockAuthController() : super(const AsyncValue.data(null));
+  _MockAuthController([User? user]) : super(AsyncValue.data(user));
 
   @override
   Future<void> checkLogin() async {}
@@ -48,6 +52,19 @@ class _MockAuthController extends StateNotifier<AsyncValue<User?>>
 
   @override
   get client => throw UnimplementedError();
+}
+
+ApiClient _failingCreateApi() {
+  final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+  return ApiClient(
+    config,
+    client: MockClient((request) async {
+      if (request.method == 'POST' && request.url.path == '/api/v1/events') {
+        return http.Response('Conflict', 409);
+      }
+      return http.Response('[]', 200);
+    }),
+  );
 }
 
 void main() {
@@ -145,6 +162,51 @@ void main() {
       // Opening the guide marks it seen → the emphasis (badge) is removed.
       expect(find.byType(Badge), findsNothing);
       expect(find.text('How to Trade'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'create event failure shows error SnackBar and keeps dialog open (#266)',
+    (WidgetTester tester) async {
+      final user = User()
+        ..id = 1
+        ..username = 'creator';
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            apiClientProvider.overrideWithValue(_failingCreateApi()),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open the create-event dialog via FAB.
+      await tester.tap(find.text('New Event'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      // Scope to the dialog TextField (SearchBar also exposes a TextField).
+      final dialogField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogField, 'My Fest');
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(ElevatedButton, 'Create'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Failure must be visible; dialog must stay open (not silent success).
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Error:'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
     },
   );
 }

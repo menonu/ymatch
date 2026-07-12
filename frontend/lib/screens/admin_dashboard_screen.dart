@@ -192,6 +192,33 @@ class _AdminUsersTab extends ConsumerWidget {
                   onSelected: (value) async {
                     final adminId = currentUser?.id ?? 0;
                     final admin = ref.read(adminControllerProvider.notifier);
+                    Future<void> runAdminAction(
+                      Future<void> Function() action,
+                      String successLabel,
+                    ) async {
+                      try {
+                        await action();
+                        ref.invalidate(adminUsersProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(successLabel)),
+                          );
+                        }
+                      } catch (e) {
+                        // #266: privileged admin actions must show failure feedback.
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                          );
+                        }
+                      }
+                    }
+
                     switch (value) {
                       case 'ban':
                         final reason = await _showInputDialog(
@@ -199,28 +226,50 @@ class _AdminUsersTab extends ConsumerWidget {
                           'Ban Reason',
                           'Enter reason (optional)',
                         );
-                        await admin.banUser(user.id, adminId, reason: reason);
-                        ref.invalidate(adminUsersProvider);
+                        await runAdminAction(
+                          () => admin.banUser(
+                            user.id,
+                            adminId,
+                            reason: reason,
+                          ),
+                          'User banned',
+                        );
                         break;
                       case 'unban':
-                        await admin.unbanUser(user.id, adminId);
-                        ref.invalidate(adminUsersProvider);
+                        await runAdminAction(
+                          () => admin.unbanUser(user.id, adminId),
+                          'User unbanned',
+                        );
                         break;
                       case 'role_admin':
-                        await admin.updateUserRole(user.id, adminId, 'admin');
-                        ref.invalidate(adminUsersProvider);
+                        await runAdminAction(
+                          () => admin.updateUserRole(
+                            user.id,
+                            adminId,
+                            'admin',
+                          ),
+                          'Role updated to admin',
+                        );
                         break;
                       case 'role_moderator':
-                        await admin.updateUserRole(
-                          user.id,
-                          adminId,
-                          'moderator',
+                        await runAdminAction(
+                          () => admin.updateUserRole(
+                            user.id,
+                            adminId,
+                            'moderator',
+                          ),
+                          'Role updated to moderator',
                         );
-                        ref.invalidate(adminUsersProvider);
                         break;
                       case 'role_user':
-                        await admin.updateUserRole(user.id, adminId, 'user');
-                        ref.invalidate(adminUsersProvider);
+                        await runAdminAction(
+                          () => admin.updateUserRole(
+                            user.id,
+                            adminId,
+                            'user',
+                          ),
+                          'Role updated to user',
+                        );
                         break;
                     }
                   },
@@ -734,18 +783,34 @@ class _AdminDebugTab extends ConsumerWidget {
                               ),
                             );
                           }
-                          await ref
-                              .read(eventsControllerProvider.notifier)
-                              .generateDebugData(user.id);
-                          ref.invalidate(eventsProvider);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Test data generated successfully!',
+                          try {
+                            await ref
+                                .read(eventsControllerProvider.notifier)
+                                .generateDebugData(user.id);
+                            ref.invalidate(eventsProvider);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Test data generated successfully!',
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            }
+                          } catch (e) {
+                            // #266: do not show success SnackBar on failure.
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Failed to generate test data: $e',
+                                  ),
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.error,
+                                ),
+                              );
+                            }
                           }
                         }
                       },
@@ -762,13 +827,32 @@ class _AdminDebugTab extends ConsumerWidget {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      onPressed: () {
+                      onPressed: () async {
                         final newUuid = const Uuid().v4();
                         final currentUrl = Uri.base.origin;
                         final newUrl = Uri.parse(
                           '$currentUrl/#/?dev_user=$newUuid',
                         );
-                        launchUrl(newUrl, webOnlyWindowName: '_blank');
+                        try {
+                          // #266: await launchUrl so a rejection is not uncaught.
+                          final ok = await launchUrl(
+                            newUrl,
+                            webOnlyWindowName: '_blank',
+                          );
+                          if (!ok && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Could not open new session URL'),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Could not open URL: $e')),
+                            );
+                          }
+                        }
                       },
                     ),
                   ),
