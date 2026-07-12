@@ -335,9 +335,18 @@ This differs from the GCP deployment which uses Google Cloud Storage.
 ## Teardown
 
 **Danger:** `terraform/oci` manages **both** compute (VMs) **and** the off-VM
-backup bucket (`ymatch-db-backups`, with `lifecycle.prevent_destroy = true`).
-A full `terraform destroy` will **fail** while `prevent_destroy` is set — by
-design, so a stack teardown cannot silently delete DR retention.
+backup bucket (`ymatch-db-backups`).
+
+`lifecycle.prevent_destroy = true` is set **only on the bucket**. A full
+`terraform destroy` will still destroy VMs, networking, the object lifecycle
+policy, and the `ymatch-db-backup` upload IAM user/group/policy, then **fail**
+when it tries to destroy the bucket. That is **not** a no-op: automation and
+compute can already be gone while objects remain without rotation or upload
+credentials.
+
+Always prefer **targeted** destroy for compute (section 2). Download dumps
+first (section 1) before any destroy that could touch Object Storage or backup
+automation.
 
 ### 1. Download backups before any destroy that could touch Object Storage
 
@@ -427,8 +436,9 @@ base64 -w0 ~/.oci/ymatch_db_backup.pem | gh secret set OCI_CLI_KEY_CONTENT_B64
 # gh secret delete OCI_CLI_KEY_CONTENT 2>/dev/null || true
 ```
 
-The group policy only allows `read buckets` / `manage objects` on
-`ymatch-db-backups` in the app compartment — not tenancy-wide admin.
+The group policy only allows `read buckets` plus object
+create/overwrite/inspect/read on `ymatch-db-backups` (no `OBJECT_DELETE`).
+Lifecycle expiry deletes use the Object Storage **service** principal, not CI.
 
 After the first successful run, confirm the object exists:
 

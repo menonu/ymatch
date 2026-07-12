@@ -145,8 +145,21 @@ resource "oci_identity_policy" "db_backup_upload" {
   compartment_id = var.tenancy_ocid
   name           = "ymatch-db-backup-upload"
   description    = "Least-privilege Object Storage access for DB backup CI (#383)"
+  # Put + head only — no OBJECT_DELETE. Lifecycle expiry stays on the
+  # Object Storage service principal (objectstorage_lifecycle above).
   statements = [
     "Allow group ${oci_identity_group.db_backup.name} to read buckets in compartment id ${var.compartment_ocid} where target.bucket.name='${oci_objectstorage_bucket.db_backups.name}'",
-    "Allow group ${oci_identity_group.db_backup.name} to manage objects in compartment id ${var.compartment_ocid} where target.bucket.name='${oci_objectstorage_bucket.db_backups.name}'",
+    join(" ", [
+      "Allow group ${oci_identity_group.db_backup.name} to manage objects in compartment id ${var.compartment_ocid}",
+      "where all {",
+      "target.bucket.name='${oci_objectstorage_bucket.db_backups.name}',",
+      "any {",
+      "request.permission='OBJECT_CREATE',",
+      "request.permission='OBJECT_OVERWRITE',",
+      "request.permission='OBJECT_INSPECT',",
+      "request.permission='OBJECT_READ'",
+      "}",
+      "}",
+    ]),
   ]
 }
