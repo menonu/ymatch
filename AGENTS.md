@@ -4,6 +4,34 @@
 
 **ymatch** — Merchandise trading platform for managing inventory (HAVE/WANT) and executing physical exchanges based on system matches at events.
 
+## Development Workflow
+
+**Trunk-Based Development**: All work goes through PRs targeting `main`. Never push directly to `main`.
+
+**Test-Driven Development (TDD)**: Follow the **Red → Green → Refactor** cycle for any non-trivial change.
+
+Where tests live:
+- **Backend unit tests** — `#[cfg(test)] mod tests` inside the source file under test (e.g. `src/services/match_lifecycle.rs`).
+- **Backend integration tests** — `backend/tests/api_tests.rs` (HTTP + DB end-to-end).
+- **Frontend unit / widget tests** — `frontend/test/` (collocated by feature).
+
+**Issue-Driven**: Every change starts with a GitHub Issue — create it **first**, before any branch or code. The issue is the single source of truth for the goal and acceptance criteria; track its status throughout
+
+1. **Issue**: `gh issue create` (Must be first)
+2. **Branch**: Create a branch and worktree
+3. **TDD**: Follow Red -> Green -> Refactor
+4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `flutter analyze`
+5. **Push & PR**: Commit, push, and run `gh pr create`
+6. **CI Test**: Verify all CI checks pass successfully
+7. **Review**: Run `/pr-review <PR>` when that skill is available.
+   * If `/pr-review` is **not** available: run an equivalent PR review. Gather PR metadata, linked issue(s), and the full diff (`gh pr view` / `gh pr diff`); evaluate **correctness vs. the issue**, **security**, and **design** (modularity, abstraction, cohesion, separation of concerns, coupling); post findings as a PR comment with severities `[critical]` / `[major]` / `[minor]` / `[nit]`.
+   * Fix or explain `[critical]` / `[major]` findings.
+   * Resolve or accept `[minor]` / `[nit]` findings.
+   * Re-run after changes.
+8. **Report & Wait**: Report the PR URL to the user and stop. **Do not merge.** Wait for human merge or explicit authorization. Cleanup worktree after merge
+
+See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
+
 ## Directory Structure
 
 ```
@@ -35,34 +63,6 @@ All project documentation lives under `docs/` and follows the [Diátaxis framewo
 | **Explanation** | Understanding-oriented concepts | `docs/explanation/` |
 
 See [Documentation Index](./docs/README.md) for the full file listing.
-
-## Development Workflow
-
-**Trunk-Based Development**: All work goes through PRs targeting `main`. Never push directly to `main`.
-
-**Test-Driven Development (TDD)**: Follow the **Red → Green → Refactor** cycle for any non-trivial change.
-
-Where tests live:
-- **Backend unit tests** — `#[cfg(test)] mod tests` inside the source file under test (e.g. `src/services/match_lifecycle.rs`).
-- **Backend integration tests** — `backend/tests/api_tests.rs` (HTTP + DB end-to-end).
-- **Frontend unit / widget tests** — `frontend/test/` (collocated by feature).
-
-**Issue-Driven**: Every change starts with a GitHub Issue — create it **first**, before any branch or code. The issue is the single source of truth for the goal and acceptance criteria; track its status throughout
-
-1. **Issue**: `gh issue create` (Must be first)
-2. **Branch**: Create a branch and worktree
-3. **TDD**: Follow Red -> Green -> Refactor
-4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `flutter analyze`
-5. **Push & PR**: Commit, push, and run `gh pr create`
-6. **CI Test**: Verify all CI checks pass successfully
-7. **Review**: Run `/pr-review <PR>` when that skill is available.
-   * If `/pr-review` is **not** available: run an equivalent PR review. Gather PR metadata, linked issue(s), and the full diff (`gh pr view` / `gh pr diff`); evaluate **correctness vs. the issue**, **security**, and **design** (modularity, abstraction, cohesion, separation of concerns, coupling); post findings as a PR comment with severities `[critical]` / `[major]` / `[minor]` / `[nit]`.
-   * Fix or explain `[critical]` / `[major]` findings.
-   * Resolve or accept `[minor]` / `[nit]` findings.
-   * Re-run after changes.
-8. **Report & Wait**: Report the PR URL to the user and stop. **Do not merge.** Wait for human merge or explicit authorization. Cleanup worktree after merge
-
-See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
 
 ## Architecture Decision Records (ADRs)
 
