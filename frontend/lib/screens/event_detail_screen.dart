@@ -37,6 +37,9 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
+  /// Whether the bottom-left group description panel is open (#128).
+  bool _groupInfoOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +58,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final merchAsync = ref.watch(merchProvider(widget.eventId));
+    final groupsAsync = ref.watch(eventGroupsProvider(widget.eventId));
     final user = ref.watch(currentUserProvider);
     final inventoryAsync = user != null
         ? ref.watch(inventoryProvider(user.id))
@@ -136,6 +140,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           items.sort((a, b) => _naturalCompare(a.name, b.name));
         }
 
+        // Index group metadata by name for the tab shield + info panel (#128).
+        final groupsMeta =
+            groupsAsync.valueOrNull ?? const <MerchandiseGroup>[];
+        final groupByName = <String, MerchandiseGroup>{
+          for (final g in groupsMeta) g.groupName: g,
+        };
+
         return DefaultTabController(
           length: groupKeys.length,
           child: Scaffold(
@@ -176,6 +187,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   tooltip: l10n.refresh,
                   onPressed: () {
                     ref.invalidate(merchProvider(widget.eventId));
+                    ref.invalidate(eventGroupsProvider(widget.eventId));
                     if (user != null)
                       ref.invalidate(inventoryProvider(user.id));
                   },
@@ -370,6 +382,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                           g.eventId == widget.eventId &&
                                           g.groupName == name,
                                     );
+                                    // Group edit controls live only at the
+                                    // bottom of EventDetailScreen (and the
+                                    // info panel) — not on the tab bar (#128).
                                     return Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -416,192 +431,281 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
               ),
             ),
-            body: Column(
+            body: Stack(
               children: [
-                Container(
-                  width: double.infinity,
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 6,
-                    horizontal: 16,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SegmentedButton<MerchFilter>(
-                            segments: [
-                              ButtonSegment(
-                                value: MerchFilter.all,
-                                label: Text(
-                                  AppLocalizations.of(context)!.merchFilterAll,
-                                ),
-                                icon: const Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 16,
-                                ),
-                              ),
-                              ButtonSegment(
-                                value: MerchFilter.have,
-                                label: Text(AppLocalizations.of(context)!.have),
-                                icon: const Icon(
-                                  Icons.check_circle_outline,
-                                  size: 16,
-                                ),
-                              ),
-                              ButtonSegment(
-                                value: MerchFilter.want,
-                                label: Text(AppLocalizations.of(context)!.want),
-                                icon: const Icon(
-                                  Icons.favorite_border,
-                                  size: 16,
-                                ),
-                              ),
-                              ButtonSegment(
-                                value: MerchFilter.missing,
-                                label: Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.merchFilterMissing,
-                                ),
-                                icon: const Icon(Icons.help_outline, size: 16),
-                              ),
-                            ],
-                            selected: {filterMode},
-                            onSelectionChanged:
-                                (Set<MerchFilter> newSelection) {
-                                  ref.read(merchFilterProvider.notifier).state =
-                                      newSelection.first;
-                                },
-                            style: SegmentedButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              textStyle: const TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ),
+                Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 16,
                       ),
-                      if (hiddenCount > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '$hiddenCount hidden',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.deepOrange,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: groupKeys.map((groupName) {
-                      final items = groupedMerch[groupName]!;
-
-                      return Column(
+                      child: Row(
                         children: [
                           Expanded(
-                            child: Builder(
-                              builder: (context) {
-                                if (items.isEmpty) {
-                                  return Center(
-                                    child: Text(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: SegmentedButton<MerchFilter>(
+                                segments: [
+                                  ButtonSegment(
+                                    value: MerchFilter.all,
+                                    label: Text(
                                       AppLocalizations.of(
                                         context,
-                                      )!.noItemsMatchFilter,
-                                      style: const TextStyle(
-                                        color: Colors.grey,
-                                      ),
+                                      )!.merchFilterAll,
                                     ),
-                                  );
-                                }
-
-                                if (viewMode == ViewMode.grid) {
-                                  return GridView.builder(
-                                    padding: const EdgeInsets.only(
-                                      top: 16,
-                                      bottom: 80,
-                                      left: 16,
-                                      right: 16,
+                                    icon: const Icon(
+                                      Icons.inventory_2_outlined,
+                                      size: 16,
                                     ),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 3,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                          childAspectRatio: 0.6,
-                                        ),
-                                    itemCount: items.length,
-                                    itemBuilder: (context, index) =>
-                                        _buildGridItem(
-                                          context,
-                                          ref,
-                                          user,
-                                          items[index],
-                                          inventoryLookup,
-                                          displayMode,
-                                        ),
-                                  );
-                                } else if (viewMode == ViewMode.list) {
-                                  return ListView.builder(
-                                    padding: const EdgeInsets.only(
-                                      top: 8,
-                                      bottom: 80,
+                                  ),
+                                  ButtonSegment(
+                                    value: MerchFilter.have,
+                                    label: Text(
+                                      AppLocalizations.of(context)!.have,
                                     ),
-                                    itemCount: items.length,
-                                    itemBuilder: (context, index) =>
-                                        _buildCompactListItem(
-                                          context,
-                                          ref,
-                                          user,
-                                          items[index],
-                                          inventoryLookup,
-                                          displayMode,
-                                        ),
-                                  );
-                                } else {
-                                  // #203: removed ReorderableListView +
-                                  // updateSortOrder; manual item sorting
-                                  // conflicted with the inventory steppers.
-                                  return ListView.builder(
-                                    padding: const EdgeInsets.only(
-                                      top: 16,
-                                      bottom: 80,
-                                      left: 16,
-                                      right: 16,
+                                    icon: const Icon(
+                                      Icons.check_circle_outline,
+                                      size: 16,
                                     ),
-                                    itemCount: items.length,
-                                    itemBuilder: (context, index) {
-                                      final item = items[index];
-                                      return _buildDetailedListItem(
+                                  ),
+                                  ButtonSegment(
+                                    value: MerchFilter.want,
+                                    label: Text(
+                                      AppLocalizations.of(context)!.want,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.favorite_border,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  ButtonSegment(
+                                    value: MerchFilter.missing,
+                                    label: Text(
+                                      AppLocalizations.of(
                                         context,
-                                        ref,
-                                        user,
-                                        item,
-                                        inventoryLookup,
-                                        displayMode,
-                                      );
+                                      )!.merchFilterMissing,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.help_outline,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ],
+                                selected: {filterMode},
+                                onSelectionChanged:
+                                    (Set<MerchFilter> newSelection) {
+                                      ref
+                                          .read(merchFilterProvider.notifier)
+                                          .state = newSelection
+                                          .first;
                                     },
-                                  );
-                                }
-                              },
+                                style: SegmentedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  textStyle: const TextStyle(fontSize: 11),
+                                ),
+                              ),
                             ),
                           ),
+                          if (hiddenCount > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$hiddenCount hidden',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.deepOrange,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
+                      ),
+                    ),
+                    // Group description panel for the active tab (#128).
+                    if (_groupInfoOpen)
+                      _buildGroupInfoPanel(
+                        context,
+                        groupKeys,
+                        groupByName,
+                        user,
+                        otherItems,
+                      ),
+                    Expanded(
+                      child: TabBarView(
+                        children: groupKeys.map((groupName) {
+                          final items = groupedMerch[groupName]!;
+
+                          return Column(
+                            children: [
+                              Expanded(
+                                child: Builder(
+                                  builder: (context) {
+                                    if (items.isEmpty) {
+                                      return Center(
+                                        child: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!.noItemsMatchFilter,
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      );
+                                    }
+
+                                    if (viewMode == ViewMode.grid) {
+                                      return GridView.builder(
+                                        padding: const EdgeInsets.only(
+                                          top: 16,
+                                          bottom: 80,
+                                          left: 16,
+                                          right: 16,
+                                        ),
+                                        gridDelegate:
+                                            const SliverGridDelegateWithFixedCrossAxisCount(
+                                              crossAxisCount: 3,
+                                              crossAxisSpacing: 8,
+                                              mainAxisSpacing: 8,
+                                              childAspectRatio: 0.6,
+                                            ),
+                                        itemCount: items.length,
+                                        itemBuilder: (context, index) =>
+                                            _buildGridItem(
+                                              context,
+                                              ref,
+                                              user,
+                                              items[index],
+                                              inventoryLookup,
+                                              displayMode,
+                                            ),
+                                      );
+                                    } else if (viewMode == ViewMode.list) {
+                                      return ListView.builder(
+                                        padding: const EdgeInsets.only(
+                                          top: 8,
+                                          bottom: 80,
+                                        ),
+                                        itemCount: items.length,
+                                        itemBuilder: (context, index) =>
+                                            _buildCompactListItem(
+                                              context,
+                                              ref,
+                                              user,
+                                              items[index],
+                                              inventoryLookup,
+                                              displayMode,
+                                            ),
+                                      );
+                                    } else {
+                                      // #203: removed ReorderableListView +
+                                      // updateSortOrder; manual item sorting
+                                      // conflicted with the inventory steppers.
+                                      return ListView.builder(
+                                        padding: const EdgeInsets.only(
+                                          top: 16,
+                                          bottom: 80,
+                                          left: 16,
+                                          right: 16,
+                                        ),
+                                        itemCount: items.length,
+                                        itemBuilder: (context, index) {
+                                          final item = items[index];
+                                          return _buildDetailedListItem(
+                                            context,
+                                            ref,
+                                            user,
+                                            item,
+                                            inventoryLookup,
+                                            displayMode,
+                                          );
+                                        },
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+                // Bottom-left controls (#128): Group info (everyone) + Edit
+                // group (creator of the active tab only). Tabs stay clean —
+                // no shield/edit icons there.
+                Positioned(
+                  left: 16,
+                  bottom: 16 + MediaQuery.paddingOf(context).bottom,
+                  child: Builder(
+                    builder: (context) {
+                      final tabCtrl = DefaultTabController.of(context);
+                      return AnimatedBuilder(
+                        animation: tabCtrl,
+                        builder: (context, _) {
+                          final index = tabCtrl.index.clamp(
+                            0,
+                            groupKeys.length - 1,
+                          );
+                          final activeName = groupKeys[index];
+                          final activeMeta = groupByName[activeName];
+                          final canEditActive =
+                              user != null &&
+                              activeMeta != null &&
+                              activeMeta.hasCreatedBy() &&
+                              activeMeta.createdBy == user.id &&
+                              activeName != otherItems;
+
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Icon-only, no label / border / FAB chrome (#128).
+                              IconButton(
+                                tooltip: l10n.groupInfo,
+                                iconSize: 28,
+                                onPressed: () {
+                                  setState(
+                                    () => _groupInfoOpen = !_groupInfoOpen,
+                                  );
+                                },
+                                icon: Icon(
+                                  _groupInfoOpen
+                                      ? Icons.info
+                                      : Icons.info_outline,
+                                  color: _groupInfoOpen
+                                      ? AppTheme.primaryColor
+                                      : null,
+                                ),
+                              ),
+                              if (canEditActive) ...[
+                                IconButton(
+                                  tooltip: l10n.editGroup,
+                                  iconSize: 24,
+                                  onPressed: () => _showEditGroupDialog(
+                                    context,
+                                    activeName,
+                                    activeMeta,
+                                  ),
+                                  icon: const Icon(Icons.edit),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
                       );
-                    }).toList(),
+                    },
                   ),
                 ),
               ],
@@ -628,6 +732,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     if (role == null || !role.canCreateMerch) return null;
     final l10n = AppLocalizations.of(context)!;
     return FloatingActionButton.extended(
+      heroTag: 'add_merch_fab',
       onPressed: () {
         Navigator.push(
           context,
@@ -635,10 +740,133 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             builder: (context) => AddMerchScreen(eventId: widget.eventId),
             fullscreenDialog: true,
           ),
-        );
+        ).then((_) {
+          // New groups may have been created while adding merch.
+          ref.invalidate(eventGroupsProvider(widget.eventId));
+        });
       },
       label: Text(l10n.addMerch),
       icon: const Icon(Icons.add_photo_alternate),
+    );
+  }
+
+  /// Panel showing the active tab's group name + description (#128).
+  /// Tracks the current tab via [DefaultTabController] so switching tabs
+  /// updates the panel without closing it.
+  Widget _buildGroupInfoPanel(
+    BuildContext context,
+    List<String> groupKeys,
+    Map<String, MerchandiseGroup> groupByName,
+    User? user,
+    String otherItems,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    return Builder(
+      builder: (context) {
+        final tabCtrl = DefaultTabController.of(context);
+        return AnimatedBuilder(
+          animation: tabCtrl,
+          builder: (context, _) {
+            final index = tabCtrl.index.clamp(0, groupKeys.length - 1);
+            final groupName = groupKeys[index];
+            final meta = groupByName[groupName];
+            final description =
+                meta != null &&
+                    meta.hasDescription() &&
+                    meta.description.trim().isNotEmpty
+                ? meta.description.trim()
+                : null;
+            final isGroupCreator =
+                user != null &&
+                meta != null &&
+                meta.hasCreatedBy() &&
+                meta.createdBy == user.id;
+            // Synthetic "Other items" bucket has no formal group row.
+            final isSynthetic = groupName == otherItems;
+
+            return Material(
+              elevation: 1,
+              color: Colors.blueGrey.shade50,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.info_outline, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            groupName,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isSynthetic
+                                ? l10n.noGroupDescription
+                                : (description ?? l10n.noGroupDescription),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: description == null
+                                      ? Colors.grey[600]
+                                      : null,
+                                  fontStyle: description == null
+                                      ? FontStyle.italic
+                                      : FontStyle.normal,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isGroupCreator && !isSynthetic)
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: l10n.editGroup,
+                        onPressed: () =>
+                            _showEditGroupDialog(context, groupName, meta),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: l10n.cancel,
+                      onPressed: () => setState(() => _groupInfoOpen = false),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Group-edit dialog: name is read-only; description is editable (#128).
+  /// Only called for the group creator (UI gate; backend enforces ownership
+  /// / RBAC as well).
+  Future<void> _showEditGroupDialog(
+    BuildContext context,
+    String groupName,
+    MerchandiseGroup? meta,
+  ) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _EditGroupDialog(
+        eventId: widget.eventId,
+        userId: user.id,
+        groupName: groupName,
+        initialDescription: meta != null && meta.hasDescription()
+            ? meta.description
+            : '',
+      ),
     );
   }
 
@@ -1338,6 +1566,121 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Group description edit dialog (#128). Owns its controller so dispose
+/// cannot race the route close animation.
+class _EditGroupDialog extends ConsumerStatefulWidget {
+  final int eventId;
+  final int userId;
+  final String groupName;
+  final String initialDescription;
+
+  const _EditGroupDialog({
+    required this.eventId,
+    required this.userId,
+    required this.groupName,
+    required this.initialDescription,
+  });
+
+  @override
+  ConsumerState<_EditGroupDialog> createState() => _EditGroupDialogState();
+}
+
+class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
+  late final TextEditingController _descCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _descCtrl = TextEditingController(text: widget.initialDescription);
+  }
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(groupControllerProvider.notifier)
+          .updateGroup(
+            eventId: widget.eventId,
+            userId: widget.userId,
+            groupName: widget.groupName,
+            description: _descCtrl.text.trim(),
+          );
+      // Info panel reads eventGroupsProvider only — do not invalidate merch:
+      // that forces a full-screen loading scaffold and resets the active tab.
+      ref.invalidate(eventGroupsProvider(widget.eventId));
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.groupSaved)));
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.failedToSaveGroup(e.toString())),
+          backgroundColor: errorColor,
+        ),
+      );
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.editGroup),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InputDecorator(
+              decoration: InputDecoration(labelText: l10n.groupNameLabel),
+              child: Text(widget.groupName),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: l10n.groupDescription,
+                hintText: l10n.groupDescriptionHint,
+              ),
+              maxLines: 4,
+              enabled: !_saving,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l10n.save),
+        ),
+      ],
     );
   }
 }

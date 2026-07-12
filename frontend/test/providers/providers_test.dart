@@ -136,6 +136,129 @@ void main() {
     });
   });
 
+  // #128: group create/update payloads and error surfacing for the frontend
+  // group description UI.
+  group('GroupController (#128)', () {
+    test(
+      'createGroup posts camelCase proto3 JSON and returns the group',
+      () async {
+        String? capturedBody;
+        String? capturedPath;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/events/7/groups') {
+              capturedBody = request.body;
+              capturedPath = request.url.path;
+              return http.Response(
+                jsonEncode({
+                  'id': 3,
+                  'eventId': 7,
+                  'groupName': 'Pins',
+                  'description': 'enamel pins',
+                  'createdBy': 1,
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        final group = await container
+            .read(groupControllerProvider.notifier)
+            .createGroup(
+              eventId: 7,
+              userId: 1,
+              groupName: 'Pins',
+              description: 'enamel pins',
+            );
+
+        expect(capturedPath, '/api/v1/events/7/groups');
+        final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(decoded, containsPair('eventId', 7));
+        expect(decoded, containsPair('userId', 1));
+        expect(decoded, containsPair('groupName', 'Pins'));
+        expect(decoded, containsPair('description', 'enamel pins'));
+        expect(decoded, isNot(contains('group_name')));
+        expect(group.groupName, 'Pins');
+        expect(group.description, 'enamel pins');
+      },
+    );
+
+    test(
+      'updateGroup URL-encodes the group name and rethrows on failure',
+      () async {
+        String? capturedPath;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'PUT' &&
+                request.url.path.contains('/groups/')) {
+              capturedPath = request.url.path;
+              return http.Response('Forbidden', 403);
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(groupControllerProvider.notifier)
+              .updateGroup(
+                eventId: 7,
+                userId: 1,
+                groupName: 'Key Chains',
+                description: 'updated',
+              ),
+          throwsA(isA<Exception>()),
+        );
+        // Space encoded as %20 (or + depending on encoder — encodeComponent uses %20).
+        expect(capturedPath, '/api/v1/events/7/groups/Key%20Chains');
+      },
+    );
+
+    test('eventGroupsProvider parses ListGroupsResponse', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.url.path == '/api/v1/events/7/groups') {
+            return http.Response(
+              jsonEncode({
+                'groups': [
+                  {
+                    'id': 1,
+                    'eventId': 7,
+                    'groupName': 'Pins',
+                    'description': 'nice',
+                    'createdBy': 2,
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode([]), 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final groups = await container.read(eventGroupsProvider(7).future);
+      expect(groups, hasLength(1));
+      expect(groups.first.groupName, 'Pins');
+      expect(groups.first.createdBy, 2);
+    });
+  });
+
   // #215: request payloads must be built from generated protobuf types and
   // serialized via toProto3Json(), which emits camelCase keys. These tests
   // pin that contract so the payloads can't silently regress to hand-written

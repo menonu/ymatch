@@ -547,6 +547,85 @@ final merchControllerProvider =
       return MerchController(ref.watch(apiClientProvider));
     });
 
+// --- Merchandise groups (#128) ---
+// Group metadata (description + creator) is a first-class entity separate from
+// the merch list. Loaded independently so the EventDetailScreen info panel and
+// bottom edit control can update without refetching every item.
+final eventGroupsProvider = FutureProvider.autoDispose
+    .family<List<MerchandiseGroup>, int>((ref, eventId) async {
+      final client = ref.watch(apiClientProvider);
+      final json = await client.get('/api/v1/events/$eventId/groups');
+      if (json is! Map<String, dynamic>) return [];
+      final response = ListGroupsResponse()..mergeFromProto3Json(json);
+      return response.groups;
+    });
+
+class GroupController extends StateNotifier<AsyncValue<void>> {
+  final ApiClient client;
+  GroupController(this.client) : super(const AsyncValue.data(null));
+
+  Future<MerchandiseGroup> createGroup({
+    required int eventId,
+    required int userId,
+    required String groupName,
+    String? description,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final payload = CreateGroupRequest()
+        ..eventId = eventId
+        ..userId = userId
+        ..groupName = groupName;
+      if (description != null && description.isNotEmpty) {
+        payload.description = description;
+      }
+      final json = await client.post(
+        '/api/v1/events/$eventId/groups',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
+      state = const AsyncValue.data(null);
+      return MerchandiseGroup()
+        ..mergeFromProto3Json(json as Map<String, dynamic>);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  Future<MerchandiseGroup> updateGroup({
+    required int eventId,
+    required int userId,
+    required String groupName,
+    String? description,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final payload = UpdateGroupRequest()
+        ..eventId = eventId
+        ..userId = userId
+        ..groupName = groupName;
+      // Always send description so clearing the field is possible.
+      payload.description = description ?? '';
+      final encodedName = Uri.encodeComponent(groupName);
+      final json = await client.put(
+        '/api/v1/events/$eventId/groups/$encodedName',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
+      state = const AsyncValue.data(null);
+      return MerchandiseGroup()
+        ..mergeFromProto3Json(json as Map<String, dynamic>);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+}
+
+final groupControllerProvider =
+    StateNotifierProvider<GroupController, AsyncValue<void>>((ref) {
+      return GroupController(ref.watch(apiClientProvider));
+    });
+
 // --- Inventory ---
 // --- Inventory Notifier (Optimistic Updates) ---
 class UserInventoryNotifier

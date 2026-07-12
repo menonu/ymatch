@@ -38,6 +38,20 @@ Merchandise _merch({required int creatorId}) => Merchandise()
   ..groupName = 'Pens'
   ..creatorId = creatorId;
 
+MerchandiseGroup _testGroup({
+  required String name,
+  String? description,
+  int? createdBy,
+}) {
+  final g = MerchandiseGroup()
+    ..id = 1
+    ..eventId = 5
+    ..groupName = name;
+  if (description != null) g.description = description;
+  if (createdBy != null) g.createdBy = createdBy;
+  return g;
+}
+
 /// An [ApiClient] whose backing [http.Client] returns an empty JSON array for
 /// any GET. This keeps `inventoryProvider` and `favoriteGroupsProvider` (which
 /// both build via `client.get`) from hitting the network. `merchProvider` is
@@ -57,8 +71,7 @@ ApiClient _failingDeleteMerchClient() {
   return ApiClient(
     config,
     client: MockClient((request) async {
-      if (request.method == 'DELETE' &&
-          request.url.path.contains('/merch/')) {
+      if (request.method == 'DELETE' && request.url.path.contains('/merch/')) {
         return http.Response('Forbidden', 403);
       }
       return http.Response('[]', 200);
@@ -232,9 +245,7 @@ void main() {
             merchProvider(
               5,
             ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            myEventRoleProvider(
-              5,
-            ).overrideWith(
+            myEventRoleProvider(5).overrideWith(
               (ref) async => MyEventRoleResponse()..canCreateMerch = true,
             ),
           ],
@@ -243,8 +254,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(FloatingActionButton), findsOneWidget);
+      // Info icon is always present (#128); Add Merch is the gated one.
       expect(find.byIcon(Icons.add_photo_alternate), findsOneWidget);
+      expect(find.byTooltip('Group info'), findsOneWidget);
     },
   );
 
@@ -259,9 +271,7 @@ void main() {
             merchProvider(
               5,
             ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            myEventRoleProvider(
-              5,
-            ).overrideWith(
+            myEventRoleProvider(5).overrideWith(
               (ref) async => MyEventRoleResponse()..canCreateMerch = false,
             ),
           ],
@@ -270,8 +280,141 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(FloatingActionButton), findsNothing);
       expect(find.byIcon(Icons.add_photo_alternate), findsNothing);
+      // Group info icon still available for any signed-in visitor (#128).
+      expect(find.byTooltip('Group info'), findsOneWidget);
+    },
+  );
+
+  // --- Group description UI (#128) ---
+
+  testWidgets(
+    'Info button toggles the group description panel for the active tab (#128)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 1,
+                ),
+              ],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Panel closed by default.
+      expect(find.text('Collectible pens'), findsNothing);
+
+      await tester.tap(find.byTooltip('Group info'));
+      await tester.pumpAndSettle();
+
+      // Panel shows the active group name + description.
+      // Group name appears in the tab AND the panel.
+      expect(find.text('Pens'), findsWidgets);
+      expect(find.text('Collectible pens'), findsOneWidget);
+
+      // Toggle closed again.
+      await tester.tap(find.byTooltip('Group info'));
+      await tester.pumpAndSettle();
+      expect(find.text('Collectible pens'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'group creator sees bottom edit icon (not on tabs) and can open the '
+    'edit dialog (#128)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 1,
+                ),
+              ],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No shield / edit on the tab bar — only the bottom edit control.
+      expect(find.byIcon(Icons.shield), findsNothing);
+      expect(find.byTooltip('Edit Group'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Edit Group'));
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      expect(
+        find.descendant(of: dialog, matching: find.text('Edit Group')),
+        findsOneWidget,
+      );
+      // Description field seeded with the current value.
+      expect(
+        find.descendant(of: dialog, matching: find.text('Collectible pens')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'non-creator does not see group edit icons on EventDetailScreen (#128)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 2)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 99, // someone else
+                ),
+              ],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.shield), findsNothing);
+      expect(find.byIcon(Icons.edit), findsNothing);
+      expect(find.byTooltip('Edit Group'), findsNothing);
+
+      // Info panel is still readable, without an edit affordance.
+      await tester.tap(find.byTooltip('Group info'));
+      await tester.pumpAndSettle();
+      expect(find.text('Collectible pens'), findsOneWidget);
+      expect(find.byIcon(Icons.edit_outlined), findsNothing);
     },
   );
 
@@ -281,7 +424,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            apiClientProvider.overrideWith((ref) => _failingDeleteMerchClient()),
+            apiClientProvider.overrideWith(
+              (ref) => _failingDeleteMerchClient(),
+            ),
             authProvider.overrideWith((ref) => _MockAuthController(_user())),
             merchProvider(
               5,

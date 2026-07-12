@@ -300,6 +300,35 @@ class AppLocalizationsJa extends AppLocalizations {
   String get newGroupHint => '例: キーホルダー';
 
   @override
+  String get groupNameLabel => 'グループ名';
+
+  @override
+  String get groupDescription => '説明';
+
+  @override
+  String get groupDescriptionHint => 'このグループについてのメモ（任意）';
+
+  @override
+  String get editGroup => 'グループを編集';
+
+  @override
+  String get groupInfo => 'グループ情報';
+
+  @override
+  String get noGroupDescription => '説明はまだありません。';
+
+  @override
+  String failedToSaveGroup(String error) {
+    return 'グループの保存に失敗しました: $error';
+  }
+
+  @override
+  String get groupSaved => 'グループを保存しました';
+
+  @override
+  String get youCanEditGroup => 'このグループを編集できます';
+
+  @override
   String failedToSend(String error) {
     return '送信に失敗しました: $error';
   }

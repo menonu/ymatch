@@ -301,6 +301,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newGroupHint => 'e.g., Keychains';
 
   @override
+  String get groupNameLabel => 'Group name';
+
+  @override
+  String get groupDescription => 'Description';
+
+  @override
+  String get groupDescriptionHint => 'Optional notes about this group';
+
+  @override
+  String get editGroup => 'Edit Group';
+
+  @override
+  String get groupInfo => 'Group info';
+
+  @override
+  String get noGroupDescription => 'No description yet.';
+
+  @override
+  String failedToSaveGroup(String error) {
+    return 'Failed to save group: $error';
+  }
+
+  @override
+  String get groupSaved => 'Group saved';
+
+  @override
+  String get youCanEditGroup => 'You can edit this group';
+
+  @override
   String failedToSend(String error) {
     return 'Failed to send: $error';
   }

@@ -437,6 +437,47 @@
   "@newGroupHint": {
     "description": "Hint text for the new group name field"
   },
+  "groupNameLabel": "Group name",
+  "@groupNameLabel": {
+    "description": "Read-only label for the group name in the edit dialog"
+  },
+  "groupDescription": "Description",
+  "@groupDescription": {
+    "description": "Label for the optional group description field"
+  },
+  "groupDescriptionHint": "Optional notes about this group",
+  "@groupDescriptionHint": {
+    "description": "Hint text for the group description field"
+  },
+  "editGroup": "Edit Group",
+  "@editGroup": {
+    "description": "Dialog title for editing a group description"
+  },
+  "groupInfo": "Group info",
+  "@groupInfo": {
+    "description": "Tooltip / accessibility label for the group info button"
+  },
+  "noGroupDescription": "No description yet.",
+  "@noGroupDescription": {
+    "description": "Placeholder when a group has no description"
+  },
+  "failedToSaveGroup": "Failed to save group: {error}",
+  "@failedToSaveGroup": {
+    "description": "Snackbar when creating or updating a group fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "groupSaved": "Group saved",
+  "@groupSaved": {
+    "description": "Snackbar after a group is created or updated successfully"
+  },
+  "youCanEditGroup": "You can edit this group",
+  "@youCanEditGroup": {
+    "description": "Tooltip on the shield icon shown to group creators"
+  },
 
   "failedToSend": "Failed to send: {error}",
   "@failedToSend": {
