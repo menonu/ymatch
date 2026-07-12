@@ -104,6 +104,6 @@ flutter analyze
 ## Next Steps
 
 Now that you have your development environment up and running:
-- Check out the [System Architecture & Actors](../explanation/architecture.md) to understand the project structure.
+- Check out the [Architecture (arc42)](../explanation/architecture/README.md) to understand the project structure (C4 context, building blocks, deployment).
 - Read the [API Specification](../reference/api_spec.md) to see available endpoints.
 - Read [How to Deploy to OCI](../how_to/oci_deployment.md) when you are ready to prepare a release.
