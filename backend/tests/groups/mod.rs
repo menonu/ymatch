@@ -463,7 +463,7 @@ async fn test_group_photo_url_create_update_and_clear(pool: PgPool) {
         group.get("photoUrl")
     );
 
-    // List includes photo when set again
+    // List includes photo when set again via PUT
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let _ = app
         .oneshot(
@@ -479,7 +479,7 @@ async fn test_group_photo_url_create_update_and_clear(pool: PgPool) {
         )
         .await
         .unwrap();
-    let app = backend::routes::create_router(pool, test_storage());
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
@@ -495,6 +495,32 @@ async fn test_group_photo_url_create_update_and_clear(pool: PgPool) {
     assert_eq!(
         body["groups"][0]["photoUrl"].as_str().unwrap(),
         "https://cdn.example/g3.png"
+    );
+
+    // POST create upsert must NOT clobber an existing photo_url (#404 review).
+    let other_id = login_guest(&pool, "group-photo-clobber", "tok").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "hostile", "photoUrl": "https://evil.example/x.png"}}"#,
+                    event_id, other_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        group["photoUrl"].as_str().unwrap(),
+        "https://cdn.example/g3.png",
+        "create upsert must not overwrite photo_url"
     );
 }
 

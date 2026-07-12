@@ -164,12 +164,14 @@ impl MerchandiseGroupRepository {
             return Err(AppError::not_found("Event not found"));
         }
 
+        // On conflict, never touch photo_url here — that write is gated by the
+        // PUT update path (creator / group.edit RBAC). Create remains an
+        // unauthenticated-ish upsert for description metadata only (#404).
         let sql = format!(
             r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by, photo_url)
                VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (event_id, group_name) DO UPDATE
                  SET description = EXCLUDED.description,
-                     photo_url = COALESCE(EXCLUDED.photo_url, merchandise_groups.photo_url),
                      updated_at = NOW()
                RETURNING {}"#,
             GROUP_COLUMNS
