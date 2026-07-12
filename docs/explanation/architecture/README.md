@@ -26,7 +26,7 @@ resulting shape and points outward for details.
 | 06 | [Runtime view](06-runtime.md) | Auth, matching, trade negotiation, inventory apply | sequence / state |
 | 07 | [Deployment view](07-deployment.md) | Local, staging, production | **C4** Deployment |
 | 08 | [Cross-cutting](08-crosscutting.md) | Security, RBAC, i18n, errors, images | prose + links |
-| 09 | [Quality](09-quality.md) | NFRs, testing layers, coverage | prose |
+| 09 | [Quality](09-quality.md) | Quality attributes (SAiP 4th vocabulary), testing, performance | prose |
 
 ## Related docs
 

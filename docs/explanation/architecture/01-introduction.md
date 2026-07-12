@@ -56,12 +56,18 @@ behavior is precise.
 
 ### Quality attributes (summary)
 
-| ID | Attribute | Target (pragmatic) |
-|----|-----------|-------------------|
-| QA-01 | Multi-platform client | Flutter (web primary in prod; iOS/Android capable). |
-| QA-02 | Deployability | Local Docker + single-VM OCI compose for staging/prod. |
-| QA-03 | Correctness of trades | State machine + DB transactions; unit + integration + e2e coverage. |
-| QA-04 | Public-repo safety | No secrets in git; see [security.md](../security.md). |
-| QA-05 | i18n | English and Japanese UI strings. |
+Names follow the quality-attribute set used in *Software Architecture in
+Practice*, 4th ed. (Bass, Clements, Kazman). Targets are pragmatic for ymatch;
+detail and tactics are in [09 — Quality](09-quality.md).
 
-See [09 — Quality](09-quality.md) for testing and gates.
+| Quality attribute | Target (pragmatic) |
+|-------------------|-------------------|
+| **Usability** | Flutter client (web primary in prod; mobile-capable); English and Japanese UI. |
+| **Deployability** | Local Docker + identical single-VM OCI Compose for staging/prod. |
+| **Security** | RBAC on privileged actions; no secrets in the public repo ([security.md](../security.md)). |
+| **Testability** | Trade lifecycle and API verifiable via unit, integration, and e2e tests; coverage gates on `main`. |
+| **Performance** | Acceptable event-day latency on a single Always Free–class VM (batched match reads; periodic matcher). |
+| **Availability** | Recoverable OCI deployment (backups, documented DR); prefer redeploy over full rebuild when the VM is healthy. |
+| **Modifiability** | Layered backend (handlers → services → repositories); ADRs for hard-to-reverse decisions. |
+| **Interoperability** | Stable JSON REST + shared protobuf models for the Flutter client (and future clients). |
+
