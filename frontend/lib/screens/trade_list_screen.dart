@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
-import '../services/api_client.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -60,75 +59,34 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     return _filterMatches(matches, tab, userId).length;
   }
 
-  Future<void> _updateStatus(int userId, int matchId, String newStatus) async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      final client = ref.read(apiClientProvider);
-      final payload = UpdateMatchStatusRequest()
-        ..status = newStatus
-        ..userId = userId;
-      await client.post(
-        '/api/v1/matches/$matchId/status',
-        payload.toProto3Json() as Map<String, dynamic>,
-      );
-      ref.invalidate(matchesProvider(userId));
-      ref.invalidate(notificationCountsProvider(userId));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorPrefix(e.toString()))));
-      }
-    }
+  // #241: thin wrappers — body shape, invalidation, and error state live
+  // on MatchController. Errors surface via ref.listen in build().
+  Future<void> _updateStatus(int userId, int matchId, String newStatus) {
+    return ref
+        .read(matchControllerProvider.notifier)
+        .updateStatus(userId, matchId, newStatus);
   }
 
   Future<void> _submitOffer(
     int userId,
     int matchId,
     List<OfferItem> items,
-  ) async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      final client = ref.read(apiClientProvider);
-      final payload = OfferTradeRequest()
-        ..userId = userId
-        ..items.addAll(items);
-      await client.post(
-        '/api/v1/matches/$matchId/offer',
-        payload.toProto3Json() as Map<String, dynamic>,
-      );
-      ref.invalidate(matchesProvider(userId));
-      ref.invalidate(notificationCountsProvider(userId));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorPrefix(e.toString()))));
-      }
-    }
+  ) {
+    return ref
+        .read(matchControllerProvider.notifier)
+        .submitOffer(userId, matchId, items);
   }
 
   Future<void> _applyInventory(int userId, int matchId) async {
     final l10n = AppLocalizations.of(context)!;
-    try {
-      final client = ref.read(apiClientProvider);
-      final payload = ApplyInventoryRequest()..userId = userId;
-      await client.post(
-        '/api/v1/matches/$matchId/apply-inventory',
-        payload.toProto3Json() as Map<String, dynamic>,
-      );
-      ref.invalidate(matchesProvider(userId));
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.inventoryUpdatedSnack)));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorPrefix(e.toString()))));
-      }
+    await ref
+        .read(matchControllerProvider.notifier)
+        .applyInventory(userId, matchId);
+    // Success snackbar only; failures are handled by the controller listen.
+    if (mounted && !ref.read(matchControllerProvider).hasError) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.inventoryUpdatedSnack)));
     }
   }
 
@@ -141,6 +99,14 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
 
     final matchesAsync = ref.watch(matchesProvider(user.id));
     final l10n = AppLocalizations.of(context)!;
+
+    // Single owner for match-mutation error SnackBars (#241).
+    ref.listen<AsyncValue<void>>(matchControllerProvider, (previous, next) {
+      if (!next.hasError) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorPrefix(next.error.toString()))),
+      );
+    });
 
     return Scaffold(
       appBar: AppBar(
