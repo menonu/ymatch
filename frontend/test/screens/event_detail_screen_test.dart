@@ -50,6 +50,22 @@ ApiClient _emptyGetClient() {
   );
 }
 
+/// Fails creator-scoped merch DELETE while keeping GETs happy for other
+/// providers that still hit the network (#395 / #266).
+ApiClient _failingDeleteMerchClient() {
+  final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+  return ApiClient(
+    config,
+    client: MockClient((request) async {
+      if (request.method == 'DELETE' &&
+          request.url.path.contains('/merch/')) {
+        return http.Response('Forbidden', 403);
+      }
+      return http.Response('[]', 200);
+    }),
+  );
+}
+
 class _MockAuthController extends StateNotifier<AsyncValue<User?>>
     implements AuthController {
   _MockAuthController(User user) : super(AsyncValue.data(user));
@@ -256,6 +272,43 @@ void main() {
 
       expect(find.byType(FloatingActionButton), findsNothing);
       expect(find.byIcon(Icons.add_photo_alternate), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'delete merch failure shows error SnackBar and keeps dialog open (#395)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _failingDeleteMerchClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('TestPen42'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(ElevatedButton, 'Delete'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Error:'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
     },
   );
 }

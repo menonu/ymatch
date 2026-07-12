@@ -67,6 +67,31 @@ ApiClient _failingCreateApi() {
   );
 }
 
+/// Fails PUT rename and DELETE-by-creator paths used by the owner long-press
+/// menus (#395 / #266).
+ApiClient _failingEventMutationsApi() {
+  final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+  return ApiClient(
+    config,
+    client: MockClient((request) async {
+      if (request.method == 'PUT' &&
+          request.url.path.startsWith('/api/v1/events/')) {
+        return http.Response('Conflict', 409);
+      }
+      if (request.method == 'DELETE' &&
+          request.url.path.startsWith('/api/v1/admin/events/')) {
+        return http.Response('Forbidden', 403);
+      }
+      return http.Response('[]', 200);
+    }),
+  );
+}
+
+Event _ownedEvent() => Event()
+  ..id = 42
+  ..name = 'Owned Fest'
+  ..creatorId = 1;
+
 void main() {
   // The AppBar help icon watches howToHintSeenProvider, which reads
   // SharedPreferences — provide the in-memory mock so widget tests don't hit
@@ -204,6 +229,93 @@ void main() {
       await tester.pumpAndSettle();
 
       // Failure must be visible; dialog must stay open (not silent success).
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Error:'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'rename event failure shows error SnackBar and keeps dialog open (#395)',
+    (WidgetTester tester) async {
+      final user = User()
+        ..id = 1
+        ..username = 'creator';
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => [_ownedEvent()]),
+            apiClientProvider.overrideWithValue(_failingEventMutationsApi()),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Owned Fest'), findsOneWidget);
+      await tester.longPress(find.text('Owned Fest'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Edit Name'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      final dialogField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogField, 'Renamed Fest');
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(ElevatedButton, 'Save'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Error:'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'delete event failure shows error SnackBar and keeps dialog open (#395)',
+    (WidgetTester tester) async {
+      final user = User()
+        ..id = 1
+        ..username = 'creator';
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => [_ownedEvent()]),
+            apiClientProvider.overrideWithValue(_failingEventMutationsApi()),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Owned Fest'));
+      await tester.pumpAndSettle();
+
+      // Bottom sheet "Delete" opens the confirm dialog.
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(ElevatedButton, 'Delete'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
       expect(find.byType(SnackBar), findsOneWidget);
       expect(find.textContaining('Error:'), findsOneWidget);
       expect(find.byType(AlertDialog), findsOneWidget);

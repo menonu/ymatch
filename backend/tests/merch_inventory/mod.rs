@@ -340,6 +340,50 @@ async fn test_inventory_upsert(pool: PgPool) {
     assert_eq!(items[0]["quantity"].as_i64().unwrap(), 5);
 }
 
+/// #395 / #266: a real Postgres CHECK violation over HTTP must map to 400
+/// with a safe body (defense-in-depth for `From<sqlx::Error>` wire-up).
+///
+/// Inventory has `CHECK (status IN ('HAVE', 'WANT', 'TRADE'))`. An invalid
+/// status is not pre-validated in the handler, so the DB constraint is what
+/// rejects the write — this is the blanket CHECK → 400 path.
+#[sqlx::test]
+async fn test_inventory_check_violation_returns_400_safe_body(pool: PgPool) {
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "check-inv-user", "Check Inv Event").await;
+
+    let merch_id = create_merch(&pool, event_id, "Check Item", "G").await;
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/user/inventory")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "merchId": {}, "status": "NOT_A_STATUS", "quantity": 1}}"#,
+                    user_id, merch_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    let body = body_to_string(resp.into_body()).await;
+    // Mapped message from From<sqlx::Error> CHECK handling — never raw SQL.
+    assert!(
+        body.contains("Invalid request data"),
+        "expected safe CHECK mapping body, got: {body}"
+    );
+    assert!(
+        !body.contains("check constraint")
+            && !body.contains("inventory_status_check")
+            && !body.contains("23514"),
+        "client body must not leak SQL/CHECK detail, got: {body}"
+    );
+}
+
 #[sqlx::test]
 async fn test_draft_merch_visibility(pool: PgPool) {
     // Create user

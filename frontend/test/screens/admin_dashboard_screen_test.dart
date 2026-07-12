@@ -233,4 +233,131 @@ void main() {
       expect(find.byIcon(Icons.image_outlined), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Users tab role-change failure shows error SnackBar (no success) (#395)',
+    (WidgetTester tester) async {
+      final target = User()
+        ..id = 99
+        ..username = 'target_user'
+        ..role = 'user';
+
+      final mockClient = MockClient((request) async {
+        if (request.method == 'POST' &&
+            request.url.path == '/api/v1/admin/users/99/role') {
+          return http.Response('Forbidden', 403);
+        }
+        return http.Response('[]', 200);
+      });
+      final api = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: mockClient,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            apiClientProvider.overrideWith((ref) => api),
+            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+            adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+            adminUsersProvider.overrideWith((ref) async => [target]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Users'));
+      await tester.pumpAndSettle();
+      expect(find.text('target_user'), findsOneWidget);
+
+      // Open the per-user actions menu and pick a role change (no reason dialog).
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('🛡️ Set Moderator'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Error:'), findsOneWidget);
+      // Must not take the silent invalidate / success-only path.
+      expect(find.text('Role updated to moderator'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Debug generate failure shows error SnackBar and not success (#395)',
+    (WidgetTester tester) async {
+      final mockClient = MockClient((request) async {
+        // generateDebugData starts with POST /api/v1/events.
+        if (request.method == 'POST' && request.url.path == '/api/v1/events') {
+          return http.Response('Internal Server Error', 500);
+        }
+        return http.Response('[]', 200);
+      });
+      final api = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: mockClient,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            apiClientProvider.overrideWith((ref) => api),
+            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+            adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+            adminUsersProvider.overrideWith((ref) async => <User>[]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Debug'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.text('Generate Test Event (50 items in 5 tabs)'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Generate Data?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Generate'));
+      // The UI first shows "Generating data...", then on failure queues
+      // "Failed to generate…". SnackBar transitions need stepped pumps (a single
+      // large pump can skip intermediate hide/show frames) (#395).
+      await tester.pump(); // close dialog + schedule async work
+      await tester.pump(const Duration(milliseconds: 50)); // await mock POST
+      expect(find.text('Generating data...'), findsOneWidget);
+
+      // #266/#395: must never claim success, even while the first SnackBar is up.
+      expect(find.text('Test data generated successfully!'), findsNothing);
+
+      // Advance in 1s steps until the queued failure SnackBar is visible.
+      final failed = find.textContaining('Failed to generate test data:');
+      var sawFailure = false;
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(seconds: 1));
+        if (failed.evaluate().isNotEmpty) {
+          sawFailure = true;
+          break;
+        }
+        // Success must never appear at any intermediate step.
+        expect(find.text('Test data generated successfully!'), findsNothing);
+      }
+      expect(sawFailure, isTrue, reason: 'error SnackBar never became visible');
+      expect(failed, findsOneWidget);
+      expect(find.text('Test data generated successfully!'), findsNothing);
+    },
+  );
 }
