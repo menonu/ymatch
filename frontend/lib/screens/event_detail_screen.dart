@@ -708,37 +708,34 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              FloatingActionButton.extended(
-                                heroTag: 'group_info_fab',
+                              // Icon-only, no label / border / FAB chrome (#128).
+                              IconButton(
+                                tooltip: l10n.groupInfo,
+                                iconSize: 28,
                                 onPressed: () {
                                   setState(
                                     () => _groupInfoOpen = !_groupInfoOpen,
                                   );
                                 },
-                                backgroundColor: _groupInfoOpen
-                                    ? AppTheme.primaryColor
-                                    : null,
-                                foregroundColor: _groupInfoOpen
-                                    ? Colors.white
-                                    : null,
-                                label: Text(l10n.groupInfo),
                                 icon: Icon(
                                   _groupInfoOpen
                                       ? Icons.info
                                       : Icons.info_outline,
+                                  color: _groupInfoOpen
+                                      ? AppTheme.primaryColor
+                                      : null,
                                 ),
                               ),
                               if (canEditActive) ...[
-                                const SizedBox(width: 12),
-                                FloatingActionButton.small(
-                                  heroTag: 'group_edit_fab',
+                                IconButton(
                                   tooltip: l10n.editGroup,
+                                  iconSize: 24,
                                   onPressed: () => _showEditGroupDialog(
                                     context,
                                     activeName,
                                     activeMeta,
                                   ),
-                                  child: const Icon(Icons.edit),
+                                  icon: const Icon(Icons.edit),
                                 ),
                               ],
                             ],

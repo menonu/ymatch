@@ -254,9 +254,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Info FAB is always present (#128); Add Merch is the gated one.
+      // Info icon is always present (#128); Add Merch is the gated one.
       expect(find.byIcon(Icons.add_photo_alternate), findsOneWidget);
-      expect(find.text('Group info'), findsOneWidget);
+      expect(find.byTooltip('Group info'), findsOneWidget);
     },
   );
 
@@ -281,8 +281,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.add_photo_alternate), findsNothing);
-      // Group info FAB still available for any signed-in visitor (#128).
-      expect(find.text('Group info'), findsOneWidget);
+      // Group info icon still available for any signed-in visitor (#128).
+      expect(find.byTooltip('Group info'), findsOneWidget);
     },
   );
 
@@ -317,7 +317,7 @@ void main() {
       // Panel closed by default.
       expect(find.text('Collectible pens'), findsNothing);
 
-      await tester.tap(find.text('Group info'));
+      await tester.tap(find.byTooltip('Group info'));
       await tester.pumpAndSettle();
 
       // Panel shows the active group name + description.
@@ -326,7 +326,7 @@ void main() {
       expect(find.text('Collectible pens'), findsOneWidget);
 
       // Toggle closed again.
-      await tester.tap(find.text('Group info'));
+      await tester.tap(find.byTooltip('Group info'));
       await tester.pumpAndSettle();
       expect(find.text('Collectible pens'), findsNothing);
     },
@@ -413,7 +413,7 @@ void main() {
       expect(find.byTooltip('Edit Group'), findsNothing);
 
       // Info panel is still readable, without an edit affordance.
-      await tester.tap(find.text('Group info'));
+      await tester.tap(find.byTooltip('Group info'));
       await tester.pumpAndSettle();
       expect(find.text('Collectible pens'), findsOneWidget);
       expect(find.byIcon(Icons.edit_outlined), findsNothing);
