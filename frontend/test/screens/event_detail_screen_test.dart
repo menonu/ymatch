@@ -542,4 +542,94 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'initialGroupName selects the matching group tab (#406)',
+    (tester) async {
+      final alpha = Merchandise()
+        ..id = 1
+        ..eventId = 5
+        ..name = 'AlphaItem'
+        ..groupName = 'Alpha'
+        ..creatorId = 1;
+      final zeta = Merchandise()
+        ..id = 2
+        ..eventId = 5
+        ..name = 'ZetaItem'
+        ..groupName = 'Zeta'
+        ..creatorId = 1;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(5).overrideWith((ref) async => [alpha, zeta]),
+          ],
+          child: _localized(
+            const EventDetailScreen(eventId: 5, initialGroupName: 'Zeta'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Natural sort puts Alpha before Zeta; favorite-group deep link must
+      // open Zeta (index 1), not the default first tab.
+      final tabCtrl = DefaultTabController.of(
+        tester.element(find.byType(TabBar)),
+      );
+      expect(tabCtrl.index, 1);
+      expect(find.text('ZetaItem'), findsOneWidget);
+      expect(find.text('AlphaItem'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'unknown initialGroupName falls back to first group tab (#406)',
+    (tester) async {
+      final alpha = Merchandise()
+        ..id = 1
+        ..eventId = 5
+        ..name = 'AlphaItem'
+        ..groupName = 'Alpha'
+        ..creatorId = 1;
+      final zeta = Merchandise()
+        ..id = 2
+        ..eventId = 5
+        ..name = 'ZetaItem'
+        ..groupName = 'Zeta'
+        ..creatorId = 1;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(5).overrideWith((ref) async => [alpha, zeta]),
+          ],
+          child: _localized(
+            const EventDetailScreen(
+              eventId: 5,
+              initialGroupName: 'DoesNotExist',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tabCtrl = DefaultTabController.of(
+        tester.element(find.byType(TabBar)),
+      );
+      expect(tabCtrl.index, 0);
+      expect(find.text('AlphaItem'), findsOneWidget);
+    },
+  );
+
+  test('resolveInitialGroupTabIndex maps name or falls back (#406)', () {
+    expect(resolveInitialGroupTabIndex(['A', 'B'], 'B'), 1);
+    expect(resolveInitialGroupTabIndex(['A', 'B'], 'missing'), 0);
+    expect(resolveInitialGroupTabIndex(['A', 'B'], null), 0);
+    expect(resolveInitialGroupTabIndex(['A', 'B'], ''), 0);
+    expect(resolveInitialGroupTabIndex([], 'B'), 0);
+  });
 }

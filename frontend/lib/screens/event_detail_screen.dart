@@ -30,10 +30,28 @@ final itemSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 class EventDetailScreen extends ConsumerStatefulWidget {
   final int eventId;
 
-  const EventDetailScreen({super.key, required this.eventId});
+  /// Optional group tab to select on open (favorite-group shortcut, #406).
+  final String? initialGroupName;
+
+  const EventDetailScreen({
+    super.key,
+    required this.eventId,
+    this.initialGroupName,
+  });
 
   @override
   ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+/// Index of [initialGroupName] in [groupKeys], or 0 if absent/unknown (#406).
+int resolveInitialGroupTabIndex(
+  List<String> groupKeys,
+  String? initialGroupName,
+) {
+  if (groupKeys.isEmpty) return 0;
+  if (initialGroupName == null || initialGroupName.isEmpty) return 0;
+  final i = groupKeys.indexOf(initialGroupName);
+  return i >= 0 ? i : 0;
 }
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
@@ -149,6 +167,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
         return DefaultTabController(
           length: groupKeys.length,
+          initialIndex: resolveInitialGroupTabIndex(
+            groupKeys,
+            widget.initialGroupName,
+          ),
           child: Scaffold(
             appBar: AppBar(
               titleSpacing: 16,
