@@ -41,7 +41,7 @@ column is `Permission::as_str`.
 | Scope | Role | Description |
 |---|---|---|
 | `global` | `admin` | Full access / all permissions. Superuser bypass. |
-| `global` | `moderator` | Platform management: ban/unban, create & manage events, edit or remove any event/merch/group, delete matches. |
+| `global` | `moderator` | Platform management: read user details, ban/unban, create & manage events, edit or remove any event/merch/group, delete matches. |
 | `global` | `user` | Standard trading. No elevated permissions (ordinary trading is ownership-checked). |
 | `event` | `creator` | Owns an event; manages its editors; edits the event, its merch, and its groups. |
 | `event` | `editor` | Edits an event's merch and groups; cannot delete the event or manage editors. |
@@ -53,6 +53,7 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 
 | Permission | Granted to | Satisfies | Enforced by |
 |---|---|---|---|
+| `user.read` | admin, moderator | `user.read` | `admin::get_user_details` (`GET /admin/users/:id`) |
 | `user.ban` | admin, moderator | `user.ban` | `admin::ban_user` (`POST /admin/users/:id/ban`) |
 | `user.unban` | admin, moderator | `user.unban` | `admin::unban_user` (`POST /admin/users/:id/unban`) |
 | `user.role.manage` | admin | `user.role.manage` | `admin::update_user_role` (`PUT /admin/users/:id/role`) |

@@ -2,15 +2,20 @@ use crate::common::*;
 
 #[sqlx::test]
 async fn test_admin_get_user_details_returns_user(pool: PgPool) {
-    let (user_id, _event_id) =
+    // create_test_user_and_event grants global/moderator, which holds user.read.
+    let (caller_id, _event_id) =
         create_test_user_and_event(pool.clone(), "admin-getuser", "Admin GetUser Event").await;
+    let target = login_guest(&pool, "admin-getuser-target", "t").await;
 
     let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/v1/admin/users/{}", user_id))
+                .uri(format!(
+                    "/api/v1/admin/users/{}?user_id={}",
+                    target, caller_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -19,24 +24,106 @@ async fn test_admin_get_user_details_returns_user(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_to_string(resp.into_body()).await;
     let user: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(user["id"], user_id);
+    assert_eq!(user["id"], target);
     assert!(user["username"].as_str().is_some());
 }
 
 #[sqlx::test]
 async fn test_admin_get_user_details_nonexistent_returns_404(pool: PgPool) {
+    let (admin_id, _eid) =
+        create_test_user_and_event(pool.clone(), "admin-getuser-404", "GetUser 404 Event").await;
+    grant_global_role(&pool, admin_id, "admin").await;
+
     let app = backend::routes::create_router(pool, test_storage());
     let resp = app
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/api/v1/admin/users/999999")
+                .uri(format!("/api/v1/admin/users/999999?user_id={}", admin_id))
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+/// #376: plain callers must not read another user's details (device_token
+/// exposure). Moderator and admin both hold `user.read` and get 200.
+#[sqlx::test]
+async fn test_admin_get_user_details_rbac_boundary(pool: PgPool) {
+    let target = login_guest(&pool, "getuser-rbac-target", "tok-target").await;
+
+    // Plain caller → 403.
+    let plain = login_guest(&pool, "getuser-rbac-plain", "tok-plain").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/admin/users/{}?user_id={}", target, plain))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "plain user must not read user details"
+    );
+
+    // Missing user_id query param → 400.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/admin/users/{}", target))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Moderator → 200.
+    let moderator = login_guest(&pool, "getuser-rbac-mod", "tok-mod").await;
+    grant_global_role(&pool, moderator, "moderator").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/v1/admin/users/{}?user_id={}",
+                    target, moderator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let user: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(user["id"], target);
+
+    // Admin → 200 (superuser bypass + explicit grant).
+    let admin = login_guest(&pool, "getuser-rbac-admin", "tok-admin").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/admin/users/{}?user_id={}", target, admin))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 }
 
 #[sqlx::test]

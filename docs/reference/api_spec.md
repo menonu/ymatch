@@ -404,8 +404,12 @@ Delete a match.
 
 ### GET /api/v1/admin/users/:id
 
-Get detailed user information.
+Get detailed user information (includes sensitive fields such as `device_token`).
 
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
 - **Response**: `200 OK`
   ```json
   {
@@ -418,6 +422,7 @@ Get detailed user information.
     "created_at": "2025-07-01T00:00:00Z"
   }
   ```
+- **Permissions**: Admin or moderator only (`user.read`).
 
 ### POST /api/v1/admin/users/:id/ban
 

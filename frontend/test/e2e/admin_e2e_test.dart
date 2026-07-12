@@ -175,7 +175,8 @@ void main() {
         .read(adminControllerProvider.notifier)
         .banUser(targetId, adminUserId, reason: 'e2e test ban');
 
-    final banned = await api.get('/api/v1/admin/users/$targetId');
+    final banned =
+        await api.get('/api/v1/admin/users/$targetId?user_id=$adminUserId');
     expect((banned as Map)['isBanned'], isTrue,
         reason: 'target user should be banned');
 
@@ -183,7 +184,8 @@ void main() {
         .read(adminControllerProvider.notifier)
         .unbanUser(targetId, adminUserId);
 
-    final unbanned = await api.get('/api/v1/admin/users/$targetId');
+    final unbanned =
+        await api.get('/api/v1/admin/users/$targetId?user_id=$adminUserId');
     expect((unbanned as Map)['isBanned'], isFalse,
         reason: 'target user should be unbanned');
   });
@@ -199,7 +201,8 @@ void main() {
         .read(adminControllerProvider.notifier)
         .updateUserRole(targetId, adminUserId, 'moderator');
 
-    final updated = await api.get('/api/v1/admin/users/$targetId');
+    final updated =
+        await api.get('/api/v1/admin/users/$targetId?user_id=$adminUserId');
     expect((updated as Map)['role'], 'moderator');
   });
 
