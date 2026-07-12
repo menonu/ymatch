@@ -1547,20 +1547,24 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               ),
             ],
           ),
-          // −/+ hint icons centered on left/right edges
+          // −/+ hint icons centered on left/right edges.
+          // IgnorePointer so taps on the glyphs reach the half-area
+          // GestureDetectors below (#408) — same as the center label.
           Positioned(
             left: 2,
             top: 0,
             bottom: 0,
-            child: Center(
-              child: Text(
-                '−',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: qty > 0
-                      ? color.withValues(alpha: 0.5)
-                      : Colors.grey.withValues(alpha: 0.3),
-                  fontWeight: FontWeight.bold,
+            child: IgnorePointer(
+              child: Center(
+                child: Text(
+                  '−',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: qty > 0
+                        ? color.withValues(alpha: 0.5)
+                        : Colors.grey.withValues(alpha: 0.3),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1569,13 +1573,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             right: 3,
             top: 0,
             bottom: 0,
-            child: Center(
-              child: Text(
-                '+',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: color.withValues(alpha: 0.5),
-                  fontWeight: FontWeight.bold,
+            child: IgnorePointer(
+              child: Center(
+                child: Text(
+                  '+',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: color.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

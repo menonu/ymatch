@@ -5,6 +5,8 @@
 // exists in `event_detail_screen.dart` (`isOwner`); these tests pin it and
 // verify the new "Edit Item" dialog exposes a "Change Image" affordance.
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -632,4 +634,150 @@ void main() {
     expect(resolveInitialGroupTabIndex(['A', 'B'], ''), 0);
     expect(resolveInitialGroupTabIndex([], 'B'), 0);
   });
+
+  // --- Inventory stepper −/+ glyph hit targets (#408) ---
+  // Decorative − / + Text sits above the half-area GestureDetectors. Without
+  // IgnorePointer, taps on those glyphs are absorbed and never reach the
+  // detectors. These tests tap the glyph Text widgets themselves.
+
+  testWidgets(
+    'tapping the decorative + glyph on the detailed stepper increments inventory (#408)',
+    (tester) async {
+      final inventoryPosts = <Map<String, dynamic>>[];
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final client = ApiClient(
+        config,
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/user/inventory') {
+            final body =
+                jsonDecode(request.body) as Map<String, dynamic>;
+            inventoryPosts.add(body);
+            return http.Response(
+              jsonEncode({
+                'id': inventoryPosts.length,
+                'userId': body['userId'],
+                'merchId': body['merchId'],
+                'status': body['status'],
+                'quantity': body['quantity'],
+                'merchName': '',
+              }),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => client),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Detailed view shows three steppers (HAVE / WANT / TRADE), each with a +
+      // hint glyph. Tap at the first (+) center — the HAVE stepper. Use
+      // tapAt so the hit lands on the glyph position even when the Text is
+      // IgnorePointer (the bug is that hits at that offset must reach the
+      // half-area GestureDetector beneath).
+      expect(find.text('+'), findsNWidgets(3));
+      await tester.tapAt(tester.getCenter(find.text('+').first));
+      await tester.pumpAndSettle();
+
+      expect(
+        inventoryPosts,
+        isNotEmpty,
+        reason: 'tap on + glyph must reach the increase GestureDetector',
+      );
+      expect(inventoryPosts.first['status'], 'HAVE');
+      expect(inventoryPosts.first['quantity'], 1);
+      expect(inventoryPosts.first['merchId'], 10);
+    },
+  );
+
+  testWidgets(
+    'tapping the decorative − glyph on the detailed stepper decrements inventory (#408)',
+    (tester) async {
+      final inventoryPosts = <Map<String, dynamic>>[];
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final client = ApiClient(
+        config,
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/user/1/inventory') {
+            // Seed HAVE=1 so the decrease path is active.
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 1,
+                  'userId': 1,
+                  'merchId': 10,
+                  'status': 'HAVE',
+                  'quantity': 1,
+                  'merchName': 'TestPen42',
+                },
+              ]),
+              200,
+            );
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/user/inventory') {
+            final body =
+                jsonDecode(request.body) as Map<String, dynamic>;
+            inventoryPosts.add(body);
+            return http.Response(
+              jsonEncode({
+                'id': 1,
+                'userId': body['userId'],
+                'merchId': body['merchId'],
+                'status': body['status'],
+                'quantity': body['quantity'],
+                'merchName': '',
+              }),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => client),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Unicode minus (U+2212), not ASCII hyphen — matches _buildStepper.
+      expect(find.text('−'), findsNWidgets(3));
+      await tester.tapAt(tester.getCenter(find.text('−').first));
+      await tester.pumpAndSettle();
+
+      expect(
+        inventoryPosts,
+        isNotEmpty,
+        reason: 'tap on − glyph must reach the decrease GestureDetector',
+      );
+      expect(inventoryPosts.first['status'], 'HAVE');
+      expect(inventoryPosts.first['quantity'], 0);
+      expect(inventoryPosts.first['merchId'], 10);
+    },
+  );
 }
