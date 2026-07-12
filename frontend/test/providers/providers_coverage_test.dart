@@ -321,6 +321,85 @@ void main() {
           .read(eventsControllerProvider.notifier)
           .registerView(1, 1);
     });
+
+    test('updateEvent failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'PUT' &&
+              request.url.path == '/api/v1/events/3') {
+            return http.Response('Conflict', 409);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(eventsControllerProvider.notifier)
+            .updateEvent(3, 1, 'Renamed'),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(eventsControllerProvider).hasError, isTrue);
+    });
+
+    test(
+      'deleteEventByCreator failure -> state error AND rethrows (#395)',
+      () async {
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'DELETE' &&
+                request.url.path == '/api/v1/admin/events/3') {
+              return http.Response('Forbidden', 403);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(eventsControllerProvider.notifier)
+              .deleteEventByCreator(3, 1),
+          throwsA(isA<Exception>()),
+        );
+        expect(container.read(eventsControllerProvider).hasError, isTrue);
+      },
+    );
+
+    test(
+      'generateDebugData failure -> state error AND rethrows (#395)',
+      () async {
+        final api = _apiWith(
+          client: MockClient((request) async {
+            // First step of generateDebugData is POST /api/v1/events.
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/events') {
+              return http.Response('Internal Server Error', 500);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(eventsControllerProvider.notifier)
+              .generateDebugData(1),
+          throwsA(isA<Exception>()),
+        );
+        expect(container.read(eventsControllerProvider).hasError, isTrue);
+      },
+    );
   });
 
   // ---- MerchController (addMerch rethrows per #227) ----
@@ -377,6 +456,33 @@ void main() {
       );
       expect(container.read(merchControllerProvider).hasError, isTrue);
     });
+
+    test(
+      'deleteMerchByCreator failure -> state error AND rethrows (#395)',
+      () async {
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'DELETE' &&
+                request.url.path == '/api/v1/events/1/merch/9') {
+              return http.Response('Forbidden', 403);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(merchControllerProvider.notifier)
+              .deleteMerchByCreator(1, 9, 1),
+          throwsA(isA<Exception>()),
+        );
+        expect(container.read(merchControllerProvider).hasError, isTrue);
+      },
+    );
   });
 
   // ---- Admin read providers ----
@@ -526,6 +632,177 @@ void main() {
         throwsA(isA<Exception>()),
       );
 
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('unbanUser failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/admin/users/5/unban') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .unbanUser(5, 1),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test(
+      'updateUserRole failure -> state error AND rethrows (#395)',
+      () async {
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/admin/users/5/role') {
+              return http.Response('Forbidden', 403);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(adminControllerProvider.notifier)
+              .updateUserRole(5, 1, 'moderator'),
+          throwsA(isA<Exception>()),
+        );
+        expect(container.read(adminControllerProvider).hasError, isTrue);
+      },
+    );
+
+    test('publishEvent failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/events/3/publish') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .publishEvent(3, 1),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('publishMerch failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/events/1/merch/9/publish') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .publishMerch(1, 9, 1),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('deleteEvent failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'DELETE' &&
+              request.url.path == '/api/v1/admin/events/3') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .deleteEvent(3, 1),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('deleteMerch failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'DELETE' &&
+              request.url.path == '/api/v1/admin/merch/9') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .deleteMerch(9, 1),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('deleteMatch failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'DELETE' &&
+              request.url.path == '/api/v1/admin/matches/4') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .deleteMatch(4, 1),
+        throwsA(isA<Exception>()),
+      );
       expect(container.read(adminControllerProvider).hasError, isTrue);
     });
   });
