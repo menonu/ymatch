@@ -20,27 +20,28 @@ recorded as ADRs; this page is the map, not the full rationale.
 ### Backend layering
 
 ```
-HTTP handlers  →  services (PermissionPolicy, MatchLifecycleService, RbacService)
-               →  repositories (SQL, concrete structs + generic Executor)
+HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
+               →  domain persistence (SQL)
                →  PostgreSQL
 ```
 
-- **Handlers** parse input, call services/repos, map errors — no business SQL.
-- **Repositories** own SQL for their tables (concrete structs; generic
-  `Executor` for transactional methods — evolved from the earlier trait/`dyn`
-  shape in #163 / #191).
-- **Services** own multi-step domain rules and transactions:
-  `PermissionPolicy` (active/ban gate), `RbacService` (permissions),
-  `MatchLifecycleService` (trade state machine).
+- **Handlers** parse input, apply entry gates, map results — no domain SQL.
+- **Persistence** owns SQL per domain (concrete repository modules; transactional
+  methods use a shared executor pattern).
+- **Services** own multi-step rules (active/ban gate, RBAC checks, trade
+  negotiation and inventory apply).
+
+See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
+(not a source-tree listing).
 
 ### Frontend layering
 
 ```
-Screens / widgets  →  Riverpod providers & controllers  →  ApiClient  →  Backend
+Screens / navigation  →  app state  →  API client  →  Backend
 ```
 
-- Generated models under `lib/models/` (from protobuf).
-- Controllers encapsulate mutations; `FutureProvider`s load lists.
+- **App state** holds session and async catalog/trade data and drives mutations.
+- **API client** speaks HTTPS JSON using shared protobuf wire shapes.
 
 ### Domain strategies (see ADRs)
 

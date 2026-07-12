@@ -1,43 +1,35 @@
 direction: down
 title: |md
-  # Component diagram — Flutter client
+  # Component diagram — Flutter client (conceptual)
 | {near: top-center}
 
 fe: "Flutter Web UI" {
   style.fill: "#F3E5F5"
   style.stroke: "#6A1B9A"
 
-  screens: "Screens\nlib/screens/*" {
+  screens: "Screens / navigation" {
     style.fill: "#E1BEE7"
   }
-  widgets: "Shared widgets\nlib/widgets/*" {
+  widgets: "Shared UI" {
     style.fill: "#E1BEE7"
   }
-  providers: "Providers & controllers\nlib/providers/providers.dart" {
+  state: "App state\nsession, loads, mutations" {
     style.fill: "#CE93D8"
   }
-  api: "ApiClient\nlib/services/api_client.dart" {
+  api: "API client\nHTTPS + proto3 JSON" {
     style.fill: "#CE93D8"
   }
-  models: "Models\nlib/models/* (protobuf)" {
-    style.fill: "#BA68C8"
-  }
-  router: "Router\nGoRouter" {
-    style.fill: "#E1BEE7"
-  }
-  l10n: "Localization\nlib/l10n/* EN + JA" {
+  l10n: "Localization\nEN + JA" {
     style.fill: "#E1BEE7"
   }
 }
 
-backend: "Backend API\nREST" {
+backend: "Backend API" {
   style.fill: "#FFF3E0"
 }
 
-fe.screens -> fe.providers: "watch / read"
+fe.screens -> fe.state: "read / write"
 fe.screens -> fe.widgets: "compose"
-fe.screens -> fe.router: "navigate"
-fe.providers -> fe.api: "mutations & fetches"
-fe.api -> fe.models: "encode/decode"
+fe.state -> fe.api: "fetch / mutate"
 fe.api -> backend: "HTTPS JSON"
 fe.screens -> fe.l10n: "strings"

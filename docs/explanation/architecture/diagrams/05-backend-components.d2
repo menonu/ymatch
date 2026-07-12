@@ -1,6 +1,6 @@
 direction: down
 title: |md
-  # Component diagram — Backend API
+  # Component diagram — Backend API (conceptual)
 | {near: top-center}
 
 client: "Flutter client" {
@@ -11,45 +11,45 @@ api: "Backend API" {
   style.fill: "#E3F2FD"
   style.stroke: "#1565C0"
 
-  routes: "Router & middleware\nAxum — routes, rate limit, AppState" {
+  edge: "HTTP edge\nroutes, middleware, app state" {
     style.fill: "#BBDEFB"
   }
-  handlers: "HTTP handlers\nhandlers/*" {
+  handlers: "HTTP handlers\nparse, gate, delegate" {
     style.fill: "#BBDEFB"
   }
-  lifecycle: "MatchLifecycleService\nservices/match_lifecycle.rs" {
+  access: "Access control\nactive/ban + RBAC" {
     style.fill: "#90CAF9"
   }
-  rbac: "RbacService\nservices/rbac.rs" {
+  lifecycle: "Trade lifecycle\nnegotiate, complete, apply" {
     style.fill: "#90CAF9"
   }
-  repos: "Repositories\nrepositories/*\nconcrete structs + Executor" {
+  persist: "Domain persistence\nSQL per domain" {
     style.fill: "#90CAF9"
   }
-  matching: "Matching job\nmatching.rs\nperiodic WANT/TRADE discovery" {
+  matching: "Matching job\nperiodic TRADE/WANT discovery" {
     style.fill: "#90CAF9"
   }
-  storage: "ImageStorage\nstorage/* local or Firebase/GCS" {
+  storage: "Image storage\nlocal or object store" {
     style.fill: "#90CAF9"
   }
-  proto: "Generated models\ngenerated/* (prost)" {
+  models: "Wire models\nprotobuf types" {
     style.fill: "#B3E5FC"
   }
 }
 
-db: "PostgreSQL 16" {
+db: "PostgreSQL" {
   shape: cylinder
   style.fill: "#81C784"
 }
 
-client -> api.routes: "REST /api/v1"
-api.routes -> api.handlers: "Dispatch"
+client -> api.edge: "REST /api/v1"
+api.edge -> api.handlers: "Dispatch"
 api.handlers -> api.lifecycle: "Trade mutations"
-api.handlers -> api.rbac: "check(permission)"
-api.handlers -> api.repos: "CRUD"
-api.lifecycle -> api.repos: "Transactional SQL"
-api.rbac -> api.repos: "Load roles"
-api.matching -> db: "Direct SQL"
-api.repos -> db: "SQLx"
-api.handlers -> api.storage: "Upload/delete"
-api.handlers -> api.proto: "Serialize"
+api.handlers -> api.access: "Authorize"
+api.handlers -> api.persist: "Reads / simple writes"
+api.lifecycle -> api.persist: "Transactional writes"
+api.access -> api.persist: "Roles / users"
+api.matching -> db: "Match discovery SQL"
+api.persist -> db: "SQL"
+api.handlers -> api.storage: "Upload / delete"
+api.handlers -> api.models: "Encode / decode"

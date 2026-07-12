@@ -8,8 +8,8 @@ sketch, cross-container data flow).
 |-----------|----------|---------|
 | `03-system-context` | L1 System Context | [03-context.md](../03-context.md) |
 | `05-containers` | L2 Containers | [05-building-blocks.md](../05-building-blocks.md) |
-| `05-backend-components` | L3 Components | [05-building-blocks.md](../05-building-blocks.md) |
-| `05-frontend-components` | L3 Components | [05-building-blocks.md](../05-building-blocks.md) |
+| `05-backend-components` | L3 Components (conceptual) | [05-building-blocks.md](../05-building-blocks.md) |
+| `05-frontend-components` | L3 Components (conceptual) | [05-building-blocks.md](../05-building-blocks.md) |
 | `07-deployment-oci` | Deployment | [07-deployment.md](../07-deployment.md) |
 | `07-deployment-local` | Deployment | [07-deployment.md](../07-deployment.md) |
 

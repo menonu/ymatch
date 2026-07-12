@@ -7,11 +7,17 @@ C4 hierarchy:
 |----------|------|--------|
 | 1 — System Context | Black-box system + people/external systems | [03 — Context](03-context.md) |
 | **2 — Containers** | Deployable / runtime units | **this section** |
-| **3 — Components** | Major modules inside the largest containers | **this section** |
+| **3 — Components** | Major **conceptual** modules inside the largest containers | **this section** |
+
+This view describes **responsibilities and collaboration**, not a complete
+source-tree inventory. File paths may appear in diagrams as orientation aids
+only; they are not an exhaustive module list. Placement on hosts is
+[07 — Deployment](07-deployment.md). Tables and columns live in
+[DB schema](../../reference/db_schema.md); UI identifiers in
+[UI components](../../reference/ui_components.md).
 
 C4 diagrams: [D2](https://d2lang.com/) → SVG in [`diagrams/`](diagrams/).
-Simple data-flow uses Mermaid below. Placement on hosts is
-[07 — Deployment](07-deployment.md).
+Simple data-flow uses Mermaid below.
 
 ## Containers (C4 level 2)
 
@@ -24,87 +30,84 @@ Source: [`diagrams/05-containers.d2`](diagrams/05-containers.d2)
 > **Note on the SPA box:** In production the Flutter UI is **static assets**
 > served by the Nginx container; JS runs in the **user’s browser**, not as a
 > separate process next to Nginx. The “Flutter Web UI” box is a **logical**
-> client module (codebase + runtime behaviour). Deployable peers are Caddy,
-> Nginx, Backend API, and PostgreSQL (see also [07 — Deployment](07-deployment.md)).
+> client module. Deployable peers are Caddy, Nginx, Backend API, and PostgreSQL
+> (see also [07 — Deployment](07-deployment.md)).
 
 ### Container responsibilities
 
-| Container | Responsibility | Primary codebase / config |
-|-----------|----------------|---------------------------|
-| **Flutter Web UI** (logical) | Presentation, client state, REST via `ApiClient` / protobuf JSON | `frontend/` |
-| **Nginx (frontend container)** | Serves compiled Flutter assets only | `frontend.Dockerfile.prod` |
-| **Backend API** | Auth, RBAC, domain services, repositories, periodic matcher, image storage | `backend/` |
-| **PostgreSQL** | System of record | `backend/migrations/` (+ runtime data) |
-| **Caddy** | Public HTTPS termination and path routing (prod/staging) | `Caddyfile.oci` |
+| Container | Responsibility |
+|-----------|----------------|
+| **Flutter Web UI** (logical) | Presentation, client state, calls the API over HTTPS JSON |
+| **Nginx (frontend container)** | Serves the built web assets in staging/prod |
+| **Backend API** | HTTP API, domain rules, matching job, image storage adapter |
+| **PostgreSQL** | System of record |
+| **Caddy** | Public HTTPS termination and path routing (staging/prod) |
 
-Local development collapses edge routing: Flutter dev server (:8081) talks to API
-(:3000) with Postgres from `docker compose` (:5432). See
-[07 — Deployment](07-deployment.md).
+Local development collapses edge routing: Flutter dev server talks to the API
+with Postgres from Compose. See [07 — Deployment](07-deployment.md).
 
 ## Backend components (C4 level 3)
 
-Decomposition of the **Backend API** container.
+Conceptual modules inside the **Backend API** container (not a file listing).
 
 ![Component diagram — Backend API](diagrams/05-backend-components.svg)
 
 Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 
-### Backend module map
+### Conceptual modules
 
-| Area | Path | Role |
-|------|------|------|
-| Entry | `main.rs`, `lib.rs` | Boot pool, spawn matcher, serve |
-| Routes / state | `routes.rs` | `AppState`, middleware (incl. governor rate limit) |
-| Handlers | `handlers/` | Auth, events, groups, merch, inventory, matches, messages, admin, images, search, system |
-| Match lifecycle | `services/match_lifecycle.rs` | Negotiation + inventory apply (`offer`, `change_status`, `apply_inventory`) |
-| Permission policy | `services/permissions.rs` | `PermissionPolicy`: `verify_active` / ban gate; used with RBAC |
-| RBAC | `services/rbac.rs`, `repositories/rbac.rs` | Permission checks over `user_roles` |
-| Permissions catalog | `services/permission_catalog.rs` | Permission/role seed definitions |
-| Repositories | `repositories/` | user, event, merch, group, inventory, match_, message, favorites, views, rbac |
-| Matching | `matching.rs` | Background mutual-trade discovery |
-| Notifications | `notifications.rs` | Log-only push stub |
-| Storage | `storage/` | `ImageStorage` trait + local / Firebase |
-| Errors | `error.rs` | `AppError` → HTTP |
+| Module | Responsibility |
+|--------|----------------|
+| **HTTP edge** | Routing, middleware (e.g. rate limit), shared app state wiring |
+| **HTTP handlers** | Parse requests, enforce entry gates, map results/errors — no domain SQL |
+| **Access control** | Ban/active checks and RBAC permission decisions |
+| **Trade lifecycle** | Negotiation state machine and inventory apply (transactional) |
+| **Domain persistence** | SQL ownership per domain (users, catalog, inventory, matches, messages, roles, …) |
+| **Matching job** | Periodic discovery of mutual TRADE/WANT pairs within a group |
+| **Image storage** | Pluggable store for uploaded merch photos (local volume or object store) |
+| **Wire models** | Shared request/response shapes (protobuf-generated types) |
+| **Notifications** | Outbound user alerts (currently a log-only stub) |
 
-### Repository list (SQL ownership)
+Layering sketch (same idea as [04 — Solution strategy](04-solution-strategy.md)):
 
-| Repository | Domain tables (approx.) |
-|------------|-------------------------|
-| `UserRepository` | `users` (+ role derivation) |
-| `EventRepository` | `events` |
-| `MerchandiseRepository` | `merchandise` |
-| `MerchandiseGroupRepository` | `merchandise_groups` |
-| `InventoryRepository` | `inventory` |
-| `MatchRepository` | `matches`, `match_items` |
-| `MessageRepository` | `messages` |
-| `EventFavoritesRepository` / `GroupFavoritesRepository` / `EventViewsRepository` | favorites & views |
-| `RbacRepository` | `roles`, `permissions`, `role_permissions`, `user_roles` |
-
-Exact columns: [DB schema reference](../../reference/db_schema.md).
+```
+HTTP handlers  →  access control + trade lifecycle (+ other services)
+               →  domain persistence
+               →  PostgreSQL
+```
 
 ## Frontend components (C4 level 3)
 
-Decomposition of the **Flutter Web UI** container (client-side modules; static
-files are served by the Nginx container in prod).
+Conceptual modules inside the **Flutter Web UI** (client-side; assets hosted by
+Nginx in prod).
 
 ![Component diagram — Flutter client](diagrams/05-frontend-components.svg)
 
 Source: [`diagrams/05-frontend-components.d2`](diagrams/05-frontend-components.d2)
 
-### Primary screens
+### Conceptual modules
 
-| Screen | User-facing role |
-|--------|------------------|
-| `LoginScreen` | Guest start / restore / login |
-| `HomeScreen` | **Items** tab — event list |
-| `EventDetailScreen` | Merch + inventory for one event |
-| `AddMerchScreen` | Create merch (RBAC-gated) |
-| `TradeListScreen` | **Matches** tab — negotiate & complete |
-| `ChatScreen` | Per-match messages / location |
-| `ProfileScreen` | Account, how-to, system status |
-| `AdminDashboardScreen` | Elevated admin/mod tools |
+| Module | Responsibility |
+|--------|----------------|
+| **Screens / navigation** | User-facing surfaces and routing (login, items, event detail, matches, chat, profile, admin, …) |
+| **Shared UI** | Reusable chrome, cards, dialogs |
+| **App state** | Auth session, catalog/inventory/matches loads, controllers for mutations |
+| **API client** | HTTPS JSON + protobuf encoding to the Backend API |
+| **Localization** | EN / JA user-visible strings |
 
-Identifiers and EN/JA labels: [UI components](../../reference/ui_components.md),
+### Primary user surfaces (product)
+
+| Surface | Role |
+|---------|------|
+| Login | Guest start / restore / account entry |
+| Items (event list) | Browse and open events |
+| Event detail | Merch catalog + personal inventory for one event |
+| Matches | Negotiate, complete, and apply trades |
+| Chat | Coordinate meetup / location for a match |
+| Profile | Account, how-to, system status |
+| Admin | Elevated moderation / catalog tools |
+
+Code identifiers and EN/JA labels: [UI components](../../reference/ui_components.md),
 [UI specs](../../reference/ui_specs.md).
 
 ## Cross-container data
@@ -113,19 +116,20 @@ Identifiers and EN/JA labels: [UI components](../../reference/ui_components.md),
 flowchart LR
   subgraph Client
     UI[Screens]
-    P[Providers]
-    AC[ApiClient]
+    S[App state]
+    AC[API client]
   end
   subgraph API
     H[Handlers]
-    S[Services]
-    R[Repos]
+    Dom[Domain services]
+    P[Persistence]
   end
   DB[(PostgreSQL)]
 
-  UI --> P --> AC -->|proto3 JSON| H --> S --> R --> DB
-  H --> R
+  UI --> S --> AC -->|proto3 JSON| H --> Dom --> P --> DB
+  H --> P
 ```
 
-Shared **contract**: `proto/models.proto` → Rust `backend/src/generated` and
-Dart `frontend/lib/models` via `scripts/proto-gen.sh`.
+Shared **contract**: protobuf models regenerated into backend and frontend
+bindings (`scripts/proto-gen.sh`). Endpoint catalog:
+[API spec](../../reference/api_spec.md).
