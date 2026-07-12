@@ -1,0 +1,55 @@
+direction: down
+title: |md
+  # Component diagram — Backend API (conceptual)
+| {near: top-center}
+
+client: "Flutter client" {
+  style.fill: "#FFF3E0"
+}
+
+api: "Backend API" {
+  style.fill: "#E3F2FD"
+  style.stroke: "#1565C0"
+
+  edge: "HTTP edge\nroutes, middleware, app state" {
+    style.fill: "#BBDEFB"
+  }
+  handlers: "HTTP handlers\nparse, gate, delegate" {
+    style.fill: "#BBDEFB"
+  }
+  access: "Access control\nactive/ban + RBAC" {
+    style.fill: "#90CAF9"
+  }
+  lifecycle: "Trade lifecycle\nnegotiate, complete, apply" {
+    style.fill: "#90CAF9"
+  }
+  persist: "Domain persistence\nSQL per domain" {
+    style.fill: "#90CAF9"
+  }
+  matching: "Matching job\nperiodic TRADE/WANT discovery" {
+    style.fill: "#90CAF9"
+  }
+  storage: "Image storage\nlocal or object store" {
+    style.fill: "#90CAF9"
+  }
+  models: "Wire models\nprotobuf types" {
+    style.fill: "#B3E5FC"
+  }
+}
+
+db: "PostgreSQL" {
+  shape: cylinder
+  style.fill: "#81C784"
+}
+
+client -> api.edge: "REST /api/v1"
+api.edge -> api.handlers: "Dispatch"
+api.handlers -> api.lifecycle: "Trade mutations"
+api.handlers -> api.access: "Authorize"
+api.handlers -> api.persist: "Reads / simple writes"
+api.lifecycle -> api.persist: "Transactional writes"
+api.access -> api.persist: "Roles / users"
+api.matching -> db: "Match discovery SQL"
+api.persist -> db: "SQL"
+api.handlers -> api.storage: "Upload / delete"
+api.handlers -> api.models: "Encode / decode"

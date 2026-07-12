@@ -1,0 +1,35 @@
+direction: down
+title: |md
+  # Component diagram — Flutter client (conceptual)
+| {near: top-center}
+
+fe: "Flutter Web UI" {
+  style.fill: "#F3E5F5"
+  style.stroke: "#6A1B9A"
+
+  screens: "Screens / navigation" {
+    style.fill: "#E1BEE7"
+  }
+  widgets: "Shared UI" {
+    style.fill: "#E1BEE7"
+  }
+  state: "App state\nsession, loads, mutations" {
+    style.fill: "#CE93D8"
+  }
+  api: "API client\nHTTPS + proto3 JSON" {
+    style.fill: "#CE93D8"
+  }
+  l10n: "Localization\nEN + JA" {
+    style.fill: "#E1BEE7"
+  }
+}
+
+backend: "Backend API" {
+  style.fill: "#FFF3E0"
+}
+
+fe.screens -> fe.state: "read / write"
+fe.screens -> fe.widgets: "compose"
+fe.state -> fe.api: "fetch / mutate"
+fe.api -> backend: "HTTPS JSON"
+fe.screens -> fe.l10n: "strings"

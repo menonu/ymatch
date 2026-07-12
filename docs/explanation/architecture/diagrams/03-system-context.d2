@@ -1,0 +1,57 @@
+direction: right
+title: |md
+  # System Context — ymatch
+| {near: top-center}
+
+fan: "Fan / trader" {
+  shape: person
+  style.fill: "#E3F2FD"
+}
+curator: "Event creator / editor" {
+  shape: person
+  style.fill: "#E3F2FD"
+}
+staff: "Moderator / admin" {
+  shape: person
+  style.fill: "#E3F2FD"
+}
+ops: "Operator" {
+  shape: person
+  style.fill: "#E3F2FD"
+}
+
+ymatch: "ymatch" {
+  shape: rectangle
+  style.fill: "#BBDEFB"
+  style.bold: true
+  tooltip: "Catalog, inventory, matching, negotiation, messaging"
+}
+
+browser: "Web browser" {
+  style.fill: "#FFF3E0"
+}
+github: "GitHub\n(CI/CD, Secrets, GHCR)" {
+  style.fill: "#FFF3E0"
+}
+oci: "Oracle Cloud (OCI)\nVMs, Object Storage" {
+  style.fill: "#FFF3E0"
+}
+nr: "New Relic" {
+  style.fill: "#FFF3E0"
+}
+discord: "Discord\n(alert webhook)" {
+  style.fill: "#FFF3E0"
+}
+
+fan -> ymatch: "HTTPS\nJSON REST + assets"
+curator -> ymatch: "HTTPS"
+staff -> ymatch: "HTTPS"
+ops -> ymatch: "SSH / deploy"
+ops -> oci: "Provisions"
+ops -> github: "PRs / workflows"
+ymatch -> oci: "Runs on VMs;\nbackups"
+github -> ymatch: "Build & deploy"
+ymatch -> nr: "Telemetry\n(when configured)"
+nr -> discord: "Alerts\n(when configured)"
+fan -> browser: "Opens"
+browser -> ymatch: "UI + API"

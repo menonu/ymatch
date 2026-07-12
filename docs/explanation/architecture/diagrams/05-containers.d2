@@ -1,0 +1,45 @@
+direction: down
+title: |md
+  # Container diagram — ymatch
+| {near: top-center}
+
+user: "User\n(fan, curator, staff)" {
+  shape: person
+  style.fill: "#E3F2FD"
+}
+
+ymatch: "ymatch system boundary" {
+  style.fill: "#E8F5E9"
+  style.stroke: "#2E7D32"
+  style.border-radius: 8
+
+  proxy: "Edge proxy\nCaddy\nTLS (nip.io), reverse proxy" {
+    style.fill: "#C8E6C9"
+  }
+  fe_static: "Frontend static host\nNginx container\nFlutter web assets" {
+    style.fill: "#C8E6C9"
+  }
+  web: "Flutter Web UI\nRiverpod, GoRouter\nSPA" {
+    style.fill: "#A5D6A7"
+  }
+  api: "Backend API\nRust, Axum, SQLx\nREST /api/v1, matcher, uploads" {
+    style.fill: "#A5D6A7"
+  }
+  db: "PostgreSQL 16\nSystem of record" {
+    shape: cylinder
+    style.fill: "#81C784"
+  }
+}
+
+backup: "OCI Object Storage\nDB backups" {
+  shape: cylinder
+  style.fill: "#FFF3E0"
+}
+
+user -> ymatch.proxy: "HTTPS :443"
+ymatch.proxy -> ymatch.fe_static: "/*"
+ymatch.proxy -> ymatch.api: "/api/*, /uploads/*"
+ymatch.web -> ymatch.proxy: "Same origin / API base"
+ymatch.api -> ymatch.db: "SQL (SQLx)"
+ymatch.api -> backup: "pg_dump (ops jobs)"
+# GHCR image pulls are a host/Docker concern at deploy time — see §07, not L2 traffic.

@@ -60,10 +60,7 @@ Fact-based, technical specifications describing the machinery, endpoints, schema
 ## 4. Explanation (Understanding-Oriented)
 Conceptual explanations, architecture reviews, design decisions, and background context to clarify *why* the system is designed the way it is.
 
+* [Architecture (arc42)](explanation/architecture/README.md): Living system architecture — goals, constraints, **C4** L1 context (§03), L2–L3 containers/components (§05), deployment (§07), runtime scenarios, cross-cutting concerns, quality.
+* [Architecture Decision Records](explanation/adr/README.md): Conventions and index for ADRs — append-only records of significant architectural decisions. Supersede old ADRs with a new ADR rather than editing them in place. Linked from the arc42 solution-strategy section.
 * [Repository Security](explanation/security.md): What must never be committed (secrets, credentials, host paths, PII, terraform state), where sensitive values live instead, and the pre-commit checklist. Governing policy for a public repo.
-* [Requirements Specification](explanation/requirements.md): Functional and non-functional requirements of the system.
-* [System Architecture & Actors](explanation/architecture.md): Overview of components, tech stack, and roles (User, System).
-* [Use Cases](explanation/use_cases.md): User interaction flows, triggers, goals, and pre-conditions.
-* [Initial Project Idea](explanation/initial_concept.md): Original prompt, core matching rules, and initial requirements definition.
 * [Disaster Recovery](explanation/disaster_recovery.md): Recovery procedure, lessons learned from the June 2026 end-to-end test, and known gaps.
-* [Architecture Decision Records](explanation/adr/README.md): Conventions and index for ADRs — append-only records of significant architectural decisions. Supersede old ADRs with a new ADR rather than editing them in place.

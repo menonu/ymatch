@@ -1,0 +1,59 @@
+direction: down
+title: |md
+  # Deployment — OCI staging / production (per environment)
+| {near: top-center}
+
+internet: "Internet" {
+  style.fill: "#ECEFF1"
+  user_device: "User device / Browser" {
+    style.fill: "#E3F2FD"
+    browser: "Flutter web session" {
+      style.fill: "#BBDEFB"
+    }
+  }
+}
+
+oci: "OCI tenancy (e.g. ap-tokyo-1)" {
+  style.fill: "#E8F5E9"
+  style.stroke: "#2E7D32"
+
+  vm: "Compute VM (Ampere A1)\nprod or staging shape" {
+    style.fill: "#C8E6C9"
+    docker: "Docker Engine / Compose" {
+      style.fill: "#A5D6A7"
+      caddy: "Caddy\nTLS + reverse proxy\n:80/:443" { style.fill: "#81C784" }
+      fe: "ymatch_frontend\nNginx + Flutter build" { style.fill: "#81C784" }
+      api: "ymatch_backend\nRust API :3000\nIMAGE_STORAGE=local" { style.fill: "#81C784" }
+      db: "ymatch_db\nPostgreSQL 16" {
+        shape: cylinder
+        style.fill: "#66BB6A"
+      }
+      uploads: "uploads volume" { style.fill: "#A5D6A7" }
+      pgdata: "pg_data volume" { style.fill: "#A5D6A7" }
+    }
+  }
+
+  os: "Object Storage" {
+    style.fill: "#DCEDC8"
+    backups: "DB backups + tfstate" {
+      shape: cylinder
+      style.fill: "#AED581"
+    }
+  }
+}
+
+gh: "GitHub" {
+  style.fill: "#FFF3E0"
+  gha: "Actions\ndeploy-oci.yml /\ndeploy-oci-staging.yml" { style.fill: "#FFE0B2" }
+  ghcr: "GHCR images" { style.fill: "#FFE0B2" }
+}
+
+internet.user_device.browser -> oci.vm.docker.caddy: "HTTPS\nhttps://<ip>.nip.io"
+oci.vm.docker.caddy -> oci.vm.docker.fe: "/*"
+oci.vm.docker.caddy -> oci.vm.docker.api: "/api/*, /uploads/*"
+oci.vm.docker.api -> oci.vm.docker.db: "SQL"
+oci.vm.docker.api -> oci.vm.docker.uploads: "read/write"
+oci.vm.docker.db -> oci.vm.docker.pgdata: "files"
+gh.gha -> oci.vm: "SSH deploy / compose up"
+oci.vm -> gh.ghcr: "Pull images"
+oci.vm -> oci.os.backups: "pg_dump upload"

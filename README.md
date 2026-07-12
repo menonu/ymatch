@@ -145,12 +145,11 @@ ymatch/
 ## Documentation
 
 See the [Documentation Index](./docs/README.md) for full details.
+- [Architecture (arc42 + C4)](./docs/explanation/architecture/README.md)
 - [API Specification](./docs/reference/api_spec.md)
 - [Database Schema](./docs/reference/db_schema.md)
-- [Requirements](./docs/explanation/requirements.md)
-- [Architecture](./docs/explanation/architecture.md)
 - [UI Specs](./docs/reference/ui_specs.md)
-- [Use Cases](./docs/explanation/use_cases.md)
+- [Architecture Decision Records](./docs/explanation/adr/README.md)
 
 ## Permission System
 
