@@ -571,12 +571,26 @@ class HomeScreen extends ConsumerWidget {
             onPressed: () async {
               final newName = ctrl.text.trim();
               if (newName.isNotEmpty && user != null) {
-                await ref
-                    .read(eventsControllerProvider.notifier)
-                    .updateEvent(event.id, user.id, newName);
-                ref.invalidate(eventsProvider);
+                try {
+                  await ref
+                      .read(eventsControllerProvider.notifier)
+                      .updateEvent(event.id, user.id, newName);
+                  ref.invalidate(eventsProvider);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                } catch (e) {
+                  // #266: surface rename failure; keep dialog open.
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.errorPrefix(e.toString())),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    );
+                  }
+                }
+              } else if (ctx.mounted) {
+                Navigator.pop(ctx);
               }
-              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(l10n.save),
           ),
@@ -602,12 +616,26 @@ class HomeScreen extends ConsumerWidget {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (user != null) {
-                await ref
-                    .read(eventsControllerProvider.notifier)
-                    .deleteEventByCreator(event.id, user.id);
-                ref.invalidate(eventsProvider);
+                try {
+                  await ref
+                      .read(eventsControllerProvider.notifier)
+                      .deleteEventByCreator(event.id, user.id);
+                  ref.invalidate(eventsProvider);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                } catch (e) {
+                  // #266: surface delete failure; keep dialog open.
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.errorPrefix(e.toString())),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    );
+                  }
+                }
+              } else if (ctx.mounted) {
+                Navigator.pop(ctx);
               }
-              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(l10n.delete),
           ),
@@ -675,11 +703,23 @@ class HomeScreen extends ConsumerWidget {
               final name = nameController.text.trim();
               final user = ref.read(currentUserProvider);
               if (name.isNotEmpty && user != null) {
-                await ref
-                    .read(eventsControllerProvider.notifier)
-                    .addEvent(name, user.id);
-                ref.invalidate(eventsProvider); // Refresh list
-                if (context.mounted) Navigator.pop(context);
+                try {
+                  await ref
+                      .read(eventsControllerProvider.notifier)
+                      .addEvent(name, user.id);
+                  ref.invalidate(eventsProvider); // Refresh list
+                  if (context.mounted) Navigator.pop(context);
+                } catch (e) {
+                  // #266: surface create failure; keep dialog open.
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.errorPrefix(e.toString())),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    );
+                  }
+                }
               }
             },
             child: Text(l10n.create),

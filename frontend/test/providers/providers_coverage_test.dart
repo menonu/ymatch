@@ -278,7 +278,7 @@ void main() {
       expect(container.read(eventsControllerProvider).hasError, isFalse);
     });
 
-    test('addEvent failure -> state error (no rethrow)', () async {
+    test('addEvent failure -> state error AND rethrows (#266)', () async {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'POST' && request.url.path == '/api/v1/events') {
@@ -292,10 +292,12 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // Should not throw (error is captured into state).
-      await container
-          .read(eventsControllerProvider.notifier)
-          .addEvent('Fest', 1);
+      // #266: callers (create-event dialog) need the failure visible so they
+      // can show a SnackBar instead of closing as if create succeeded.
+      await expectLater(
+        container.read(eventsControllerProvider.notifier).addEvent('Fest', 1),
+        throwsA(isA<Exception>()),
+      );
 
       expect(container.read(eventsControllerProvider).hasError, isTrue);
     });
@@ -502,7 +504,7 @@ void main() {
       expect(container.read(adminControllerProvider).hasError, isFalse);
     });
 
-    test('banUser failure -> state error (no rethrow)', () async {
+    test('banUser failure -> state error AND rethrows (#266)', () async {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'POST' &&
@@ -517,9 +519,12 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await container
-          .read(adminControllerProvider.notifier)
-          .banUser(5, 1, reason: 'spam');
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .banUser(5, 1, reason: 'spam'),
+        throwsA(isA<Exception>()),
+      );
 
       expect(container.read(adminControllerProvider).hasError, isTrue);
     });

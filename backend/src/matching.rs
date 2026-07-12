@@ -125,18 +125,40 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
                         matches_created += 1;
 
-                        // Notify both users
+                        // Notify both users. `.ok()` collapses RowNotFound and
+                        // infra errors; log the infra case so a transient DB
+                        // failure is observable (#266).
                         let user1_row =
                             sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
                                 .bind(want_user_id)
                                 .fetch_one(pool)
                                 .await
+                                .map_err(|e| {
+                                    if !matches!(e, sqlx::Error::RowNotFound) {
+                                        tracing::warn!(
+                                            error = %e,
+                                            user_id = want_user_id,
+                                            "match notification: failed to load user"
+                                        );
+                                    }
+                                    e
+                                })
                                 .ok();
                         let user2_row =
                             sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
                                 .bind(partner_id)
                                 .fetch_one(pool)
                                 .await
+                                .map_err(|e| {
+                                    if !matches!(e, sqlx::Error::RowNotFound) {
+                                        tracing::warn!(
+                                            error = %e,
+                                            user_id = partner_id,
+                                            "match notification: failed to load user"
+                                        );
+                                    }
+                                    e
+                                })
                                 .ok();
 
                         if let (Some(u1), Some(u2)) = (user1_row, user2_row) {

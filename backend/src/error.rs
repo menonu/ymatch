@@ -34,9 +34,9 @@ pub enum AppError {
     /// twice, banned user).
     Conflict(String),
 
-    /// 500 — an unexpected internal failure. The wrapped string is logged but
-    /// not exposed to the client verbatim in the future; today it is forwarded
-    /// for backward compatibility with the old `(StatusCode, String)` shape.
+    /// 500 — an unexpected internal failure. The wrapped string is logged
+    /// server-side; [`IntoResponse`] returns a generic body so clients never
+    /// see raw DB / stack detail (#266).
     Internal(String),
 }
 
@@ -85,7 +85,9 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = self.status_and_message();
         if status == StatusCode::INTERNAL_SERVER_ERROR {
+            // Log the real detail; never forward it to the client (#266).
             tracing::error!(error = %message, "internal error");
+            return (status, "internal error".to_string()).into_response();
         }
         (status, message).into_response()
     }
@@ -95,6 +97,15 @@ impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
         match e {
             sqlx::Error::RowNotFound => Self::not_found("Resource not found"),
+            sqlx::Error::Database(ref db) => match db.code().as_deref() {
+                // unique_violation → 409 Conflict (e.g. duplicate username)
+                Some("23505") => Self::conflict("Resource already exists"),
+                // foreign_key_violation / check_violation → 400 Bad Request
+                Some("23503") | Some("23514") => Self::bad_request("Invalid request data"),
+                // Other DB errors: keep full text for server logs via Internal,
+                // but IntoResponse sanitizes the client body.
+                _ => Self::internal(e.to_string()),
+            },
             other => Self::internal(other.to_string()),
         }
     }
@@ -165,6 +176,115 @@ mod tests {
         let err: AppError = sqlx::Error::PoolClosed.into();
         let (status, _) = err.status_and_message();
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    /// Fake Postgres error so unit tests can exercise SQLSTATE mapping
+    /// without a live database (#266).
+    #[derive(Debug)]
+    struct FakeDbError {
+        code: &'static str,
+        message: &'static str,
+    }
+
+    impl fmt::Display for FakeDbError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.message)
+        }
+    }
+
+    impl std::error::Error for FakeDbError {}
+
+    impl sqlx::error::DatabaseError for FakeDbError {
+        fn message(&self) -> &str {
+            self.message
+        }
+
+        fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+            Some(std::borrow::Cow::Borrowed(self.code))
+        }
+
+        fn as_error(&self) -> &(dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync + 'static> {
+            self
+        }
+
+        fn kind(&self) -> sqlx::error::ErrorKind {
+            match self.code {
+                "23505" => sqlx::error::ErrorKind::UniqueViolation,
+                "23503" => sqlx::error::ErrorKind::ForeignKeyViolation,
+                "23514" => sqlx::error::ErrorKind::CheckViolation,
+                _ => sqlx::error::ErrorKind::Other,
+            }
+        }
+    }
+
+    fn db_err(code: &'static str, message: &'static str) -> sqlx::Error {
+        sqlx::Error::Database(Box::new(FakeDbError { code, message }))
+    }
+
+    #[test]
+    fn sqlx_unique_violation_maps_to_409() {
+        let err: AppError = db_err(
+            "23505",
+            "duplicate key value violates unique constraint \"users_username_key\"",
+        )
+        .into();
+        let (status, msg) = err.status_and_message();
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(msg, "Resource already exists");
+        // Client must never see the raw constraint name.
+        assert!(!msg.contains("users_username_key"));
+        assert!(!msg.contains("duplicate key"));
+    }
+
+    #[test]
+    fn sqlx_fk_violation_maps_to_400() {
+        let err: AppError =
+            db_err("23503", "insert or update on table violates foreign key").into();
+        let (status, msg) = err.status_and_message();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(msg, "Invalid request data");
+    }
+
+    #[test]
+    fn sqlx_check_violation_maps_to_400() {
+        let err: AppError = db_err("23514", "new row violates check constraint").into();
+        let (status, msg) = err.status_and_message();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(msg, "Invalid request data");
+    }
+
+    #[test]
+    fn sqlx_other_database_error_maps_to_500_with_detail_internally() {
+        let err: AppError = db_err("XX000", "something exploded in pg").into();
+        let (status, msg) = err.status_and_message();
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        // Detail is retained for server logs / Display; IntoResponse sanitizes.
+        assert!(msg.contains("something exploded"));
+    }
+
+    #[tokio::test]
+    async fn internal_into_response_body_is_generic() {
+        use axum::body::to_bytes;
+
+        let response = AppError::internal(
+            "duplicate key value violates unique constraint \"users_username_key\"",
+        )
+        .into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        assert_eq!(body, "internal error");
+        assert!(!body.contains("duplicate"));
+        assert!(!body.contains("users_username_key"));
     }
 
     #[test]

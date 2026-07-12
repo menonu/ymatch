@@ -120,6 +120,52 @@ async fn test_signup_and_login(pool: PgPool) {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
+/// #266: duplicate username must be 409 Conflict with a safe body, not a
+/// 500 that leaks the Postgres unique-constraint text.
+#[sqlx::test]
+async fn test_signup_duplicate_username_returns_409(pool: PgPool) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/signup")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"username": "dup_user_266", "password": "pass123"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/signup")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"username": "dup_user_266", "password": "other"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    let body = body_to_string(resp.into_body()).await;
+    assert!(
+        !body.contains("duplicate key") && !body.contains("users_username"),
+        "client body must not leak SQL detail, got: {body}"
+    );
+    assert!(
+        body.to_lowercase().contains("already exists") || body.contains("Conflict"),
+        "expected a conflict-style message, got: {body}"
+    );
+}
+
 #[sqlx::test]
 async fn test_list_users(pool: PgPool) {
     // Create a user first

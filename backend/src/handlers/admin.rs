@@ -138,11 +138,15 @@ pub async fn ban_user(
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::UserBan).await?;
 
-    let banned_until = payload
-        .banned_until
-        .as_deref()
-        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt| dt.with_timezone(&chrono::Utc));
+    // #266: malformed banned_until must be a 400, not a silent permanent ban.
+    let banned_until = match payload.banned_until.as_deref() {
+        None => None,
+        Some(s) => Some(
+            chrono::DateTime::parse_from_rfc3339(s)
+                .map_err(|e| AppError::bad_request(format!("invalid banned_until: {e}")))?
+                .with_timezone(&chrono::Utc),
+        ),
+    };
 
     state
         .users
