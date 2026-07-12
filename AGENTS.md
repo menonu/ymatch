@@ -55,7 +55,8 @@ Where tests live:
 4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `flutter analyze`
 5. **Push & PR**: Commit, push, and run `gh pr create`
 6. **CI Test**: Verify all CI checks pass successfully
-7. **Review**: Run `/pr-review <PR>`
+7. **Review**: Run `/pr-review <PR>` when that skill is available.
+   * If `/pr-review` is **not** available: run an equivalent PR review. Gather PR metadata, linked issue(s), and the full diff (`gh pr view` / `gh pr diff`); evaluate **correctness vs. the issue**, **security**, and **design** (modularity, abstraction, cohesion, separation of concerns, coupling); post findings as a PR comment with severities `[critical]` / `[major]` / `[minor]` / `[nit]`.
    * Fix or explain `[critical]` / `[major]` findings.
    * Resolve or accept `[minor]` / `[nit]` findings.
    * Re-run after changes.
