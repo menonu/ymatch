@@ -22,7 +22,6 @@ env:
   DB_CONTAINER: ymatch_db
   DB_USER: ymatch_user
   DB_NAME: ymatch
-  # Auth for oracle-actions/run-oci-cli-command
   # Prefer the least-privilege ymatch-db-backup user (terraform/oci/backup.tf),
   # not the Terraform admin API key.
   OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
@@ -67,13 +66,6 @@ jobs:
           echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
           echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
 
-      - name: Resolve Object Storage namespace
-        id: ns
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: os ns get
-          query: data
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -95,72 +87,70 @@ jobs:
             exit 1
           fi
 
-      # silent defaults to true — avoids publishing object inventory on public logs
-      - name: Upload daily backup
-        if: steps.types.outputs.daily == 'true'
+      # Install CLI once (oracle-actions caches under ~/.local). We then drive
+      # put/head from shell so workspace-relative files work and errors surface
+      # without dumping full bucket inventories to public logs.
+      - name: Install OCI CLI
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
-          command: >-
-            os object put
-            --namespace ${{ steps.ns.outputs.raw_output }}
-            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --name daily/ymatch-${{ steps.types.outputs.date }}.sql.gz
-            --file backup.sql.gz
-            --force
+          command: -v
 
-      - name: Upload weekly backup
-        if: steps.types.outputs.weekly == 'true'
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: >-
-            os object put
-            --namespace ${{ steps.ns.outputs.raw_output }}
-            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --name weekly/ymatch-${{ steps.types.outputs.date }}.sql.gz
-            --file backup.sql.gz
-            --force
+      - name: Configure OCI CLI credentials
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.oci"
+          KEY_FILE="$HOME/.oci/db_backup_key.pem"
+          # Write PEM exactly as stored in the secret (preserve newlines)
+          printf '%s\n' "${{ secrets.OCI_CLI_KEY_CONTENT }}" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          {
+            echo "[DEFAULT]"
+            echo "user=${{ secrets.OCI_CLI_USER }}"
+            echo "fingerprint=${{ secrets.OCI_CLI_FINGERPRINT }}"
+            echo "tenancy=${{ secrets.OCI_CLI_TENANCY }}"
+            echo "region=${{ secrets.OCI_CLI_REGION }}"
+            echo "key_file=$KEY_FILE"
+          } > "$HOME/.oci/config"
+          chmod 600 "$HOME/.oci/config"
+          # Resolve namespace dynamically (do not hardcode tenancy identifiers)
+          NS="$(oci os ns get --query data --raw-output)"
+          echo "OCI_BACKUP_NAMESPACE=$NS" >> "$GITHUB_ENV"
+          echo "Resolved Object Storage namespace (length ${#NS})"
 
-      - name: Upload monthly backup
-        if: steps.types.outputs.monthly == 'true'
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: >-
-            os object put
-            --namespace ${{ steps.ns.outputs.raw_output }}
-            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --name monthly/ymatch-${{ steps.types.outputs.date }}.sql.gz
-            --file backup.sql.gz
-            --force
+      - name: Upload and verify backups
+        run: |
+          set -euo pipefail
+          DATE="${{ steps.types.outputs.date }}"
+          NS="${OCI_BACKUP_NAMESPACE:?namespace not set}"
+          BUCKET="${{ env.OCI_BACKUP_BUCKET }}"
+          test -f backup.sql.gz
 
-      - name: Verify daily object
-        if: steps.types.outputs.daily == 'true'
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: >-
-            os object head
-            --namespace ${{ steps.ns.outputs.raw_output }}
-            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --name daily/ymatch-${{ steps.types.outputs.date }}.sql.gz
+          upload_and_verify() {
+            local prefix="$1"
+            local name="${prefix}/ymatch-${DATE}.sql.gz"
+            echo "Uploading ${name}..."
+            oci os object put \
+              --namespace "$NS" \
+              --bucket-name "$BUCKET" \
+              --name "$name" \
+              --file backup.sql.gz \
+              --force >/dev/null
+            oci os object head \
+              --namespace "$NS" \
+              --bucket-name "$BUCKET" \
+              --name "$name" >/dev/null
+            echo "Verified ${name}"
+          }
 
-      - name: Verify weekly object
-        if: steps.types.outputs.weekly == 'true'
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: >-
-            os object head
-            --namespace ${{ steps.ns.outputs.raw_output }}
-            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --name weekly/ymatch-${{ steps.types.outputs.date }}.sql.gz
-
-      - name: Verify monthly object
-        if: steps.types.outputs.monthly == 'true'
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: >-
-            os object head
-            --namespace ${{ steps.ns.outputs.raw_output }}
-            --bucket-name ${{ env.OCI_BACKUP_BUCKET }}
-            --name monthly/ymatch-${{ steps.types.outputs.date }}.sql.gz
+          if [ "${{ steps.types.outputs.daily }}" = "true" ]; then
+            upload_and_verify daily
+          fi
+          if [ "${{ steps.types.outputs.weekly }}" = "true" ]; then
+            upload_and_verify weekly
+          fi
+          if [ "${{ steps.types.outputs.monthly }}" = "true" ]; then
+            upload_and_verify monthly
+          fi
 
       - name: Report to New Relic
         if: always()
@@ -183,4 +173,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -f backup.sql.gz ~/.ssh/oci_key
+        run: rm -f backup.sql.gz ~/.ssh/oci_key ~/.oci/db_backup_key.pem ~/.oci/config
