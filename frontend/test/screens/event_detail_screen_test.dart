@@ -333,7 +333,7 @@ void main() {
   );
 
   testWidgets(
-    'group creator sees edit icon on EventDetailScreen and can open the '
+    'group creator sees bottom edit icon (not on tabs) and can open the '
     'edit dialog (#128)',
     (tester) async {
       await tester.pumpWidget(
@@ -359,13 +359,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Editable indicator (shield) + edit affordances on the screen.
-      expect(find.byIcon(Icons.shield), findsOneWidget);
-      // Tab edit icon + bottom-left edit FAB.
-      expect(find.byIcon(Icons.edit), findsWidgets);
+      // No shield / edit on the tab bar — only the bottom edit control.
+      expect(find.byIcon(Icons.shield), findsNothing);
+      expect(find.byTooltip('Edit Group'), findsOneWidget);
 
-      // Open via the bottom-left edit FAB (tooltip = "Edit Group").
-      await tester.tap(find.byTooltip('Edit Group').first);
+      await tester.tap(find.byTooltip('Edit Group'));
       await tester.pumpAndSettle();
 
       final dialog = find.byType(AlertDialog);

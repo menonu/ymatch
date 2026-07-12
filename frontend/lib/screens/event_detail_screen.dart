@@ -382,49 +382,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                           g.eventId == widget.eventId &&
                                           g.groupName == name,
                                     );
-                                    final meta = groupByName[name];
-                                    final isGroupCreator =
-                                        user != null &&
-                                        meta != null &&
-                                        meta.hasCreatedBy() &&
-                                        meta.createdBy == user.id;
-                                    // Edit is only via EventDetailScreen
-                                    // controls (tab edit icon, bottom-left
-                                    // edit FAB, info-panel edit) — not
-                                    // tab long-press (#128).
+                                    // Group edit controls live only at the
+                                    // bottom of EventDetailScreen (and the
+                                    // info panel) — not on the tab bar (#128).
                                     return Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(name),
-                                        // Shield = creator / editable
-                                        // indicator (#128).
-                                        if (isGroupCreator) ...[
-                                          const SizedBox(width: 4),
-                                          Tooltip(
-                                            message: l10n.youCanEditGroup,
-                                            child: Icon(
-                                              Icons.shield,
-                                              color: AppTheme.primaryColor,
-                                              size: 16,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 2),
-                                          GestureDetector(
-                                            onTap: () => _showEditGroupDialog(
-                                              context,
-                                              name,
-                                              meta,
-                                            ),
-                                            child: Tooltip(
-                                              message: l10n.editGroup,
-                                              child: Icon(
-                                                Icons.edit,
-                                                color: AppTheme.primaryColor,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
                                         const SizedBox(width: 4),
                                         GestureDetector(
                                           onTap: user == null
@@ -680,9 +644,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ],
                 ),
                 // Bottom-left controls (#128): Group info (everyone) + Edit
-                // group (creator of the active tab only). Edit lives on
-                // EventDetailScreen as a dedicated icon/button — not buried
-                // only behind long-press.
+                // group (creator of the active tab only). Tabs stay clean —
+                // no shield/edit icons there.
                 Positioned(
                   left: 16,
                   bottom: 16 + MediaQuery.paddingOf(context).bottom,
