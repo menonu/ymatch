@@ -99,7 +99,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'event/:id',
                     builder: (context, state) {
                       final id = int.parse(state.pathParameters['id']!);
-                      return EventDetailScreen(eventId: id);
+                      // Favorite-group shortcuts pass ?group=<name> (#406).
+                      final group = state.uri.queryParameters['group'];
+                      return EventDetailScreen(
+                        eventId: id,
+                        initialGroupName: group,
+                      );
                     },
                   ),
                 ],

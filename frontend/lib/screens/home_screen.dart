@@ -186,6 +186,7 @@ class HomeScreen extends ConsumerWidget {
                                 group.groupName,
                               ),
                               group.eventId,
+                              groupName: group.groupName,
                             ),
                           );
                         }),
@@ -480,8 +481,9 @@ class HomeScreen extends ConsumerWidget {
     BuildContext context,
     IconData icon,
     String label,
-    int eventId,
-  ) {
+    int eventId, {
+    String? groupName,
+  }) {
     return ActionChip(
       avatar: Icon(
         icon,
@@ -498,9 +500,17 @@ class HomeScreen extends ConsumerWidget {
       side: BorderSide.none,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onPressed: () {
-        // Navigate to the event. In a real implementation, we would also need to pass the group name
-        // to automatically switch the tab, or the EventDetailScreen would read the desired group from GoRouter state.
-        context.go('/event/$eventId');
+        // Favorite-group chips pass ?group= so EventDetailScreen opens that tab (#406).
+        if (groupName != null && groupName.isNotEmpty) {
+          context.go(
+            Uri(
+              path: '/event/$eventId',
+              queryParameters: {'group': groupName},
+            ).toString(),
+          );
+        } else {
+          context.go('/event/$eventId');
+        }
       },
     );
   }
