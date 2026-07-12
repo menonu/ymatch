@@ -4,7 +4,8 @@ How the containers are placed on infrastructure for **local development**,
 **staging**, and **production**. Operational steps live in How-To guides; this
 section is the map.
 
-Diagrams: [D2](https://d2lang.com/) sources + committed SVG in [`diagrams/`](diagrams/).
+C4 deployment maps: [D2](https://d2lang.com/) → SVG in [`diagrams/`](diagrams/).
+CI sketch uses Mermaid.
 
 ## Production / staging (C4 deployment)
 
@@ -67,9 +68,15 @@ Flutter tests tagged `e2e`. Guide: [e2e_tests](../../how_to/e2e_tests.md).
 
 ## CI/CD sketch
 
-![CI/CD sketch](diagrams/07-cicd.svg)
-
-Source: [`diagrams/07-cicd.d2`](diagrams/07-cicd.d2)
+```mermaid
+flowchart LR
+  PR[Pull request] --> CI[ci.yml / coverage / e2e]
+  CI --> Main[merge to main]
+  Main --> DepP[deploy-oci.yml]
+  Main --> DepS[deploy-oci-staging.yml]
+  DepP --> ProdVM[Prod VM compose]
+  DepS --> StgVM[Staging VM compose]
+```
 
 Secrets (DB passwords, SSH keys, hosts, New Relic, Discord) live in **GitHub
 Secrets** only — never in the repo ([security.md](../security.md)).

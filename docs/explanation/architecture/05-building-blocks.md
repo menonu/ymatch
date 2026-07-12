@@ -3,7 +3,8 @@
 Structural decomposition inside the system. Uses **C4 Container** (recap) and
 **C4 Component** views for the two largest codebases.
 
-Diagrams: [D2](https://d2lang.com/) sources + committed SVG in [`diagrams/`](diagrams/).
+C4 component diagrams: [D2](https://d2lang.com/) → SVG in [`diagrams/`](diagrams/).
+Simple data-flow uses Mermaid below.
 
 ## Containers (recap)
 
@@ -79,9 +80,23 @@ Identifiers and EN/JA labels: [UI components](../../reference/ui_components.md),
 
 ## Cross-container data
 
-![Cross-container data flow](diagrams/05-cross-container-data.svg)
+```mermaid
+flowchart LR
+  subgraph Client
+    UI[Screens]
+    P[Providers]
+    AC[ApiClient]
+  end
+  subgraph API
+    H[Handlers]
+    S[Services]
+    R[Repos]
+  end
+  DB[(PostgreSQL)]
 
-Source: [`diagrams/05-cross-container-data.d2`](diagrams/05-cross-container-data.d2)
+  UI --> P --> AC -->|proto3 JSON| H --> S --> R --> DB
+  H --> R
+```
 
 Shared **contract**: `proto/models.proto` → Rust `backend/src/generated` and
 Dart `frontend/lib/models` via `scripts/proto-gen.sh`.

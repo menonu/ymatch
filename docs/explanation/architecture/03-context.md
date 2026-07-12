@@ -3,8 +3,9 @@
 This section uses the **C4 model** System Context (level 1) and Container
 (level 2) views to show what is inside the ymatch boundary and what sits outside.
 
-Diagrams are authored in [D2](https://d2lang.com/) and committed as SVG under
-[`diagrams/`](diagrams/) (GitHub does not reliably render Mermaid C4).
+C4 structural diagrams are authored in [D2](https://d2lang.com/) and committed
+as SVG under [`diagrams/`](diagrams/) (GitHub does not reliably render Mermaid
+C4). Sequences and simple flowcharts elsewhere use Mermaid.
 
 ## System context (C4 level 1)
 
