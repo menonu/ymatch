@@ -3,17 +3,13 @@
 // list trades and drive the match state machine:
 //   - GET  /api/v1/matches/user/{id}            (matchesProvider)
 //   - GET  /api/v1/matches/user/{id}/counts     (notificationCountsProvider)
-//   - POST /api/v1/matches/{id}/offer           (no provider; see trade_list_screen._submitOffer)
-//   - POST /api/v1/matches/{id}/status          (no provider; see trade_list_screen._updateStatus)
-//   - POST /api/v1/matches/{id}/apply-inventory (no provider; see trade_list_screen._applyInventory)
+//   - POST /api/v1/matches/{id}/offer           (MatchController.submitOffer)
+//   - POST /api/v1/matches/{id}/status          (MatchController.updateStatus)
+//   - POST /api/v1/matches/{id}/apply-inventory (MatchController.applyInventory)
 //
-// The three POST endpoints are not wrapped in a Riverpod controller
-// — they are called directly from `trade_list_screen.dart` with
-// `client.post(...)`. To exercise the **same body shape** the screen
-// sends (not a hand-built body in a test helper, which is exactly
-// the gap #227 exploited), the lifecycle test below uses
-// `OfferTradeRequest.toProto3Json()` for /offer and the same
-// camelCase literal maps for /status and /apply-inventory.
+// #241: the three lifecycle mutations go through MatchController so
+// the test exercises the same proto body shapes and invalidation
+// path the trades UI uses (not hand-built raw maps).
 //
 // The match state machine is sequential: PENDING → OFFERED →
 // ACCEPTED → COMPLETED → apply-inventory. The three POST endpoints
@@ -207,49 +203,41 @@ void main() {
   });
 
   test(
-      'full match lifecycle: /offer, /status, /status, /apply-inventory '
-      'drive the state machine end-to-end', () async {
-    // Each step uses the **same body shape** the screen sends
-    // (trade_list_screen.dart), not a hand-built body.
-    //
-    // 1. PENDING → OFFERED  via POST /matches/{id}/offer
-    final offer = pb.OfferTradeRequest()
-      ..userId = user1Id
-      ..items.addAll([
-        pb.OfferItem()
-          ..merchId = cardA
-          ..giverUserId = user1Id
-          ..quantity = 1,
-        pb.OfferItem()
-          ..merchId = cardB
-          ..giverUserId = user2Id
-          ..quantity = 1,
-      ]);
-    await api.post(
-      '/api/v1/matches/$matchId/offer',
-      offer.toProto3Json() as Map<String, dynamic>,
-    );
+      'full match lifecycle via MatchController: offer → accept → complete → apply-inventory',
+      () async {
+    // Drive mutations through MatchController so the test locks the
+    // same proto body shapes and invalidation path as trade_list_screen.
+    final container = makeContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(matchControllerProvider.notifier);
+
+    // 1. PENDING → OFFERED
+    await controller.submitOffer(user1Id, matchId, [
+      pb.OfferItem()
+        ..merchId = cardA
+        ..giverUserId = user1Id
+        ..quantity = 1,
+      pb.OfferItem()
+        ..merchId = cardB
+        ..giverUserId = user2Id
+        ..quantity = 1,
+    ]);
+    expect(container.read(matchControllerProvider).hasError, isFalse);
     expect(await getMatchStatus(matchId), 'OFFERED');
 
-    // 2. OFFERED → ACCEPTED  via POST /matches/{id}/status
-    //    The non-proposer (user2) accepts the balanced proposal.
-    await api.post('/api/v1/matches/$matchId/status', {
-      'status': 'ACCEPTED',
-      'userId': user2Id,
-    });
+    // 2. OFFERED → ACCEPTED  (non-proposer accepts)
+    await controller.updateStatus(user2Id, matchId, 'ACCEPTED');
+    expect(container.read(matchControllerProvider).hasError, isFalse);
     expect(await getMatchStatus(matchId), 'ACCEPTED');
 
-    // 3. ACCEPTED → COMPLETED  via POST /matches/{id}/status
-    await api.post('/api/v1/matches/$matchId/status', {
-      'status': 'COMPLETED',
-      'userId': user1Id,
-    });
+    // 3. ACCEPTED → COMPLETED
+    await controller.updateStatus(user1Id, matchId, 'COMPLETED');
+    expect(container.read(matchControllerProvider).hasError, isFalse);
     expect(await getMatchStatus(matchId), 'COMPLETED');
 
-    // 4. Apply inventory  via POST /matches/{id}/apply-inventory
-    await api.post('/api/v1/matches/$matchId/apply-inventory', {
-      'userId': user1Id,
-    });
+    // 4. Apply inventory
+    await controller.applyInventory(user1Id, matchId);
+    expect(container.read(matchControllerProvider).hasError, isFalse);
     expect(await getInventoryApplied(matchId), isTrue);
   });
 }

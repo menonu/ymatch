@@ -841,6 +841,82 @@ final notificationCountsProvider =
       return NotificationCounts()..mergeFromProto3Json(json);
     });
 
+/// Owns the three match-lifecycle mutations used by the trades UI.
+///
+/// #241: centralizes request body construction (proto types),
+/// `matchesProvider` + `notificationCountsProvider` invalidation, and
+/// loading/error state so screens can `ref.listen` instead of duplicating
+/// try/catch + SnackBar + invalidate at each call site.
+class MatchController extends StateNotifier<AsyncValue<void>> {
+  final ApiClient client;
+  final Ref ref;
+
+  MatchController(this.client, this.ref) : super(const AsyncValue.data(null));
+
+  void _invalidateMatchLists(int userId) {
+    ref.invalidate(matchesProvider(userId));
+    ref.invalidate(notificationCountsProvider(userId));
+  }
+
+  Future<void> submitOffer(
+    int userId,
+    int matchId,
+    List<OfferItem> items,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final payload = OfferTradeRequest()
+        ..userId = userId
+        ..items.addAll(items);
+      await client.post(
+        '/api/v1/matches/$matchId/offer',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
+      _invalidateMatchLists(userId);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateStatus(int userId, int matchId, String status) async {
+    state = const AsyncValue.loading();
+    try {
+      final payload = UpdateMatchStatusRequest()
+        ..status = status
+        ..userId = userId;
+      await client.post(
+        '/api/v1/matches/$matchId/status',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
+      _invalidateMatchLists(userId);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> applyInventory(int userId, int matchId) async {
+    state = const AsyncValue.loading();
+    try {
+      final payload = ApplyInventoryRequest()..userId = userId;
+      await client.post(
+        '/api/v1/matches/$matchId/apply-inventory',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
+      _invalidateMatchLists(userId);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final matchControllerProvider =
+    StateNotifierProvider<MatchController, AsyncValue<void>>((ref) {
+      return MatchController(ref.watch(apiClientProvider), ref);
+    });
+
 // --- Search ---
 final searchQueryProvider = StateProvider<String>((ref) => '');
 

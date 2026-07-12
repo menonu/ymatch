@@ -583,6 +583,120 @@ void main() {
     });
   });
 
+  // ---- MatchController (#241) ----
+
+  group('MatchController', () {
+    test('submitOffer POSTs OfferTradeRequest proto body and clears error',
+        () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/offer') {
+            capturedBody = request.body;
+            return _okEmpty();
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final item = OfferItem()
+        ..merchId = 1
+        ..giverUserId = 7
+        ..quantity = 1;
+      await container
+          .read(matchControllerProvider.notifier)
+          .submitOffer(7, 9, [item]);
+
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      expect(capturedBody, isNotNull);
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(body['userId'], 7);
+      expect(body['items'], isA<List>());
+      expect((body['items'] as List).first['merchId'], 1);
+    });
+
+    test('updateStatus POSTs UpdateMatchStatusRequest proto body', () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/status') {
+            capturedBody = request.body;
+            return _okEmpty();
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(matchControllerProvider.notifier)
+          .updateStatus(7, 9, 'ACCEPTED');
+
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(body['status'], 'ACCEPTED');
+      expect(body['userId'], 7);
+    });
+
+    test('applyInventory POSTs ApplyInventoryRequest proto body', () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/apply-inventory') {
+            capturedBody = request.body;
+            return _okEmpty();
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(matchControllerProvider.notifier)
+          .applyInventory(7, 9);
+
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(body['userId'], 7);
+    });
+
+    test('mutation failure sets error state (no rethrow)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/status') {
+            return http.Response('bad status', 422);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      // Completes without throwing — screen listens on state for SnackBars.
+      await container
+          .read(matchControllerProvider.notifier)
+          .updateStatus(7, 9, 'ACCEPTED');
+
+      expect(container.read(matchControllerProvider).hasError, isTrue);
+    });
+  });
+
   // ---- searchProvider / searchQueryProvider ----
 
   group('searchProvider', () {
