@@ -39,15 +39,15 @@ sequenceDiagram
   end
   Note over U: Client stores User locally
   U->>API: later call with user_id in body or query
-  API->>API: PermissionPolicy.verify_active
-  API->>API: RbacService.check when needed
+  Note over API: Privileged catalog/admin paths: active/ban gate + RBAC
+  Note over API: Trade paths: match participation / lifecycle rules
 ```
 
 - Guest path minimizes signup friction for event-day use.
 - `User.role` on the wire is **derived** from global `user_roles` at read time
   ([ADR 0006](../adr/0006-derive-user-role-from-user-roles.md)).
-- Product wording “propose / counter” maps to API `offer_trade` /
-  `MatchLifecycleService::offer` and status transitions via `change_status`.
+- Product wording “propose / counter” maps to offer/status lifecycle operations
+  (not a separate status named “propose”).
 
 ## Matching job
 
@@ -80,8 +80,13 @@ stateDiagram-v2
   OFFERED --> ACCEPTED: non-proposer accepts balanced offer
   OFFERED --> REJECTED: either rejects
   ACCEPTED --> COMPLETED: complete
-  COMPLETED --> [*]: apply inventory per user
+  COMPLETED --> [*]
+  REJECTED --> [*]
 ```
+
+After `COMPLETED`, each party may **apply inventory** as a separate, idempotent
+step (status stays `COMPLETED`; not a further state-machine transition —
+[ADR 0002](../adr/0002-negotiation-state-machine.md)).
 
 ```mermaid
 sequenceDiagram

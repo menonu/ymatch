@@ -25,11 +25,17 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
                →  PostgreSQL
 ```
 
-- **Handlers** parse input, apply entry gates, map results — no domain SQL.
+**Target shape** (most product paths):
+
+- **Handlers** parse input, apply entry gates, map results — prefer no domain SQL.
 - **Persistence** owns SQL per domain (concrete repository modules; transactional
   methods use a shared executor pattern).
 - **Services** own multi-step rules (active/ban gate, RBAC checks, trade
   negotiation and inventory apply).
+
+**Known exceptions on `main`:** some admin and search handlers still run
+ad-hoc SQL; the background **matching job** also issues raw SQL rather than
+going through repositories. Treat those as follow-up cleanup, not the target.
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
 (not a source-tree listing).
@@ -83,15 +89,18 @@ There is **no JWT / bearer session** today. Identity is **client-asserted**:
 - **Guest sessions** via device UUID (`POST /api/v1/auth/guest`) return a `User`
   JSON body (low-friction entry).
 - **Registered users** sign up / log in with password; handlers also return
-  `User` JSON only (`handlers/auth.rs`).
+  `User` JSON only.
 - The Flutter client stores the user (e.g. local preferences) and passes
   **`user_id`** (body or query) on subsequent mutations/reads.
-- Handlers typically call `PermissionPolicy::verify_active(user_id)` (ban /
-  existence gate), then `RbacService::check` for privileged permissions.
+- **Privileged catalog/admin paths** (events, merch, groups, admin, …) typically
+  call the active/ban gate then RBAC permission checks.
+- **Trade / inventory paths** usually gate on **match participation** or ownership
+  inside the lifecycle/persistence logic, not the full ban+RBAC sequence on every
+  call.
 - Admin UI is gated on an elevated global role derived for the wire `User.role`
   field ([ADR 0006](../adr/0006-derive-user-role-from-user-roles.md)).
 
 This is **not** cryptographic session authentication: any client that can guess
-or supply another user's id can attempt their actions until RBAC/ban checks
-reject them. Treat stronger authn as a future hardening item if the threat model
-requires it. Wire shapes: [API spec](../../reference/api_spec.md).
+or supply another user's id can attempt their actions until participation/RBAC/ban
+checks reject them. Treat stronger authn as a future hardening item if the threat
+model requires it. Wire shapes: [API spec](../../reference/api_spec.md).

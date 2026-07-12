@@ -31,9 +31,6 @@ ymatch: "ymatch system boundary" {
   }
 }
 
-ghcr: "GHCR\nContainer images" {
-  style.fill: "#FFF3E0"
-}
 backup: "OCI Object Storage\nDB backups" {
   shape: cylinder
   style.fill: "#FFF3E0"
@@ -45,4 +42,4 @@ ymatch.proxy -> ymatch.api: "/api/*, /uploads/*"
 ymatch.web -> ymatch.proxy: "Same origin / API base"
 ymatch.api -> ymatch.db: "SQL (SQLx)"
 ymatch.api -> backup: "pg_dump (ops jobs)"
-ghcr -> ymatch.proxy: "Image pulls on deploy"
+# GHCR image pulls are a host/Docker concern at deploy time — see §07, not L2 traffic.

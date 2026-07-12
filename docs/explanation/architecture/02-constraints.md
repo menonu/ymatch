@@ -22,5 +22,10 @@
 ## Conventions that act as constraints
 
 - **ADRs are append-only** — reverse a decision with a new ADR, do not rewrite history ([adr/README](../adr/README.md)).
-- **Authorization through `RbacService`** — handlers check permissions; ownership short-circuits are explicit where documented ([ADR 0004](../adr/0004-rbac-permission-model.md), [permissions reference](../../reference/permissions.md)).
-- **SQL ownership in repositories** — handlers parse/delegate; domain multi-statement flows live in services (notably `MatchLifecycleService`).
+- **Authorization through RBAC + participation rules** — privileged catalog/admin
+  paths check permissions; ownership and match-participation short-circuits are
+  explicit where documented ([ADR 0004](../adr/0004-rbac-permission-model.md),
+  [permissions reference](../../reference/permissions.md)).
+- **SQL ownership toward repositories** — target is handlers parse/delegate and
+  multi-statement flows in services; some admin/search/matching SQL remains outside
+  that ideal (documented in [04](04-solution-strategy.md) / [05](05-building-blocks.md)).

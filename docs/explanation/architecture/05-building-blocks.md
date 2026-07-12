@@ -59,14 +59,14 @@ Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 | Module | Responsibility |
 |--------|----------------|
 | **HTTP edge** | Routing, middleware (e.g. rate limit), shared app state wiring |
-| **HTTP handlers** | Parse requests, enforce entry gates, map results/errors — no domain SQL |
-| **Access control** | Ban/active checks and RBAC permission decisions |
+| **HTTP handlers** | Parse requests, enforce entry gates, map results/errors (prefer no domain SQL) |
+| **Access control** | Ban/active checks and RBAC permission decisions (privileged paths) |
 | **Trade lifecycle** | Negotiation state machine and inventory apply (transactional) |
 | **Domain persistence** | SQL ownership per domain (users, catalog, inventory, matches, messages, roles, …) |
-| **Matching job** | Periodic discovery of mutual TRADE/WANT pairs within a group |
+| **Matching job** | Periodic discovery of mutual TRADE/WANT pairs within a group (raw SQL today) |
 | **Image storage** | Pluggable store for uploaded merch photos (local volume or object store) |
 | **Wire models** | Shared request/response shapes (protobuf-generated types) |
-| **Notifications** | Outbound user alerts (currently a log-only stub) |
+| **Notifications** | Outbound user alerts (currently a log-only stub; not drawn on the L3 diagram) |
 
 Layering sketch (same idea as [04 — Solution strategy](04-solution-strategy.md)):
 
@@ -75,6 +75,9 @@ HTTP handlers  →  access control + trade lifecycle (+ other services)
                →  domain persistence
                →  PostgreSQL
 ```
+
+Target layering for most product paths; admin/search/matching SQL exceptions
+noted in [04](04-solution-strategy.md).
 
 ## Frontend components (C4 level 3)
 

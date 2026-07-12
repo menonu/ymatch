@@ -67,7 +67,7 @@ detail and tactics are in [09 — Quality](09-quality.md).
 | **Security** | RBAC + ban gates on privileged actions; no secrets in the public repo ([security.md](../security.md)). Identity is client-asserted `user_id` today (no JWT) — see quality gaps in [09](09-quality.md). |
 | **Testability** | Trade lifecycle and API verifiable via unit, integration, and e2e tests; coverage gates on `main`. |
 | **Performance** | Acceptable event-day latency on a single Always Free–class VM (batched match reads; periodic matcher). |
-| **Availability** | **≥ 98%** uptime target; detection via monitoring (not multi-instance redundancy). Recoverable single-VM OCI deploy (backups, documented DR); prefer redeploy over full rebuild when the VM is healthy. |
+| **Availability** | **Provisional product target ≥ 98%** uptime (not yet a measured SLO); detection via monitoring, **not** multi-instance redundancy. Recoverable single-VM OCI deploy (backups, documented DR). |
 | **Modifiability** | Layered backend (handlers → services → repositories); ADRs for hard-to-reverse decisions. |
 | **Interoperability** | Stable JSON REST + shared protobuf models for the Flutter client (and future clients). |
 

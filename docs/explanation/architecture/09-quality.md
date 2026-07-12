@@ -15,7 +15,7 @@ and ADRs; this chapter focuses on *how well* the system achieves qualities.
 | **Security** | Confidentiality of secrets; authorization of privileged actions; integrity of trades under RBAC. | Public-repo secret policy ([security.md](../security.md)); `RbacService` checks; permission reference + ADRs; rate limiting; role-grant script for ops. |
 | **Usability** | Fans and curators can complete inventory/trade flows on event day, in EN/JA. | Flutter web UI; Riverpod state; EN + JA localizations; subset JP font ([ADR 0003](../adr/0003-subset-woff2-japanese-font.md)). |
 | **Deployability** | Staging/prod deployable as a small, repeatable stack; local dev is one compose + cargo/flutter. | Identical `docker-compose.oci.yml` per VM; GitHub Actions deploy; Terraform for infra; [OCI how-tos](../../how_to/oci_deployment.md). |
-| **Availability** | **≥ 98%** uptime for the production environment. | **Monitoring** (New Relic / alerts — [monitoring_setup](../../how_to/monitoring_setup.md)) to detect and respond to outages; health/status endpoints. **No service redundancy** (single VM + Compose stack per environment by design — Always Free cost envelope). Object Storage backups; [disaster_recovery](../disaster_recovery.md) for VM/key loss. |
+| **Availability** | **Provisional ≥ 98%** production uptime target (aspirational; no formal measured SLO yet). | **Monitoring** (New Relic / alerts — [monitoring_setup](../../how_to/monitoring_setup.md)) to detect and respond to outages; health/status endpoints. **No service redundancy** (single VM + Compose stack per environment by design — Always Free cost envelope). Object Storage backups; [disaster_recovery](../disaster_recovery.md) for VM/key loss. |
 | **Performance** | Match lists and API remain usable under modest concurrent event-day load on one VM. | Batched match-list queries (historical N+1 fix); periodic matcher (not per-request); keep first-load assets bounded (font subset). |
 | **Modifiability** | Domain and infra changes land via small PRs without rewriting the stack. | Handler / service / repository layering; concrete repositories; append-only ADRs; protobuf as the shared contract. |
 | **Interoperability** | Client and server share one explicit data contract. | `proto/models.proto` → generated Rust + Dart; REST under `/api/v1` ([API spec](../../reference/api_spec.md)). |
@@ -67,6 +67,6 @@ a backlog dump:
 - Some operational runbooks assume maintainer familiarity with OCI free-tier
   quotas (see disaster recovery lessons) — **availability** / ops friction.
 
-**Availability** target (≥ **98%** uptime) is judged via **monitoring/alerts**
+**Availability** provisional target (≥ **98%**) is judged via **monitoring/alerts**
 (and operator response), not multi-instance redundancy — single VM + Compose by
 design. Update this subsection when a gap is closed or a new systemic risk appears.
