@@ -349,6 +349,9 @@ impl serde::Serialize for CreateGroupRequest {
         if self.description.is_some() {
             len += 1;
         }
+        if self.photo_url.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.CreateGroupRequest", len)?;
         if self.event_id != 0 {
             struct_ser.serialize_field("eventId", &self.event_id)?;
@@ -361,6 +364,9 @@ impl serde::Serialize for CreateGroupRequest {
         }
         if let Some(v) = self.description.as_ref() {
             struct_ser.serialize_field("description", v)?;
+        }
+        if let Some(v) = self.photo_url.as_ref() {
+            struct_ser.serialize_field("photoUrl", v)?;
         }
         struct_ser.end()
     }
@@ -379,6 +385,8 @@ impl<'de> serde::Deserialize<'de> for CreateGroupRequest {
             "group_name",
             "groupName",
             "description",
+            "photo_url",
+            "photoUrl",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -387,6 +395,7 @@ impl<'de> serde::Deserialize<'de> for CreateGroupRequest {
             UserId,
             GroupName,
             Description,
+            PhotoUrl,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -412,6 +421,7 @@ impl<'de> serde::Deserialize<'de> for CreateGroupRequest {
                             "userId" | "user_id" => Ok(GeneratedField::UserId),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
                             "description" => Ok(GeneratedField::Description),
+                            "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -435,6 +445,7 @@ impl<'de> serde::Deserialize<'de> for CreateGroupRequest {
                 let mut user_id__ = None;
                 let mut group_name__ = None;
                 let mut description__ = None;
+                let mut photo_url__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::EventId => {
@@ -465,6 +476,12 @@ impl<'de> serde::Deserialize<'de> for CreateGroupRequest {
                             }
                             description__ = map_.next_value()?;
                         }
+                        GeneratedField::PhotoUrl => {
+                            if photo_url__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("photoUrl"));
+                            }
+                            photo_url__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(CreateGroupRequest {
@@ -472,6 +489,7 @@ impl<'de> serde::Deserialize<'de> for CreateGroupRequest {
                     user_id: user_id__.unwrap_or_default(),
                     group_name: group_name__.unwrap_or_default(),
                     description: description__,
+                    photo_url: photo_url__,
                 })
             }
         }
@@ -2403,6 +2421,9 @@ impl serde::Serialize for MerchandiseGroup {
         if self.updated_at.is_some() {
             len += 1;
         }
+        if self.photo_url.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.MerchandiseGroup", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -2424,6 +2445,9 @@ impl serde::Serialize for MerchandiseGroup {
         }
         if let Some(v) = self.updated_at.as_ref() {
             struct_ser.serialize_field("updatedAt", v)?;
+        }
+        if let Some(v) = self.photo_url.as_ref() {
+            struct_ser.serialize_field("photoUrl", v)?;
         }
         struct_ser.end()
     }
@@ -2447,6 +2471,8 @@ impl<'de> serde::Deserialize<'de> for MerchandiseGroup {
             "createdAt",
             "updated_at",
             "updatedAt",
+            "photo_url",
+            "photoUrl",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -2458,6 +2484,7 @@ impl<'de> serde::Deserialize<'de> for MerchandiseGroup {
             CreatedBy,
             CreatedAt,
             UpdatedAt,
+            PhotoUrl,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2486,6 +2513,7 @@ impl<'de> serde::Deserialize<'de> for MerchandiseGroup {
                             "createdBy" | "created_by" => Ok(GeneratedField::CreatedBy),
                             "createdAt" | "created_at" => Ok(GeneratedField::CreatedAt),
                             "updatedAt" | "updated_at" => Ok(GeneratedField::UpdatedAt),
+                            "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2512,6 +2540,7 @@ impl<'de> serde::Deserialize<'de> for MerchandiseGroup {
                 let mut created_by__ = None;
                 let mut created_at__ = None;
                 let mut updated_at__ = None;
+                let mut photo_url__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -2562,6 +2591,12 @@ impl<'de> serde::Deserialize<'de> for MerchandiseGroup {
                             }
                             updated_at__ = map_.next_value()?;
                         }
+                        GeneratedField::PhotoUrl => {
+                            if photo_url__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("photoUrl"));
+                            }
+                            photo_url__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(MerchandiseGroup {
@@ -2572,6 +2607,7 @@ impl<'de> serde::Deserialize<'de> for MerchandiseGroup {
                     created_by: created_by__,
                     created_at: created_at__,
                     updated_at: updated_at__,
+                    photo_url: photo_url__,
                 })
             }
         }
@@ -4401,6 +4437,9 @@ impl serde::Serialize for UpdateGroupRequest {
         if self.description.is_some() {
             len += 1;
         }
+        if self.photo_url.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.UpdateGroupRequest", len)?;
         if self.event_id != 0 {
             struct_ser.serialize_field("eventId", &self.event_id)?;
@@ -4413,6 +4452,9 @@ impl serde::Serialize for UpdateGroupRequest {
         }
         if let Some(v) = self.description.as_ref() {
             struct_ser.serialize_field("description", v)?;
+        }
+        if let Some(v) = self.photo_url.as_ref() {
+            struct_ser.serialize_field("photoUrl", v)?;
         }
         struct_ser.end()
     }
@@ -4431,6 +4473,8 @@ impl<'de> serde::Deserialize<'de> for UpdateGroupRequest {
             "group_name",
             "groupName",
             "description",
+            "photo_url",
+            "photoUrl",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4439,6 +4483,7 @@ impl<'de> serde::Deserialize<'de> for UpdateGroupRequest {
             UserId,
             GroupName,
             Description,
+            PhotoUrl,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4464,6 +4509,7 @@ impl<'de> serde::Deserialize<'de> for UpdateGroupRequest {
                             "userId" | "user_id" => Ok(GeneratedField::UserId),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
                             "description" => Ok(GeneratedField::Description),
+                            "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4487,6 +4533,7 @@ impl<'de> serde::Deserialize<'de> for UpdateGroupRequest {
                 let mut user_id__ = None;
                 let mut group_name__ = None;
                 let mut description__ = None;
+                let mut photo_url__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::EventId => {
@@ -4517,6 +4564,12 @@ impl<'de> serde::Deserialize<'de> for UpdateGroupRequest {
                             }
                             description__ = map_.next_value()?;
                         }
+                        GeneratedField::PhotoUrl => {
+                            if photo_url__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("photoUrl"));
+                            }
+                            photo_url__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(UpdateGroupRequest {
@@ -4524,6 +4577,7 @@ impl<'de> serde::Deserialize<'de> for UpdateGroupRequest {
                     user_id: user_id__.unwrap_or_default(),
                     group_name: group_name__.unwrap_or_default(),
                     description: description__,
+                    photo_url: photo_url__,
                 })
             }
         }

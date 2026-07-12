@@ -103,6 +103,8 @@
   "failedToSaveGroup": "グループの保存に失敗しました: {error}",
   "groupSaved": "グループを保存しました",
   "youCanEditGroup": "このグループを編集できます",
+  "groupPhoto": "説明画像",
+  "noGroupPhoto": "画像は未設定です",
 
   "failedToSend": "送信に失敗しました: {error}",
   "noMessagesYet": "まだメッセージがありません。挨拶してみましょう！",

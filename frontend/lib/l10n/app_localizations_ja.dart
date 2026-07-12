@@ -329,6 +329,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get youCanEditGroup => 'このグループを編集できます';
 
   @override
+  String get groupPhoto => '説明画像';
+
+  @override
+  String get noGroupPhoto => '画像は未設定です';
+
+  @override
   String failedToSend(String error) {
     return '送信に失敗しました: $error';
   }

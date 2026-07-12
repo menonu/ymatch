@@ -102,6 +102,9 @@ pub struct MerchandiseGroup {
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "7")]
     pub updated_at: ::core::option::Option<::prost::alloc::string::String>,
+    /// optional description image (#404)
+    #[prost(string, optional, tag = "8")]
+    pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -433,6 +436,9 @@ pub struct CreateGroupRequest {
     pub group_name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "4")]
     pub description: ::core::option::Option<::prost::alloc::string::String>,
+    /// optional description image (#404)
+    #[prost(string, optional, tag = "5")]
+    pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -445,6 +451,9 @@ pub struct UpdateGroupRequest {
     pub group_name: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "4")]
     pub description: ::core::option::Option<::prost::alloc::string::String>,
+    /// When set: update photo_url (empty string clears). When unset: leave as-is.
+    #[prost(string, optional, tag = "5")]
+    pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

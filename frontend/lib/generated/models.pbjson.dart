@@ -331,12 +331,22 @@ const MerchandiseGroup$json = {
       '10': 'updatedAt',
       '17': true
     },
+    {
+      '1': 'photo_url',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '9': 4,
+      '10': 'photoUrl',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_description'},
     {'1': '_created_by'},
     {'1': '_created_at'},
     {'1': '_updated_at'},
+    {'1': '_photo_url'},
   ],
 };
 
@@ -346,8 +356,9 @@ final $typed_data.Uint8List merchandiseGroupDescriptor = $convert.base64Decode(
     'ZlbnRJZBIdCgpncm91cF9uYW1lGAMgASgJUglncm91cE5hbWUSJQoLZGVzY3JpcHRpb24YBCAB'
     'KAlIAFILZGVzY3JpcHRpb26IAQESIgoKY3JlYXRlZF9ieRgFIAEoBUgBUgljcmVhdGVkQnmIAQ'
     'ESIgoKY3JlYXRlZF9hdBgGIAEoCUgCUgljcmVhdGVkQXSIAQESIgoKdXBkYXRlZF9hdBgHIAEo'
-    'CUgDUgl1cGRhdGVkQXSIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC19jcmVhdGVkX2J5Qg0KC19jcm'
-    'VhdGVkX2F0Qg0KC191cGRhdGVkX2F0');
+    'CUgDUgl1cGRhdGVkQXSIAQESIAoJcGhvdG9fdXJsGAggASgJSARSCHBob3RvVXJsiAEBQg4KDF'
+    '9kZXNjcmlwdGlvbkINCgtfY3JlYXRlZF9ieUINCgtfY3JlYXRlZF9hdEINCgtfdXBkYXRlZF9h'
+    'dEIMCgpfcGhvdG9fdXJs');
 
 @$core.Deprecated('Use inventoryItemDescriptor instead')
 const InventoryItem$json = {
@@ -1111,9 +1122,19 @@ const CreateGroupRequest$json = {
       '10': 'description',
       '17': true
     },
+    {
+      '1': 'photo_url',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'photoUrl',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_description'},
+    {'1': '_photo_url'},
   ],
 };
 
@@ -1121,7 +1142,8 @@ const CreateGroupRequest$json = {
 final $typed_data.Uint8List createGroupRequestDescriptor = $convert.base64Decode(
     'ChJDcmVhdGVHcm91cFJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SWQSFwoHdXNlcl'
     '9pZBgCIAEoBVIGdXNlcklkEh0KCmdyb3VwX25hbWUYAyABKAlSCWdyb3VwTmFtZRIlCgtkZXNj'
-    'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBAUIOCgxfZGVzY3JpcHRpb24=');
+    'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBARIgCglwaG90b191cmwYBSABKAlIAVIIcG'
+    'hvdG9VcmyIAQFCDgoMX2Rlc2NyaXB0aW9uQgwKCl9waG90b191cmw=');
 
 @$core.Deprecated('Use updateGroupRequestDescriptor instead')
 const UpdateGroupRequest$json = {
@@ -1139,9 +1161,19 @@ const UpdateGroupRequest$json = {
       '10': 'description',
       '17': true
     },
+    {
+      '1': 'photo_url',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'photoUrl',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_description'},
+    {'1': '_photo_url'},
   ],
 };
 
@@ -1149,7 +1181,8 @@ const UpdateGroupRequest$json = {
 final $typed_data.Uint8List updateGroupRequestDescriptor = $convert.base64Decode(
     'ChJVcGRhdGVHcm91cFJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SWQSFwoHdXNlcl'
     '9pZBgCIAEoBVIGdXNlcklkEh0KCmdyb3VwX25hbWUYAyABKAlSCWdyb3VwTmFtZRIlCgtkZXNj'
-    'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBAUIOCgxfZGVzY3JpcHRpb24=');
+    'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBARIgCglwaG90b191cmwYBSABKAlIAVIIcG'
+    'hvdG9VcmyIAQFCDgoMX2Rlc2NyaXB0aW9uQgwKCl9waG90b191cmw=');
 
 @$core.Deprecated('Use listGroupsResponseDescriptor instead')
 const ListGroupsResponse$json = {

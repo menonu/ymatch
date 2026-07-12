@@ -27,7 +27,7 @@ pub struct AdminGroup {
 
 /// SELECT list for the `merchandise_groups` table.
 const GROUP_COLUMNS: &str =
-    "id, event_id, group_name, description, created_by, created_at, updated_at";
+    "id, event_id, group_name, description, created_by, created_at, updated_at, photo_url";
 
 pub struct MerchandiseGroupRepository {
     pool: PgPool,
@@ -135,15 +135,23 @@ impl MerchandiseGroupRepository {
     }
 
     /// Upsert a group row. The first time a group name is seen for an
-    /// event, the row is created with `created_by = user_id`. On a
-    /// subsequent call for the same `(event_id, group_name)`, the
-    /// description is updated and `created_by` is preserved.
+    /// event, the row is created with `created_by = user_id` (and optional
+    /// `photo_url` on insert only). On a subsequent call for the same
+    /// `(event_id, group_name)`, only `description` is updated and
+    /// `created_by` / `photo_url` are preserved — photo changes must go
+    /// through the RBAC-gated update path (#404).
     pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
         let group_name = req.group_name.trim().to_string();
         if group_name.is_empty() {
             return Err(AppError::bad_request("group_name is required"));
         }
         let description = req.description.clone().unwrap_or_default();
+        // Empty string → NULL so we do not store blank photo_urls.
+        let photo_url = req
+            .photo_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
 
         // Verify the event exists. Cheap check that prevents orphaned
         // group rows if a client mistypes the event_id.
@@ -155,9 +163,12 @@ impl MerchandiseGroupRepository {
             return Err(AppError::not_found("Event not found"));
         }
 
+        // On conflict, never touch photo_url here — that write is gated by the
+        // PUT update path (creator / group.edit RBAC). Create remains an
+        // unauthenticated-ish upsert for description metadata only (#404).
         let sql = format!(
-            r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by)
-               VALUES ($1, $2, $3, $4)
+            r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by, photo_url)
+               VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (event_id, group_name) DO UPDATE
                  SET description = EXCLUDED.description,
                      updated_at = NOW()
@@ -169,13 +180,16 @@ impl MerchandiseGroupRepository {
             .bind(&group_name)
             .bind(&description)
             .bind(req.user_id)
+            .bind(photo_url)
             .fetch_one(&self.pool)
             .await?;
         Ok(group_from_row(&row))
     }
 
-    /// Update the description of an existing group. Returns `None` if the
-    /// group row does not yet exist (caller should use `create` first).
+    /// Update description (and optionally photo_url) of an existing group.
+    /// Returns `None` if the group row does not yet exist (caller should use
+    /// `create` first). When `req.photo_url` is `Some`, it is applied
+    /// (empty string clears the image). When `None`, photo_url is left as-is.
     pub async fn update(
         &self,
         req: UpdateGroupRequest,
@@ -199,18 +213,42 @@ impl MerchandiseGroupRepository {
 
         let description = req.description.clone().unwrap_or_default();
 
-        let updated = sqlx::query(&format!(
-            r#"UPDATE merchandise_groups
-               SET description = $1, updated_at = NOW()
-               WHERE event_id = $2 AND group_name = $3
-               RETURNING {}"#,
-            GROUP_COLUMNS
-        ))
-        .bind(&description)
-        .bind(req.event_id)
-        .bind(&group_name)
-        .fetch_one(&self.pool)
-        .await?;
+        let updated = if let Some(ref raw_photo) = req.photo_url {
+            let photo_url = {
+                let t = raw_photo.trim();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t.to_string())
+                }
+            };
+            sqlx::query(&format!(
+                r#"UPDATE merchandise_groups
+                   SET description = $1, photo_url = $2, updated_at = NOW()
+                   WHERE event_id = $3 AND group_name = $4
+                   RETURNING {}"#,
+                GROUP_COLUMNS
+            ))
+            .bind(&description)
+            .bind(photo_url)
+            .bind(req.event_id)
+            .bind(&group_name)
+            .fetch_one(&self.pool)
+            .await?
+        } else {
+            sqlx::query(&format!(
+                r#"UPDATE merchandise_groups
+                   SET description = $1, updated_at = NOW()
+                   WHERE event_id = $2 AND group_name = $3
+                   RETURNING {}"#,
+                GROUP_COLUMNS
+            ))
+            .bind(&description)
+            .bind(req.event_id)
+            .bind(&group_name)
+            .fetch_one(&self.pool)
+            .await?
+        };
 
         Ok(Some(group_from_row(&updated)))
     }

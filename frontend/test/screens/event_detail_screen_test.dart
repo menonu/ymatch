@@ -42,6 +42,7 @@ MerchandiseGroup _testGroup({
   required String name,
   String? description,
   int? createdBy,
+  String? photoUrl,
 }) {
   final g = MerchandiseGroup()
     ..id = 1
@@ -49,6 +50,7 @@ MerchandiseGroup _testGroup({
     ..groupName = name;
   if (description != null) g.description = description;
   if (createdBy != null) g.createdBy = createdBy;
+  if (photoUrl != null) g.photoUrl = photoUrl;
   return g;
 }
 
@@ -329,6 +331,90 @@ void main() {
       await tester.tap(find.byTooltip('Group info'));
       await tester.pumpAndSettle();
       expect(find.text('Collectible pens'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Info panel shows description image below the text (#404)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 1,
+                  // data URI avoids network Image.network in tests
+                  photoUrl:
+                      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+                ),
+              ],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Group info'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Collectible pens'), findsOneWidget);
+      // Image.memory is used for data-URI photos.
+      expect(find.byType(Image), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'group edit dialog shows image attach controls (#404)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 1,
+                ),
+              ],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Edit Group'));
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      expect(
+        find.descendant(of: dialog, matching: find.text('Description image')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('Choose Image')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('No image attached')),
+        findsOneWidget,
+      );
     },
   );
 

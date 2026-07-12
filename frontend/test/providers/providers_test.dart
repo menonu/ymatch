@@ -225,6 +225,92 @@ void main() {
       },
     );
 
+    test(
+      'updateGroup sends photoUrl when updatePhoto is true (#404)',
+      () async {
+        String? capturedBody;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'PUT' &&
+                request.url.path.contains('/groups/')) {
+              capturedBody = request.body;
+              return http.Response(
+                jsonEncode({
+                  'id': 1,
+                  'eventId': 7,
+                  'groupName': 'Pins',
+                  'description': 'd',
+                  'photoUrl': 'https://cdn.example/g.png',
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        final group = await container
+            .read(groupControllerProvider.notifier)
+            .updateGroup(
+              eventId: 7,
+              userId: 1,
+              groupName: 'Pins',
+              description: 'd',
+              photoUrl: 'https://cdn.example/g.png',
+              updatePhoto: true,
+            );
+
+        final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(decoded, containsPair('photoUrl', 'https://cdn.example/g.png'));
+        expect(group.photoUrl, 'https://cdn.example/g.png');
+      },
+    );
+
+    test(
+      'updateGroup omits photoUrl when updatePhoto is false (#404)',
+      () async {
+        String? capturedBody;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'PUT' &&
+                request.url.path.contains('/groups/')) {
+              capturedBody = request.body;
+              return http.Response(
+                jsonEncode({
+                  'id': 1,
+                  'eventId': 7,
+                  'groupName': 'Pins',
+                  'description': 'd',
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(groupControllerProvider.notifier)
+            .updateGroup(
+              eventId: 7,
+              userId: 1,
+              groupName: 'Pins',
+              description: 'd',
+            );
+
+        final decoded = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(decoded, isNot(contains('photoUrl')));
+      },
+    );
+
     test('eventGroupsProvider parses ListGroupsResponse', () async {
       final api = _apiWith(
         client: MockClient((request) async {

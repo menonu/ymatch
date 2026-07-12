@@ -478,6 +478,14 @@
   "@youCanEditGroup": {
     "description": "Tooltip on the shield icon shown to group creators"
   },
+  "groupPhoto": "Description image",
+  "@groupPhoto": {
+    "description": "Label for the optional group description image"
+  },
+  "noGroupPhoto": "No image attached",
+  "@noGroupPhoto": {
+    "description": "Placeholder when the group has no description image"
+  },
 
   "failedToSend": "Failed to send: {error}",
   "@failedToSend": {
