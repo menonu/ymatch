@@ -173,12 +173,15 @@ jobs:
               --name "$name" \
               --file backup.sql.gz \
               --force >/dev/null
-            # head returns content-length; assert it matches the local dump
+            # head returns JSON; assert content-length matches the local dump
             REMOTE_SIZE=$(oci os object head \
               --namespace "$NS" \
               --bucket-name "$BUCKET" \
-              --name "$name" \
-              --query 'content-length' --raw-output)
+              --name "$name" | jq -r '."content-length"')
+            if [ -z "$REMOTE_SIZE" ] || [ "$REMOTE_SIZE" = "null" ]; then
+              echo "::error::Could not read content-length for ${name}"
+              exit 1
+            fi
             if [ "$REMOTE_SIZE" != "$LOCAL_SIZE" ]; then
               echo "::error::Size mismatch for ${name}: remote=${REMOTE_SIZE} local=${LOCAL_SIZE}"
               exit 1
