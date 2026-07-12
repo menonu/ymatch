@@ -7,12 +7,19 @@ on:
   workflow_dispatch:
     inputs:
       backup_type:
-        description: 'Backup type override (daily/weekly/monthly/all)'
-        required: false
+        description: 'Backup type override'
+        required: true
         default: 'daily'
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+          - all
 
 env:
-  GCS_BUCKET: tangential-map-491113-b4-db-backups
+  # OCI Object Storage (Always Free) — see terraform/oci/backup.tf and issue #383
+  OCI_BACKUP_BUCKET: ymatch-db-backups
   # OCI_HOST must be updated alongside the OCI_VM_HOST GitHub secret
   # when the VM is recreated. Both the deploy workflows and this
   # backup workflow should source from the same secret to avoid
@@ -31,30 +38,48 @@ jobs:
       - name: Determine backup types
         id: types
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TYPE="${{ github.event.inputs.backup_type }}"
-            if [ "$TYPE" = "all" ]; then
-              echo "daily=true" >> $GITHUB_OUTPUT
-              echo "weekly=true" >> $GITHUB_OUTPUT
-              echo "monthly=true" >> $GITHUB_OUTPUT
-            else
-              echo "daily=$( [ '$TYPE' = 'daily' ] && echo true || echo false )" >> $GITHUB_OUTPUT
-              echo "weekly=$( [ '$TYPE' = 'weekly' ] && echo true || echo false )" >> $GITHUB_OUTPUT
-              echo "monthly=$( [ '$TYPE' = 'monthly' ] && echo true || echo false )" >> $GITHUB_OUTPUT
-            fi
+            case "$TYPE" in
+              all)
+                echo "daily=true" >> "$GITHUB_OUTPUT"
+                echo "weekly=true" >> "$GITHUB_OUTPUT"
+                echo "monthly=true" >> "$GITHUB_OUTPUT"
+                ;;
+              daily)
+                echo "daily=true" >> "$GITHUB_OUTPUT"
+                echo "weekly=false" >> "$GITHUB_OUTPUT"
+                echo "monthly=false" >> "$GITHUB_OUTPUT"
+                ;;
+              weekly)
+                echo "daily=false" >> "$GITHUB_OUTPUT"
+                echo "weekly=true" >> "$GITHUB_OUTPUT"
+                echo "monthly=false" >> "$GITHUB_OUTPUT"
+                ;;
+              monthly)
+                echo "daily=false" >> "$GITHUB_OUTPUT"
+                echo "weekly=false" >> "$GITHUB_OUTPUT"
+                echo "monthly=true" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                echo "::error::Invalid backup_type='$TYPE' (expected daily|weekly|monthly|all)"
+                exit 1
+                ;;
+            esac
           else
             # Scheduled run: always daily
-            echo "daily=true" >> $GITHUB_OUTPUT
+            echo "daily=true" >> "$GITHUB_OUTPUT"
             # Weekly on Sunday (day 0)
             DOW=$(date -u +%w)
-            echo "weekly=$( [ $DOW -eq 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+            echo "weekly=$( [ "$DOW" -eq 0 ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
             # Monthly on the 1st
             DOM=$(date -u +%d)
-            echo "monthly=$( [ $DOM -eq 01 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+            echo "monthly=$( [ "$DOM" = "01" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
-          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> "$GITHUB_OUTPUT"
 
       - name: Setup SSH
         run: |
@@ -77,39 +102,104 @@ jobs:
             exit 1
           fi
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
-
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v3
-
-      - name: Upload daily backup
-        if: steps.types.outputs.daily == 'true'
+      # Single key secret (B64). Install into a venv so PEP 668
+      # (externally-managed system Python on ubuntu-24.04) cannot block pip.
+      - name: Install OCI CLI
         run: |
-          gcloud storage cp backup.sql.gz \
-            "gs://${{ env.GCS_BUCKET }}/daily/ymatch-${{ steps.types.outputs.date }}.sql.gz"
-          echo "✅ Daily backup uploaded"
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/oci-cli-venv"
+          "$RUNNER_TEMP/oci-cli-venv/bin/pip" install --quiet --upgrade pip
+          "$RUNNER_TEMP/oci-cli-venv/bin/pip" install --quiet 'oci-cli==3.88.0'
+          echo "$RUNNER_TEMP/oci-cli-venv/bin" >> "$GITHUB_PATH"
 
-      - name: Upload weekly backup
-        if: steps.types.outputs.weekly == 'true'
+      - name: Configure OCI CLI credentials
+        env:
+          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          OCI_CLI_KEY_CONTENT_B64: ${{ secrets.OCI_CLI_KEY_CONTENT_B64 }}
+          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
         run: |
-          gcloud storage cp backup.sql.gz \
-            "gs://${{ env.GCS_BUCKET }}/weekly/ymatch-${{ steps.types.outputs.date }}.sql.gz"
-          echo "✅ Weekly backup uploaded"
+          set -euo pipefail
+          mkdir -p "$HOME/.oci"
+          KEY_FILE="$HOME/.oci/db_backup_key.pem"
+          # Base64 PEM is the single source of truth (reliable multiline handling)
+          echo "$OCI_CLI_KEY_CONTENT_B64" | base64 -d > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          openssl rsa -in "$KEY_FILE" -check -noout >/dev/null
+          {
+            echo "[DEFAULT]"
+            echo "user=${OCI_CLI_USER}"
+            echo "fingerprint=${OCI_CLI_FINGERPRINT}"
+            echo "tenancy=${OCI_CLI_TENANCY}"
+            echo "region=${OCI_CLI_REGION}"
+            echo "key_file=${KEY_FILE}"
+          } > "$HOME/.oci/config"
+          chmod 600 "$HOME/.oci/config"
+          unset OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT_B64 OCI_CLI_REGION || true
+          export OCI_CLI_CONFIG_FILE="$HOME/.oci/config"
+          # Resolve namespace dynamically (do not hardcode tenancy identifiers)
+          NS="$(oci os ns get --query data --raw-output)"
+          echo "OCI_BACKUP_NAMESPACE=$NS" >> "$GITHUB_ENV"
+          echo "Resolved Object Storage namespace (length ${#NS})"
+          oci os bucket get --namespace "$NS" --bucket-name "${{ env.OCI_BACKUP_BUCKET }}" \
+            --query 'data.name' --raw-output >/dev/null
+          echo "Bucket access OK"
 
-      - name: Upload monthly backup
-        if: steps.types.outputs.monthly == 'true'
+      - name: Upload and verify backups
         run: |
-          gcloud storage cp backup.sql.gz \
-            "gs://${{ env.GCS_BUCKET }}/monthly/ymatch-${{ steps.types.outputs.date }}.sql.gz"
-          echo "✅ Monthly backup uploaded"
+          set -euo pipefail
+          unset OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT_B64 OCI_CLI_REGION || true
+          export OCI_CLI_CONFIG_FILE="$HOME/.oci/config"
+          DATE="${{ steps.types.outputs.date }}"
+          NS="${OCI_BACKUP_NAMESPACE:?namespace not set}"
+          BUCKET="${{ env.OCI_BACKUP_BUCKET }}"
+          LOCAL_SIZE=$(stat --format=%s backup.sql.gz)
+          test -f backup.sql.gz
 
-      - name: Verify uploads
-        run: |
-          echo "=== Current backups in GCS ==="
-          gcloud storage ls "gs://${{ env.GCS_BUCKET }}/**" --long 2>/dev/null || echo "No backups found yet"
+          DAILY="${{ steps.types.outputs.daily }}"
+          WEEKLY="${{ steps.types.outputs.weekly }}"
+          MONTHLY="${{ steps.types.outputs.monthly }}"
+          if [ "$DAILY" != "true" ] && [ "$WEEKLY" != "true" ] && [ "$MONTHLY" != "true" ]; then
+            echo "::error::No backup type selected (daily/weekly/monthly all false)"
+            exit 1
+          fi
+
+          upload_and_verify() {
+            local prefix="$1"
+            local name="${prefix}/ymatch-${DATE}.sql.gz"
+            echo "Uploading ${name} (${LOCAL_SIZE} bytes)..."
+            oci os object put \
+              --namespace "$NS" \
+              --bucket-name "$BUCKET" \
+              --name "$name" \
+              --file backup.sql.gz \
+              --force >/dev/null
+            # head returns JSON; assert content-length matches the local dump
+            REMOTE_SIZE=$(oci os object head \
+              --namespace "$NS" \
+              --bucket-name "$BUCKET" \
+              --name "$name" | jq -r '."content-length"')
+            if [ -z "$REMOTE_SIZE" ] || [ "$REMOTE_SIZE" = "null" ]; then
+              echo "::error::Could not read content-length for ${name}"
+              exit 1
+            fi
+            if [ "$REMOTE_SIZE" != "$LOCAL_SIZE" ]; then
+              echo "::error::Size mismatch for ${name}: remote=${REMOTE_SIZE} local=${LOCAL_SIZE}"
+              exit 1
+            fi
+            echo "Verified ${name} (content-length=${REMOTE_SIZE})"
+          }
+
+          if [ "$DAILY" = "true" ]; then
+            upload_and_verify daily
+          fi
+          if [ "$WEEKLY" = "true" ]; then
+            upload_and_verify weekly
+          fi
+          if [ "$MONTHLY" = "true" ]; then
+            upload_and_verify monthly
+          fi
 
       - name: Report to New Relic
         if: always()
@@ -122,12 +212,14 @@ jobs:
               \"eventType\": \"DatabaseBackup\",
               \"status\": \"$STATUS\",
               \"backupDate\": \"${{ steps.types.outputs.date }}\",
-              \"daily\": ${{ steps.types.outputs.daily }},
-              \"weekly\": ${{ steps.types.outputs.weekly }},
-              \"monthly\": ${{ steps.types.outputs.monthly }},
-              \"sizeBytes\": $(stat --format=%s backup.sql.gz 2>/dev/null || echo 0)
+              \"daily\": ${{ steps.types.outputs.daily || 'false' }},
+              \"weekly\": ${{ steps.types.outputs.weekly || 'false' }},
+              \"monthly\": ${{ steps.types.outputs.monthly || 'false' }},
+              \"sizeBytes\": $(stat --format=%s backup.sql.gz 2>/dev/null || echo 0),
+              \"storage\": \"oci-object-storage\",
+              \"bucket\": \"${{ env.OCI_BACKUP_BUCKET }}\"
             }]" || true
 
       - name: Cleanup
         if: always()
-        run: rm -f backup.sql.gz ~/.ssh/oci_key
+        run: rm -f backup.sql.gz ~/.ssh/oci_key ~/.oci/db_backup_key.pem ~/.oci/config

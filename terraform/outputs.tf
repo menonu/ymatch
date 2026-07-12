@@ -1,9 +1,3 @@
-output "backup_bucket_name" {
-  value       = google_storage_bucket.db_backups.name
-  description = "GCS bucket for database backups"
-}
-
-output "backup_service_account_email" {
-  value       = google_service_account.backup.email
-  description = "Service account for backup operations"
-}
+# Root GCP module outputs retired with the GCS backup path (#383).
+# Active backup outputs live in terraform/oci/outputs.tf
+# (db_backup_bucket_name, db_backup_namespace, db_backup_user_ocid, …).

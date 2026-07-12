@@ -197,14 +197,25 @@ The `.github/workflows/db-backup.yml` workflow runs daily at 03:00 JST and sends
 **Dashboard page**: "Database Backups" — shows backup status, size trends,
 hours since last backup, and type breakdown (daily/weekly/monthly).
 
-**Backup rotation** (via GCS lifecycle):
+**Backup rotation** (OCI Object Storage lifecycle, #383):
 | Type | Frequency | Retained |
 |------|-----------|----------|
-| Daily | Every day | 7 |
-| Weekly | Sunday | 4 |
-| Monthly | 1st of month | 3 |
+| Daily | Every day | 7 days |
+| Weekly | Sunday | 28 days |
+| Monthly | 1st of month | 90 days |
 
-**GCS Bucket**: `tangential-map-491113-b4-db-backups` (us-west1)
+**Bucket**: OCI Object Storage `ymatch-db-backups` (Always Free; see `terraform/oci/backup.tf`).  
+**Workflow**: `.github/workflows/db-backup.yml` (SSH dump from production VM → `oci os object put`).  
+**Restore example**:
+
+```bash
+oci os object get \
+  --namespace "$(oci os ns get --query data --raw-output)" \
+  --bucket-name ymatch-db-backups \
+  --name daily/ymatch-YYYY-MM-DD.sql.gz \
+  --file backup.sql.gz
+gunzip -c backup.sql.gz | docker exec -i ymatch_db psql -U ymatch_user ymatch
+```
 
 ### 6. Auto-Deploy Workflow
 

@@ -18,7 +18,9 @@ provider "google" {
 # NOTE: GCP Cloud Run, Compute Engine VM, VPC, and
 # Firewall resources have been removed.
 # Production workloads now run on OCI (see terraform/oci/).
-# GCP is used only for:
-#   - Database backup storage (backup.tf)
-#   - Budget monitoring (monitoring.tf)
+# Database backups moved to OCI Object Storage (#383) —
+# see terraform/oci/backup.tf. GCP remnants:
+#   - backup.tf — retired (config empty; destroy abandoned GCS
+#     resources from state only after billing is restored)
+#   - monitoring.tf — optional budget alert
 # ---------------------------------------------------

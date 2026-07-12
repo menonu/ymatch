@@ -49,3 +49,28 @@ output "staging_app_url" {
   description = "Staging application URL (available after deploy script runs)"
   value       = "https://${oci_core_instance.ymatch_staging.public_ip}.nip.io"
 }
+
+output "db_backup_bucket_name" {
+  description = "OCI Object Storage bucket for production database backups (#383)"
+  value       = oci_objectstorage_bucket.db_backups.name
+}
+
+output "db_backup_namespace" {
+  description = "Object Storage namespace for the db backup bucket"
+  value       = data.oci_objectstorage_namespace.tenancy.namespace
+}
+
+output "db_backup_region" {
+  description = "Region of the db backup bucket (same as the OCI provider region)"
+  value       = var.region
+}
+
+output "db_backup_user_ocid" {
+  description = "OCI user OCID for GitHub Actions backup uploads (set as OCI_CLI_USER)"
+  value       = oci_identity_user.db_backup.id
+}
+
+output "db_backup_user_name" {
+  description = "OCI user name for GitHub Actions backup uploads"
+  value       = oci_identity_user.db_backup.name
+}

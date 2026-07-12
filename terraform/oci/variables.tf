@@ -113,3 +113,8 @@ variable "alert_email" {
   description = "Email address for OCI budget alerts"
   type        = string
 }
+
+variable "db_backup_user_email" {
+  description = "Primary email for the least-privilege ymatch-db-backup IAM user (required by OCI Identity Domains on user create). Not used for mail delivery."
+  type        = string
+}

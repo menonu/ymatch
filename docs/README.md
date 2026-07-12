@@ -42,7 +42,7 @@ Direct, action-oriented instructions to solve specific problems or accomplish ke
 * [Applying Terraform with Secrets (TF_VAR_ + .env)](how_to/terraform_apply.md): Run `terraform plan`/`apply` for the newrelic + oci modules without committing secrets or host identifiers (#284).
 * [OCI Credentials Management](how_to/oci_credentials.md): API key generation, rotation, and loss-recovery procedure for the RSA 2048 key used by Terraform and the OCI CLI.
 * [Monitoring Setup Guide](how_to/monitoring_setup.md): Setup and queries for New Relic application/infrastructure alerts and monitoring.
-* [GCP Historical Deployment](how_to/cloud_deployment.md): Historical GCP backup & deployment strategy (GCP services are currently stopped except for backup bucket storage).
+* [GCP Historical Deployment](how_to/cloud_deployment.md): Historical GCP deployment strategy (all GCP app services stopped; DB backups moved to OCI Object Storage in #383).
 * [Frontend-Driven E2E Tests](how_to/e2e_tests.md): How to run the wire-contract E2E test suite introduced in #213 (drives the real `ApiClient` + proto3 JSON against a docker-compose stack).
 
 ---
