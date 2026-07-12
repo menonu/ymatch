@@ -400,6 +400,42 @@ void main() {
       expect(merch.length, 1);
     });
 
+    test('adminGroupsProvider fetches groups', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/admin/groups') {
+            // Non-ASCII group names need explicit UTF-8 body bytes —
+            // `http.Response(String)` encodes as Latin-1.
+            return http.Response.bytes(
+              utf8.encode(jsonEncode([
+                {
+                  'eventId': 42,
+                  'eventName': '2026 *Tibbar tibbar!*',
+                  'groupName': 'アクスタ',
+                  'itemCount': 3,
+                },
+              ])),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final groups = await container.read(adminGroupsProvider.future);
+      expect(groups.length, 1);
+      expect(groups.first.eventId, 42);
+      expect(groups.first.eventName, '2026 *Tibbar tibbar!*');
+      expect(groups.first.groupName, 'アクスタ');
+      expect(groups.first.itemCount, 3);
+    });
+
     test('adminMatchesProvider fetches matches', () async {
       final api = _apiWith(
         client: MockClient((request) async {

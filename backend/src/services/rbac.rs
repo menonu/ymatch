@@ -292,6 +292,7 @@ mod tests {
                 "merch.create.any",
                 "merch.edit.any",
                 "group.edit.any",
+                "group.delete",
                 "match.delete",
                 "system.kill_switch",
             ]),
@@ -308,6 +309,7 @@ mod tests {
                 "merch.create.any",
                 "merch.edit.any",
                 "group.edit.any",
+                "group.delete",
                 "match.delete",
             ]),
         );
@@ -461,6 +463,15 @@ mod tests {
         denied(&[CREATOR], Permission::MatchDelete);
         denied(&[EDITOR], Permission::MatchDelete);
         denied(&[USER], Permission::MatchDelete);
+    }
+
+    #[test]
+    fn moderator_can_delete_any_group() {
+        // #380: group.delete is global, granted to moderator + admin directly.
+        ok(&[MODERATOR], Permission::GroupDelete);
+        denied(&[CREATOR], Permission::GroupDelete);
+        denied(&[EDITOR], Permission::GroupDelete);
+        denied(&[USER], Permission::GroupDelete);
     }
 
     #[test]
