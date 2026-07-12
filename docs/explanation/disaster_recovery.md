@@ -143,6 +143,22 @@ The first implementation of `oci_write_compose_env` used bash
 zsh. The fix was to delegate quoting to Python's `shlex.quote`,
 which produces a string that can be `source`d by any POSIX shell.
 
+### 7. Off-VM database backups live in OCI Object Storage (#383)
+
+Daily `pg_dump` archives are uploaded by GitHub Actions to the
+`ymatch-db-backups` Object Storage bucket (not GCS). After a full VM
+recreate, restore the latest dump before or right after
+`oci_deploy_production.sh` if you need existing data:
+
+```bash
+oci os object get -bn ymatch-db-backups \
+  --name daily/ymatch-YYYY-MM-DD.sql.gz --file backup.sql.gz
+# On the new VM, with postgres up:
+gunzip -c backup.sql.gz | docker exec -i ymatch_db psql -U ymatch_user ymatch
+```
+
+See [how_to/monitoring_setup.md](../how_to/monitoring_setup.md#5-database-backup-monitoring).
+
 ## What Still Needs Improvement
 
 These items are tracked in the issue tracker:

@@ -1,8 +1,13 @@
 # ---------------------------------------------------
-# GCS Bucket for OCI Database Backups
-# Uses GCP Always Free tier: 5 GB Standard Storage in us-west1
+# DEPRECATED (#383) — GCS path retired.
+# Active backups: terraform/oci/backup.tf (OCI Object Storage).
+# Workflow: .github/workflows/db-backup.yml
 #
-# Rotation policy (14 backups max):
+# Do not apply this file for new environments. Resources below
+# may remain in GCP state until billing is restored long enough
+# to run `terraform destroy` / manual bucket delete.
+#
+# Historical rotation policy (mirrored on OCI):
 #   daily/   → kept 7 days  (max 7)
 #   weekly/  → kept 28 days (max 4)
 #   monthly/ → kept 90 days (max 3)
