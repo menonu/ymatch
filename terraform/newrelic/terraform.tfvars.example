@@ -20,3 +20,11 @@ region = "US"
 # (https://<app_public_ip>.nip.io/...). Host identifier — keep out of
 # the repo; this template is a placeholder.
 app_public_ip = "203.0.113.10"
+
+# OS hostname of the production host as reported by the New Relic
+# Infrastructure agent (SystemSample / ContainerSample `hostname`
+# attribute). This is the VNIC/OS name, not the agent display_name.
+# After an instance rebuild, discover with:
+#   SELECT uniques(hostname), uniques(displayName) FROM SystemSample SINCE 1 day ago
+# Must stay in sync with dashboard/alert NRQL (issue #410).
+nr_hostname = "ymatch-vnic-v2"

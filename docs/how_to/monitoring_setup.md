@@ -282,20 +282,47 @@ The `.github/workflows/deploy-oci.yml` deploys to OCI whenever CI passes on
 
 Free tier limit: 100 GB/month → well within budget.
 
+## Host identity (dashboard / alert filters)
+
+Infrastructure NRQL must filter on the **OS hostname** reported in
+`SystemSample.hostname` / `ContainerSample.hostname` — **not** the agent
+`display_name` (`nr_display_name` in OCI Terraform).
+
+| Environment | Agent `displayName` | OS `hostname` (use in NRQL) |
+|-------------|---------------------|-----------------------------|
+| Production  | `ymatch-oci-arm-v2` | `ymatch-vnic-v2` |
+| Staging     | `ymatch-oci-arm-staging` | `ymatch-vnic-staging` |
+
+These values are set via:
+- Agent display name: `var.nr_display_name` / `var.nr_display_name_staging` in `terraform/oci`
+- Dashboard & alert host filter: `var.nr_hostname` in `terraform/newrelic` (default `ymatch-vnic-v2`)
+
+`ContainerSample.displayName` is the docker entity id (`docker:<id>`), so
+container widgets **must** use `hostname`, not `displayName`.
+
+After an instance rebuild, confirm live values:
+
+```sql
+SELECT uniques(hostname), uniques(displayName)
+FROM SystemSample SINCE 1 day ago
+```
+
+Then update `nr_hostname` in `terraform/newrelic/terraform.tfvars` and re-apply.
+
 ## Useful NRQL Queries
 
 ```sql
--- CPU usage over time
+-- CPU usage over time (production OS hostname)
 SELECT average(cpuPercent) FROM SystemSample
-WHERE hostname = 'ymatch-oci-arm' TIMESERIES AUTO
+WHERE hostname = 'ymatch-vnic-v2' TIMESERIES AUTO
 
 -- Memory usage
 SELECT average(memoryUsedPercent) FROM SystemSample
-WHERE hostname = 'ymatch-oci-arm' TIMESERIES AUTO
+WHERE hostname = 'ymatch-vnic-v2' TIMESERIES AUTO
 
 -- Docker container status
 SELECT latest(state), latest(cpuPercent), latest(memoryUsageBytes)/1e6
-FROM ContainerSample WHERE hostname = 'ymatch-oci-arm' FACET name
+FROM ContainerSample WHERE hostname = 'ymatch-vnic-v2' FACET name
 
 -- Backend error logs
 SELECT count(*) FROM Log WHERE service = 'backend'

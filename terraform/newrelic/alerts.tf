@@ -19,7 +19,7 @@ resource "newrelic_nrql_alert_condition" "high_cpu" {
   violation_time_limit_seconds = 86400
 
   nrql {
-    query = "SELECT average(cpuPercent) FROM SystemSample WHERE hostname = 'ymatch-oci-arm'"
+    query = "SELECT average(cpuPercent) FROM SystemSample WHERE hostname = '${var.nr_hostname}'"
   }
 
   critical {
@@ -40,7 +40,7 @@ resource "newrelic_nrql_alert_condition" "high_memory" {
   violation_time_limit_seconds = 86400
 
   nrql {
-    query = "SELECT average(memoryUsedPercent) FROM SystemSample WHERE hostname = 'ymatch-oci-arm'"
+    query = "SELECT average(memoryUsedPercent) FROM SystemSample WHERE hostname = '${var.nr_hostname}'"
   }
 
   critical {
@@ -61,7 +61,7 @@ resource "newrelic_nrql_alert_condition" "high_disk" {
   violation_time_limit_seconds = 86400
 
   nrql {
-    query = "SELECT max(diskUsedPercent) FROM StorageSample WHERE hostname = 'ymatch-oci-arm'"
+    query = "SELECT max(diskUsedPercent) FROM StorageSample WHERE hostname = '${var.nr_hostname}'"
   }
 
   critical {
@@ -82,7 +82,7 @@ resource "newrelic_nrql_alert_condition" "container_down" {
   violation_time_limit_seconds = 86400
 
   nrql {
-    query = "SELECT uniqueCount(name) FROM ContainerSample WHERE hostname = 'ymatch-oci-arm'"
+    query = "SELECT uniqueCount(name) FROM ContainerSample WHERE hostname = '${var.nr_hostname}'"
   }
 
   critical {
