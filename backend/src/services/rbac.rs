@@ -69,6 +69,8 @@ pub enum Permission {
     /// Edit any group in any event (global override of `GroupEdit`).
     /// Admin + moderator.
     GroupEditAny,
+    /// Remove any group in any event. Admin + moderator.
+    GroupDelete,
     /// Delete a match (global moderation action). Admin + moderator.
     /// Has no `*.any` form — it is itself the global-scope permission.
     MatchDelete,
@@ -109,6 +111,7 @@ impl Permission {
             Permission::MerchCreateAny => "merch.create.any",
             Permission::MerchEditAny => "merch.edit.any",
             Permission::GroupEditAny => "group.edit.any",
+            Permission::GroupDelete => "group.delete",
             Permission::MatchDelete => "match.delete",
             Permission::SystemKillSwitch => "system.kill_switch",
             Permission::EventEdit => "event.edit",
@@ -147,6 +150,7 @@ impl Permission {
             Permission::MerchCreateAny => &["merch.create.any"],
             Permission::MerchEditAny => &["merch.edit.any"],
             Permission::GroupEditAny => &["group.edit.any"],
+            Permission::GroupDelete => &["group.delete"],
             Permission::MatchDelete => &["match.delete"],
             Permission::SystemKillSwitch => &["system.kill_switch"],
             Permission::EventMemberManage => &["event.member.manage"],

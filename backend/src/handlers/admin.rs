@@ -92,6 +92,25 @@ pub async fn delete_match(
     Ok(StatusCode::OK)
 }
 
+pub async fn list_groups(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<crate::repositories::group::AdminGroup>>, AppError> {
+    Ok(Json(state.groups.list_all_for_admin().await?))
+}
+
+pub async fn delete_group(
+    State(state): State<AppState>,
+    Path((event_id, group_name)): Path<(i32, String)>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<StatusCode, AppError> {
+    require_global(&state, query.user_id, Permission::GroupDelete).await?;
+    if state.groups.remove_for_admin(event_id, &group_name).await? {
+        Ok(StatusCode::OK)
+    } else {
+        Err(AppError::not_found("Group not found"))
+    }
+}
+
 pub async fn ban_user(
     State(state): State<AppState>,
     Path(target_id): Path<i32>,

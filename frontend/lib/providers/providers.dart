@@ -203,8 +203,8 @@ class HowToHintSeenController extends StateNotifier<bool> {
 
 final howToHintSeenProvider =
     StateNotifierProvider<HowToHintSeenController, bool>(
-  (ref) => HowToHintSeenController(),
-);
+      (ref) => HowToHintSeenController(),
+    );
 
 // --- Events ---
 final eventsProvider = FutureProvider<List<Event>>((ref) async {
@@ -433,19 +433,21 @@ final merchProvider = FutureProvider.family<List<Merchandise>, int>((
 // client-side re-derivation. Returns `null` when there is no logged-in user or
 // the fetch fails — both leave the button hidden (the safe default; the
 // backend 403 remains the defense-in-depth backstop on tap).
-final myEventRoleProvider =
-    FutureProvider.autoDispose.family<MyEventRoleResponse?, int>((ref, eventId) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return null;
-  final client = ref.watch(apiClientProvider);
-  try {
-    final json = await client.get('/api/v1/events/$eventId/my-role?user_id=${user.id}');
-    if (json is! Map<String, dynamic>) return null;
-    return MyEventRoleResponse()..mergeFromProto3Json(json);
-  } catch (_) {
-    return null;
-  }
-});
+final myEventRoleProvider = FutureProvider.autoDispose
+    .family<MyEventRoleResponse?, int>((ref, eventId) async {
+      final user = ref.watch(currentUserProvider);
+      if (user == null) return null;
+      final client = ref.watch(apiClientProvider);
+      try {
+        final json = await client.get(
+          '/api/v1/events/$eventId/my-role?user_id=${user.id}',
+        );
+        if (json is! Map<String, dynamic>) return null;
+        return MyEventRoleResponse()..mergeFromProto3Json(json);
+      } catch (_) {
+        return null;
+      }
+    });
 
 class MerchController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
@@ -621,6 +623,35 @@ final inventoryProvider =
     });
 
 // --- Admin ---
+class AdminGroup {
+  const AdminGroup({
+    required this.eventId,
+    required this.eventName,
+    required this.groupName,
+    required this.itemCount,
+  });
+
+  final int eventId;
+  final String eventName;
+  final String groupName;
+  final int itemCount;
+
+  factory AdminGroup.fromJson(Map<String, dynamic> json) => AdminGroup(
+    eventId: json['eventId'] as int,
+    eventName: json['eventName'] as String,
+    groupName: json['groupName'] as String,
+    itemCount: json['itemCount'] as int,
+  );
+}
+
+final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/admin/groups');
+  return (json as List)
+      .map((e) => AdminGroup.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
 final adminMerchProvider = FutureProvider<List<Merchandise>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/admin/merch');
@@ -641,25 +672,28 @@ final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
 final adminUsersProvider = FutureProvider<List<User>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final json = await client.get('/api/v1/users');
-  return (json as List)
-      .map((e) => User()..mergeFromProto3Json(e))
-      .toList();
+  return (json as List).map((e) => User()..mergeFromProto3Json(e)).toList();
 });
 
 class AdminController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;
   AdminController(this.client) : super(const AsyncValue.data(null));
 
-  Future<void> banUser(int targetUserId, int adminUserId,
-      {String? reason, String? bannedUntil}) async {
+  Future<void> banUser(
+    int targetUserId,
+    int adminUserId, {
+    String? reason,
+    String? bannedUntil,
+  }) async {
     state = const AsyncValue.loading();
     try {
       final payload = BanUserRequest();
       if (reason != null) payload.reason = reason;
       if (bannedUntil != null) payload.bannedUntil = bannedUntil;
       await client.post(
-          '/api/v1/admin/users/$targetUserId/ban?user_id=$adminUserId',
-          payload.toProto3Json() as Map<String, dynamic>);
+        '/api/v1/admin/users/$targetUserId/ban?user_id=$adminUserId',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -670,7 +704,9 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await client.post(
-          '/api/v1/admin/users/$targetUserId/unban?user_id=$adminUserId', {});
+        '/api/v1/admin/users/$targetUserId/unban?user_id=$adminUserId',
+        {},
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -678,13 +714,17 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> updateUserRole(
-      int targetUserId, int adminUserId, String role) async {
+    int targetUserId,
+    int adminUserId,
+    String role,
+  ) async {
     state = const AsyncValue.loading();
     try {
       final payload = UpdateUserRoleRequest()..role = role;
       await client.post(
-          '/api/v1/admin/users/$targetUserId/role?user_id=$adminUserId',
-          payload.toProto3Json() as Map<String, dynamic>);
+        '/api/v1/admin/users/$targetUserId/role?user_id=$adminUserId',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -695,8 +735,10 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       final payload = UserActionRequest()..userId = userId;
-      await client.post('/api/v1/events/$eventId/publish',
-          payload.toProto3Json() as Map<String, dynamic>);
+      await client.post(
+        '/api/v1/events/$eventId/publish',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -708,8 +750,9 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     try {
       final payload = UserActionRequest()..userId = userId;
       await client.post(
-          '/api/v1/events/$eventId/merch/$merchId/publish',
-          payload.toProto3Json() as Map<String, dynamic>);
+        '/api/v1/events/$eventId/merch/$merchId/publish',
+        payload.toProto3Json() as Map<String, dynamic>,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -719,8 +762,7 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
   Future<void> deleteEvent(int eventId, int userId) async {
     state = const AsyncValue.loading();
     try {
-      await client
-          .delete('/api/v1/admin/events/$eventId?user_id=$userId');
+      await client.delete('/api/v1/admin/events/$eventId?user_id=$userId');
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -730,8 +772,7 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
   Future<void> deleteMerch(int merchId, int userId) async {
     state = const AsyncValue.loading();
     try {
-      await client
-          .delete('/api/v1/admin/merch/$merchId?user_id=$userId');
+      await client.delete('/api/v1/admin/merch/$merchId?user_id=$userId');
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -741,8 +782,7 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
   Future<void> deleteMatch(int matchId, int userId) async {
     state = const AsyncValue.loading();
     try {
-      await client
-          .delete('/api/v1/admin/matches/$matchId?user_id=$userId');
+      await client.delete('/api/v1/admin/matches/$matchId?user_id=$userId');
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -769,10 +809,10 @@ final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((
 
 final notificationCountsProvider =
     FutureProvider.family<NotificationCounts, int>((ref, userId) async {
-  final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/matches/user/$userId/counts');
-  return NotificationCounts()..mergeFromProto3Json(json);
-});
+      final client = ref.watch(apiClientProvider);
+      final json = await client.get('/api/v1/matches/user/$userId/counts');
+      return NotificationCounts()..mergeFromProto3Json(json);
+    });
 
 // --- Search ---
 final searchQueryProvider = StateProvider<String>((ref) => '');
