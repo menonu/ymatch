@@ -135,12 +135,11 @@ impl MerchandiseGroupRepository {
     }
 
     /// Upsert a group row. The first time a group name is seen for an
-    /// event, the row is created with `created_by = user_id`. On a
-    /// subsequent call for the same `(event_id, group_name)`, the
-    /// description is updated and `created_by` is preserved. When
-    /// `photo_url` is provided on create, it is written; on conflict it
-    /// only overwrites when the request carries a non-empty URL (or
-    /// explicit empty is not used on create — update path clears images).
+    /// event, the row is created with `created_by = user_id` (and optional
+    /// `photo_url` on insert only). On a subsequent call for the same
+    /// `(event_id, group_name)`, only `description` is updated and
+    /// `created_by` / `photo_url` are preserved — photo changes must go
+    /// through the RBAC-gated update path (#404).
     pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
         let group_name = req.group_name.trim().to_string();
         if group_name.is_empty() {
