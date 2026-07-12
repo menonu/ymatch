@@ -333,7 +333,8 @@ void main() {
   );
 
   testWidgets(
-    'group creator sees a shield icon and can open the edit dialog (#128)',
+    'group creator sees edit icon on EventDetailScreen and can open the '
+    'edit dialog (#128)',
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -358,9 +359,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // Editable indicator (shield) + edit affordances on the screen.
       expect(find.byIcon(Icons.shield), findsOneWidget);
+      // Tab edit icon + bottom-left edit FAB.
+      expect(find.byIcon(Icons.edit), findsWidgets);
 
-      await tester.tap(find.byIcon(Icons.shield));
+      // Open via the bottom-left edit FAB (tooltip = "Edit Group").
+      await tester.tap(find.byTooltip('Edit Group').first);
       await tester.pumpAndSettle();
 
       final dialog = find.byType(AlertDialog);
@@ -378,7 +383,7 @@ void main() {
   );
 
   testWidgets(
-    'non-creator does not see a shield icon on the group tab (#128)',
+    'non-creator does not see group edit icons on EventDetailScreen (#128)',
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -404,6 +409,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.shield), findsNothing);
+      expect(find.byIcon(Icons.edit), findsNothing);
+      expect(find.byTooltip('Edit Group'), findsNothing);
 
       // Info panel is still readable, without an edit affordance.
       await tester.tap(find.text('Group info'));

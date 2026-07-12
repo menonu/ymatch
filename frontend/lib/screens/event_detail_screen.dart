@@ -402,8 +402,21 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(name),
+                                          // Shield = creator / editable
+                                          // indicator (#128). Edit action is
+                                          // the dedicated edit icon below
+                                          // (and the bottom-left edit FAB).
                                           if (isGroupCreator) ...[
                                             const SizedBox(width: 4),
+                                            Tooltip(
+                                              message: l10n.youCanEditGroup,
+                                              child: Icon(
+                                                Icons.shield,
+                                                color: AppTheme.primaryColor,
+                                                size: 16,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
                                             GestureDetector(
                                               onTap: () => _showEditGroupDialog(
                                                 context,
@@ -411,9 +424,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                                 meta,
                                               ),
                                               child: Tooltip(
-                                                message: l10n.youCanEditGroup,
+                                                message: l10n.editGroup,
                                                 child: Icon(
-                                                  Icons.shield,
+                                                  Icons.edit,
                                                   color: AppTheme.primaryColor,
                                                   size: 16,
                                                 ),
@@ -675,25 +688,73 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     ),
                   ],
                 ),
-                // Info FAB bottom-left (#128), mirrors the Add Merch FAB style.
-                // Include bottom safe-area inset so it lines up with the
-                // Scaffold FAB slot on notched devices.
+                // Bottom-left controls (#128): Group info (everyone) + Edit
+                // group (creator of the active tab only). Edit lives on
+                // EventDetailScreen as a dedicated icon/button — not buried
+                // only behind long-press.
                 Positioned(
                   left: 16,
                   bottom: 16 + MediaQuery.paddingOf(context).bottom,
-                  child: FloatingActionButton.extended(
-                    heroTag: 'group_info_fab',
-                    onPressed: () {
-                      setState(() => _groupInfoOpen = !_groupInfoOpen);
+                  child: Builder(
+                    builder: (context) {
+                      final tabCtrl = DefaultTabController.of(context);
+                      return AnimatedBuilder(
+                        animation: tabCtrl,
+                        builder: (context, _) {
+                          final index = tabCtrl.index.clamp(
+                            0,
+                            groupKeys.length - 1,
+                          );
+                          final activeName = groupKeys[index];
+                          final activeMeta = groupByName[activeName];
+                          final canEditActive =
+                              user != null &&
+                              activeMeta != null &&
+                              activeMeta.hasCreatedBy() &&
+                              activeMeta.createdBy == user.id &&
+                              activeName != otherItems;
+
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FloatingActionButton.extended(
+                                heroTag: 'group_info_fab',
+                                onPressed: () {
+                                  setState(
+                                    () => _groupInfoOpen = !_groupInfoOpen,
+                                  );
+                                },
+                                backgroundColor: _groupInfoOpen
+                                    ? AppTheme.primaryColor
+                                    : null,
+                                foregroundColor: _groupInfoOpen
+                                    ? Colors.white
+                                    : null,
+                                label: Text(l10n.groupInfo),
+                                icon: Icon(
+                                  _groupInfoOpen
+                                      ? Icons.info
+                                      : Icons.info_outline,
+                                ),
+                              ),
+                              if (canEditActive) ...[
+                                const SizedBox(width: 12),
+                                FloatingActionButton.small(
+                                  heroTag: 'group_edit_fab',
+                                  tooltip: l10n.editGroup,
+                                  onPressed: () => _showEditGroupDialog(
+                                    context,
+                                    activeName,
+                                    activeMeta,
+                                  ),
+                                  child: const Icon(Icons.edit),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      );
                     },
-                    backgroundColor: _groupInfoOpen
-                        ? AppTheme.primaryColor
-                        : null,
-                    foregroundColor: _groupInfoOpen ? Colors.white : null,
-                    label: Text(l10n.groupInfo),
-                    icon: Icon(
-                      _groupInfoOpen ? Icons.info : Icons.info_outline,
-                    ),
                   ),
                 ),
               ],
