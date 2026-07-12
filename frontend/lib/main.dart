@@ -101,7 +101,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                       final id = int.parse(state.pathParameters['id']!);
                       // Favorite-group shortcuts pass ?group=<name> (#406).
                       final group = state.uri.queryParameters['group'];
+                      // Key includes group so re-navigating to the same event
+                      // with a different favorite group rebuilds the tab state.
                       return EventDetailScreen(
+                        key: ValueKey('event-$id-${group ?? ''}'),
                         eventId: id,
                         initialGroupName: group,
                       );
