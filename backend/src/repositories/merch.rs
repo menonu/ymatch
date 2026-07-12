@@ -356,16 +356,13 @@ impl MerchandiseRepository {
         }
     }
 
-    /// Soft- or hard-delete based on whether any inventory row references
-    /// this merch. The branch logic (the only place a `SELECT EXISTS(...)`
-    /// from `inventory` lives) is now in one method on this struct, not
-    /// duplicated between `merch::delete_merch_by_creator` and
-    /// `admin::delete_merch` as in the Phase 1/2 code.
-    pub async fn delete_merch(
-        &self,
-        _event_id: i32,
-        merch_id: i32,
-    ) -> Result<Option<DeleteOutcome>, AppError> {
+    /// Soft- or hard-delete by merch primary key, based on whether any
+    /// inventory row references this merch. Used by the admin path
+    /// (`DELETE /admin/merch/:id`) which only has a merch id, and by
+    /// [`Self::delete_merch`] for the event-scoped creator path.
+    ///
+    /// Returns `None` if no merchandise row exists for `merch_id`.
+    pub async fn delete_by_id(&self, merch_id: i32) -> Result<Option<DeleteOutcome>, AppError> {
         let has_inventory: bool = sqlx::query(
             "SELECT EXISTS(SELECT 1 FROM inventory WHERE merch_id = $1 AND quantity > 0) as has_inv",
         )
@@ -399,6 +396,17 @@ impl MerchandiseRepository {
                 Some(DeleteOutcome::HardDeleted)
             })
         }
+    }
+
+    /// Soft- or hard-delete merch scoped to an event. Delegates to
+    /// [`Self::delete_by_id`]; `event_id` is retained for the event-scoped
+    /// route signature used by `merch::delete_merch_by_creator`.
+    pub async fn delete_merch(
+        &self,
+        _event_id: i32,
+        merch_id: i32,
+    ) -> Result<Option<DeleteOutcome>, AppError> {
+        self.delete_by_id(merch_id).await
     }
 
     /// Fetch the `creator_id` of a merch row, or `None` if the row does

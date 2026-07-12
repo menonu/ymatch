@@ -71,23 +71,8 @@ pub async fn delete_merch(
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::MerchDeleteAny).await?;
-
-    // The merch_id is also the only thing we have. The repository needs
-    // (event_id, merch_id) to construct its SQL, so we look up the event
-    // id from the merch row first. This is the one place that bridges
-    // the old admin path and the new repository; once MerchandiseRepository
-    // grows a `delete_by_id` method this lookup can move there.
-    let event_id: Option<i32> =
-        sqlx::query_scalar("SELECT event_id FROM merchandise WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?;
-
-    let Some(event_id) = event_id else {
-        return Ok(StatusCode::OK);
-    };
-
-    state.merch.delete_merch(event_id, id).await?;
+    // Idempotent: missing merch is still 200 (admin cleanup of stale ids).
+    let _ = state.merch.delete_by_id(id).await?;
     Ok(StatusCode::OK)
 }
 
@@ -100,15 +85,8 @@ pub async fn delete_match(
     // permission (granted to moderator + admin, plus the admin superuser
     // bypass), replacing the old `require_admin_or_mod` role-list check.
     require_global(&state, query.user_id, Permission::MatchDelete).await?;
-
-    // The matches table is owned by `MatchRepository` in Phase 4, but
-    // the admin path here is the only consumer of a "delete" method on
-    // matches. We add it via a direct SQL because the trade lifecycle
-    // service has no public delete endpoint; this is a 1-line query.
-    sqlx::query("DELETE FROM matches WHERE id = $1")
-        .bind(id)
-        .execute(&state.pool)
-        .await?;
+    // Idempotent: missing match is still 200.
+    let _ = state.matches.delete(id).await?;
     Ok(StatusCode::OK)
 }
 
