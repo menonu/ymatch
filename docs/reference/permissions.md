@@ -41,7 +41,7 @@ column is `Permission::as_str`.
 | Scope | Role | Description |
 |---|---|---|
 | `global` | `admin` | Full access / all permissions. Superuser bypass. |
-| `global` | `moderator` | Platform management: ban/unban, create & manage events, edit any event/merch/group, delete matches. |
+| `global` | `moderator` | Platform management: ban/unban, create & manage events, edit or remove any event/merch/group, delete matches. |
 | `global` | `user` | Standard trading. No elevated permissions (ordinary trading is ownership-checked). |
 | `event` | `creator` | Owns an event; manages its editors; edits the event, its merch, and its groups. |
 | `event` | `editor` | Edits an event's merch and groups; cannot delete the event or manage editors. |
@@ -63,6 +63,7 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 | `merch.create.any` | admin, moderator | `merch.create` (the event-scope check) | — (override; satisfies `merch.create`) |
 | `merch.edit.any` | admin, moderator | `merch.edit` (the event-scope check) | — (override; satisfies `merch.edit`) |
 | `group.edit.any` | admin, moderator | `group.edit` (the event-scope check) | — (override; satisfies `group.edit`) |
+| `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`) |
 | `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`) |
 | `system.kill_switch` | admin | `system.kill_switch` | — (defined; no consumer wired yet) |
 

@@ -400,6 +400,36 @@ void main() {
       expect(merch.length, 1);
     });
 
+    test('adminGroupsProvider fetches groups', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/admin/groups') {
+            return _ok([
+              {
+                'eventId': 42,
+                'eventName': 'Test Event',
+                'groupName': 'test-group',
+                'itemCount': 3,
+              },
+            ]);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final groups = await container.read(adminGroupsProvider.future);
+      expect(groups.length, 1);
+      expect(groups.first.eventId, 42);
+      expect(groups.first.eventName, 'Test Event');
+      expect(groups.first.groupName, 'test-group');
+      expect(groups.first.itemCount, 3);
+    });
+
     test('adminMatchesProvider fetches matches', () async {
       final api = _apiWith(
         client: MockClient((request) async {

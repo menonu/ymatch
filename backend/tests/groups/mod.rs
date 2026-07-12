@@ -1,6 +1,156 @@
 use crate::common::*;
 
 #[sqlx::test]
+async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
+    let (admin_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-removal-admin", "Removal Event").await;
+    let merch_id = create_merch(&pool, event_id, "Test Merch", "test-group").await;
+    let other_user_id = login_guest(&pool, "group-removal-peer", "token").await;
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name) \
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(admin_id as i32)
+    .bind(other_user_id as i32)
+    .bind(event_id as i32)
+    .bind("test-group")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO messages (match_id, sender_id, content) VALUES ($1, $2, 'hello')")
+        .bind(match_id)
+        .bind(admin_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO group_favorites (user_id, event_id, group_name) VALUES ($1, $2, $3)")
+        .bind(admin_id as i32)
+        .bind(event_id as i32)
+        .bind("test-group")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}/groups/test-group?user_id={}",
+                    event_id, admin_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let group_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("test-group")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(group_count, 0);
+    let merch_deleted: bool =
+        sqlx::query_scalar("SELECT is_deleted FROM merchandise WHERE id = $1")
+            .bind(merch_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(merch_deleted);
+    let match_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(match_count, 0);
+    let favorite_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM group_favorites WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("test-group")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(favorite_count, 0);
+}
+
+#[sqlx::test]
+async fn plain_user_cannot_remove_group(pool: PgPool) {
+    // #380: group removal is gated by the global `group.delete` permission
+    // (moderator + admin, plus the admin superuser bypass). A demoted plain
+    // user must get 403 and leave the group / merch / matches untouched.
+    let (actor_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-removal-denied", "Denied Event").await;
+    let merch_id = create_merch(&pool, event_id, "Test Merch", "test-group").await;
+    let peer_id = login_guest(&pool, "group-removal-denied-peer", "token").await;
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name) \
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(actor_id as i32)
+    .bind(peer_id as i32)
+    .bind(event_id as i32)
+    .bind("test-group")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    grant_global_role(&pool, actor_id, "user").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}/groups/test-group?user_id={}",
+                    event_id, actor_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let group_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("test-group")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(group_count, 1, "plain user must not remove the group row");
+
+    let merch_deleted: bool =
+        sqlx::query_scalar("SELECT is_deleted FROM merchandise WHERE id = $1")
+            .bind(merch_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        !merch_deleted,
+        "plain user must not soft-delete group merchandise"
+    );
+
+    let match_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(match_count, 1, "plain user must not clear group matches");
+}
+
+#[sqlx::test]
 async fn test_create_group_via_dialog(pool: PgPool) {
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-dialog-user", "Group Event").await;

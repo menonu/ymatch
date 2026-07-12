@@ -69,6 +69,8 @@ pub enum Permission {
     /// Edit any group in any event (global override of `GroupEdit`).
     /// Admin + moderator.
     GroupEditAny,
+    /// Remove any group in any event. Admin + moderator.
+    GroupDelete,
     /// Delete a match (global moderation action). Admin + moderator.
     /// Has no `*.any` form — it is itself the global-scope permission.
     MatchDelete,
@@ -109,6 +111,7 @@ impl Permission {
             Permission::MerchCreateAny => "merch.create.any",
             Permission::MerchEditAny => "merch.edit.any",
             Permission::GroupEditAny => "group.edit.any",
+            Permission::GroupDelete => "group.delete",
             Permission::MatchDelete => "match.delete",
             Permission::SystemKillSwitch => "system.kill_switch",
             Permission::EventEdit => "event.edit",
@@ -147,6 +150,7 @@ impl Permission {
             Permission::MerchCreateAny => &["merch.create.any"],
             Permission::MerchEditAny => &["merch.edit.any"],
             Permission::GroupEditAny => &["group.edit.any"],
+            Permission::GroupDelete => &["group.delete"],
             Permission::MatchDelete => &["match.delete"],
             Permission::SystemKillSwitch => &["system.kill_switch"],
             Permission::EventMemberManage => &["event.member.manage"],
@@ -288,6 +292,7 @@ mod tests {
                 "merch.create.any",
                 "merch.edit.any",
                 "group.edit.any",
+                "group.delete",
                 "match.delete",
                 "system.kill_switch",
             ]),
@@ -304,6 +309,7 @@ mod tests {
                 "merch.create.any",
                 "merch.edit.any",
                 "group.edit.any",
+                "group.delete",
                 "match.delete",
             ]),
         );
@@ -457,6 +463,15 @@ mod tests {
         denied(&[CREATOR], Permission::MatchDelete);
         denied(&[EDITOR], Permission::MatchDelete);
         denied(&[USER], Permission::MatchDelete);
+    }
+
+    #[test]
+    fn moderator_can_delete_any_group() {
+        // #380: group.delete is global, granted to moderator + admin directly.
+        ok(&[MODERATOR], Permission::GroupDelete);
+        denied(&[CREATOR], Permission::GroupDelete);
+        denied(&[EDITOR], Permission::GroupDelete);
+        denied(&[USER], Permission::GroupDelete);
     }
 
     #[test]

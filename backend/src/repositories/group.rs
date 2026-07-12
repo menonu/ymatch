@@ -16,6 +16,15 @@ use crate::generated::ymatch::{
 use crate::handlers::mappers::group_from_row;
 use sqlx::{PgPool, Row};
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminGroup {
+    pub event_id: i32,
+    pub event_name: String,
+    pub group_name: String,
+    pub item_count: i64,
+}
+
 /// SELECT list for the `merchandise_groups` table.
 const GROUP_COLUMNS: &str =
     "id, event_id, group_name, description, created_by, created_at, updated_at";
@@ -41,6 +50,88 @@ impl MerchandiseGroupRepository {
             .await?;
         let groups: Vec<MerchandiseGroup> = rows.iter().map(group_from_row).collect();
         Ok(ListGroupsResponse { groups })
+    }
+
+    /// List every group with enough context for the moderation dashboard.
+    pub async fn list_all_for_admin(&self) -> Result<Vec<AdminGroup>, AppError> {
+        let rows = sqlx::query(
+            r#"SELECT g.event_id, e.name AS event_name, g.group_name,
+                      COUNT(m.id) FILTER (WHERE m.is_deleted = false) AS item_count
+               FROM merchandise_groups g
+               JOIN events e ON e.id = g.event_id
+               LEFT JOIN merchandise m
+                 ON m.event_id = g.event_id AND m.group_name = g.group_name
+               GROUP BY g.event_id, e.name, g.group_name
+               ORDER BY e.name ASC, g.group_name ASC"#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|row| AdminGroup {
+                event_id: row.get("event_id"),
+                event_name: row.get("event_name"),
+                group_name: row.get("group_name"),
+                item_count: row.get("item_count"),
+            })
+            .collect())
+    }
+
+    /// Remove a group's user-visible state as one transaction. Merchandise is
+    /// soft-deleted so inventory history remains valid; matches and favorites
+    /// are deleted because they are scoped to the group itself.
+    pub async fn remove_for_admin(
+        &self,
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<bool, AppError> {
+        let mut tx = self.pool.begin().await?;
+        let exists: Option<i32> = sqlx::query_scalar(
+            "SELECT id FROM merchandise_groups WHERE event_id = $1 AND group_name = $2 FOR UPDATE",
+        )
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if exists.is_none() {
+            return Ok(false);
+        }
+
+        sqlx::query(
+            r#"DELETE FROM messages
+               WHERE match_id IN (
+                 SELECT id FROM matches WHERE event_id = $1 AND group_name = $2
+               )"#,
+        )
+        .bind(event_id)
+        .bind(group_name)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("DELETE FROM matches WHERE event_id = $1 AND group_name = $2")
+            .bind(event_id)
+            .bind(group_name)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM group_favorites WHERE event_id = $1 AND group_name = $2")
+            .bind(event_id)
+            .bind(group_name)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "UPDATE merchandise SET is_deleted = true, trade_enabled = false \
+             WHERE event_id = $1 AND group_name = $2",
+        )
+        .bind(event_id)
+        .bind(group_name)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("DELETE FROM merchandise_groups WHERE event_id = $1 AND group_name = $2")
+            .bind(event_id)
+            .bind(group_name)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(true)
     }
 
     /// Upsert a group row. The first time a group name is seen for an

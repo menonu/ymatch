@@ -335,6 +335,11 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             get(handlers::get_user_inventory),
         )
         .route("/api/v1/admin/merch", get(handlers::list_all_merch))
+        .route("/api/v1/admin/groups", get(handlers::list_groups))
+        .route(
+            "/api/v1/admin/events/:id/groups/:group_name",
+            delete(handlers::delete_group),
+        )
         .route("/api/v1/admin/matches", get(handlers::list_all_matches))
         .route("/api/v1/admin/events/:id", delete(handlers::delete_event))
         .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))

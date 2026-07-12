@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
-import '../utils/image_helper.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -24,7 +23,7 @@ class AdminDashboardScreen extends ConsumerWidget {
     }
 
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         appBar: AppBar(
           bottom: const TabBar(
@@ -33,6 +32,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               Tab(text: 'System'),
               Tab(text: 'Users'),
               Tab(text: 'Events'),
+              Tab(text: 'Groups'),
               Tab(text: 'Items'),
               Tab(text: 'Matches'),
               Tab(text: 'Debug'),
@@ -44,6 +44,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             _AdminSystemTab(),
             _AdminUsersTab(),
             _AdminEventsTab(),
+            _AdminGroupsTab(),
             _AdminItemsTab(),
             _AdminMatchesTab(),
             _AdminDebugTab(),
@@ -386,6 +387,92 @@ class _AdminEventsTab extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Center(child: Text('Error: $err')),
+    );
+  }
+}
+
+class _AdminGroupsTab extends ConsumerWidget {
+  const _AdminGroupsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final groupsAsync = ref.watch(adminGroupsProvider);
+    return groupsAsync.when(
+      data: (groups) {
+        if (groups.isEmpty) {
+          return const Center(child: Text('No groups found.'));
+        }
+        return ListView.builder(
+          itemCount: groups.length,
+          itemBuilder: (context, index) {
+            final group = groups[index];
+            return ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: Text(group.groupName),
+              subtitle: Text(
+                '${group.eventName} (Event ID: ${group.eventId}) | ${group.itemCount} live items',
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                tooltip: 'Remove group',
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Remove item group?'),
+                      content: Text(
+                        'Remove “${group.groupName}” from “${group.eventName}”? '
+                        'All of its items will be hidden, and its matches and favourites will be removed. This cannot be undone.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text('Remove'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  try {
+                    final userId = ref.read(currentUserProvider)?.id ?? 0;
+                    final encodedName = Uri.encodeComponent(group.groupName);
+                    await ref
+                        .read(apiClientProvider)
+                        .delete(
+                          '/api/v1/admin/events/${group.eventId}/groups/$encodedName?user_id=$userId',
+                        );
+                    ref.invalidate(adminGroupsProvider);
+                    ref.invalidate(adminMerchProvider);
+                    ref.invalidate(adminMatchesProvider);
+                    ref.invalidate(eventsProvider);
+                    ref.invalidate(favoriteGroupsProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Item group removed')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to remove group: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(child: Text('Error: $error')),
     );
   }
 }
