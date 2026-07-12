@@ -330,6 +330,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get youCanEditGroup => 'You can edit this group';
 
   @override
+  String get groupPhoto => 'Description image';
+
+  @override
+  String get noGroupPhoto => 'No image attached';
+
+  @override
   String failedToSend(String error) {
     return 'Failed to send: $error';
   }

@@ -88,6 +88,7 @@ pub fn group_from_row(row: &sqlx::postgres::PgRow) -> MerchandiseGroup {
         created_by: row.get("created_by"),
         created_at: to_rfc3339(row.get("created_at")),
         updated_at: to_rfc3339(row.get("updated_at")),
+        photo_url: empty_to_none(row.get("photo_url")),
     }
 }
 

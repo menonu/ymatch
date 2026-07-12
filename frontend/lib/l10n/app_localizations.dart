@@ -674,6 +674,18 @@ abstract class AppLocalizations {
   /// **'You can edit this group'**
   String get youCanEditGroup;
 
+  /// Label for the optional group description image
+  ///
+  /// In en, this message translates to:
+  /// **'Description image'**
+  String get groupPhoto;
+
+  /// Placeholder when the group has no description image
+  ///
+  /// In en, this message translates to:
+  /// **'No image attached'**
+  String get noGroupPhoto;
+
   /// Snackbar message when sending a chat message fails
   ///
   /// In en, this message translates to:

@@ -361,6 +361,144 @@ async fn test_implicit_group_via_first_merch(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn test_group_photo_url_create_update_and_clear(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-photo-creator", "Photo Group Event").await;
+
+    // Create with photo
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "with art", "photoUrl": "https://cdn.example/g1.png"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        group["photoUrl"].as_str().unwrap(),
+        "https://cdn.example/g1.png"
+    );
+
+    // Replace photo (overwrite)
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&format!("/api/v1/events/{}/groups/Art", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "with art", "photoUrl": "https://cdn.example/g2.png"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        group["photoUrl"].as_str().unwrap(),
+        "https://cdn.example/g2.png"
+    );
+
+    // Update description only — photo must remain
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&format!("/api/v1/events/{}/groups/Art", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "updated text only"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["description"].as_str().unwrap(), "updated text only");
+    assert_eq!(
+        group["photoUrl"].as_str().unwrap(),
+        "https://cdn.example/g2.png"
+    );
+
+    // Clear photo with empty string
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&format!("/api/v1/events/{}/groups/Art", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "updated text only", "photoUrl": ""}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        group.get("photoUrl").is_none() || group["photoUrl"].is_null(),
+        "cleared photo_url should be absent/null, got {:?}",
+        group.get("photoUrl")
+    );
+
+    // List includes photo when set again
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let _ = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&format!("/api/v1/events/{}/groups/Art", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "d", "photoUrl": "https://cdn.example/g3.png"}}"#,
+                    event_id, creator_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/events/{}/groups", event_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        body["groups"][0]["photoUrl"].as_str().unwrap(),
+        "https://cdn.example/g3.png"
+    );
+}
+
+#[sqlx::test]
 async fn test_merch_includes_group_description(pool: PgPool) {
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-desc-merch", "Merch Desc Event").await;

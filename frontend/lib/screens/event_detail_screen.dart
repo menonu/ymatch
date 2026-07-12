@@ -821,6 +821,24 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                       : FontStyle.normal,
                                 ),
                           ),
+                          // Description image below text, width-fit (#404).
+                          if (!isSynthetic &&
+                              meta != null &&
+                              meta.hasPhotoUrl() &&
+                              meta.photoUrl.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: buildImage(
+                                  meta.photoUrl,
+                                  width: double.infinity,
+                                  fit: BoxFit.fitWidth,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -866,6 +884,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         initialDescription: meta != null && meta.hasDescription()
             ? meta.description
             : '',
+        initialPhotoUrl: meta != null && meta.hasPhotoUrl()
+            ? meta.photoUrl
+            : null,
       ),
     );
   }
@@ -1570,19 +1591,22 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 }
 
-/// Group description edit dialog (#128). Owns its controller so dispose
-/// cannot race the route close animation.
+/// Group description edit dialog (#128 / #404). Owns its controller so dispose
+/// cannot race the route close animation. Image attach/replace uses the same
+/// pick + upload flow as merch edit.
 class _EditGroupDialog extends ConsumerStatefulWidget {
   final int eventId;
   final int userId;
   final String groupName;
   final String initialDescription;
+  final String? initialPhotoUrl;
 
   const _EditGroupDialog({
     required this.eventId,
     required this.userId,
     required this.groupName,
     required this.initialDescription,
+    this.initialPhotoUrl,
   });
 
   @override
@@ -1593,16 +1617,47 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
   late final TextEditingController _descCtrl;
   bool _saving = false;
 
+  /// Preview URL (existing remote or base64 of a newly picked image).
+  String? _previewUrl;
+
+  /// Raw bytes of a newly picked image (null if no change / no new pick).
+  List<int>? _pickedImageBytes;
+  String? _pickedImageName;
+
+  /// True when the user explicitly cleared the image.
+  bool _removePhoto = false;
+
   @override
   void initState() {
     super.initState();
     _descCtrl = TextEditingController(text: widget.initialDescription);
+    _previewUrl = widget.initialPhotoUrl;
   }
 
   @override
   void dispose() {
     _descCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await pickMerchImage(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _pickedImageBytes = picked.bytes;
+      _pickedImageName = picked.name;
+      _previewUrl = picked.previewUrl;
+      _removePhoto = false;
+    });
+  }
+
+  void _clearImage() {
+    setState(() {
+      _pickedImageBytes = null;
+      _pickedImageName = null;
+      _previewUrl = null;
+      _removePhoto = true;
+    });
   }
 
   Future<void> _save() async {
@@ -1612,6 +1667,19 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
 
     setState(() => _saving = true);
     try {
+      String? photoUrl;
+      var updatePhoto = false;
+      if (_pickedImageBytes != null) {
+        final uploaded = await ref
+            .read(apiClientProvider)
+            .uploadImage(_pickedImageBytes!, _pickedImageName ?? 'group.png');
+        photoUrl = uploaded;
+        updatePhoto = true;
+      } else if (_removePhoto) {
+        photoUrl = '';
+        updatePhoto = true;
+      }
+
       await ref
           .read(groupControllerProvider.notifier)
           .updateGroup(
@@ -1619,6 +1687,8 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
             userId: widget.userId,
             groupName: widget.groupName,
             description: _descCtrl.text.trim(),
+            photoUrl: photoUrl,
+            updatePhoto: updatePhoto,
           );
       // Info panel reads eventGroupsProvider only — do not invalidate merch:
       // that forces a full-screen loading scaffold and resets the active tab.
@@ -1640,6 +1710,7 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final hasPreview = _previewUrl != null && _previewUrl!.isNotEmpty;
     return AlertDialog(
       title: Text(l10n.editGroup),
       content: SingleChildScrollView(
@@ -1661,6 +1732,57 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
               ),
               maxLines: 4,
               enabled: !_saving,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.groupPhoto,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            if (hasPreview)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: buildImage(
+                    _previewUrl,
+                    width: double.infinity,
+                    fit: BoxFit.fitWidth,
+                  ),
+                ),
+              )
+            else
+              Container(
+                height: 80,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  l10n.noGroupPhoto,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : _pickImage,
+                  icon: const Icon(Icons.image, size: 18),
+                  label: Text(hasPreview ? l10n.changeImage : l10n.chooseImage),
+                ),
+                if (hasPreview) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _saving ? null : _clearImage,
+                    child: Text(
+                      l10n.remove,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

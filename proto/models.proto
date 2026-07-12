@@ -57,6 +57,7 @@ message MerchandiseGroup {
   optional int32 created_by = 5;
   optional string created_at = 6;
   optional string updated_at = 7;
+  optional string photo_url = 8; // optional description image (#404)
 }
 
 message InventoryItem {
@@ -241,6 +242,7 @@ message CreateGroupRequest {
   int32 user_id = 2;
   string group_name = 3;
   optional string description = 4;
+  optional string photo_url = 5; // optional description image (#404)
 }
 
 message UpdateGroupRequest {
@@ -248,6 +250,8 @@ message UpdateGroupRequest {
   int32 user_id = 2;
   string group_name = 3;
   optional string description = 4;
+  // When set: update photo_url (empty string clears). When unset: leave as-is.
+  optional string photo_url = 5;
 }
 
 message ListGroupsResponse {

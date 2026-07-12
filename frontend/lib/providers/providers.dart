@@ -569,6 +569,7 @@ class GroupController extends StateNotifier<AsyncValue<void>> {
     required int userId,
     required String groupName,
     String? description,
+    String? photoUrl,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -578,6 +579,9 @@ class GroupController extends StateNotifier<AsyncValue<void>> {
         ..groupName = groupName;
       if (description != null && description.isNotEmpty) {
         payload.description = description;
+      }
+      if (photoUrl != null && photoUrl.isNotEmpty) {
+        payload.photoUrl = photoUrl;
       }
       final json = await client.post(
         '/api/v1/events/$eventId/groups',
@@ -597,6 +601,9 @@ class GroupController extends StateNotifier<AsyncValue<void>> {
     required int userId,
     required String groupName,
     String? description,
+    // null = leave photo unchanged; non-null (including '') = set/clear (#404).
+    String? photoUrl,
+    bool updatePhoto = false,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -606,6 +613,9 @@ class GroupController extends StateNotifier<AsyncValue<void>> {
         ..groupName = groupName;
       // Always send description so clearing the field is possible.
       payload.description = description ?? '';
+      if (updatePhoto) {
+        payload.photoUrl = photoUrl ?? '';
+      }
       final encodedName = Uri.encodeComponent(groupName);
       final json = await client.put(
         '/api/v1/events/$eventId/groups/$encodedName',

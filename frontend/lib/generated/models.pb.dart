@@ -577,6 +577,7 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
     $core.int? createdBy,
     $core.String? createdAt,
     $core.String? updatedAt,
+    $core.String? photoUrl,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -586,6 +587,7 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
     if (createdBy != null) result.createdBy = createdBy;
     if (createdAt != null) result.createdAt = createdAt;
     if (updatedAt != null) result.updatedAt = updatedAt;
+    if (photoUrl != null) result.photoUrl = photoUrl;
     return result;
   }
 
@@ -609,6 +611,7 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'createdBy')
     ..aOS(6, _omitFieldNames ? '' : 'createdAt')
     ..aOS(7, _omitFieldNames ? '' : 'updatedAt')
+    ..aOS(8, _omitFieldNames ? '' : 'photoUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -692,6 +695,15 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
   $core.bool hasUpdatedAt() => $_has(6);
   @$pb.TagNumber(7)
   void clearUpdatedAt() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get photoUrl => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set photoUrl($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPhotoUrl() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPhotoUrl() => $_clearField(8);
 }
 
 class InventoryItem extends $pb.GeneratedMessage {
@@ -2903,12 +2915,14 @@ class CreateGroupRequest extends $pb.GeneratedMessage {
     $core.int? userId,
     $core.String? groupName,
     $core.String? description,
+    $core.String? photoUrl,
   }) {
     final result = create();
     if (eventId != null) result.eventId = eventId;
     if (userId != null) result.userId = userId;
     if (groupName != null) result.groupName = groupName;
     if (description != null) result.description = description;
+    if (photoUrl != null) result.photoUrl = photoUrl;
     return result;
   }
 
@@ -2929,6 +2943,7 @@ class CreateGroupRequest extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'userId')
     ..aOS(3, _omitFieldNames ? '' : 'groupName')
     ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..aOS(5, _omitFieldNames ? '' : 'photoUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2985,6 +3000,15 @@ class CreateGroupRequest extends $pb.GeneratedMessage {
   $core.bool hasDescription() => $_has(3);
   @$pb.TagNumber(4)
   void clearDescription() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get photoUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set photoUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPhotoUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPhotoUrl() => $_clearField(5);
 }
 
 class UpdateGroupRequest extends $pb.GeneratedMessage {
@@ -2993,12 +3017,14 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
     $core.int? userId,
     $core.String? groupName,
     $core.String? description,
+    $core.String? photoUrl,
   }) {
     final result = create();
     if (eventId != null) result.eventId = eventId;
     if (userId != null) result.userId = userId;
     if (groupName != null) result.groupName = groupName;
     if (description != null) result.description = description;
+    if (photoUrl != null) result.photoUrl = photoUrl;
     return result;
   }
 
@@ -3019,6 +3045,7 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'userId')
     ..aOS(3, _omitFieldNames ? '' : 'groupName')
     ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..aOS(5, _omitFieldNames ? '' : 'photoUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3075,6 +3102,16 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
   $core.bool hasDescription() => $_has(3);
   @$pb.TagNumber(4)
   void clearDescription() => $_clearField(4);
+
+  /// When set: update photo_url (empty string clears). When unset: leave as-is.
+  @$pb.TagNumber(5)
+  $core.String get photoUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set photoUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPhotoUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPhotoUrl() => $_clearField(5);
 }
 
 class ListGroupsResponse extends $pb.GeneratedMessage {
