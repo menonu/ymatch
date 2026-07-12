@@ -12,11 +12,9 @@
 // Note: publishEvent / publishMerch are in MerchController and will
 // be covered in merch_e2e_test.dart.
 //
-// Note: deleteEventByCreator is NOT covered here — the endpoint it
-// hits (`DELETE /api/v1/admin/events/{id}`) requires admin or
-// moderator role. The provider name is misleading; this is a real
-// bug (creators cannot delete their own events) that should be
-// tracked separately.
+// Note: deleteEventByCreator hits `DELETE /api/v1/admin/events/{id}`,
+// which authorizes via event-scope `event.delete` (event/creator role)
+// or global `event.delete.any` (moderator/admin). See #233.
 //
 // Each test calls the provider method directly (not hand-built
 // bodies) so a regression like #227 is caught here. Verifications

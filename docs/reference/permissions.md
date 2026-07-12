@@ -58,7 +58,7 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 | `user.role.manage` | admin | `user.role.manage` | `admin::update_user_role` (`PUT /admin/users/:id/role`) |
 | `event.create` | admin, moderator | `event.create` | `events::create_event` (`POST /events`) |
 | `event.edit.any` | admin, moderator | `event.edit` (the event-scope check) | — (override; satisfies `event.edit`) |
-| `event.delete.any` | admin, moderator | `event.delete` (the event-scope check) | `admin::delete_event` (`DELETE /admin/events/:id`) |
+| `event.delete.any` | admin, moderator | `event.delete` (the event-scope check) | — (override; satisfies `event.delete` on `DELETE /admin/events/:id`) |
 | `merch.delete.any` | admin, moderator | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`) |
 | `merch.create.any` | admin, moderator | `merch.create` (the event-scope check) | — (override; satisfies `merch.create`) |
 | `merch.edit.any` | admin, moderator | `merch.edit` (the event-scope check) | — (override; satisfies `merch.edit`) |
@@ -76,7 +76,7 @@ also satisfies each event-scope check.
 | Permission | Granted to (event roles) | `*.any` override | Enforced by |
 |---|---|---|---|
 | `event.edit` | creator, editor | `event.edit.any` | `events::update_event` (`PUT /events/:id`), `events::publish_event` (`POST /events/:id/publish`) |
-| `event.delete` | creator | `event.delete.any` | — (creator-facing delete not yet wired; the admin path uses `event.delete.any`) |
+| `event.delete` | creator | `event.delete.any` | `admin::delete_event` (`DELETE /admin/events/:id`) — event-scope check (#233) |
 | `event.member.manage` | creator | *(none by design)* | event-member API (`POST/DELETE/GET /events/:id/members`) |
 | `merch.delete` | creator, editor | `merch.delete.any` | `merch::delete_merch_by_creator` (`DELETE /events/:id/merch/:id`) |
 | `merch.create` | creator, editor | `merch.create.any` | `merch::create_merch` (`POST /events/:id/merch`) |

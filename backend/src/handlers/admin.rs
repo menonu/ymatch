@@ -40,7 +40,26 @@ pub async fn delete_event(
     Path(id): Path<i32>,
     axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<StatusCode, AppError> {
-    require_global(&state, query.user_id, Permission::EventDeleteAny).await?;
+    // #233: creators hold `event.delete` via the event-scoped `creator`
+    // role; moderators/admins hold `event.delete.any`. Both satisfy
+    // `Permission::EventDelete` in `Scope::Event` (see
+    // `Permission::satisfying_names`). Checking only `EventDeleteAny` in
+    // the global scope blocked legitimate creators.
+    let uid = query
+        .user_id
+        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
+    let user = state.policy.verify(uid).await?;
+    state.policy.require_not_banned(&user)?;
+    // 404 before 403 so a missing event is not leaked as Forbidden.
+    let _ = state
+        .events
+        .get_creator(id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    state
+        .rbac_service
+        .check(&user, &Scope::Event(id), Permission::EventDelete)
+        .await?;
     state.events.delete(id).await?;
     Ok(StatusCode::OK)
 }

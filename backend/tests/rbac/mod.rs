@@ -157,7 +157,7 @@ async fn test_rbac_admin_delete_event_permission(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // A plain user cannot delete an event.
+    // A plain user cannot delete an event they did not create.
     let (_creator2_id, event2_id) =
         create_test_user_and_event(pool.clone(), "rbac-del-creator2", "To Be Deleted 2").await;
     let plain = login_guest(&pool, "rbac-del-plain", "t").await;
@@ -176,6 +176,49 @@ async fn test_rbac_admin_delete_event_permission(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+/// #233: the event creator keeps `event.delete` via the event-scoped
+/// `creator` role even after losing the global moderator role (and thus
+/// `event.delete.any`). The delete handler must check `EventDelete` in
+/// `Scope::Event`, not only `EventDeleteAny` in `Scope::Global`.
+#[sqlx::test]
+async fn test_rbac_event_creator_can_delete_own_event(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "rbac-del-own-creator", "Own Event To Delete")
+            .await;
+
+    // Demote to global `user` — strips event.delete.any but leaves the
+    // event/creator role (and event.delete) on this event.
+    grant_global_role(&pool, creator_id, "user").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}?user_id={}",
+                    event_id, creator_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "event creator must be able to delete their own event (#233)"
+    );
+
+    // Event is gone.
+    let remaining: Option<(i32,)> = sqlx::query_as("SELECT id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert!(remaining.is_none(), "event row should be deleted");
 }
 
 #[sqlx::test]
