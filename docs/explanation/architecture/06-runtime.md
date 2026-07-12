@@ -85,15 +85,15 @@ sequenceDiagram
 
   Note over A,B: Match is PENDING (from matcher)
   A->>API: propose legs (absolute giver legs)
-  API->>DB: BEGIN; validate; upsert match_items; status=OFFERED; offered_by=A; COMMIT
+  API->>DB: BEGIN, validate, upsert match_items, status=OFFERED, offered_by=A, COMMIT
   B->>API: counter or accept
   alt Accept (B is non-proposer, balanced)
     API->>DB: status=ACCEPTED
     A->>API: complete
     API->>DB: status=COMPLETED
-    A->>API: apply inventory (A's side)
-    API->>DB: adjust HAVE/TRADE/WANT; mark applied
-    B->>API: apply inventory (B's side)
+    A->>API: apply inventory (A side)
+    API->>DB: adjust HAVE/TRADE/WANT, mark applied
+    B->>API: apply inventory (B side)
   else Reject
     API->>DB: status=REJECTED
   end
