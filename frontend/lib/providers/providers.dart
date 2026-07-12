@@ -759,6 +759,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -773,6 +775,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -783,6 +787,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -793,6 +799,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 
@@ -803,6 +811,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
     }
   }
 }
