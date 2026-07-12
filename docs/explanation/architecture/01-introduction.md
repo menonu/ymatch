@@ -25,7 +25,6 @@ exist so partners can coordinate the hand-off.
 
 - Real-time multiplayer or live auction mechanics.
 - Payment / escrow for money; trades are inventory-for-inventory.
-- Guaranteed push-notification delivery (the push path is still a stub logger).
 - Multi-tenant SaaS isolation beyond a single shared deployment per environment.
 
 ## Stakeholders
