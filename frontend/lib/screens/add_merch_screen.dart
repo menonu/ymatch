@@ -391,134 +391,16 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     );
   }
 
-  void _showNewGroupDialog() {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final l10n = AppLocalizations.of(context)!;
-    var saving = false;
-
-    showDialog(
+  Future<void> _showNewGroupDialog() async {
+    final createdName = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(l10n.newGroupName),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: InputDecoration(hintText: l10n.newGroupHint),
-                textInputAction: TextInputAction.next,
-                enabled: !saving,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                decoration: InputDecoration(
-                  labelText: l10n.groupDescription,
-                  hintText: l10n.groupDescriptionHint,
-                ),
-                maxLines: 3,
-                enabled: !saving,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(dialogContext),
-              child: Text(l10n.cancel),
-            ),
-            ElevatedButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final val = nameCtrl.text.trim();
-                      if (val.isEmpty) return;
-
-                      // If this name is already known (server group or a
-                      // chip we already added), just select it — never
-                      // re-POST create. Backend create is an upsert that
-                      // overwrites description without an ownership check.
-                      final existingGroups =
-                          ref
-                              .read(eventGroupsProvider(widget.eventId))
-                              .valueOrNull ??
-                          const [];
-                      final alreadyExists =
-                          _customGroups.contains(val) ||
-                          existingGroups.any((g) => g.groupName == val) ||
-                          // Also treat names already present on merch chips
-                          // as existing so we don't clobber via upsert.
-                          (ref
-                                  .read(merchProvider(widget.eventId))
-                                  .valueOrNull
-                                  ?.any(
-                                    (m) =>
-                                        m.hasGroupName() && m.groupName == val,
-                                  ) ??
-                              false);
-
-                      final user = ref.read(currentUserProvider);
-                      // Persist a brand-new group (and optional description)
-                      // when logged in so it becomes a first-class entity
-                      // before any merch is added (#128). Without a user,
-                      // fall back to local-only chip selection.
-                      if (user != null && !alreadyExists) {
-                        setDialogState(() => saving = true);
-                        try {
-                          final desc = descCtrl.text.trim();
-                          await ref
-                              .read(groupControllerProvider.notifier)
-                              .createGroup(
-                                eventId: widget.eventId,
-                                userId: user.id,
-                                groupName: val,
-                                description: desc.isEmpty ? null : desc,
-                              );
-                          ref.invalidate(eventGroupsProvider(widget.eventId));
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                l10n.failedToSaveGroup(e.toString()),
-                              ),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                          );
-                          if (dialogContext.mounted) {
-                            setDialogState(() => saving = false);
-                          }
-                          return;
-                        }
-                      }
-
-                      if (!mounted) return;
-                      setState(() {
-                        _customGroups.add(val);
-                        _selectedGroup = val;
-                      });
-                      if (dialogContext.mounted) {
-                        Navigator.pop(dialogContext);
-                      }
-                    },
-              child: saving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(l10n.set),
-            ),
-          ],
-        ),
-      ),
-    ).whenComplete(() {
-      nameCtrl.dispose();
-      descCtrl.dispose();
+      builder: (context) =>
+          _NewGroupDialog(eventId: widget.eventId, customGroups: _customGroups),
+    );
+    if (createdName == null || !mounted) return;
+    setState(() {
+      _customGroups.add(createdName);
+      _selectedGroup = createdName;
     });
   }
 
@@ -540,5 +422,139 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       if (cmp != 0) return cmp;
     }
     return a.length.compareTo(b.length);
+  }
+}
+
+/// New-group dialog with optional description (#128).
+/// Owns its [TextEditingController]s so dispose cannot race the route close.
+class _NewGroupDialog extends ConsumerStatefulWidget {
+  final int eventId;
+  final Set<String> customGroups;
+
+  const _NewGroupDialog({required this.eventId, required this.customGroups});
+
+  @override
+  ConsumerState<_NewGroupDialog> createState() => _NewGroupDialogState();
+}
+
+class _NewGroupDialogState extends ConsumerState<_NewGroupDialog> {
+  final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final val = _nameCtrl.text.trim();
+    if (val.isEmpty) return;
+
+    final l10n = AppLocalizations.of(context)!;
+
+    // Never re-POST create for an existing name — backend create is an upsert
+    // that overwrites description without an ownership check. Await the groups
+    // list so a still-loading provider cannot miss a row.
+    final knownNames = <String>{...widget.customGroups};
+    try {
+      final groups = await ref.read(eventGroupsProvider(widget.eventId).future);
+      for (final g in groups) {
+        knownNames.add(g.groupName);
+      }
+    } catch (_) {
+      // Fall back to merch chip names only.
+    }
+    final merchList = ref.read(merchProvider(widget.eventId)).valueOrNull;
+    if (merchList != null) {
+      for (final m in merchList) {
+        if (m.hasGroupName() && m.groupName.isNotEmpty) {
+          knownNames.add(m.groupName);
+        }
+      }
+    }
+    final alreadyExists = knownNames.contains(val);
+
+    final user = ref.read(currentUserProvider);
+    // Persist a brand-new group when logged in so it becomes a first-class
+    // entity before any merch is added (#128).
+    if (user != null && !alreadyExists) {
+      setState(() => _saving = true);
+      try {
+        final desc = _descCtrl.text.trim();
+        await ref
+            .read(groupControllerProvider.notifier)
+            .createGroup(
+              eventId: widget.eventId,
+              userId: user.id,
+              groupName: val,
+              description: desc.isEmpty ? null : desc,
+            );
+        ref.invalidate(eventGroupsProvider(widget.eventId));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.failedToSaveGroup(e.toString())),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    Navigator.pop(context, val);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.newGroupName),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              autofocus: true,
+              decoration: InputDecoration(hintText: l10n.newGroupHint),
+              textInputAction: TextInputAction.next,
+              enabled: !_saving,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.groupDescription,
+                hintText: l10n.groupDescriptionHint,
+              ),
+              maxLines: 3,
+              enabled: !_saving,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l10n.set),
+        ),
+      ],
+    );
   }
 }

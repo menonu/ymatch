@@ -116,9 +116,15 @@ void main() {
       (tester) async {
         int eventCounter = 1;
         int merchCounter = 1;
+        int groupCounter = 1;
 
         // We need a stateful mock backend to handle the sequence
-        final mockBackendState = {'events': [], 'merch': [], 'inventory': []};
+        final mockBackendState = {
+          'events': [],
+          'merch': [],
+          'inventory': [],
+          'groups': [],
+        };
 
         final mockClient = MockClient((request) async {
           final path = request.url.path;
@@ -188,6 +194,28 @@ void main() {
               }),
               200,
             );
+          }
+
+          // #128: NewGroupDialog creates groups via POST /events/:id/groups
+          // before merch is added. List endpoint is also used by EventDetailScreen.
+          if (path.startsWith('/api/v1/events/') && path.endsWith('/groups')) {
+            if (method == 'GET') {
+              return http.Response(
+                jsonEncode({'groups': mockBackendState['groups']}),
+                200,
+              );
+            } else if (method == 'POST') {
+              final body = jsonDecode(request.body) as Map<String, dynamic>;
+              final newGroup = {
+                'id': groupCounter++,
+                'eventId': body['eventId'],
+                'groupName': body['groupName'],
+                'description': body['description'] ?? '',
+                'createdBy': body['userId'],
+              };
+              mockBackendState['groups']!.add(newGroup);
+              return http.Response(jsonEncode(newGroup), 200);
+            }
           }
 
           if (path.startsWith('/api/v1/events/') && path.endsWith('/merch')) {
@@ -305,7 +333,16 @@ void main() {
 
         await tester.tap(find.text('New Group'));
         await tester.pumpAndSettle();
-        await tester.enterText(find.byType(TextField).last, 'Stands');
+        // #128: NewGroupDialog has name + optional description fields.
+        // Enter the group name into the first field (not the last/description).
+        final newGroupDialog = find.byType(AlertDialog);
+        expect(newGroupDialog, findsOneWidget);
+        await tester.enterText(
+          find
+              .descendant(of: newGroupDialog, matching: find.byType(TextField))
+              .first,
+          'Stands',
+        );
         await tester.tap(find.text('Set'));
         await tester.pumpAndSettle();
 

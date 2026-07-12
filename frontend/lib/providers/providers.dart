@@ -550,7 +550,7 @@ final merchControllerProvider =
 // --- Merchandise groups (#128) ---
 // Group metadata (description + creator) is a first-class entity separate from
 // the merch list. Loaded independently so the EventDetailScreen info panel and
-// tab shield can update without refetching every item.
+// bottom edit control can update without refetching every item.
 final eventGroupsProvider = FutureProvider.autoDispose
     .family<List<MerchandiseGroup>, int>((ref, eventId) async {
       final client = ref.watch(apiClientProvider);

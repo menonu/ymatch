@@ -849,102 +849,25 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   /// Group-edit dialog: name is read-only; description is editable (#128).
   /// Only called for the group creator (UI gate; backend enforces ownership
   /// / RBAC as well).
-  void _showEditGroupDialog(
+  Future<void> _showEditGroupDialog(
     BuildContext context,
     String groupName,
     MerchandiseGroup? meta,
-  ) {
+  ) async {
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
-    final l10n = AppLocalizations.of(context)!;
-    // Capture before the async gap so we don't touch BuildContext after await.
-    final messenger = ScaffoldMessenger.of(context);
-    final errorColor = Theme.of(context).colorScheme.error;
-    final descCtrl = TextEditingController(
-      text: meta != null && meta.hasDescription() ? meta.description : '',
-    );
-    var saving = false;
-
-    showDialog(
+    await showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(l10n.editGroup),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              InputDecorator(
-                decoration: InputDecoration(labelText: l10n.groupNameLabel),
-                child: Text(groupName),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: l10n.groupDescription,
-                  hintText: l10n.groupDescriptionHint,
-                ),
-                maxLines: 4,
-                enabled: !saving,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(dialogContext),
-              child: Text(l10n.cancel),
-            ),
-            ElevatedButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      setDialogState(() => saving = true);
-                      try {
-                        await ref
-                            .read(groupControllerProvider.notifier)
-                            .updateGroup(
-                              eventId: widget.eventId,
-                              userId: user.id,
-                              groupName: groupName,
-                              description: descCtrl.text.trim(),
-                            );
-                        // Info panel reads eventGroupsProvider only — do not
-                        // invalidate merch here: that forces a full-screen
-                        // loading scaffold and resets the active tab.
-                        ref.invalidate(eventGroupsProvider(widget.eventId));
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        }
-                        messenger.showSnackBar(
-                          SnackBar(content: Text(l10n.groupSaved)),
-                        );
-                      } catch (e) {
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.failedToSaveGroup(e.toString())),
-                            backgroundColor: errorColor,
-                          ),
-                        );
-                        if (dialogContext.mounted) {
-                          setDialogState(() => saving = false);
-                        }
-                      }
-                    },
-              child: saving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(l10n.save),
-            ),
-          ],
-        ),
+      builder: (context) => _EditGroupDialog(
+        eventId: widget.eventId,
+        userId: user.id,
+        groupName: groupName,
+        initialDescription: meta != null && meta.hasDescription()
+            ? meta.description
+            : '',
       ),
-    ).whenComplete(descCtrl.dispose);
+    );
   }
 
   // --- Grid View Item ---
@@ -1643,6 +1566,121 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Group description edit dialog (#128). Owns its controller so dispose
+/// cannot race the route close animation.
+class _EditGroupDialog extends ConsumerStatefulWidget {
+  final int eventId;
+  final int userId;
+  final String groupName;
+  final String initialDescription;
+
+  const _EditGroupDialog({
+    required this.eventId,
+    required this.userId,
+    required this.groupName,
+    required this.initialDescription,
+  });
+
+  @override
+  ConsumerState<_EditGroupDialog> createState() => _EditGroupDialogState();
+}
+
+class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
+  late final TextEditingController _descCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _descCtrl = TextEditingController(text: widget.initialDescription);
+  }
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(groupControllerProvider.notifier)
+          .updateGroup(
+            eventId: widget.eventId,
+            userId: widget.userId,
+            groupName: widget.groupName,
+            description: _descCtrl.text.trim(),
+          );
+      // Info panel reads eventGroupsProvider only — do not invalidate merch:
+      // that forces a full-screen loading scaffold and resets the active tab.
+      ref.invalidate(eventGroupsProvider(widget.eventId));
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.groupSaved)));
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.failedToSaveGroup(e.toString())),
+          backgroundColor: errorColor,
+        ),
+      );
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.editGroup),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InputDecorator(
+              decoration: InputDecoration(labelText: l10n.groupNameLabel),
+              child: Text(widget.groupName),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: l10n.groupDescription,
+                hintText: l10n.groupDescriptionHint,
+              ),
+              maxLines: 4,
+              enabled: !_saving,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l10n.save),
+        ),
+      ],
     );
   }
 }
