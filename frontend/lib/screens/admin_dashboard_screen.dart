@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
+import '../utils/image_helper.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -543,16 +544,11 @@ class _AdminItemsTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final item = items[index];
             return ListTile(
-              leading: item.hasPhotoUrl() && item.photoUrl.isNotEmpty
-                  ? Image.network(
-                      item.photoUrl,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.image_not_supported),
-                    )
-                  : const Icon(Icons.image),
+              leading: buildImage(
+                item.hasPhotoUrl() ? item.photoUrl : null,
+                width: 50,
+                height: 50,
+              ),
               title: Text(item.name),
               subtitle: Text(
                 'ID: ${item.id} | Event ID: ${item.eventId} | Group: ${item.hasGroupName() ? item.groupName : 'None'}',

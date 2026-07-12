@@ -129,4 +129,108 @@ void main() {
       expect(find.text('Item group removed'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Items tab resolves relative photoUrl via buildImage (#331)',
+    (WidgetTester tester) async {
+      final merch = Merchandise()
+        ..id = 10
+        ..eventId = 5
+        ..name = 'RelativePhotoMerch'
+        ..groupName = 'Pins'
+        ..photoUrl = 'uploads/abc.png';
+
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+      final api = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: mockClient,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            apiClientProvider.overrideWith((ref) => api),
+            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+            adminMerchProvider.overrideWith((ref) async => [merch]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+            adminUsersProvider.overrideWith((ref) async => <User>[]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Items'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RelativePhotoMerch'), findsOneWidget);
+
+      // buildImage → resolveImageUrl turns relative paths into absolute
+      // backend URLs (non-web tests resolve to http://localhost:3000/...).
+      // Direct Image.network(item.photoUrl) would leave "uploads/abc.png"
+      // unresolved and fail to load.
+      final Image image = tester.widget(find.byType(Image));
+      expect(image.image, isA<NetworkImage>());
+      expect(
+        (image.image as NetworkImage).url,
+        'http://localhost:3000/uploads/abc.png',
+      );
+      expect(image.fit, BoxFit.contain);
+      expect(image.width, 50);
+      expect(image.height, 50);
+    },
+  );
+
+  testWidgets(
+    'Items tab shows placeholder when photoUrl is empty (#331)',
+    (WidgetTester tester) async {
+      final merch = Merchandise()
+        ..id = 11
+        ..eventId = 5
+        ..name = 'NoPhotoMerch'
+        ..groupName = 'Pins';
+
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+      final api = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: mockClient,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            apiClientProvider.overrideWith((ref) => api),
+            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+            adminMerchProvider.overrideWith((ref) async => [merch]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+            adminUsersProvider.overrideWith((ref) async => <User>[]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Items'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('NoPhotoMerch'), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+      // buildImage default placeholder uses image_outlined, not Icons.image.
+      expect(find.byIcon(Icons.image_outlined), findsOneWidget);
+    },
+  );
 }
