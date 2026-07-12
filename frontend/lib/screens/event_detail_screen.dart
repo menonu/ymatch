@@ -676,9 +676,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ],
                 ),
                 // Info FAB bottom-left (#128), mirrors the Add Merch FAB style.
+                // Include bottom safe-area inset so it lines up with the
+                // Scaffold FAB slot on notched devices.
                 Positioned(
                   left: 16,
-                  bottom: 16,
+                  bottom: 16 + MediaQuery.paddingOf(context).bottom,
                   child: FloatingActionButton.extended(
                     heroTag: 'group_info_fab',
                     onPressed: () {
@@ -862,7 +864,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               InputDecorator(
-                decoration: InputDecoration(labelText: l10n.selectGroup),
+                decoration: InputDecoration(labelText: l10n.groupNameLabel),
                 child: Text(groupName),
               ),
               const SizedBox(height: 12),
@@ -897,9 +899,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                               groupName: groupName,
                               description: descCtrl.text.trim(),
                             );
+                        // Info panel reads eventGroupsProvider only — do not
+                        // invalidate merch here: that forces a full-screen
+                        // loading scaffold and resets the active tab.
                         ref.invalidate(eventGroupsProvider(widget.eventId));
-                        // Merch list mirrors group_description on each item.
-                        ref.invalidate(merchProvider(widget.eventId));
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext);
                         }

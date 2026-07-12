@@ -620,6 +620,12 @@ abstract class AppLocalizations {
   /// **'e.g., Keychains'**
   String get newGroupHint;
 
+  /// Read-only label for the group name in the edit dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get groupNameLabel;
+
   /// Label for the optional group description field
   ///
   /// In en, this message translates to:

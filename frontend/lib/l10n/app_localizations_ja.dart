@@ -300,6 +300,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get newGroupHint => '例: キーホルダー';
 
   @override
+  String get groupNameLabel => 'グループ名';
+
+  @override
   String get groupDescription => '説明';
 
   @override

@@ -436,14 +436,35 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                       final val = nameCtrl.text.trim();
                       if (val.isEmpty) return;
 
+                      // If this name is already known (server group or a
+                      // chip we already added), just select it — never
+                      // re-POST create. Backend create is an upsert that
+                      // overwrites description without an ownership check.
+                      final existingGroups =
+                          ref
+                              .read(eventGroupsProvider(widget.eventId))
+                              .valueOrNull ??
+                          const [];
+                      final alreadyExists =
+                          _customGroups.contains(val) ||
+                          existingGroups.any((g) => g.groupName == val) ||
+                          // Also treat names already present on merch chips
+                          // as existing so we don't clobber via upsert.
+                          (ref
+                                  .read(merchProvider(widget.eventId))
+                                  .valueOrNull
+                                  ?.any(
+                                    (m) =>
+                                        m.hasGroupName() && m.groupName == val,
+                                  ) ??
+                              false);
+
                       final user = ref.read(currentUserProvider);
-                      // Persist the group (and optional description) when we
-                      // have a logged-in user so it becomes a first-class
-                      // entity before any merch is added (#128). Without a
-                      // user, fall back to the local-only chip selection —
-                      // the first merch create will still auto-create the
-                      // group row server-side.
-                      if (user != null) {
+                      // Persist a brand-new group (and optional description)
+                      // when logged in so it becomes a first-class entity
+                      // before any merch is added (#128). Without a user,
+                      // fall back to local-only chip selection.
+                      if (user != null && !alreadyExists) {
                         setDialogState(() => saving = true);
                         try {
                           final desc = descCtrl.text.trim();

@@ -94,6 +94,7 @@
   "noItemsInGroup": "このグループにはまだアイテムがありません。",
   "newGroupName": "新しいグループ名",
   "newGroupHint": "例: キーホルダー",
+  "groupNameLabel": "グループ名",
   "groupDescription": "説明",
   "groupDescriptionHint": "このグループについてのメモ（任意）",
   "editGroup": "グループを編集",

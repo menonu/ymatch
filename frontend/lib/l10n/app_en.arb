@@ -437,6 +437,10 @@
   "@newGroupHint": {
     "description": "Hint text for the new group name field"
   },
+  "groupNameLabel": "Group name",
+  "@groupNameLabel": {
+    "description": "Read-only label for the group name in the edit dialog"
+  },
   "groupDescription": "Description",
   "@groupDescription": {
     "description": "Label for the optional group description field"

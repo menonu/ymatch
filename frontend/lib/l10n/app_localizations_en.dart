@@ -301,6 +301,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newGroupHint => 'e.g., Keychains';
 
   @override
+  String get groupNameLabel => 'Group name';
+
+  @override
   String get groupDescription => 'Description';
 
   @override
