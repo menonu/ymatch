@@ -697,6 +697,98 @@ void main() {
     });
   });
 
+  // ---- ChatController / messagesProvider (#245) ----
+
+  group('ChatController', () {
+    test('sendMessage POSTs SendMessageRequest proto body and clears error',
+        () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            capturedBody = request.body;
+            return _okEmpty();
+          }
+          // Invalidation re-fetches messages after a successful send.
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            return _ok([]);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .sendMessage(9, 7, 'hello');
+
+      expect(container.read(chatControllerProvider).hasError, isFalse);
+      expect(capturedBody, isNotNull);
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(body['matchId'], 9);
+      expect(body['senderId'], 7);
+      expect(body['content'], 'hello');
+    });
+
+    test('sendMessage failure sets error state (no rethrow)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            return http.Response('bad message', 422);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      // Completes without throwing — screen listens on state for SnackBars.
+      await container
+          .read(chatControllerProvider.notifier)
+          .sendMessage(9, 7, 'hello');
+
+      expect(container.read(chatControllerProvider).hasError, isTrue);
+    });
+  });
+
+  group('messagesProvider', () {
+    test('GETs /matches/{id}/messages and maps to Message list', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            return _ok([
+              {
+                'id': 1,
+                'matchId': 9,
+                'senderId': 7,
+                'content': 'hi',
+              },
+            ]);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final messages = await container.read(messagesProvider(9).future);
+      expect(messages, hasLength(1));
+      expect(messages.first.senderId, 7);
+      expect(messages.first.content, 'hi');
+    });
+  });
+
   // ---- searchProvider / searchQueryProvider ----
 
   group('searchProvider', () {
