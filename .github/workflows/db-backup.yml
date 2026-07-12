@@ -22,13 +22,6 @@ env:
   DB_CONTAINER: ymatch_db
   DB_USER: ymatch_user
   DB_NAME: ymatch
-  # Prefer the least-privilege ymatch-db-backup user (terraform/oci/backup.tf),
-  # not the Terraform admin API key.
-  OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
-  OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
-  OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
-  OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
-  OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
 
 jobs:
   backup:
@@ -87,39 +80,62 @@ jobs:
             exit 1
           fi
 
-      # Install CLI once (oracle-actions caches under ~/.local). We then drive
-      # put/head from shell so workspace-relative files work and errors surface
-      # without dumping full bucket inventories to public logs.
+      # Install CLI once (oracle-actions caches under ~/.local). Uploads run from
+      # shell so workspace-relative files work and errors surface without dumping
+      # full bucket inventories to public logs.
       - name: Install OCI CLI
         uses: oracle-actions/run-oci-cli-command@v1.3.2
+        env:
+          # Required by the action even for `oci -v`; use least-privilege identity
+          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
         with:
           command: -v
 
       - name: Configure OCI CLI credentials
+        env:
+          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          # Base64 PEM avoids multiline secret / script injection issues
+          OCI_CLI_KEY_CONTENT_B64: ${{ secrets.OCI_CLI_KEY_CONTENT_B64 }}
+          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.oci"
           KEY_FILE="$HOME/.oci/db_backup_key.pem"
-          # Write PEM exactly as stored in the secret (preserve newlines)
-          printf '%s\n' "${{ secrets.OCI_CLI_KEY_CONTENT }}" > "$KEY_FILE"
+          echo "$OCI_CLI_KEY_CONTENT_B64" | base64 -d > "$KEY_FILE"
           chmod 600 "$KEY_FILE"
+          # Sanity: PEM must parse
+          openssl rsa -in "$KEY_FILE" -check -noout >/dev/null
           {
             echo "[DEFAULT]"
-            echo "user=${{ secrets.OCI_CLI_USER }}"
-            echo "fingerprint=${{ secrets.OCI_CLI_FINGERPRINT }}"
-            echo "tenancy=${{ secrets.OCI_CLI_TENANCY }}"
-            echo "region=${{ secrets.OCI_CLI_REGION }}"
-            echo "key_file=$KEY_FILE"
+            echo "user=${OCI_CLI_USER}"
+            echo "fingerprint=${OCI_CLI_FINGERPRINT}"
+            echo "tenancy=${OCI_CLI_TENANCY}"
+            echo "region=${OCI_CLI_REGION}"
+            echo "key_file=${KEY_FILE}"
           } > "$HOME/.oci/config"
           chmod 600 "$HOME/.oci/config"
-          # Resolve namespace dynamically (do not hardcode tenancy identifiers)
+          # Prefer config-file auth only
+          unset OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT OCI_CLI_KEY_CONTENT_B64 OCI_CLI_REGION || true
+          export OCI_CLI_CONFIG_FILE="$HOME/.oci/config"
           NS="$(oci os ns get --query data --raw-output)"
           echo "OCI_BACKUP_NAMESPACE=$NS" >> "$GITHUB_ENV"
           echo "Resolved Object Storage namespace (length ${#NS})"
+          oci os bucket get --namespace "$NS" --bucket-name "${{ env.OCI_BACKUP_BUCKET }}" \
+            --query 'data.name' --raw-output >/dev/null
+          echo "Bucket access OK"
 
       - name: Upload and verify backups
         run: |
           set -euo pipefail
+          # Use only the config file written above (no KEY_CONTENT env)
+          unset OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT OCI_CLI_REGION || true
+          export OCI_CLI_CONFIG_FILE="$HOME/.oci/config"
           DATE="${{ steps.types.outputs.date }}"
           NS="${OCI_BACKUP_NAMESPACE:?namespace not set}"
           BUCKET="${{ env.OCI_BACKUP_BUCKET }}"
