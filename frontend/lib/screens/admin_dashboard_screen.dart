@@ -452,6 +452,7 @@ class _AdminGroupsTab extends ConsumerWidget {
                     ref.invalidate(adminMerchProvider);
                     ref.invalidate(adminMatchesProvider);
                     ref.invalidate(eventsProvider);
+                    ref.invalidate(favoriteGroupsProvider);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Item group removed')),
