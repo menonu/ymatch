@@ -21,15 +21,21 @@ Major deployable / runtime units inside the system boundary.
 
 Source: [`diagrams/05-containers.d2`](diagrams/05-containers.d2)
 
+> **Note on the SPA box:** In production the Flutter UI is **static assets**
+> served by the Nginx container; JS runs in the **user’s browser**, not as a
+> separate process next to Nginx. The “Flutter Web UI” box is a **logical**
+> client module (codebase + runtime behaviour). Deployable peers are Caddy,
+> Nginx, Backend API, and PostgreSQL (see also [07 — Deployment](07-deployment.md)).
+
 ### Container responsibilities
 
 | Container | Responsibility | Primary codebase / config |
 |-----------|----------------|---------------------------|
-| **Flutter Web UI** | Presentation, client state, REST via `ApiClient` / protobuf JSON | `frontend/` (built assets) |
+| **Flutter Web UI** (logical) | Presentation, client state, REST via `ApiClient` / protobuf JSON | `frontend/` |
+| **Nginx (frontend container)** | Serves compiled Flutter assets only | `frontend.Dockerfile.prod` |
 | **Backend API** | Auth, RBAC, domain services, repositories, periodic matcher, image storage | `backend/` |
 | **PostgreSQL** | System of record | `backend/migrations/` (+ runtime data) |
 | **Caddy** | Public HTTPS termination and path routing (prod/staging) | `Caddyfile.oci` |
-| **Nginx (frontend container)** | Serves compiled Flutter assets only | `frontend.Dockerfile.prod` |
 
 Local development collapses edge routing: Flutter dev server (:8081) talks to API
 (:3000) with Postgres from `docker compose` (:5432). See
@@ -49,9 +55,10 @@ Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 |------|------|------|
 | Entry | `main.rs`, `lib.rs` | Boot pool, spawn matcher, serve |
 | Routes / state | `routes.rs` | `AppState`, middleware (incl. governor rate limit) |
-| Handlers | `handlers/` | Auth, events, merch, inventory, matches, messages, admin, images, search, system |
-| Match lifecycle | `services/match_lifecycle.rs` | Negotiation + inventory apply |
-| RBAC | `services/rbac.rs`, `repositories/rbac.rs` | Permission model |
+| Handlers | `handlers/` | Auth, events, groups, merch, inventory, matches, messages, admin, images, search, system |
+| Match lifecycle | `services/match_lifecycle.rs` | Negotiation + inventory apply (`offer`, `change_status`, `apply_inventory`) |
+| Permission policy | `services/permissions.rs` | `PermissionPolicy`: `verify_active` / ban gate; used with RBAC |
+| RBAC | `services/rbac.rs`, `repositories/rbac.rs` | Permission checks over `user_roles` |
 | Permissions catalog | `services/permission_catalog.rs` | Permission/role seed definitions |
 | Repositories | `repositories/` | user, event, merch, group, inventory, match_, message, favorites, views, rbac |
 | Matching | `matching.rs` | Background mutual-trade discovery |

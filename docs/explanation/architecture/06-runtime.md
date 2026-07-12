@@ -19,6 +19,9 @@ views live as D2→SVG in sections 03, 05, and 07.
 
 ## Auth and session
 
+No bearer/JWT middleware. Login and guest endpoints return a `User`; the client
+reuses that identity by sending `user_id` on later calls.
+
 ```mermaid
 sequenceDiagram
   participant U as User / Flutter
@@ -28,19 +31,23 @@ sequenceDiagram
   alt Guest
     U->>API: POST /api/v1/auth/guest { uuid }
     API->>DB: find or create guest user + roles
-    API-->>U: user + JWT
+    API-->>U: User JSON
   else Registered
     U->>API: POST /api/v1/auth/login
     API->>DB: verify credentials
-    API-->>U: user + JWT
+    API-->>U: User JSON
   end
-  U->>API: subsequent requests Authorization: Bearer …
-  API->>API: extract user, RbacService.check as needed
+  Note over U: Client stores User locally
+  U->>API: later call with user_id in body or query
+  API->>API: PermissionPolicy.verify_active
+  API->>API: RbacService.check when needed
 ```
 
 - Guest path minimizes signup friction for event-day use.
 - `User.role` on the wire is **derived** from global `user_roles` at read time
   ([ADR 0006](../adr/0006-derive-user-role-from-user-roles.md)).
+- Product wording “propose / counter” maps to API `offer_trade` /
+  `MatchLifecycleService::offer` and status transitions via `change_status`.
 
 ## Matching job
 

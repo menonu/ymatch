@@ -6,10 +6,10 @@
 |---------|----------|
 | Public repository | Never commit secrets, PEM keys, host absolute paths, PII, tfstate — [security.md](../security.md). |
 | Transport | HTTPS at Caddy in staging/prod; local HTTP is dev-only. |
-| Authn | JWT after guest or password login. |
-| Authz | `RbacService` + permission catalog; admin superuser bypass documented in ADR 0004. |
-| Rate limiting | Governor middleware on the API (`routes.rs`). |
-| Image upload | Authenticated upload endpoints; files stored via `ImageStorage`. |
+| Authn | **Client-asserted identity**: guest/login return `User` JSON; client stores the user and sends `user_id` on later requests. No JWT/session token layer today. |
+| Authz | `PermissionPolicy::verify_active` (ban/existence) then `RbacService` + permission catalog; admin superuser bypass in ADR 0004. |
+| Rate limiting | Governor middleware on most `/api/v1` routes (`routes.rs`). |
+| Image upload | **Unauthenticated** `POST /api/v1/images/upload` and `DELETE /api/v1/images/:filename` (content-type + 1MB size checks only); files via `ImageStorage`. Known gap — see [09 — Quality](09-quality.md). |
 
 ## RBAC
 
@@ -50,9 +50,10 @@
 | `PORT` | API listen port (default 3000) |
 | `IMAGE_STORAGE` / `UPLOAD_DIR` | Image backend |
 | `MATCHING_INTERVAL_SECONDS` | Matcher cadence |
-| `JWT` / auth secrets | Token signing (via env; never commit) |
+| `RATE_LIMIT_*` (if set) | Governor rate-limit tuning (see `routes.rs` defaults) |
 
-Templates: `backend/.env.example` (gitignored real `.env`).
+Templates: `backend/.env.example` (gitignored real `.env`). No JWT/signing secret
+env vars exist in the current API.
 
 ## Protocol / codegen
 

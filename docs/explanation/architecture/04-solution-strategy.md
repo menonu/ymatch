@@ -20,7 +20,7 @@ recorded as ADRs; this page is the map, not the full rationale.
 ### Backend layering
 
 ```
-HTTP handlers  →  services (policies, MatchLifecycleService, RbacService)
+HTTP handlers  →  services (PermissionPolicy, MatchLifecycleService, RbacService)
                →  repositories (SQL, concrete structs + generic Executor)
                →  PostgreSQL
 ```
@@ -29,9 +29,9 @@ HTTP handlers  →  services (policies, MatchLifecycleService, RbacService)
 - **Repositories** own SQL for their tables (concrete structs; generic
   `Executor` for transactional methods — evolved from the earlier trait/`dyn`
   shape in #163 / #191).
-- **Services** own multi-step domain rules and transactions
-  (`MatchLifecycleService`, `RbacService`, legacy permission helpers where still
-  present).
+- **Services** own multi-step domain rules and transactions:
+  `PermissionPolicy` (active/ban gate), `RbacService` (permissions),
+  `MatchLifecycleService` (trade state machine).
 
 ### Frontend layering
 
@@ -77,6 +77,20 @@ Negotiation and inventory effects are **not** in the matcher — they live in
 
 ## Auth strategy
 
-- **Guest sessions** via device UUID (`/api/v1/auth/guest`) — low-friction entry.
-- **Registered users** with password; JWT bearer tokens for subsequent calls.
-- **RBAC** consulted for privileged routes; admin UI gated on elevated global role.
+There is **no JWT / bearer session** today. Identity is **client-asserted**:
+
+- **Guest sessions** via device UUID (`POST /api/v1/auth/guest`) return a `User`
+  JSON body (low-friction entry).
+- **Registered users** sign up / log in with password; handlers also return
+  `User` JSON only (`handlers/auth.rs`).
+- The Flutter client stores the user (e.g. local preferences) and passes
+  **`user_id`** (body or query) on subsequent mutations/reads.
+- Handlers typically call `PermissionPolicy::verify_active(user_id)` (ban /
+  existence gate), then `RbacService::check` for privileged permissions.
+- Admin UI is gated on an elevated global role derived for the wire `User.role`
+  field ([ADR 0006](../adr/0006-derive-user-role-from-user-roles.md)).
+
+This is **not** cryptographic session authentication: any client that can guess
+or supply another user's id can attempt their actions until RBAC/ban checks
+reject them. Treat stronger authn as a future hardening item if the threat model
+requires it. Wire shapes: [API spec](../../reference/api_spec.md).

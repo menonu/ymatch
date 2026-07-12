@@ -56,9 +56,17 @@ workflow exists for visibility.
 Document honestly; track work in GitHub issues rather than expanding this into
 a backlog dump:
 
+- **Security — client-asserted `user_id`:** no JWT/session token; callers supply
+  identity on each request. Adequate only while the threat model assumes a
+  trusted/low-stakes client; cryptographic authn would raise **security**.
+- **Security — unauthenticated image upload/delete:** `POST /api/v1/images/upload`
+  and `DELETE /api/v1/images/:filename` enforce content-type and 1MB size only
+  (no `user_id` / RBAC). Abuse risk on a public API surface.
 - Push notifications are **stubbed** (`notifications.rs` logs only) — limits
   **usability** for “notify me when matched” until a real provider lands.
 - Some operational runbooks assume maintainer familiarity with OCI free-tier
   quotas (see disaster recovery lessons) — **availability** / ops friction.
 
-Update this subsection when a gap is closed or a new systemic risk appears.
+**Availability** target (≥ **98%** uptime) is judged via **monitoring/alerts**
+(and operator response), not multi-instance redundancy — single VM + Compose by
+design. Update this subsection when a gap is closed or a new systemic risk appears.

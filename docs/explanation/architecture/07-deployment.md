@@ -68,15 +68,25 @@ Flutter tests tagged `e2e`. Guide: [e2e_tests](../../how_to/e2e_tests.md).
 
 ## CI/CD sketch
 
+Staging and production use **different triggers** (identical Compose stack shape):
+
 ```mermaid
 flowchart LR
   PR[Pull request] --> CI[ci.yml / coverage / e2e]
   CI --> Main[merge to main]
-  Main --> DepP[deploy-oci.yml]
-  Main --> DepS[deploy-oci-staging.yml]
-  DepP --> ProdVM[Prod VM compose]
+  Main --> StgTrig[workflow_run: CI success on main]
+  StgTrig --> DepS[deploy-oci-staging.yml]
   DepS --> StgVM[Staging VM compose]
+  Tag[push tag release/X.Y.Z] --> DepP[deploy-oci.yml]
+  Manual[workflow_dispatch] --> DepP
+  Manual --> DepS
+  DepP --> ProdVM[Prod VM compose]
 ```
+
+| Environment | Workflow | When it runs |
+|-------------|----------|--------------|
+| Staging | `deploy-oci-staging.yml` | After successful **CI** on `main` (`workflow_run`), or manual `workflow_dispatch` |
+| Production | `deploy-oci.yml` | Push of tag `release/X.Y.Z`, or manual `workflow_dispatch` — **not** every merge to `main` |
 
 Secrets (DB passwords, SSH keys, hosts, New Relic, Discord) live in **GitHub
 Secrets** only — never in the repo ([security.md](../security.md)).
