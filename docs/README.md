@@ -42,7 +42,6 @@ Direct, action-oriented instructions to solve specific problems or accomplish ke
 * [Applying Terraform with Secrets (TF_VAR_ + .env)](how_to/terraform_apply.md): Run `terraform plan`/`apply` for the newrelic + oci modules without committing secrets or host identifiers (#284).
 * [OCI Credentials Management](how_to/oci_credentials.md): API key generation, rotation, and loss-recovery procedure for the RSA 2048 key used by Terraform and the OCI CLI.
 * [Monitoring Setup Guide](how_to/monitoring_setup.md): Setup and queries for New Relic application/infrastructure alerts and monitoring.
-* [GCP Historical Deployment](how_to/cloud_deployment.md): Historical GCP deployment strategy (all GCP app services stopped; DB backups moved to OCI Object Storage in #383).
 * [Frontend-Driven E2E Tests](how_to/e2e_tests.md): How to run the wire-contract E2E test suite introduced in #213 (drives the real `ApiClient` + proto3 JSON against a docker-compose stack).
 
 ---
@@ -67,6 +66,4 @@ Conceptual explanations, architecture reviews, design decisions, and background 
 * [Use Cases](explanation/use_cases.md): User interaction flows, triggers, goals, and pre-conditions.
 * [Initial Project Idea](explanation/initial_concept.md): Original prompt, core matching rules, and initial requirements definition.
 * [Disaster Recovery](explanation/disaster_recovery.md): Recovery procedure, lessons learned from the June 2026 end-to-end test, and known gaps.
-* [Phase 4 Design](explanation/refactoring_phase_4.md): Match/Inventory/Message repository design, N+1 fix (1+4N → 3 queries), state-machine model for the trade lifecycle. Historical (describes the initial `trait + dyn` shape that #191 refined — see [Issue #191](https://github.com/menonu/ymatch/issues/191) for the current shape).
-* [Backend Refactoring Summary](explanation/refactoring_summary.md): Phase 1-5 wrap-up of the #163 Repository pattern refactor, final architecture, aggregate metrics, follow-up issues. The post-#191 follow-up (PRs #192-#210, closing the `trait + dyn` indirection in favor of a concrete-struct + generic-Executor shape) is documented on [Issue #191](https://github.com/menonu/ymatch/issues/191) (closing comment).
 * [Architecture Decision Records](explanation/adr/README.md): Conventions and index for ADRs — append-only records of significant architectural decisions. Supersede old ADRs with a new ADR rather than editing them in place.
