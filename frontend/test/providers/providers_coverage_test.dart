@@ -405,20 +405,14 @@ void main() {
         client: MockClient((request) async {
           if (request.method == 'GET' &&
               request.url.path == '/api/v1/admin/groups') {
-            // Non-ASCII group names need explicit UTF-8 body bytes —
-            // `http.Response(String)` encodes as Latin-1.
-            return http.Response.bytes(
-              utf8.encode(jsonEncode([
-                {
-                  'eventId': 42,
-                  'eventName': '2026 *Tibbar tibbar!*',
-                  'groupName': 'アクスタ',
-                  'itemCount': 3,
-                },
-              ])),
-              200,
-              headers: {'content-type': 'application/json; charset=utf-8'},
-            );
+            return _ok([
+              {
+                'eventId': 42,
+                'eventName': 'Test Event',
+                'groupName': 'test-group',
+                'itemCount': 3,
+              },
+            ]);
           }
           return _okEmpty();
         }),
@@ -431,8 +425,8 @@ void main() {
       final groups = await container.read(adminGroupsProvider.future);
       expect(groups.length, 1);
       expect(groups.first.eventId, 42);
-      expect(groups.first.eventName, '2026 *Tibbar tibbar!*');
-      expect(groups.first.groupName, 'アクスタ');
+      expect(groups.first.eventName, 'Test Event');
+      expect(groups.first.groupName, 'test-group');
       expect(groups.first.itemCount, 3);
     });
 

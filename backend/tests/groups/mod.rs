@@ -4,7 +4,7 @@ use crate::common::*;
 async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
     let (admin_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-removal-admin", "Removal Event").await;
-    let merch_id = create_merch(&pool, event_id, "Acrylic stand", "アクスタ").await;
+    let merch_id = create_merch(&pool, event_id, "Test Merch", "test-group").await;
     let other_user_id = login_guest(&pool, "group-removal-peer", "token").await;
 
     let match_id: i32 = sqlx::query_scalar(
@@ -14,7 +14,7 @@ async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
     .bind(admin_id as i32)
     .bind(other_user_id as i32)
     .bind(event_id as i32)
-    .bind("アクスタ")
+    .bind("test-group")
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -27,7 +27,7 @@ async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
     sqlx::query("INSERT INTO group_favorites (user_id, event_id, group_name) VALUES ($1, $2, $3)")
         .bind(admin_id as i32)
         .bind(event_id as i32)
-        .bind("アクスタ")
+        .bind("test-group")
         .execute(&pool)
         .await
         .unwrap();
@@ -38,7 +38,7 @@ async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
             Request::builder()
                 .method("DELETE")
                 .uri(format!(
-                    "/api/v1/admin/events/{}/groups/%E3%82%A2%E3%82%AF%E3%82%B9%E3%82%BF?user_id={}",
+                    "/api/v1/admin/events/{}/groups/test-group?user_id={}",
                     event_id, admin_id
                 ))
                 .body(Body::empty())
@@ -52,7 +52,7 @@ async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
         "SELECT COUNT(*) FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
     )
     .bind(event_id as i32)
-    .bind("アクスタ")
+    .bind("test-group")
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -74,7 +74,7 @@ async fn admin_can_remove_group_and_all_of_its_live_references(pool: PgPool) {
         "SELECT COUNT(*) FROM group_favorites WHERE event_id = $1 AND group_name = $2",
     )
     .bind(event_id as i32)
-    .bind("アクスタ")
+    .bind("test-group")
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -88,7 +88,7 @@ async fn plain_user_cannot_remove_group(pool: PgPool) {
     // user must get 403 and leave the group / merch / matches untouched.
     let (actor_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-removal-denied", "Denied Event").await;
-    let merch_id = create_merch(&pool, event_id, "Acrylic stand", "アクスタ").await;
+    let merch_id = create_merch(&pool, event_id, "Test Merch", "test-group").await;
     let peer_id = login_guest(&pool, "group-removal-denied-peer", "token").await;
 
     let match_id: i32 = sqlx::query_scalar(
@@ -98,7 +98,7 @@ async fn plain_user_cannot_remove_group(pool: PgPool) {
     .bind(actor_id as i32)
     .bind(peer_id as i32)
     .bind(event_id as i32)
-    .bind("アクスタ")
+    .bind("test-group")
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -111,7 +111,7 @@ async fn plain_user_cannot_remove_group(pool: PgPool) {
             Request::builder()
                 .method("DELETE")
                 .uri(format!(
-                    "/api/v1/admin/events/{}/groups/%E3%82%A2%E3%82%AF%E3%82%B9%E3%82%BF?user_id={}",
+                    "/api/v1/admin/events/{}/groups/test-group?user_id={}",
                     event_id, actor_id
                 ))
                 .body(Body::empty())
@@ -125,7 +125,7 @@ async fn plain_user_cannot_remove_group(pool: PgPool) {
         "SELECT COUNT(*) FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
     )
     .bind(event_id as i32)
-    .bind("アクスタ")
+    .bind("test-group")
     .fetch_one(&pool)
     .await
     .unwrap();

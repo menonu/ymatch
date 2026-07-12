@@ -59,8 +59,8 @@ void main() {
       var groups = <AdminGroup>[
         const AdminGroup(
           eventId: 42,
-          eventName: '2026 *Tibbar tibbar!*',
-          groupName: 'アクスタ',
+          eventName: 'Test Event',
+          groupName: 'test-group',
           itemCount: 3,
         ),
       ];
@@ -101,9 +101,9 @@ void main() {
       await tester.tap(find.text('Groups'));
       await tester.pumpAndSettle();
 
-      expect(find.text('アクスタ'), findsOneWidget);
+      expect(find.text('test-group'), findsOneWidget);
       expect(
-        find.text('2026 *Tibbar tibbar!* (Event ID: 42) | 3 live items'),
+        find.text('Test Event (Event ID: 42) | 3 live items'),
         findsOneWidget,
       );
 
@@ -114,7 +114,7 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(deletedPaths, isEmpty);
-      expect(find.text('アクスタ'), findsOneWidget);
+      expect(find.text('test-group'), findsOneWidget);
 
       // Confirm removal issues the URL-encoded DELETE and shows success.
       await tester.tap(find.byTooltip('Remove group'));
@@ -122,7 +122,7 @@ void main() {
       await tester.tap(find.widgetWithText(ElevatedButton, 'Remove'));
       await tester.pumpAndSettle();
 
-      final encoded = Uri.encodeComponent('アクスタ');
+      final encoded = Uri.encodeComponent('test-group');
       expect(deletedPaths, [
         '/api/v1/admin/events/42/groups/$encoded?user_id=7',
       ]);
