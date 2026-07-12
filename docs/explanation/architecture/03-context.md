@@ -3,40 +3,16 @@
 This section uses the **C4 model** System Context (level 1) and Container
 (level 2) views to show what is inside the ymatch boundary and what sits outside.
 
+Diagrams are authored in [D2](https://d2lang.com/) and committed as SVG under
+[`diagrams/`](diagrams/) (GitHub does not reliably render Mermaid C4).
+
 ## System context (C4 level 1)
 
 People and external systems that interact with **ymatch** as a whole.
 
-```mermaid
-C4Context
-title System Context — ymatch
+![System Context — ymatch](diagrams/03-system-context.svg)
 
-Person(fan, "Fan / trader", "Manages inventory, negotiates trades, chats at events")
-Person(curator, "Event creator / editor", "Curates events, groups, and merch catalog")
-Person(staff, "Moderator / admin", "Bans, elevated ops, admin dashboard")
-Person(ops, "Operator", "Deploys, backs up, monitors, recovers")
-
-System(ymatch, "ymatch", "Merchandise trading platform: catalog, inventory, matching, negotiation, messaging")
-
-System_Ext(browser, "Web browser", "Serves Flutter web UI to fans and staff")
-System_Ext(github, "GitHub", "Source, CI/CD, Secrets, container packages (GHCR)")
-System_Ext(oci, "Oracle Cloud (OCI)", "VMs, networking, Object Storage for DB backups & Terraform state")
-System_Ext(nr, "New Relic", "APM / infra metrics and alerts (optional operator tooling)")
-System_Ext(discord, "Discord", "Alert webhook relay (optional operator tooling)")
-
-Rel(fan, ymatch, "Uses over HTTPS", "JSON REST + static assets")
-Rel(curator, ymatch, "Uses over HTTPS")
-Rel(staff, ymatch, "Uses over HTTPS")
-Rel(ops, ymatch, "SSH / deploy / terraform", "not end-user API")
-Rel(ops, oci, "Provisions & operates")
-Rel(ops, github, "Merges PRs, runs workflows")
-Rel(ymatch, oci, "Runs on VMs; stores backups")
-Rel(github, ymatch, "Builds & deploys images/workflows")
-Rel(ymatch, nr, "Telemetry (when configured)")
-Rel(nr, discord, "Alert notifications (when configured)")
-Rel(fan, browser, "Opens")
-Rel(browser, ymatch, "Loads UI & calls API")
-```
+Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 
 ### In scope
 
@@ -60,31 +36,9 @@ Rel(browser, ymatch, "Loads UI & calls API")
 
 Major deployable / runtime units **inside** the ymatch system boundary.
 
-```mermaid
-C4Container
-title Container diagram — ymatch
+![Container diagram — ymatch](diagrams/03-containers.svg)
 
-Person(user, "User", "Fan, curator, or staff in a browser/app")
-
-System_Boundary(ymatch, "ymatch") {
-    Container(web, "Flutter Web UI", "Flutter, Riverpod, GoRouter", "SPA: inventory, matches, chat, admin")
-    Container(api, "Backend API", "Rust, Axum, SQLx", "REST /api/v1, auth, lifecycle, matching loop, image upload")
-    ContainerDb(db, "PostgreSQL", "PostgreSQL 16", "Users, catalog, inventory, matches, messages, RBAC")
-    Container(proxy, "Edge proxy", "Caddy", "TLS (nip.io), reverse proxy /api, /uploads, static UI")
-    Container(fe_static, "Frontend static host", "Nginx (container)", "Serves built Flutter web assets")
-}
-
-System_Ext(ghcr, "GHCR", "Container images")
-System_Ext(backup, "OCI Object Storage", "DB backup objects")
-
-Rel(user, proxy, "HTTPS", "443")
-Rel(proxy, fe_static, "/*")
-Rel(proxy, api, "/api/*, /uploads/*")
-Rel(api, db, "SQL", "SQLx")
-Rel(web, proxy, "Same origin or configured API base")
-Rel(api, backup, "pg_dump uploads (scheduled ops)", "when backup jobs run")
-Rel(ghcr, proxy, "Image pulls on deploy")
-```
+Source: [`diagrams/03-containers.d2`](diagrams/03-containers.d2)
 
 ### Container responsibilities
 

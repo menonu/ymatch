@@ -1,0 +1,21 @@
+direction: down
+title: |md
+  # Matching job
+| {near: top-center}
+
+a: "Tick" { style.fill: "#BBDEFB" }
+b: "Load WANT inventory rows\n(active merch, non-null group, not banned)" { style.fill: "#BBDEFB" }
+c: "For each WANT: find other users\nTRADING that merch" { style.fill: "#BBDEFB" }
+d: "Partner has WANT for something\nI TRADE in same event+group?" {
+  shape: diamond
+  style.fill: "#FFF9C4"
+}
+e: "Insert PENDING match for pair+group\nif not already present" { style.fill: "#C8E6C9" }
+f: "Next candidate" { style.fill: "#BBDEFB" }
+g: "Sleep until next interval" { style.fill: "#E0E0E0" }
+
+a -> b -> c -> d
+d -> e: "yes"
+d -> f: "no"
+e -> f
+f -> g

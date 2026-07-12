@@ -1,0 +1,28 @@
+title: |md
+  # Negotiate and complete
+| {near: top-center}
+
+shape: sequence_diagram
+
+a: "User A (Flutter)"
+b: "User B (Flutter)"
+api: "MatchLifecycleService"
+db: "PostgreSQL"
+
+a -> api: "propose legs\n(absolute giver legs)"
+api -> db: "BEGIN; validate; upsert items;\nstatus=OFFERED; offered_by=A; COMMIT"
+
+b -> api: "counter or accept"
+
+api."Accept path (B non-proposer, balanced)"
+api -> db: "status=ACCEPTED"
+a -> api: "complete"
+api -> db: "status=COMPLETED"
+a -> api: "apply inventory (A)"
+api -> db: "adjust HAVE/TRADE/WANT;\nmark applied"
+b -> api: "apply inventory (B)"
+api -> db: "adjust; mark applied"
+
+api."Reject path"
+b -> api: "reject"
+api -> db: "status=REJECTED"

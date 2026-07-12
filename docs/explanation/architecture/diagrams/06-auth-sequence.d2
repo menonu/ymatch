@@ -1,0 +1,23 @@
+title: |md
+  # Auth and session
+| {near: top-center}
+
+shape: sequence_diagram
+
+u: "User / Flutter"
+api: "Backend"
+db: "PostgreSQL"
+
+u."Guest path"
+u -> api: "POST /api/v1/auth/guest { uuid }"
+api -> db: "find or create guest + roles"
+api -> u: "user + JWT"
+
+u."Registered path"
+u -> api: "POST /api/v1/auth/login"
+api -> db: "verify credentials"
+api -> u: "user + JWT"
+
+u."Authenticated calls"
+u -> api: "Authorization: Bearer …"
+api -> api: "extract user;\nRbacService.check as needed"

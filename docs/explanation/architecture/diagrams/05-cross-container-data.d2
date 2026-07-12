@@ -1,0 +1,29 @@
+direction: right
+title: |md
+  # Cross-container data flow
+| {near: top-center}
+
+client: "Client" {
+  style.fill: "#F3E5F5"
+  ui: "Screens"
+  p: "Providers"
+  ac: "ApiClient"
+  ui -> p -> ac
+}
+
+api: "API" {
+  style.fill: "#E3F2FD"
+  h: "Handlers"
+  s: "Services"
+  r: "Repos"
+  h -> s -> r
+  h -> r
+}
+
+db: "PostgreSQL" {
+  shape: cylinder
+  style.fill: "#81C784"
+}
+
+client.ac -> api.h: "proto3 JSON"
+api.r -> db: "SQL"

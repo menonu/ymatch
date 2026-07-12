@@ -20,11 +20,11 @@ resulting shape and points outward for details.
 |---|---------|----------|----------|
 | 01 | [Introduction & goals](01-introduction.md) | Product goals, stakeholders, top requirements | prose |
 | 02 | [Constraints](02-constraints.md) | Technical, organizational, operational limits | prose |
-| 03 | [Context & scope](03-context.md) | External actors and system boundary | **C4** System Context + Containers |
+| 03 | [Context & scope](03-context.md) | External actors and system boundary | **C4** (D2 → SVG) |
 | 04 | [Solution strategy](04-solution-strategy.md) | Tech stack, patterns, ADR index | prose |
-| 05 | [Building blocks](05-building-blocks.md) | Backend layers, frontend layers, matching job | **C4** Containers + Components |
-| 06 | [Runtime view](06-runtime.md) | Auth, matching, trade negotiation, inventory apply | sequence / state |
-| 07 | [Deployment view](07-deployment.md) | Local, staging, production | **C4** Deployment |
+| 05 | [Building blocks](05-building-blocks.md) | Backend layers, frontend layers, matching job | **C4** (D2 → SVG) |
+| 06 | [Runtime view](06-runtime.md) | Auth, matching, trade negotiation, inventory apply | D2 → SVG |
+| 07 | [Deployment view](07-deployment.md) | Local, staging, production | **C4** (D2 → SVG) |
 | 08 | [Cross-cutting](08-crosscutting.md) | Security, RBAC, i18n, errors, images | prose + links |
 | 09 | [Quality](09-quality.md) | Quality attributes (SAiP 4th vocabulary), testing, performance | prose |
 
@@ -41,7 +41,17 @@ resulting shape and points outward for details.
 ## Conventions used here
 
 - **C4 model** ([c4model.com](https://c4model.com/)) for structural views in
-  sections 03, 05, and 07. Diagrams use Mermaid C4 syntax (renderable on GitHub).
+  sections 03, 05, and 07.
+- **Diagrams** are authored in [D2](https://d2lang.com/) and **committed as SVG**
+  under [`diagrams/`](diagrams/) (paired `.d2` source + `.svg` output). GitHub’s
+  Mermaid renderer does not reliably draw C4; do not use Mermaid for these views.
+  Regenerate after editing a `.d2` file:
+  ```bash
+  # requires: https://d2lang.com/tour (d2 CLI)
+  d2 --layout=dagre docs/explanation/architecture/diagrams/FOO.d2 \
+                    docs/explanation/architecture/diagrams/FOO.svg
+  ```
+  Or rebuild all: `for f in docs/explanation/architecture/diagrams/*.d2; do d2 --layout=dagre "$f" "${f%.d2}.svg"; done`
 - Prefer **links** over copying reference material (endpoint lists, column
   definitions, permission matrices).
 - Prefer **accuracy over completeness** — empty arc42 sections are omitted rather

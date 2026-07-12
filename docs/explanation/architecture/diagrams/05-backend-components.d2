@@ -1,0 +1,55 @@
+direction: down
+title: |md
+  # Component diagram — Backend API
+| {near: top-center}
+
+client: "Flutter client" {
+  style.fill: "#FFF3E0"
+}
+
+api: "Backend API" {
+  style.fill: "#E3F2FD"
+  style.stroke: "#1565C0"
+
+  routes: "Router & middleware\nAxum — routes, rate limit, AppState" {
+    style.fill: "#BBDEFB"
+  }
+  handlers: "HTTP handlers\nhandlers/*" {
+    style.fill: "#BBDEFB"
+  }
+  lifecycle: "MatchLifecycleService\nservices/match_lifecycle.rs" {
+    style.fill: "#90CAF9"
+  }
+  rbac: "RbacService\nservices/rbac.rs" {
+    style.fill: "#90CAF9"
+  }
+  repos: "Repositories\nrepositories/*\nconcrete structs + Executor" {
+    style.fill: "#90CAF9"
+  }
+  matching: "Matching job\nmatching.rs\nperiodic WANT/TRADE discovery" {
+    style.fill: "#90CAF9"
+  }
+  storage: "ImageStorage\nstorage/* local or Firebase/GCS" {
+    style.fill: "#90CAF9"
+  }
+  proto: "Generated models\ngenerated/* (prost)" {
+    style.fill: "#B3E5FC"
+  }
+}
+
+db: "PostgreSQL 16" {
+  shape: cylinder
+  style.fill: "#81C784"
+}
+
+client -> api.routes: "REST /api/v1"
+api.routes -> api.handlers: "Dispatch"
+api.handlers -> api.lifecycle: "Trade mutations"
+api.handlers -> api.rbac: "check(permission)"
+api.handlers -> api.repos: "CRUD"
+api.lifecycle -> api.repos: "Transactional SQL"
+api.rbac -> api.repos: "Load roles"
+api.matching -> db: "Direct SQL"
+api.repos -> db: "SQLx"
+api.handlers -> api.storage: "Upload/delete"
+api.handlers -> api.proto: "Serialize"

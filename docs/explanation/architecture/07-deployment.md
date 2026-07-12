@@ -4,54 +4,17 @@ How the containers are placed on infrastructure for **local development**,
 **staging**, and **production**. Operational steps live in How-To guides; this
 section is the map.
 
+Diagrams: [D2](https://d2lang.com/) sources + committed SVG in [`diagrams/`](diagrams/).
+
 ## Production / staging (C4 deployment)
 
 Staging and production use the **same** `docker-compose.oci.yml` on separate
 OCI Ampere A1 VMs (see issue #209). They differ by host, secrets, and sizing —
 not by architecture.
 
-```mermaid
-C4Deployment
-title Deployment — OCI staging / production (per environment)
+![Deployment — OCI staging / production](diagrams/07-deployment-oci.svg)
 
-Deployment_Node(internet, "Internet", "") {
-    Deployment_Node(user_device, "User device", "Browser") {
-        Container(browser, "Browser", "Flutter web client session")
-    }
-}
-
-Deployment_Node(oci, "OCI tenancy", "Always Free region e.g. ap-tokyo-1") {
-    Deployment_Node(vm, "Compute VM", "Ampere A1 — prod or staging shape") {
-        Deployment_Node(docker, "Docker Engine", "compose project") {
-            Container(caddy, "Caddy", "TLS + reverse proxy :80/:443")
-            Container(fe, "ymatch_frontend", "Nginx + Flutter build")
-            Container(api, "ymatch_backend", "Rust API :3000, IMAGE_STORAGE=local")
-            ContainerDb(db, "ymatch_db", "PostgreSQL 16")
-            Container(uploads, "uploads volume", "Local image files")
-            Container(pgdata, "pg_data volume", "Database files")
-        }
-    }
-
-    Deployment_Node(os, "Object Storage", "Bucket") {
-        ContainerDb(backups, "DB backups + tfstate", "Objects")
-    }
-}
-
-Deployment_Node(gh, "GitHub", "") {
-    Container(gha, "Actions", "deploy-oci.yml / deploy-oci-staging.yml")
-    Container(ghcr, "GHCR", "Mirrored base images / builds")
-}
-
-Rel(browser, caddy, "HTTPS", "https://<ip>.nip.io")
-Rel(caddy, fe, "/*")
-Rel(caddy, api, "/api/*, /uploads/*")
-Rel(api, db, "SQL")
-Rel(api, uploads, "read/write")
-Rel(db, pgdata, "files")
-Rel(gha, vm, "SSH deploy / compose up")
-Rel(vm, ghcr, "Pull images")
-Rel(vm, backups, "pg_dump upload (backup jobs)")
-```
+Source: [`diagrams/07-deployment-oci.d2`](diagrams/07-deployment-oci.d2)
 
 ### Environment matrix
 
@@ -84,24 +47,9 @@ Internet → Caddy :443
 
 ## Local development (C4 deployment)
 
-```mermaid
-C4Deployment
-title Deployment — local developer machine
+![Deployment — local developer machine](diagrams/07-deployment-local.svg)
 
-Deployment_Node(dev, "Developer machine", "") {
-    Deployment_Node(host, "Host OS", "") {
-        Container(fe_dev, "Flutter tooling", "flutter run -d web-server :8081")
-        Container(api_dev, "cargo run --bin backend", ":3000")
-    }
-    Deployment_Node(dind, "Docker Compose", "docker-compose.yml") {
-        ContainerDb(pg, "PostgreSQL", ":5432")
-        Container(pgadmin, "pgAdmin", ":5050 optional")
-    }
-}
-
-Rel(fe_dev, api_dev, "HTTP JSON", "localhost:3000")
-Rel(api_dev, pg, "DATABASE_URL")
-```
+Source: [`diagrams/07-deployment-local.d2`](diagrams/07-deployment-local.d2)
 
 | Service | Port (default) |
 |---------|----------------|
@@ -119,15 +67,9 @@ Flutter tests tagged `e2e`. Guide: [e2e_tests](../../how_to/e2e_tests.md).
 
 ## CI/CD sketch
 
-```mermaid
-flowchart LR
-  PR[Pull request] --> CI[ci.yml / coverage / e2e]
-  CI --> Main[merge to main]
-  Main --> DepP[deploy-oci.yml]
-  Main --> DepS[deploy-oci-staging.yml]
-  DepP --> ProdVM[Prod VM compose]
-  DepS --> StgVM[Staging VM compose]
-```
+![CI/CD sketch](diagrams/07-cicd.svg)
+
+Source: [`diagrams/07-cicd.d2`](diagrams/07-cicd.d2)
 
 Secrets (DB passwords, SSH keys, hosts, New Relic, Discord) live in **GitHub
 Secrets** only — never in the repo ([security.md](../security.md)).

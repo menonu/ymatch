@@ -1,0 +1,26 @@
+direction: right
+title: |md
+  # Deployment — local developer machine
+| {near: top-center}
+
+dev: "Developer machine" {
+  style.fill: "#E3F2FD"
+
+  host: "Host OS" {
+    style.fill: "#BBDEFB"
+    fe_dev: "Flutter tooling\nflutter run web :8081" { style.fill: "#90CAF9" }
+    api_dev: "cargo run --bin backend\n:3000" { style.fill: "#90CAF9" }
+  }
+
+  dind: "Docker Compose\n(docker-compose.yml)" {
+    style.fill: "#C8E6C9"
+    pg: "PostgreSQL :5432" {
+      shape: cylinder
+      style.fill: "#81C784"
+    }
+    pgadmin: "pgAdmin :5050\n(optional)" { style.fill: "#A5D6A7" }
+  }
+}
+
+dev.host.fe_dev -> dev.host.api_dev: "HTTP JSON\nlocalhost:3000"
+dev.host.api_dev -> dev.dind.pg: "DATABASE_URL"

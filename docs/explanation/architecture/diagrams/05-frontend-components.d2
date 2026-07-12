@@ -1,0 +1,43 @@
+direction: down
+title: |md
+  # Component diagram — Flutter client
+| {near: top-center}
+
+fe: "Flutter Web UI" {
+  style.fill: "#F3E5F5"
+  style.stroke: "#6A1B9A"
+
+  screens: "Screens\nlib/screens/*" {
+    style.fill: "#E1BEE7"
+  }
+  widgets: "Shared widgets\nlib/widgets/*" {
+    style.fill: "#E1BEE7"
+  }
+  providers: "Providers & controllers\nlib/providers/providers.dart" {
+    style.fill: "#CE93D8"
+  }
+  api: "ApiClient\nlib/services/api_client.dart" {
+    style.fill: "#CE93D8"
+  }
+  models: "Models\nlib/models/* (protobuf)" {
+    style.fill: "#BA68C8"
+  }
+  router: "Router\nGoRouter" {
+    style.fill: "#E1BEE7"
+  }
+  l10n: "Localization\nlib/l10n/* EN + JA" {
+    style.fill: "#E1BEE7"
+  }
+}
+
+backend: "Backend API\nREST" {
+  style.fill: "#FFF3E0"
+}
+
+fe.screens -> fe.providers: "watch / read"
+fe.screens -> fe.widgets: "compose"
+fe.screens -> fe.router: "navigate"
+fe.providers -> fe.api: "mutations & fetches"
+fe.api -> fe.models: "encode/decode"
+fe.api -> backend: "HTTPS JSON"
+fe.screens -> fe.l10n: "strings"

@@ -1,0 +1,28 @@
+direction: right
+title: |md
+  # Trade negotiation state machine (simplified)
+| {near: top-center}
+
+pending: "PENDING" {
+  style.fill: "#BBDEFB"
+}
+offered: "OFFERED" {
+  style.fill: "#FFE082"
+}
+accepted: "ACCEPTED" {
+  style.fill: "#A5D6A7"
+}
+completed: "COMPLETED" {
+  style.fill: "#81C784"
+}
+rejected: "REJECTED" {
+  style.fill: "#EF9A9A"
+}
+
+pending -> offered: "either party proposes"
+pending -> rejected: "either rejects"
+offered -> offered: "non-proposer counters"
+offered -> accepted: "non-proposer accepts\n(balanced)"
+offered -> rejected: "either rejects"
+accepted -> completed: "complete"
+completed -> completed: "apply inventory\nper user"

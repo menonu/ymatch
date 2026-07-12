@@ -3,6 +3,8 @@
 Structural decomposition inside the system. Uses **C4 Container** (recap) and
 **C4 Component** views for the two largest codebases.
 
+Diagrams: [D2](https://d2lang.com/) sources + committed SVG in [`diagrams/`](diagrams/).
+
 ## Containers (recap)
 
 See [03 — Context](03-context.md) for the full container diagram. Code maps to
@@ -17,36 +19,9 @@ containers as:
 
 ## Backend components (C4 level 3)
 
-```mermaid
-C4Component
-title Component diagram — Backend API
+![Component diagram — Backend API](diagrams/05-backend-components.svg)
 
-Container_Boundary(api, "Backend API") {
-    Component(routes, "Router & middleware", "Axum", "Route table, rate limit, CORS, AppState")
-    Component(handlers, "HTTP handlers", "handlers/*", "Parse request, authorize hooks, delegate")
-    Component(lifecycle, "MatchLifecycleService", "services/match_lifecycle.rs", "Propose/counter/accept/complete/apply transactions")
-    Component(rbac, "RbacService", "services/rbac.rs", "Permission checks over user_roles")
-    Component(repos, "Repositories", "repositories/*", "SQL access; concrete structs + Executor")
-    Component(matching, "Matching job", "matching.rs", "Periodic WANT/TRADE mutual match creation")
-    Component(storage, "ImageStorage", "storage/*", "Local or Firebase/GCS adapter")
-    Component(proto, "Generated models", "generated/*", "prost types from proto/")
-}
-
-ContainerDb(db, "PostgreSQL", "PostgreSQL 16", "System of record")
-Container_Ext(client, "Flutter client", "HTTPS JSON")
-
-Rel(client, routes, "REST /api/v1")
-Rel(routes, handlers, "Dispatch")
-Rel(handlers, lifecycle, "Trade mutations")
-Rel(handlers, rbac, "check(permission)")
-Rel(handlers, repos, "CRUD reads/writes")
-Rel(lifecycle, repos, "Transactional SQL")
-Rel(rbac, repos, "Load roles/permissions")
-Rel(matching, db, "Direct SQL for match discovery")
-Rel(repos, db, "SQLx")
-Rel(handlers, storage, "Upload/delete images")
-Rel(handlers, proto, "Serialize responses")
-```
+Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 
 ### Backend module map
 
@@ -82,30 +57,9 @@ Exact columns: [DB schema reference](../../reference/db_schema.md).
 
 ## Frontend components (C4 level 3)
 
-```mermaid
-C4Component
-title Component diagram — Flutter client
+![Component diagram — Flutter client](diagrams/05-frontend-components.svg)
 
-Container_Boundary(fe, "Flutter Web UI") {
-    Component(screens, "Screens", "lib/screens/*", "Login, Items, Event detail, Matches, Chat, Profile, Admin")
-    Component(widgets, "Shared widgets", "lib/widgets/*", "Cards, dialogs, chrome")
-    Component(providers, "Providers & controllers", "lib/providers/providers.dart", "Auth, events, merch, inventory, matches, admin, search")
-    Component(api, "ApiClient", "lib/services/api_client.dart", "HTTP + auth headers + proto3 JSON")
-    Component(models, "Models", "lib/models/*", "Generated protobuf Dart types")
-    Component(router, "Router", "GoRouter", "Deep links / tab navigation")
-    Component(l10n, "Localization", "lib/l10n/*", "EN + JA ARB → AppLocalizations")
-}
-
-Container_Ext(api_ext, "Backend API", "REST")
-
-Rel(screens, providers, "watch / read")
-Rel(screens, widgets, "compose")
-Rel(screens, router, "navigate")
-Rel(providers, api, "mutations & fetches")
-Rel(api, models, "encode/decode")
-Rel(api, api_ext, "HTTPS JSON")
-Rel(screens, l10n, "strings")
-```
+Source: [`diagrams/05-frontend-components.d2`](diagrams/05-frontend-components.d2)
 
 ### Primary screens
 
@@ -125,23 +79,9 @@ Identifiers and EN/JA labels: [UI components](../../reference/ui_components.md),
 
 ## Cross-container data
 
-```mermaid
-flowchart LR
-  subgraph Client
-    UI[Screens]
-    P[Providers]
-    AC[ApiClient]
-  end
-  subgraph API
-    H[Handlers]
-    S[Services]
-    R[Repos]
-  end
-  DB[(PostgreSQL)]
+![Cross-container data flow](diagrams/05-cross-container-data.svg)
 
-  UI --> P --> AC -->|proto3 JSON| H --> S --> R --> DB
-  H --> R
-```
+Source: [`diagrams/05-cross-container-data.d2`](diagrams/05-cross-container-data.d2)
 
 Shared **contract**: `proto/models.proto` → Rust `backend/src/generated` and
 Dart `frontend/lib/models` via `scripts/proto-gen.sh`.

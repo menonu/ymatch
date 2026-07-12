@@ -1,0 +1,22 @@
+title: |md
+  # Privileged operations (RBAC)
+| {near: top-center}
+
+shape: sequence_diagram
+
+u: "User"
+h: "Handler"
+r: "RbacService"
+db: "PostgreSQL"
+
+u -> h: "e.g. POST merch / admin ban"
+h -> r: "check(user, permission, scope)"
+r -> db: "load user_roles +\nrole_permissions"
+r -> h: "allow or deny"
+
+h."allowed (or admin bypass)"
+h -> db: "mutation via repository"
+h -> u: "2xx"
+
+h."denied"
+h -> u: "403"
