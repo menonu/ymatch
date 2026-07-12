@@ -44,7 +44,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT latest(cpuPercent) as 'CPU %', latest(memoryUsageBytes)/1e6 as 'Mem MB' FROM ContainerSample WHERE hostname = 'ymatch-oci-arm' FACET name"
+        query      = "SELECT latest(cpuPercent) as 'CPU %', latest(memoryUsageBytes)/1e6 as 'Mem MB' FROM ContainerSample WHERE hostname = '${var.nr_hostname}' FACET name"
       }
     }
 
@@ -57,7 +57,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT average(cpuPercent) FROM SystemSample WHERE hostname = 'ymatch-oci-arm' TIMESERIES AUTO"
+        query      = "SELECT average(cpuPercent) FROM SystemSample WHERE hostname = '${var.nr_hostname}' TIMESERIES AUTO"
       }
     }
 
@@ -69,7 +69,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT average(memoryUsedPercent) FROM SystemSample WHERE hostname = 'ymatch-oci-arm' TIMESERIES AUTO"
+        query      = "SELECT average(memoryUsedPercent) FROM SystemSample WHERE hostname = '${var.nr_hostname}' TIMESERIES AUTO"
       }
     }
 
@@ -81,7 +81,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT max(diskUsedPercent) as 'Disk Used %' FROM StorageSample WHERE hostname = 'ymatch-oci-arm'"
+        query      = "SELECT max(diskUsedPercent) as 'Disk Used %' FROM StorageSample WHERE hostname = '${var.nr_hostname}'"
       }
       warning  = 70
       critical = 80
@@ -96,7 +96,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT average(receiveBytesPerSecond) as 'RX', average(transmitBytesPerSecond) as 'TX' FROM NetworkSample WHERE hostname = 'ymatch-oci-arm' TIMESERIES AUTO"
+        query      = "SELECT average(receiveBytesPerSecond) as 'RX', average(transmitBytesPerSecond) as 'TX' FROM NetworkSample WHERE hostname = '${var.nr_hostname}' TIMESERIES AUTO"
       }
     }
 

@@ -34,3 +34,19 @@ variable "nr_license_key" {
   type        = string
   sensitive   = true
 }
+
+# OS hostname of the production OCI host as reported in Infrastructure
+# samples (`SystemSample.hostname`, `ContainerSample.hostname`, etc.).
+# This is the VNIC/OS name (e.g. ymatch-vnic-v2), NOT the agent
+# display_name (e.g. ymatch-oci-arm-v2). ContainerSample only filters
+# reliably on hostname — see issue #410.
+#
+# Keep in sync with the production VM's OS hostname. After an instance
+# rebuild, query:
+#   SELECT uniques(hostname), uniques(displayName) FROM SystemSample
+#   SINCE 1 day ago
+variable "nr_hostname" {
+  description = "Production host OS hostname used in dashboard/alert NRQL filters"
+  type        = string
+  default     = "ymatch-vnic-v2"
+}
