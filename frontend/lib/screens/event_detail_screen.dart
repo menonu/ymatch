@@ -388,81 +388,72 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         meta != null &&
                                         meta.hasCreatedBy() &&
                                         meta.createdBy == user.id;
-                                    return GestureDetector(
-                                      // Long-press tab opens the edit dialog
-                                      // for the group creator (#128).
-                                      onLongPress: isGroupCreator
-                                          ? () => _showEditGroupDialog(
+                                    // Edit is only via EventDetailScreen
+                                    // controls (tab edit icon, bottom-left
+                                    // edit FAB, info-panel edit) — not
+                                    // tab long-press (#128).
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(name),
+                                        // Shield = creator / editable
+                                        // indicator (#128).
+                                        if (isGroupCreator) ...[
+                                          const SizedBox(width: 4),
+                                          Tooltip(
+                                            message: l10n.youCanEditGroup,
+                                            child: Icon(
+                                              Icons.shield,
+                                              color: AppTheme.primaryColor,
+                                              size: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 2),
+                                          GestureDetector(
+                                            onTap: () => _showEditGroupDialog(
                                               context,
                                               name,
                                               meta,
-                                            )
-                                          : null,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(name),
-                                          // Shield = creator / editable
-                                          // indicator (#128). Edit action is
-                                          // the dedicated edit icon below
-                                          // (and the bottom-left edit FAB).
-                                          if (isGroupCreator) ...[
-                                            const SizedBox(width: 4),
-                                            Tooltip(
-                                              message: l10n.youCanEditGroup,
+                                            ),
+                                            child: Tooltip(
+                                              message: l10n.editGroup,
                                               child: Icon(
-                                                Icons.shield,
+                                                Icons.edit,
                                                 color: AppTheme.primaryColor,
                                                 size: 16,
                                               ),
                                             ),
-                                            const SizedBox(width: 2),
-                                            GestureDetector(
-                                              onTap: () => _showEditGroupDialog(
-                                                context,
-                                                name,
-                                                meta,
-                                              ),
-                                              child: Tooltip(
-                                                message: l10n.editGroup,
-                                                child: Icon(
-                                                  Icons.edit,
-                                                  color: AppTheme.primaryColor,
-                                                  size: 16,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                          const SizedBox(width: 4),
-                                          GestureDetector(
-                                            onTap: user == null
-                                                ? null
-                                                : () async {
-                                                    await ref
-                                                        .read(
-                                                          eventsControllerProvider
-                                                              .notifier,
-                                                        )
-                                                        .toggleFavoriteGroup(
-                                                          widget.eventId,
-                                                          user.id,
-                                                          name,
-                                                          !isFav,
-                                                        );
-                                                    ref.invalidate(
-                                                      favoriteGroupsProvider,
-                                                    );
-                                                  },
-                                            child: Icon(
-                                              isFav
-                                                  ? Icons.star
-                                                  : Icons.star_border,
-                                              color: Colors.amber,
-                                              size: 18,
-                                            ),
                                           ),
                                         ],
-                                      ),
+                                        const SizedBox(width: 4),
+                                        GestureDetector(
+                                          onTap: user == null
+                                              ? null
+                                              : () async {
+                                                  await ref
+                                                      .read(
+                                                        eventsControllerProvider
+                                                            .notifier,
+                                                      )
+                                                      .toggleFavoriteGroup(
+                                                        widget.eventId,
+                                                        user.id,
+                                                        name,
+                                                        !isFav,
+                                                      );
+                                                  ref.invalidate(
+                                                    favoriteGroupsProvider,
+                                                  );
+                                                },
+                                          child: Icon(
+                                            isFav
+                                                ? Icons.star
+                                                : Icons.star_border,
+                                            color: Colors.amber,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ],
                                     );
                                   },
                                 ),
