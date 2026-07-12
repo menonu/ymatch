@@ -90,13 +90,19 @@ jobs:
           if prs:
               pr_number = prs[0].get("number")
           if pr_number is None:
-              # Squash merge subject: "feat: foo (#123)"
-              m = re.search(r"\(#(\d+)\)", commit_subject)
-              if not m:
-                  # Merge commit body/subject: "Merge pull request #123 from …"
-                  m = re.search(r"Merge pull request #(\d+)", commit_msg)
+              # Merge commit: "Merge pull request #123 from …" (unambiguous).
+              m = re.search(r"Merge pull request #(\d+)", commit_msg)
               if m:
                   pr_number = int(m.group(1))
+              else:
+                  # Squash subject is often "feat: foo (#issue) (#pr)" or
+                  # "feat: foo (#issue)" alone. Prefer the *last* (#N) so we
+                  # pick the PR when both are present; if only the issue is
+                  # embedded the link may 404 on /pull/ — still better than
+                  # mis-attributing an earlier issue as the PR.
+                  nums = re.findall(r"\(#(\d+)\)", commit_subject)
+                  if nums:
+                      pr_number = int(nums[-1])
 
           commit_url = f"https://github.com/{repo}/commit/{head_sha}" if head_sha else ""
           pr_url = f"https://github.com/{repo}/pull/{pr_number}" if pr_number else ""
@@ -150,6 +156,9 @@ jobs:
           body = {
               "username": "ymatch CI",
               "embeds": [embed],
+              # Commit subjects are untrusted text from git history;
+              # never let them ping @everyone / roles via the webhook.
+              "allowed_mentions": {"parse": []},
           }
 
           req = urllib.request.Request(
