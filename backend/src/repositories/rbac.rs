@@ -76,9 +76,9 @@ impl RbacRepository {
     /// their own event (`EventEdit`) and manage its editors
     /// (`EventMemberManage`) without a separate grant step, and the event +
     /// its creator role commit atomically. The catalog also grants
-    /// `event.delete` to `event/creator`; enforcing a creator-facing delete
-    /// is a separate, future endpoint. Idempotent: re-running (e.g. on a
-    /// retry) is a no-op via `ON CONFLICT DO NOTHING`.
+    /// `event.delete` to `event/creator`, which `admin::delete_event` enforces
+    /// via `Permission::EventDelete` in `Scope::Event` (#233). Idempotent:
+    /// re-running (e.g. on a retry) is a no-op via `ON CONFLICT DO NOTHING`.
     ///
     /// Takes a `&mut PgConnection` from the caller's open transaction so the
     /// role assignment commits with the event row. The role id is looked up
