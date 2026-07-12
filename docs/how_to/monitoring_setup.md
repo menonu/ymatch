@@ -32,6 +32,8 @@ OCI/GCP budget alerts.
 │  GitHub Actions ──────── CI/CD Telemetry (via exporter) │
 │                          DB Backup workflow → NR events  │
 │                          Auto-deploy workflow → NR events│
+│                          main E2E/coverage failure →     │
+│                            Discord (direct, #281)        │
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
@@ -180,14 +182,45 @@ so you can verify the format even without a real Discord webhook.
 ### 4. GitHub Actions Exporter
 
 The `.github/workflows/newrelic-exporter.yml` workflow automatically sends
-CI/CD telemetry to New Relic whenever any workflow completes. This appears
-as distributed traces in New Relic.
+CI/CD telemetry to New Relic whenever a watched workflow completes. This
+appears as distributed traces in New Relic.
+
+**Watched workflows:** CI, Deploy (Production/Staging), Database Backup,
+Frontend E2E, Backend Coverage, Frontend Coverage.
 
 **Required GitHub Secrets:**
 | Secret | Description |
 |--------|-------------|
 | `NEW_RELIC_LICENSE_KEY` | Ingest license key (NRAL suffix) |
 | `NEW_RELIC_ACCOUNT_ID` | New Relic account ID |
+
+### 4b. Post-merge E2E / coverage failure alerts (#281)
+
+After #279, E2E and coverage run **only on `main`** (plus manual
+`workflow_dispatch`) and no longer block PRs. A regression can therefore
+land silently unless something watches those main runs.
+
+`.github/workflows/notify-main-failure.yml` listens for completed runs of:
+
+| Workflow | File |
+|----------|------|
+| Frontend E2E | `ci-e2e.yml` |
+| Backend Coverage | `coverage.yml` |
+| Frontend Coverage | `coverage-frontend.yml` |
+
+and posts a Discord embed when the conclusion is `failure` or
+`timed_out` **and** `head_branch == main`. Manual runs on PR branches
+do not notify.
+
+**Embed fields:** workflow name, branch, conclusion, commit (SHA +
+subject + link), actor/event, PR (when detectable), and a link to the
+workflow run.
+
+**Required GitHub Secret:** `DISCORD_WEBHOOK_URL` (same webhook as the
+NR → Discord path in §3 / the Discord Alert Relayer above).
+
+This is the **direct Discord** leg of the hybrid approach in #281; the
+exporter above covers NR telemetry for the same workflows.
 
 ### 5. Database Backup Monitoring
 

@@ -1,0 +1,172 @@
+name: Notify main workflow failure
+
+# #281: Post-merge E2E / coverage failures on `main` no longer block PRs
+# (#279), so a regression can land silently. This workflow posts a
+# Discord alert as soon as one of those main-only workflows fails.
+#
+# Hybrid option from #281: direct Discord path (immediate, independent
+# of New Relic alerting). The New Relic exporter is extended separately
+# so the same runs still show up in NR telemetry for unified dashboards.
+
+on:
+  workflow_run:
+    workflows:
+      - Frontend E2E
+      - Backend Coverage
+      - Frontend Coverage
+    types: [completed]
+    # Filter on the head branch of the *triggering* run so manual
+    # workflow_dispatch on a PR branch never notifies.
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  notify:
+    name: Discord notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Defense in depth: branches: [main] above plus an explicit job
+    # filter. Notify only on hard failures (not cancelled/skipped).
+    if: >
+      contains(fromJSON('["failure", "timed_out"]'), github.event.workflow_run.conclusion)
+      && github.event.workflow_run.head_branch == 'main'
+    steps:
+      - name: Post failure to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          EVENT_NAME: ${{ github.event.workflow_run.event }}
+          DISPLAY_TITLE: ${{ github.event.workflow_run.display_title }}
+          # JSON so multiline commit messages stay intact; limited fields
+          # only (full workflow_run can be large).
+          HEAD_COMMIT_JSON: ${{ toJSON(github.event.workflow_run.head_commit) }}
+          PULL_REQUESTS_JSON: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::error::DISCORD_WEBHOOK_URL secret is not set"
+            exit 1
+          fi
+
+          python3 <<'PYEOF'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.request
+
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          repo = os.environ["REPO"]
+          workflow_name = os.environ.get("WORKFLOW_NAME") or "Unknown workflow"
+          conclusion = (os.environ.get("CONCLUSION") or "failure").upper()
+          branch = os.environ.get("BRANCH") or "main"
+          head_sha = os.environ.get("HEAD_SHA") or ""
+          short_sha = head_sha[:7] if head_sha else "unknown"
+          run_url = os.environ.get("RUN_URL") or ""
+          actor = os.environ.get("ACTOR") or "unknown"
+          event_name = os.environ.get("EVENT_NAME") or "unknown"
+          display_title = os.environ.get("DISPLAY_TITLE") or ""
+
+          head_commit = json.loads(os.environ.get("HEAD_COMMIT_JSON") or "null") or {}
+          commit_msg = (head_commit.get("message") or display_title or "").strip()
+          # First line only for the embed field.
+          commit_subject = commit_msg.splitlines()[0] if commit_msg else "(no commit message)"
+          if len(commit_subject) > 200:
+              commit_subject = commit_subject[:197] + "..."
+
+          # Prefer an associated PR from the workflow_run payload; fall
+          # back to parsing "Merge pull request #N" / "(#N)" from the
+          # commit subject (common on main after squash/merge).
+          pr_number = None
+          prs = json.loads(os.environ.get("PULL_REQUESTS_JSON") or "null") or []
+          if prs:
+              pr_number = prs[0].get("number")
+          if pr_number is None:
+              # Squash merge subject: "feat: foo (#123)"
+              m = re.search(r"\(#(\d+)\)", commit_subject)
+              if not m:
+                  # Merge commit body/subject: "Merge pull request #123 from …"
+                  m = re.search(r"Merge pull request #(\d+)", commit_msg)
+              if m:
+                  pr_number = int(m.group(1))
+
+          commit_url = f"https://github.com/{repo}/commit/{head_sha}" if head_sha else ""
+          pr_url = f"https://github.com/{repo}/pull/{pr_number}" if pr_number else ""
+
+          # Red for failure / dark red for timed_out.
+          color = 0xCC0000 if conclusion == "FAILURE" else 0x8B0000
+
+          fields = [
+              {"name": "Workflow", "value": workflow_name, "inline": True},
+              {"name": "Branch", "value": f"`{branch}`", "inline": True},
+              {"name": "Conclusion", "value": conclusion, "inline": True},
+              {
+                  "name": "Commit",
+                  "value": (
+                      f"[`{short_sha}`]({commit_url}) — {commit_subject}"
+                      if commit_url
+                      else f"`{short_sha}` — {commit_subject}"
+                  ),
+                  "inline": False,
+              },
+              {"name": "Triggered by", "value": f"`{actor}` ({event_name})", "inline": True},
+          ]
+          if pr_number:
+              fields.append(
+                  {
+                      "name": "PR",
+                      "value": f"[#{pr_number}]({pr_url})",
+                      "inline": True,
+                  }
+              )
+          if run_url:
+              fields.append(
+                  {
+                      "name": "Run",
+                      "value": f"[Open workflow run]({run_url})",
+                      "inline": False,
+                  }
+              )
+
+          embed = {
+              "title": f"🚨 main: {workflow_name} {conclusion.lower()}",
+              "description": (
+                  "Post-merge check failed on `main` "
+                  "(E2E/coverage no longer block PRs — #279 / #281)."
+              ),
+              "color": color,
+              "fields": fields,
+              "footer": {"text": f"{repo} · post-merge main notify"},
+          }
+
+          body = {
+              "username": "ymatch CI",
+              "embeds": [embed],
+          }
+
+          req = urllib.request.Request(
+              webhook,
+              data=json.dumps(body).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  if resp.status not in (200, 204):
+                      print(f"Discord returned {resp.status}", file=sys.stderr)
+                      sys.exit(1)
+                  print(
+                      f"Discord accepted alert for {workflow_name} "
+                      f"({conclusion}) status={resp.status}"
+                  )
+          except Exception as exc:  # noqa: BLE001 — surface any POST failure
+              print(f"Failed to post Discord alert: {exc}", file=sys.stderr)
+              sys.exit(1)
+          PYEOF
