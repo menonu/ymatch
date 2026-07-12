@@ -47,6 +47,10 @@ use tokio::sync::OnceCell;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
     // --- global scope ---
+    /// Read detailed user records (admin inspection). Granted to admin +
+    /// moderator. Gates `GET /admin/users/:id` which returns the full User
+    /// proto including sensitive fields (`device_token`, ban state, …).
+    UserRead,
     /// Ban a user. Granted to admin + moderator.
     UserBan,
     /// Lift a ban. Granted to admin + moderator.
@@ -101,6 +105,7 @@ impl Permission {
     /// The value stored in the `permissions.name` column.
     pub fn as_str(&self) -> &'static str {
         match self {
+            Permission::UserRead => "user.read",
             Permission::UserBan => "user.ban",
             Permission::UserUnban => "user.unban",
             Permission::UserRoleManage => "user.role.manage",
@@ -140,6 +145,7 @@ impl Permission {
             Permission::MerchCreate => &["merch.create", "merch.create.any"],
             Permission::MerchEdit => &["merch.edit", "merch.edit.any"],
             Permission::GroupEdit => &["group.edit", "group.edit.any"],
+            Permission::UserRead => &["user.read"],
             Permission::UserBan => &["user.ban"],
             Permission::UserUnban => &["user.unban"],
             Permission::UserRoleManage => &["user.role.manage"],
@@ -282,6 +288,7 @@ mod tests {
         perms_by_role.insert(
             ADMIN,
             set(&[
+                "user.read",
                 "user.ban",
                 "user.unban",
                 "user.role.manage",
@@ -300,6 +307,7 @@ mod tests {
         perms_by_role.insert(
             MODERATOR,
             set(&[
+                "user.read",
                 "user.ban",
                 "user.unban",
                 "event.create",
@@ -408,6 +416,7 @@ mod tests {
 
     #[test]
     fn satisfying_names_for_global_permissions_is_just_the_name() {
+        assert_eq!(Permission::UserRead.satisfying_names(), &["user.read"]);
         assert_eq!(Permission::UserBan.satisfying_names(), &["user.ban"]);
         assert_eq!(
             Permission::UserRoleManage.satisfying_names(),
@@ -475,6 +484,16 @@ mod tests {
     }
 
     #[test]
+    fn moderator_can_read_user_details() {
+        // #376: user.read is global, granted to moderator + admin directly.
+        ok(&[MODERATOR], Permission::UserRead);
+        ok(&[ADMIN], Permission::UserRead);
+        denied(&[CREATOR], Permission::UserRead);
+        denied(&[EDITOR], Permission::UserRead);
+        denied(&[USER], Permission::UserRead);
+    }
+
+    #[test]
     fn moderator_cannot_manage_event_members() {
         // No *.any override for event.member.manage; moderator is not the creator.
         denied(&[MODERATOR], Permission::EventMemberManage);
@@ -482,6 +501,7 @@ mod tests {
 
     #[test]
     fn moderator_global_permissions() {
+        ok(&[MODERATOR], Permission::UserRead);
         ok(&[MODERATOR], Permission::UserBan);
         ok(&[MODERATOR], Permission::UserUnban);
         ok(&[MODERATOR], Permission::EventCreate);
@@ -527,6 +547,7 @@ mod tests {
 
     #[test]
     fn plain_user_has_no_elevated_permissions() {
+        denied(&[USER], Permission::UserRead);
         denied(&[USER], Permission::UserBan);
         denied(&[USER], Permission::EventCreate);
         denied(&[USER], Permission::EventEdit);
@@ -891,6 +912,25 @@ mod tests {
         assert!(
             service
                 .check(&verified(admin_id), &Scope::Global, Permission::MatchDelete)
+                .await
+                .is_ok()
+        );
+        // #376: user.read — moderator/admin ok, plain user denied.
+        assert!(
+            service
+                .check(&verified(mod_id), &Scope::Global, Permission::UserRead)
+                .await
+                .is_ok()
+        );
+        assert!(
+            service
+                .check(&verified(user_id), &Scope::Global, Permission::UserRead)
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .check(&verified(admin_id), &Scope::Global, Permission::UserRead)
                 .await
                 .is_ok()
         );

@@ -16,9 +16,10 @@ pub struct AdminQuery {
 
 /// Resolve the caller from the `user_id` query param and require they hold
 /// `permission` in the global scope (ADR 0004 §3). This is the RBAC entry
-/// point for the admin endpoints: `event.delete.any`, `merch.delete.any`,
-/// `user.ban`, `user.unban`, `user.role.manage`, and `match.delete`. The
-/// admin superuser bypass is handled inside [`RbacService::check`].
+/// point for the admin endpoints: `user.read`, `user.ban`, `user.unban`,
+/// `user.role.manage`, `merch.delete.any`, `group.delete`, and
+/// `match.delete`. The admin superuser bypass is handled inside
+/// [`RbacService::check`].
 async fn require_global(
     state: &AppState,
     query_user_id: Option<i32>,
@@ -202,7 +203,13 @@ pub async fn update_user_role(
 pub async fn get_user_details(
     State(state): State<AppState>,
     Path(target_id): Path<i32>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
 ) -> Result<Json<User>, AppError> {
+    // #376: the full User proto includes sensitive fields (device_token,
+    // ban state, role). Gate on the global `user.read` permission so a
+    // plain caller cannot enumerate device tokens by sequential id.
+    require_global(&state, query.user_id, Permission::UserRead).await?;
+
     let user = state
         .users
         .get_by_id(target_id)
