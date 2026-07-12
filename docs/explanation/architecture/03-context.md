@@ -1,15 +1,18 @@
 # 03 — Context and scope (C4)
 
-This section uses the **C4 model** System Context (level 1) and Container
-(level 2) views to show what is inside the ymatch boundary and what sits outside.
+This section uses the **C4 model System Context** (level 1) view: people and
+external systems that interact with **ymatch** as a black box, plus what is in
+or out of product scope.
+
+Internal decomposition starts at **C4 level 2 (Containers)** in
+[05 — Building blocks](05-building-blocks.md). How containers are placed on
+machines is in [07 — Deployment](07-deployment.md).
 
 C4 structural diagrams are authored in [D2](https://d2lang.com/) and committed
 as SVG under [`diagrams/`](diagrams/) (GitHub does not reliably render Mermaid
 C4). Sequences and simple flowcharts elsewhere use Mermaid.
 
 ## System context (C4 level 1)
-
-People and external systems that interact with **ymatch** as a whole.
 
 ![System Context — ymatch](diagrams/03-system-context.svg)
 
@@ -33,26 +36,6 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 - Third-party payment rails
 - Multi-region active-active failover
 
-## Containers (C4 level 2)
-
-Major deployable / runtime units **inside** the ymatch system boundary.
-
-![Container diagram — ymatch](diagrams/03-containers.svg)
-
-Source: [`diagrams/03-containers.d2`](diagrams/03-containers.d2)
-
-### Container responsibilities
-
-| Container | Responsibility |
-|-----------|----------------|
-| **Flutter Web UI** | Presentation, client state, calls REST via `ApiClient` / protobuf JSON. |
-| **Backend API** | Auth, RBAC checks, domain services, repositories, periodic matcher, image storage adapter. |
-| **PostgreSQL** | System of record. |
-| **Caddy** | Public HTTPS termination and path routing (prod/staging). |
-| **Nginx (frontend container)** | Serves compiled Flutter assets only. |
-
-Local development collapses edge routing: Flutter dev server (:8081) talks to API (:3000) with Postgres from `docker compose` (:5432). See [07 — Deployment](07-deployment.md).
-
 ## External interfaces (summary)
 
 | Interface | Protocol | Notes |
@@ -62,3 +45,7 @@ Local development collapses edge routing: Flutter dev server (:8081) talks to AP
 | API ↔ Postgres | TCP SQL | Connection string from env (`DATABASE_URL`). |
 | CI ↔ VM | SSH + Docker | GitHub Actions deploy workflows. |
 | Ops ↔ OCI | OCI API / Terraform | Infra and Object Storage; secrets never in git. |
+
+Container-level wiring (Caddy paths, compose services) is detailed in
+[05 — Building blocks](05-building-blocks.md) and
+[07 — Deployment](07-deployment.md).

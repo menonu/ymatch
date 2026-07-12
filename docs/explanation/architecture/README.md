@@ -20,9 +20,9 @@ resulting shape and points outward for details.
 |---|---------|----------|----------|
 | 01 | [Introduction & goals](01-introduction.md) | Product goals, stakeholders, top requirements | prose |
 | 02 | [Constraints](02-constraints.md) | Technical, organizational, operational limits | prose |
-| 03 | [Context & scope](03-context.md) | External actors and system boundary | **C4** (D2 → SVG) |
+| 03 | [Context & scope](03-context.md) | External actors and system boundary | **C4 L1** System Context (D2 → SVG) |
 | 04 | [Solution strategy](04-solution-strategy.md) | Tech stack, patterns, ADR index | prose |
-| 05 | [Building blocks](05-building-blocks.md) | Backend layers, frontend layers, matching job | **C4** (D2 → SVG) |
+| 05 | [Building blocks](05-building-blocks.md) | Containers + components | **C4 L2–L3** (D2 → SVG) |
 | 06 | [Runtime view](06-runtime.md) | Auth, matching, trade negotiation, inventory apply | Mermaid (sequence / state / flowchart) |
 | 07 | [Deployment view](07-deployment.md) | Local, staging, production | **C4** (D2 → SVG); CI sketch Mermaid |
 | 08 | [Cross-cutting](08-crosscutting.md) | Security, RBAC, i18n, errors, images | prose + links |
@@ -40,8 +40,11 @@ resulting shape and points outward for details.
 
 ## Conventions used here
 
-- **C4 model** ([c4model.com](https://c4model.com/)) for structural views in
-  sections 03, 05, and 07.
+- **C4 model** ([c4model.com](https://c4model.com/)) mapped to arc42 as:
+  - **L1 System Context** → section 03
+  - **L2 Containers** → section 05 (building blocks)
+  - **L3 Components** → section 05 (building blocks)
+  - **Deployment** → section 07
 - **Diagram tooling**
   - **D2 → committed SVG** for C4 structural diagrams only (GitHub’s Mermaid
     renderer does not reliably draw C4). Sources and renders live under

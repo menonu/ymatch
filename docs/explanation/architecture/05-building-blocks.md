@@ -1,24 +1,43 @@
 # 05 — Building block view (C4)
 
-Structural decomposition inside the system. Uses **C4 Container** (recap) and
-**C4 Component** views for the two largest codebases.
+Structural decomposition **inside** the ymatch system boundary, following the
+C4 hierarchy:
 
-C4 component diagrams: [D2](https://d2lang.com/) → SVG in [`diagrams/`](diagrams/).
-Simple data-flow uses Mermaid below.
+| C4 level | View | Where |
+|----------|------|--------|
+| 1 — System Context | Black-box system + people/external systems | [03 — Context](03-context.md) |
+| **2 — Containers** | Deployable / runtime units | **this section** |
+| **3 — Components** | Major modules inside the largest containers | **this section** |
 
-## Containers (recap)
+C4 diagrams: [D2](https://d2lang.com/) → SVG in [`diagrams/`](diagrams/).
+Simple data-flow uses Mermaid below. Placement on hosts is
+[07 — Deployment](07-deployment.md).
 
-See [03 — Context](03-context.md) for the full container diagram. Code maps to
-containers as:
+## Containers (C4 level 2)
 
-| Container | Primary codebase |
-|-----------|------------------|
-| Flutter Web UI | `frontend/` |
-| Backend API | `backend/` |
-| PostgreSQL | `backend/migrations/` (+ runtime data) |
-| Caddy / Nginx | `Caddyfile.oci`, `frontend.Dockerfile.prod` |
+Major deployable / runtime units inside the system boundary.
+
+![Container diagram — ymatch](diagrams/05-containers.svg)
+
+Source: [`diagrams/05-containers.d2`](diagrams/05-containers.d2)
+
+### Container responsibilities
+
+| Container | Responsibility | Primary codebase / config |
+|-----------|----------------|---------------------------|
+| **Flutter Web UI** | Presentation, client state, REST via `ApiClient` / protobuf JSON | `frontend/` (built assets) |
+| **Backend API** | Auth, RBAC, domain services, repositories, periodic matcher, image storage | `backend/` |
+| **PostgreSQL** | System of record | `backend/migrations/` (+ runtime data) |
+| **Caddy** | Public HTTPS termination and path routing (prod/staging) | `Caddyfile.oci` |
+| **Nginx (frontend container)** | Serves compiled Flutter assets only | `frontend.Dockerfile.prod` |
+
+Local development collapses edge routing: Flutter dev server (:8081) talks to API
+(:3000) with Postgres from `docker compose` (:5432). See
+[07 — Deployment](07-deployment.md).
 
 ## Backend components (C4 level 3)
+
+Decomposition of the **Backend API** container.
 
 ![Component diagram — Backend API](diagrams/05-backend-components.svg)
 
@@ -57,6 +76,9 @@ Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 Exact columns: [DB schema reference](../../reference/db_schema.md).
 
 ## Frontend components (C4 level 3)
+
+Decomposition of the **Flutter Web UI** container (client-side modules; static
+files are served by the Nginx container in prod).
 
 ![Component diagram — Flutter client](diagrams/05-frontend-components.svg)
 
