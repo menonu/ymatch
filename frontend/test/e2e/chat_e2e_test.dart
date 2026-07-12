@@ -1,13 +1,12 @@
 // Part of #230: comprehensive E2E coverage for all user-facing
 // features. This file covers the Chat area — the endpoints that
 // drive the match conversation:
-//   - GET  /api/v1/matches/{id}/messages  (messagesProvider in chat_screen.dart)
-//   - POST /api/v1/matches/{id}/messages  (screen-level call in chat_screen.dart)
+//   - GET  /api/v1/matches/{id}/messages  (messagesProvider)
+//   - POST /api/v1/matches/{id}/messages  (ChatController.sendMessage)
 //
-// The POST endpoint is not wrapped in a Riverpod controller — it is
-// called directly from `chat_screen.dart` with a hand-built
-// camelCase body. This test sends the same body shape the screen
-// sends so a regression like #227 is caught here.
+// #245: the POST goes through ChatController so the test locks the
+// same proto body shape (`SendMessageRequest.toProto3Json()`) and
+// invalidation path as chat_screen.dart — not a hand-built map.
 //
 // Chat requires an existing match, so setUpAll creates two users,
 // two merch items, a cross-trade inventory setup, and waits for the
@@ -21,7 +20,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/screens/chat_screen.dart';
+import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -161,19 +160,18 @@ void main() {
   });
 
   test(
-      'chat screen POSTs to /matches/{id}/messages with the same body shape',
+      'ChatController.sendMessage POSTs SendMessageRequest and refreshes messages',
       () async {
+    // Drive the mutation through ChatController so the test locks the
+    // same proto body shape and invalidation path as chat_screen.
     final container = makeContainer();
     addTearDown(container.dispose);
+    final controller = container.read(chatControllerProvider.notifier);
 
     final content = 'e2e_chat_${DateTime.now().microsecondsSinceEpoch}';
 
-    // Send the exact body shape chat_screen.dart uses.
-    await api.post('/api/v1/matches/$matchId/messages', {
-      'matchId': matchId,
-      'senderId': user1Id,
-      'content': content,
-    });
+    await controller.sendMessage(matchId, user1Id, content);
+    expect(container.read(chatControllerProvider).hasError, isFalse);
 
     // Verify the message appears via the provider (the same GET path
     // the screen polls every 3 seconds).

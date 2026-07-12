@@ -3,21 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
-import '../services/api_client.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import 'map_picker_screen.dart';
 import 'package:latlong2/latlong.dart';
-
-final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((
-  ref,
-  matchId,
-) async {
-  final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/matches/$matchId/messages');
-  return (json as List).map((e) => Message()..mergeFromProto3Json(e)).toList();
-});
 
 class ChatScreen extends ConsumerStatefulWidget {
   final int matchId;
@@ -35,7 +25,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Poll for new messages every 3 seconds
+    // Polling stays on the screen (not ChatController): a singleton
+    // controller has no per-match lifecycle, while this widget already
+    // starts the timer in initState and cancels it in dispose when the
+    // route is popped. Moving it would require a family/autoDispose
+    // notifier for little gain.
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       ref.invalidate(messagesProvider(widget.matchId));
     });
@@ -48,34 +42,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage(User currentUser) async {
+  // #245: thin wrapper — body shape, invalidation, and error state live
+  // on ChatController. Errors surface via ref.listen in build().
+  Future<void> _sendMessage(User currentUser) async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
     _messageController.clear();
 
-    try {
-      final client = ref.read(apiClientProvider);
-      final payload = SendMessageRequest()
-        ..matchId = widget.matchId
-        ..senderId = currentUser.id
-        ..content = text;
-      await client.post(
-        '/api/v1/matches/${widget.matchId}/messages',
-        payload.toProto3Json() as Map<String, dynamic>,
-      );
-      ref.invalidate(messagesProvider(widget.matchId));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.failedToSend(e.toString()),
-            ),
-          ),
-        );
-      }
-    }
+    await ref
+        .read(chatControllerProvider.notifier)
+        .sendMessage(widget.matchId, currentUser.id, text);
   }
 
   @override
@@ -86,6 +63,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final messagesAsync = ref.watch(messagesProvider(widget.matchId));
     final l10n = AppLocalizations.of(context)!;
+
+    // Single owner for chat-send error SnackBars (#245).
+    ref.listen<AsyncValue<void>>(chatControllerProvider, (previous, next) {
+      if (!next.hasError) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.failedToSend(next.error.toString())),
+        ),
+      );
+    });
 
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.white),

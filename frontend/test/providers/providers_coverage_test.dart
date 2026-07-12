@@ -697,6 +697,128 @@ void main() {
     });
   });
 
+  // ---- ChatController / messagesProvider (#245) ----
+
+  group('ChatController', () {
+    test('sendMessage POSTs SendMessageRequest proto body and invalidates',
+        () async {
+      String? capturedBody;
+      var getCount = 0;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            capturedBody = request.body;
+            return _okEmpty();
+          }
+          // Invalidation re-fetches messages after a successful send.
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            getCount++;
+            return _ok([]);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      // Keep messagesProvider alive so invalidate re-runs the future
+      // (autoDispose would otherwise drop it between reads).
+      final sub = container.listen(messagesProvider(9), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(messagesProvider(9).future);
+      expect(getCount, 1);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .sendMessage(9, 7, 'hello');
+
+      expect(container.read(chatControllerProvider).hasError, isFalse);
+      expect(capturedBody, isNotNull);
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(body['matchId'], 9);
+      expect(body['senderId'], 7);
+      expect(body['content'], 'hello');
+
+      // Wait for the post-invalidate re-fetch kicked off by the listener.
+      await container.read(messagesProvider(9).future);
+      expect(getCount, greaterThanOrEqualTo(2),
+          reason: 'sendMessage should invalidate messagesProvider');
+    });
+
+    test('sendMessage failure sets error state (no rethrow, no invalidate)',
+        () async {
+      var getCount = 0;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            return http.Response('bad message', 422);
+          }
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            getCount++;
+            return _ok([]);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final sub = container.listen(messagesProvider(9), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(messagesProvider(9).future);
+      expect(getCount, 1);
+
+      // Completes without throwing — screen listens on state for SnackBars.
+      await container
+          .read(chatControllerProvider.notifier)
+          .sendMessage(9, 7, 'hello');
+
+      expect(container.read(chatControllerProvider).hasError, isTrue);
+      // Failure path must not invalidate.
+      await container.read(messagesProvider(9).future);
+      expect(getCount, 1,
+          reason: 'failed send must not invalidate messagesProvider');
+    });
+  });
+
+  group('messagesProvider', () {
+    test('GETs /matches/{id}/messages and maps to Message list', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/matches/9/messages') {
+            return _ok([
+              {
+                'id': 1,
+                'matchId': 9,
+                'senderId': 7,
+                'content': 'hi',
+              },
+            ]);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final messages = await container.read(messagesProvider(9).future);
+      expect(messages, hasLength(1));
+      expect(messages.first.senderId, 7);
+      expect(messages.first.content, 'hi');
+    });
+  });
+
   // ---- searchProvider / searchQueryProvider ----
 
   group('searchProvider', () {
