@@ -206,9 +206,9 @@ CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-o
 | `OCI_CLI_USER` | `db-backup.yml` | When the least-privilege `ymatch-db-backup` user changes |
 | `OCI_CLI_TENANCY` | `db-backup.yml` | When the tenancy OCID changes (rare) |
 | `OCI_CLI_FINGERPRINT` | `db-backup.yml` | When the backup user’s API key is rotated |
-| `OCI_CLI_KEY_CONTENT` | `db-backup.yml` (OCI CLI install action) | When the backup user’s API private key is rotated (PEM body) |
-| `OCI_CLI_KEY_CONTENT_B64` | `db-backup.yml` (upload config) | Base64 of the same PEM; preferred for reliable multiline handling |
-| `OCI_CLI_REGION` | `db-backup.yml` | When the home region for Object Storage changes || `NEW_RELIC_LICENSE_KEY` | NR deployment / backup report | When the NR license is rotated |
+| `OCI_CLI_KEY_CONTENT_B64` | `db-backup.yml` | Base64 of the backup user’s PEM API key (single source of truth) |
+| `OCI_CLI_REGION` | `db-backup.yml` | When the home region for Object Storage changes |
+| `NEW_RELIC_LICENSE_KEY` | NR deployment / backup report | When the NR license is rotated |
 | `NEW_RELIC_ACCOUNT_ID` | NR deployment / backup report | When the NR account changes |
 
 > **Note:** `GCP_SA_KEY` is **retired** for backups (#383). Database dumps are uploaded to OCI Object Storage (`ymatch-db-backups`), not GCS.
@@ -421,10 +421,10 @@ gh secret set OCI_CLI_USER --body "$USER_OCID"
 gh secret set OCI_CLI_TENANCY --body "$TENANCY"
 gh secret set OCI_CLI_FINGERPRINT --body "<fingerprint-from-upload>"
 gh secret set OCI_CLI_REGION --body "$REGION"
-# Base64 form is preferred (reliable multiline handling in Actions)
+# Single key secret (base64 PEM — reliable multiline handling in Actions)
 base64 -w0 ~/.oci/ymatch_db_backup.pem | gh secret set OCI_CLI_KEY_CONTENT_B64
-# Still needed by oracle-actions/run-oci-cli-command for the install step
-gh secret set OCI_CLI_KEY_CONTENT < ~/.oci/ymatch_db_backup.pem
+# Optional cleanup if an older raw-PEM secret was ever set:
+# gh secret delete OCI_CLI_KEY_CONTENT 2>/dev/null || true
 ```
 
 The group policy only allows `read buckets` / `manage objects` on
