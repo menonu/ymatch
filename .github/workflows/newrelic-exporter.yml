@@ -2,7 +2,18 @@ name: New Relic GitHub Actions Exporter
 
 on:
   workflow_run:
-    workflows: ["CI", "Deploy to OCI (Production)", "Deploy to OCI (Staging)", "Database Backup"]
+    # Include post-merge E2E + coverage (#281) so main-branch failures
+    # appear in NR telemetry alongside CI/deploy/backup. Discord
+    # alerting for those failures is handled directly by
+    # notify-main-failure.yml (hybrid path; independent of NR alerts).
+    workflows:
+      - CI
+      - Deploy to OCI (Production)
+      - Deploy to OCI (Staging)
+      - Database Backup
+      - Frontend E2E
+      - Backend Coverage
+      - Frontend Coverage
     types: [completed]
 
 permissions:
