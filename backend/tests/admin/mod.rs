@@ -349,6 +349,8 @@ async fn test_admin_list_all_matches_returns_array(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_admin_delete_merch_succeeds(pool: PgPool) {
+    // #180: admin delete goes through MerchandiseRepository::delete_by_id
+    // (hard-delete when no inventory references the row).
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "admin-deleterch", "Admin DeleteMerch").await;
 
@@ -394,13 +396,143 @@ async fn test_admin_delete_merch_succeeds(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Verify the merch row is gone.
+    // Verify the merch row is gone (hard delete — no inventory).
     let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM merchandise WHERE id = $1")
         .bind(merch_id as i32)
         .fetch_optional(&pool)
         .await
         .unwrap();
     assert!(row.is_none(), "merch should be deleted");
+}
+
+#[sqlx::test]
+async fn test_admin_delete_merch_soft_deletes_with_inventory(pool: PgPool) {
+    // #180: delete_by_id soft-deletes when inventory still references the row.
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "admin-softdel-merch", "Admin SoftDel Merch")
+            .await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name": "Soft Del Target", "groupName": "Group A", "creatorId": {}}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let merch_id: i64 =
+        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
+            ["id"]
+            .as_i64()
+            .unwrap();
+
+    // Seed a HAVE inventory row so delete_by_id takes the soft-delete branch.
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity)
+         VALUES ($1, $2, 'HAVE', 1)
+         ON CONFLICT (user_id, merch_id, status) DO UPDATE SET quantity = 1",
+    )
+    .bind(user_id as i32)
+    .bind(merch_id as i32)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    grant_global_role(&pool, user_id, "admin").await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/merch/{}?user_id={}",
+                    merch_id, user_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let row: Option<(bool, bool)> =
+        sqlx::query_as("SELECT is_deleted, trade_enabled FROM merchandise WHERE id = $1")
+            .bind(merch_id as i32)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+    let (is_deleted, trade_enabled) = row.expect("merch row should remain after soft delete");
+    assert!(is_deleted, "merch should be soft-deleted");
+    assert!(!trade_enabled, "soft-deleted merch must disable trade");
+}
+
+#[sqlx::test]
+async fn test_admin_delete_match(pool: PgPool) {
+    // #180: admin match delete goes through MatchRepository::delete.
+    let (admin_id, event_id) =
+        create_test_user_and_event(pool.clone(), "admin-delmatch", "Admin DeleteMatch").await;
+    grant_global_role(&pool, admin_id, "admin").await;
+    let other = login_guest(&pool, "admin-delmatch-other", "t").await;
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, 'G', 'PENDING') RETURNING id",
+    )
+    .bind(admin_id as i32)
+    .bind(other as i32)
+    .bind(event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/matches/{}?user_id={}",
+                    match_id, admin_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let still_there: Option<i32> = sqlx::query_scalar("SELECT id FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert!(still_there.is_none(), "match row should be deleted");
+
+    // Idempotent: deleting a missing match is still 200.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/matches/{}?user_id={}",
+                    match_id, admin_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 }
 
 #[sqlx::test]

@@ -631,6 +631,21 @@ impl MatchRepository {
         Ok(())
     }
 
+    /// Delete a match row by primary key. Used by the admin path
+    /// (`DELETE /admin/matches/:id`). Returns `true` if a row was deleted.
+    ///
+    /// `match_items` cascade via FK; `messages` do not — callers that need
+    /// to wipe a match with messages must clear those first (or accept the
+    /// FK error). Admin deletes of empty/pending matches are the common case.
+    pub async fn delete(&self, match_id: i32) -> Result<bool, AppError> {
+        let affected = sqlx::query("DELETE FROM matches WHERE id = $1")
+            .bind(match_id)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+        Ok(affected > 0)
+    }
+
     /// Set the per-user inventory-applied timestamp. `is_user1` picks
     /// which column to write.
     pub async fn mark_inventory_applied<'c, E>(
