@@ -392,38 +392,113 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   }
 
   void _showNewGroupDialog() {
-    final ctrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     final l10n = AppLocalizations.of(context)!;
+    var saving = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.newGroupName),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: InputDecoration(hintText: l10n.newGroupHint),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(l10n.newGroupName),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: InputDecoration(hintText: l10n.newGroupHint),
+                textInputAction: TextInputAction.next,
+                enabled: !saving,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                decoration: InputDecoration(
+                  labelText: l10n.groupDescription,
+                  hintText: l10n.groupDescriptionHint,
+                ),
+                maxLines: 3,
+                enabled: !saving,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext),
+              child: Text(l10n.cancel),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final val = nameCtrl.text.trim();
+                      if (val.isEmpty) return;
+
+                      final user = ref.read(currentUserProvider);
+                      // Persist the group (and optional description) when we
+                      // have a logged-in user so it becomes a first-class
+                      // entity before any merch is added (#128). Without a
+                      // user, fall back to the local-only chip selection —
+                      // the first merch create will still auto-create the
+                      // group row server-side.
+                      if (user != null) {
+                        setDialogState(() => saving = true);
+                        try {
+                          final desc = descCtrl.text.trim();
+                          await ref
+                              .read(groupControllerProvider.notifier)
+                              .createGroup(
+                                eventId: widget.eventId,
+                                userId: user.id,
+                                groupName: val,
+                                description: desc.isEmpty ? null : desc,
+                              );
+                          ref.invalidate(eventGroupsProvider(widget.eventId));
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                l10n.failedToSaveGroup(e.toString()),
+                              ),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                          );
+                          if (dialogContext.mounted) {
+                            setDialogState(() => saving = false);
+                          }
+                          return;
+                        }
+                      }
+
+                      if (!mounted) return;
+                      setState(() {
+                        _customGroups.add(val);
+                        _selectedGroup = val;
+                      });
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext);
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.set),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final val = ctrl.text.trim();
-              if (val.isNotEmpty) {
-                setState(() {
-                  _customGroups.add(val);
-                  _selectedGroup = val;
-                });
-              }
-              Navigator.pop(context);
-            },
-            child: Text(l10n.set),
-          ),
-        ],
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      descCtrl.dispose();
+    });
   }
 
   static int _naturalCompare(String a, String b) {

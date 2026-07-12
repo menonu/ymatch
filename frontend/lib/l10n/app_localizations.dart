@@ -620,6 +620,54 @@ abstract class AppLocalizations {
   /// **'e.g., Keychains'**
   String get newGroupHint;
 
+  /// Label for the optional group description field
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get groupDescription;
+
+  /// Hint text for the group description field
+  ///
+  /// In en, this message translates to:
+  /// **'Optional notes about this group'**
+  String get groupDescriptionHint;
+
+  /// Dialog title for editing a group description
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Group'**
+  String get editGroup;
+
+  /// Tooltip / accessibility label for the group info button
+  ///
+  /// In en, this message translates to:
+  /// **'Group info'**
+  String get groupInfo;
+
+  /// Placeholder when a group has no description
+  ///
+  /// In en, this message translates to:
+  /// **'No description yet.'**
+  String get noGroupDescription;
+
+  /// Snackbar when creating or updating a group fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save group: {error}'**
+  String failedToSaveGroup(String error);
+
+  /// Snackbar after a group is created or updated successfully
+  ///
+  /// In en, this message translates to:
+  /// **'Group saved'**
+  String get groupSaved;
+
+  /// Tooltip on the shield icon shown to group creators
+  ///
+  /// In en, this message translates to:
+  /// **'You can edit this group'**
+  String get youCanEditGroup;
+
   /// Snackbar message when sending a chat message fails
   ///
   /// In en, this message translates to:
