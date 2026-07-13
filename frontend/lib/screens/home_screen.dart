@@ -203,37 +203,55 @@ class HomeScreen extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.white,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SegmentedButton<EventFilter>(
-                // Suppress the default selected check icon so each segment's
-                // width is identical in its selected and unselected states
-                // (issue #324). Selection is still conveyed by the segmented
-                // button's selected background color.
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(
-                    value: EventFilter.all,
-                    label: Text(AppLocalizations.of(context)!.filterAllEvents),
+            child: SegmentedButton<EventFilter>(
+              // `expandedInsets` makes the button expand to fill its parent's
+              // width and distributes it equally across segments, so the bar
+              // fits the screen on one row instead of scrolling horizontally
+              // (issue #415). The outer Container provides the 16px gutters.
+              expandedInsets: EdgeInsets.zero,
+              // Suppress the default selected check icon so each segment's
+              // width is identical in its selected and unselected states
+              // (issue #324). Selection is still conveyed by the segmented
+              // button's selected background color.
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: EventFilter.all,
+                  label: Text(
+                    AppLocalizations.of(context)!.filterAllEvents,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                  ButtonSegment(
-                    value: EventFilter.favorite,
-                    label: Text(AppLocalizations.of(context)!.filterFavorites),
-                  ),
-                  ButtonSegment(
-                    value: EventFilter.joined,
-                    label: Text(AppLocalizations.of(context)!.filterMyItems),
-                  ),
-                ],
-                selected: {filterMode},
-                onSelectionChanged: (Set<EventFilter> newSelection) {
-                  ref.read(eventFilterProvider.notifier).state =
-                      newSelection.first;
-                },
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(fontSize: 12),
                 ),
+                ButtonSegment(
+                  value: EventFilter.favorite,
+                  label: Text(
+                    AppLocalizations.of(context)!.filterFavorites,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                ButtonSegment(
+                  value: EventFilter.joined,
+                  label: Text(
+                    AppLocalizations.of(context)!.filterMyItems,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+              selected: {filterMode},
+              onSelectionChanged: (Set<EventFilter> newSelection) {
+                ref.read(eventFilterProvider.notifier).state =
+                    newSelection.first;
+              },
+              style: SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                // Trim segment gutters so the longest localized label
+                // (Japanese "すべてのイベント") stays on one line at the
+                // narrowest supported width (issue #415).
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                textStyle: const TextStyle(fontSize: 12),
               ),
             ),
           ),
