@@ -180,6 +180,32 @@ void main() {
               '(height ${entry.value} vs single-line $minHeight)',
         );
       }
+
+      // The issue also requires labels to stay *fully visible* (single line).
+      // `maxLines: 1` + `TextOverflow.ellipsis` would silently truncate a
+      // too-wide label without wrapping — the height check above cannot see
+      // that. Measure each label's intrinsic text width and confirm it fits
+      // inside its segment's content box (segment width minus the 6px gutters
+      // applied via `SegmentedButton.styleFrom(padding: ...)`).
+      const segmentHorizontalPadding = 6.0;
+      final segmentContentWidth =
+          (buttonWidth / 3) - segmentHorizontalPadding * 2;
+      for (final label in const ['すべてのイベント', 'お気に入り', 'マイアイテム']) {
+        final painter = TextPainter(
+          text: TextSpan(text: label, style: const TextStyle(fontSize: 12)),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: double.infinity);
+        expect(
+          painter.width,
+          lessThanOrEqualTo(segmentContentWidth),
+          reason:
+              '"$label" intrinsic width ${painter.width.toStringAsFixed(1)} '
+              'exceeds segment content width '
+              '${segmentContentWidth.toStringAsFixed(1)} — the label would '
+              'truncate with ellipsis instead of staying fully visible',
+        );
+        painter.dispose();
+      }
     },
   );
 
