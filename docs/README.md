@@ -37,6 +37,7 @@ Practical steps to help you get started and learn how to develop with `ymatch`.
 Direct, action-oriented instructions to solve specific problems or accomplish key deployment/operation tasks.
 
 * [Development Workflow Guide](how_to/development_workflow.md): Step-by-step workflow for branches, pull requests, local lints, and tests.
+* [PR Review Guide](how_to/pr_review.md): Rubric, methodology, severity tags, and comment format for reviewing PRs (equivalent to `/pr-review` when the skill is unavailable).
 * [Granting Global Roles](how_to/grant_roles.md): Run `scripts/grant_role.sh <username> <role>` per environment to grant `user`/`moderator`/`admin` (ADR 0004 §6, #228) without committing a username.
 * [OCI Production Deployment (Always Free ARM)](how_to/oci_deployment.md): Steps to provision infrastructure with Terraform and deploy the full stack on OCI.
 * [Applying Terraform with Secrets (TF_VAR_ + .env)](how_to/terraform_apply.md): Run `terraform plan`/`apply` for the newrelic + oci modules without committing secrets or host identifiers (#284).
