@@ -1,6 +1,6 @@
 # PR Review Guide
 
-How to review a GitHub pull request with a fixed rubric and a consistent comment format. Prefer `/pr-review <PR>` when that skill is available; use this guide as the equivalent procedure when it is not (see [AGENTS.md](../../AGENTS.md) step 7). Either way, this document is the project-owned source for the shared rubric, methodology, severities, and comment template.
+How to review a GitHub pull request with a fixed rubric and a consistent comment format. Prefer `/pr-review <PR>` (project skill at [`.claude/skills/pr-review/`](../../.claude/skills/pr-review/)); use this guide as the equivalent procedure when the skill cannot be invoked (see [AGENTS.md](../../AGENTS.md) step 7). This document is the human-readable source for the shared rubric, methodology, severities, and comment template.
 
 ---
 
@@ -54,16 +54,14 @@ If neither works, stop and ask for the PR number or URL.
 
 Collect **PR metadata**, **linked issue(s)** with full body text, **changed-file list**, and the **complete diff**. Do not post a comment yet.
 
-#### Option A — Skill bundle script (when installed)
-
-If `~/.claude/skills/pr-review/gather_context.sh` exists:
+#### Option A — Project skill bundle script (preferred)
 
 ```bash
-CTX="$(bash "$HOME/.claude/skills/pr-review/gather_context.sh" "$PR")"
+CTX="$(bash "$(git rev-parse --show-toplevel)/.claude/skills/pr-review/gather_context.sh" "$PR")"
 # Read $CTX; it holds metadata, files, linked issues, and the full diff.
 ```
 
-#### Option B — Portable `gh` commands (no skill required)
+#### Option B — Portable `gh` commands (no skill script)
 
 Prefer the GitHub **REST API** via `gh api` for issue bodies (same approach as the skill’s bundle script). `gh issue view` can fail on some repos because of GraphQL deprecations around project cards.
 
@@ -204,6 +202,7 @@ Context gathering is scripted (or uses the portable `gh` sequence above). The re
 
 ## Related
 
+- [`.claude/skills/pr-review/`](../../.claude/skills/pr-review/) — project skill (`SKILL.md` + `gather_context.sh`); invoke as `/pr-review`
 - [Development Workflow Guide](./development_workflow.md) — full branch → PR → merge flow
 - [AGENTS.md](../../AGENTS.md) — project workflow; step 7 points here for review detail
 - [Repository Security](../explanation/security.md) — secrets and public-repo commit policy (security dimension)

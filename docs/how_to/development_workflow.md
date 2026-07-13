@@ -113,7 +113,7 @@ This triggers the CI pipeline (`.github/workflows/ci.yml`) to build and test you
 
 After the PR exists (and preferably after CI is green), run a structured review:
 
-- Prefer `/pr-review <PR>` when that skill is available.
+- Prefer `/pr-review <PR>` (project skill under [`.claude/skills/pr-review/`](../../.claude/skills/pr-review/)).
 - Otherwise follow the [PR Review Guide](./pr_review.md): gather PR + issue + diff, evaluate correctness / security / design, and post a comment in the standard format with severities `[critical]` / `[major]` / `[minor]` / `[nit]`.
 
 Address critical and major findings (or explain them), then re-run the review. Do not merge from the agent — see the next step.

@@ -23,7 +23,7 @@ Where tests live:
 4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `flutter analyze`
 5. **Push & PR**: Commit, push, and run `gh pr create`
 6. **CI Test**: Verify all CI checks pass successfully
-7. **Review**: Run `/pr-review <PR>` when that skill is available; otherwise run the equivalent procedure in the [PR Review Guide](./docs/how_to/pr_review.md) (context gathering, rubric, methodology, comment format, severities).
+7. **Review**: Run `/pr-review <PR>` (project skill: [`.claude/skills/pr-review/`](./.claude/skills/pr-review/)); if the skill cannot be invoked, follow the [PR Review Guide](./docs/how_to/pr_review.md) (context gathering, rubric, methodology, comment format, severities).
    * Fix or explain `[critical]` / `[major]` findings.
    * Resolve or accept `[minor]` / `[nit]` findings.
    * Re-run after changes.
