@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/l10n/app_localizations.dart';
@@ -99,6 +102,112 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
+
+  testWidgets(
+    'filter tabs fit within screen width at a narrow viewport (#415)',
+    (WidgetTester tester) async {
+      // Representative narrow phone width. With `devicePixelRatio = 1.0` the
+      // physical size equals the logical size in logical pixels.
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController()),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+          ],
+          // Japanese labels are the longest of the supported locales
+          // (e.g. "すべてのイベント"), so they are the worst case for fit.
+          child: _localized(const HomeScreen(), locale: const Locale('ja')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final buttonFinder = find.byType(SegmentedButton<EventFilter>);
+      expect(buttonFinder, findsOneWidget);
+
+      // The filter bar lives in a Container with 16px horizontal padding, so
+      // with `expandedInsets: EdgeInsets.zero` the bar must fill exactly
+      // screenWidth - 32 — no horizontal scroll, no overflow, one row.
+      const availableWidth = 360 - 32;
+      final buttonWidth = tester.getSize(buttonFinder).width;
+      expect(
+        buttonWidth,
+        closeTo(availableWidth, 0.5),
+        reason:
+            'filter tab bar ($buttonWidth) does not fill the available '
+            'width ($availableWidth)',
+      );
+
+      // The three segments must share the available width equally so the bar
+      // fills the row instead of left-aligning at intrinsic width. Each
+      // segment renders as its own TextButton, so measure those.
+      final segments = find.descendant(
+        of: buttonFinder,
+        matching: find.byType(TextButton),
+      );
+      expect(segments, findsNWidgets(3));
+      final widths = tester
+          .renderObjectList(segments)
+          .map((r) => (r as RenderBox).size.width)
+          .toList();
+      expect(
+        widths.every((w) => (w - widths.first).abs() < 0.5),
+        isTrue,
+        reason: 'segment widths are not equal: $widths',
+      );
+
+      // No label may wrap to a second line — the bar must stay a single row.
+      // A wrapped label's paragraph height is roughly double a single line, so
+      // compare every label's height against the shortest one (which always
+      // fits on one line) and reject any that grew.
+      final labelHeights = <String, double>{};
+      for (final label in const ['すべてのイベント', 'お気に入り', 'マイアイテム']) {
+        final paragraph =
+            tester.renderObject(find.text(label)) as RenderParagraph;
+        labelHeights[label] = paragraph.size.height;
+      }
+      final minHeight = labelHeights.values.reduce(math.min);
+      for (final entry in labelHeights.entries) {
+        expect(
+          entry.value,
+          lessThan(minHeight * 1.5),
+          reason:
+              '"${entry.key}" wrapped to more than one line '
+              '(height ${entry.value} vs single-line $minHeight)',
+        );
+      }
+
+      // The issue also requires labels to stay *fully visible* (single line).
+      // `maxLines: 1` + `TextOverflow.ellipsis` would silently truncate a
+      // too-wide label without wrapping — the height check above cannot see
+      // that. Measure each label's intrinsic text width and confirm it fits
+      // inside its segment's content box (segment width minus the 6px gutters
+      // applied via `SegmentedButton.styleFrom(padding: ...)`).
+      const segmentHorizontalPadding = 6.0;
+      final segmentContentWidth =
+          (buttonWidth / 3) - segmentHorizontalPadding * 2;
+      for (final label in const ['すべてのイベント', 'お気に入り', 'マイアイテム']) {
+        final painter = TextPainter(
+          text: TextSpan(text: label, style: const TextStyle(fontSize: 12)),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: double.infinity);
+        expect(
+          painter.width,
+          lessThanOrEqualTo(segmentContentWidth),
+          reason:
+              '"$label" intrinsic width ${painter.width.toStringAsFixed(1)} '
+              'exceeds segment content width '
+              '${segmentContentWidth.toStringAsFixed(1)} — the label would '
+              'truncate with ellipsis instead of staying fully visible',
+        );
+        painter.dispose();
+      }
+    },
+  );
 
   testWidgets(
     'filter tab button keeps a fixed width regardless of selection (#324)',
