@@ -597,4 +597,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get howToPreviewTabHint => 'Available after login';
+
+  @override
+  String get exportInventoryTooltip => 'Export this group\'s inventory';
+
+  @override
+  String get exportInventoryTitle => 'Export inventory';
+
+  @override
+  String get exportFormatLabel => 'Format';
+
+  @override
+  String get exportFormatBasic => 'Basic';
+
+  @override
+  String get exportFormatCsv => 'CSV';
+
+  @override
+  String get exportFormatMarkdown => 'Markdown';
+
+  @override
+  String get exportCopy => 'Copy';
+
+  @override
+  String get exportCopied => 'Copied to clipboard';
+
+  @override
+  String get exportEmpty => 'Nothing selected to export';
 }

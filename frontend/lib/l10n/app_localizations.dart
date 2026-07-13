@@ -1177,6 +1177,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Available after login'**
   String get howToPreviewTabHint;
+
+  /// Tooltip for the per-item-group export icon button (ADR 0007)
+  ///
+  /// In en, this message translates to:
+  /// **'Export this group\'s inventory'**
+  String get exportInventoryTooltip;
+
+  /// Title of the export dialog shown from a group's info header (ADR 0007)
+  ///
+  /// In en, this message translates to:
+  /// **'Export inventory'**
+  String get exportInventoryTitle;
+
+  /// Label above the format chooser in the export dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get exportFormatLabel;
+
+  /// Export format option: the colon/comma text format (ADR 0007 'basic')
+  ///
+  /// In en, this message translates to:
+  /// **'Basic'**
+  String get exportFormatBasic;
+
+  /// Export format option: RFC 4180 CSV (ADR 0007 'csv')
+  ///
+  /// In en, this message translates to:
+  /// **'CSV'**
+  String get exportFormatCsv;
+
+  /// Export format option: a GitHub-flavored markdown table (ADR 0007 'markdown')
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown'**
+  String get exportFormatMarkdown;
+
+  /// Copy-to-clipboard button in the export dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get exportCopy;
+
+  /// Toast shown after the exported text is copied to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get exportCopied;
+
+  /// Hint shown in the export dialog preview when no status is checked or no items match
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing selected to export'**
+  String get exportEmpty;
 }
 
 class _AppLocalizationsDelegate
