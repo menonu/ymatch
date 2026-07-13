@@ -143,17 +143,22 @@ String _renderMarkdown(
     if (!selected.contains(s)) continue;
     final label = labels.labelFor(s);
     for (final e in buckets[s]!) {
-      rows.add('| $label | ${e.name} | ${e.qty} |');
+      rows.add('| ${_mdCell(label)} | ${_mdCell(e.name)} | ${e.qty} |');
     }
   }
   return rows.join('\n');
 }
 
 /// Quote a CSV field per RFC 4180: wrap in double quotes when it contains a
-/// comma, double-quote, or newline; double any embedded double-quote.
+/// comma, double-quote, or newline; double any embedded double-quote. (Line
+/// terminator is LF, matching the other formats and clipboard use.)
 String _csvCell(String field) {
   if (field.contains(',') || field.contains('"') || field.contains('\n')) {
     return '"${field.replaceAll('"', '""')}"';
   }
   return field;
 }
+
+/// Escape a markdown table cell so a `|` in the content is not parsed as a
+/// column separator (GFM).
+String _mdCell(String field) => field.replaceAll('|', '\\|');

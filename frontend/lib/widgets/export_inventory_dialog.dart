@@ -66,7 +66,7 @@ class _ExportInventoryDialogState extends ConsumerState<ExportInventoryDialog> {
     );
 
     return AlertDialog(
-      title: Text(l10n.exportInventoryTitle),
+      title: Text('${l10n.exportInventoryTitle} — ${widget.displayGroupName}'),
       content: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(

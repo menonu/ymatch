@@ -44,7 +44,7 @@ Three text formats ship initially, selected via a format chooser in the UI. The 
 
 1. **`basic`** — the canonical format above. One line per included status, in the fixed order 所持 → 求 → 譲. Each line: `<label>: <items>`. Items are `name` or `name*qty` (qty suffix omitted when qty == 1), comma-space separated, **sorted alphabetically by name** for stable diffs. Omit a status's line entirely when its checkbox is unchecked.
 
-2. **`csv`** — RFC 4180 CSV with header `status,item,quantity`, one row per item. Fields are quoted when they contain a comma, quote, or newline. Status column uses the **localized label** (所持 / 求 / 譲), consistent with `basic`. Rows ordered status-first (所持 → 求 → 譲), then alphabetically by name.
+2. **`csv`** — CSV with header `status,item,quantity`, one row per item, using RFC 4180 quoting rules (fields are quoted when they contain a comma, quote, or newline; embedded quotes are doubled) but **LF (`\n`) record terminators** — matching `basic`/`markdown` and the clipboard/paste target, where LF is the universal choice. Status column uses the **localized label** (所持 / 求 / 譲), consistent with `basic`. Rows ordered status-first (所持 → 求 → 譲), then alphabetically by name.
 
 3. **`markdown`** — a single GitHub-flavored table:
 
@@ -56,7 +56,7 @@ Three text formats ship initially, selected via a format chooser in the UI. The 
    ...
    ```
 
-   Same row ordering as CSV; the `qty` cell is the integer.
+   Same row ordering as CSV; the `qty` cell is the integer. A `|` in a cell's content is escaped as `\|` so it is not parsed as a column separator.
 
 ### Rules shared by all formats
 

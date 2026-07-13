@@ -439,6 +439,28 @@ void main() {
       );
       expect(out, '| status | item | qty |\n|--------|------|-----|');
     });
+
+    test('a pipe in an item name is escaped so it does not break the table', () {
+      final out = exportInventoryText(
+        items: [
+          _item(
+            merchId: 1,
+            status: 'HAVE',
+            quantity: 1,
+            merchName: 'a|b',
+            groupName: 'G',
+          ),
+        ],
+        groupName: 'G',
+        selected: {ExportStatus.have},
+        format: ExportFormat.markdown,
+        labels: _labels,
+      );
+      expect(
+        out,
+        '| status | item | qty |\n|--------|------|-----|\n| 所持 | a\\|b | 1 |',
+      );
+    });
   });
 
   group('exportInventoryText — status token mapping', () {
