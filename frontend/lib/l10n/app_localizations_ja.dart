@@ -595,9 +595,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get howToPreviewTabHint => 'ログイン後に使用できます';
 
   @override
-  String get exportInventoryTooltip => 'このグループの在庫をエクスポート';
-
-  @override
   String get exportInventoryTitle => '在庫エクスポート';
 
   @override

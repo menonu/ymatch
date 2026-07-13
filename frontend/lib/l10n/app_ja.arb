@@ -191,7 +191,6 @@
   "noCompletedTrades": "完了した取引はまだありません。",
   "howToHint": "取引ガイドはプロフィールタブにあります。ログイン後にタップして確認しましょう。",
   "howToPreviewTabHint": "ログイン後に使用できます",
-  "exportInventoryTooltip": "このグループの在庫をエクスポート",
   "exportInventoryTitle": "在庫エクスポート",
   "exportFormatLabel": "形式",
   "exportFormatBasic": "基本",

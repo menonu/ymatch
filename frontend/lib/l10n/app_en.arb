@@ -844,13 +844,9 @@
   "@howToPreviewTabHint": {
     "description": "Shown when the virtual Profile tab preview on the login screen is tapped — the tab is not usable until after login"
   },
-  "exportInventoryTooltip": "Export this group's inventory",
-  "@exportInventoryTooltip": {
-    "description": "Tooltip for the per-item-group export icon button (ADR 0007)"
-  },
   "exportInventoryTitle": "Export inventory",
   "@exportInventoryTitle": {
-    "description": "Title of the export dialog shown from a group's info header (ADR 0007)"
+    "description": "Label for the export-inventory menu item in the event-detail 3-dots menu, and title of the export dialog (ADR 0007)"
   },
   "exportFormatLabel": "Format",
   "@exportFormatLabel": {

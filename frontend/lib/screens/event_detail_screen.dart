@@ -356,12 +356,33 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           SnackBar(content: Text(l10n.noMissingItems)),
                         );
                       }
+                    } else if (value == 'export') {
+                      if (user == null) return;
+                      // Export the active tab's group (ADR 0007). The synthetic
+                      // "Other items" bucket maps to the empty group name.
+                      final tabCtrl = DefaultTabController.of(context);
+                      final index = tabCtrl.index.clamp(
+                        0,
+                        groupKeys.length - 1,
+                      );
+                      final groupName = groupKeys[index];
+                      final rawGroup = groupName == otherItems ? '' : groupName;
+                      await _showExportInventoryDialog(
+                        context,
+                        displayGroupName: groupName,
+                        rawGroup: rawGroup,
+                        user: user,
+                      );
                     }
                   },
                   itemBuilder: (BuildContext context) => [
                     PopupMenuItem(
                       value: 'want_missing',
                       child: Text(l10n.wantAllMissing),
+                    ),
+                    PopupMenuItem(
+                      value: 'export',
+                      child: Text(l10n.exportInventoryTitle),
                     ),
                   ],
                 ),
@@ -871,20 +892,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         tooltip: l10n.editGroup,
                         onPressed: () =>
                             _showEditGroupDialog(context, groupName, meta),
-                      ),
-                    // Export the user's own inventory for this group (ADR 0007).
-                    // Available to any logged-in user; the synthetic "Other
-                    // items" bucket maps to the empty group name.
-                    if (user != null)
-                      IconButton(
-                        icon: const Icon(Icons.ios_share),
-                        tooltip: l10n.exportInventoryTooltip,
-                        onPressed: () => _showExportInventoryDialog(
-                          context,
-                          displayGroupName: groupName,
-                          rawGroup: isSynthetic ? '' : groupName,
-                          user: user,
-                        ),
                       ),
                     IconButton(
                       icon: const Icon(Icons.close),

@@ -1178,13 +1178,7 @@ abstract class AppLocalizations {
   /// **'Available after login'**
   String get howToPreviewTabHint;
 
-  /// Tooltip for the per-item-group export icon button (ADR 0007)
-  ///
-  /// In en, this message translates to:
-  /// **'Export this group\'s inventory'**
-  String get exportInventoryTooltip;
-
-  /// Title of the export dialog shown from a group's info header (ADR 0007)
+  /// Label for the export-inventory menu item in the event-detail 3-dots menu, and title of the export dialog (ADR 0007)
   ///
   /// In en, this message translates to:
   /// **'Export inventory'**
