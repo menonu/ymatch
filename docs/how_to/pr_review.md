@@ -1,8 +1,6 @@
 # PR Review Guide
 
-How to review a GitHub pull request with a fixed rubric and a consistent comment format. Use this whenever the `/pr-review` skill is available **or** when you must run an equivalent review without it (see [AGENTS.md](../../AGENTS.md) step 7).
-
-This guide is the project-owned equivalent of the `pr-review` skill: same dimensions, methodology, severities, and output template so reviews stay comparable across tools and sessions.
+How to review a GitHub pull request with a fixed rubric and a consistent comment format. Prefer `/pr-review <PR>` when that skill is available; use this guide as the equivalent procedure when it is not (see [AGENTS.md](../../AGENTS.md) step 7). Either way, this document is the project-owned source for the shared rubric, methodology, severities, and comment template.
 
 ---
 
@@ -10,7 +8,7 @@ This guide is the project-owned equivalent of the `pr-review` skill: same dimens
 
 Run a PR review after the PR exists and CI is green (or at least after the diff is ready for human review):
 
-1. After `gh pr create` (workflow step 7 in AGENTS.md).
+1. When you reach **Review** in the workflow ([AGENTS.md](../../AGENTS.md) step 7 — after `gh pr create` and CI checks).
 2. Again after you address `[critical]` / `[major]` findings and push fixes.
 
 Do **not** merge after review. Report the PR URL and wait for a human merge or explicit authorization.
@@ -67,22 +65,27 @@ CTX="$(bash "$HOME/.claude/skills/pr-review/gather_context.sh" "$PR")"
 
 #### Option B — Portable `gh` commands (no skill required)
 
+Prefer the GitHub **REST API** via `gh api` for issue bodies (same approach as the skill’s bundle script). `gh issue view` can fail on some repos because of GraphQL deprecations around project cards.
+
 ```bash
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 PR_NUM="$(printf '%s' "$PR" | sed -E 's@^.*/pull/([0-9]+).*@\1@; s/^#//; s/[^0-9]//g')"
 
 # PR metadata
-gh pr view "$PR_NUM" --json title,author,baseRefName,headRefName,state,additions,deletions,changedFiles,commits,body,url
+gh api "repos/$REPO/pulls/$PR_NUM" --jq \
+  '"**Title:** \(.title)\n**Author:** \(.user.login)\n**Base:** \(.base.ref)  ←  **Head:** \(.head.ref)\n**State:** \(.state)\n**Files:** \(.changed_files) (+\(.additions)/-\(.deletions))\n\n**Body:**\n\(.body // "(no PR body)")"'
 
 # Changed files
-gh pr view "$PR_NUM" --json files --jq '.files[] | "\(.path) (+\(.additions)/-\(.deletions))"'
+gh api "repos/$REPO/pulls/$PR_NUM/files" --jq \
+  '.[] | "- [\(.status)] \(.filename)  (+\(.additions)/-\(.deletions))"'
 
 # Full diff
 gh pr diff "$PR_NUM"
 
 # Linked issues: parse closes/fixes/resolves (and similar) from PR body + commits,
-# then fetch each issue body, e.g.:
-gh issue view <N> --json title,state,body
+# then fetch each issue body via REST, e.g.:
+gh api "repos/$REPO/issues/<N>" --jq \
+  '"**\(.title)**  (state: \(.state))\n\n\(.body // "(no issue body)")"'
 ```
 
 Linked issues are usually referenced in the PR body or commit messages with keywords such as `closes`, `fixes`, `resolves`, `implements`, `references`, or `see` followed by `#N`. If none are found, evaluate correctness against the PR’s own stated intent and note “none detected” in the comment.
