@@ -338,89 +338,83 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Info panel shows description image below the text (#404)',
-    (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(
-              5,
-            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            eventGroupsProvider(5).overrideWith(
-              (ref) async => [
-                _testGroup(
-                  name: 'Pens',
-                  description: 'Collectible pens',
-                  createdBy: 1,
-                  // data URI avoids network Image.network in tests
-                  photoUrl:
-                      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-                ),
-              ],
-            ),
-          ],
-          child: _localized(const EventDetailScreen(eventId: 5)),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('Info panel shows description image below the text (#404)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          eventGroupsProvider(5).overrideWith(
+            (ref) async => [
+              _testGroup(
+                name: 'Pens',
+                description: 'Collectible pens',
+                createdBy: 1,
+                // data URI avoids network Image.network in tests
+                photoUrl:
+                    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+              ),
+            ],
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Group info'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Group info'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Collectible pens'), findsOneWidget);
-      // Image.memory is used for data-URI photos.
-      expect(find.byType(Image), findsWidgets);
-    },
-  );
+    expect(find.text('Collectible pens'), findsOneWidget);
+    // Image.memory is used for data-URI photos.
+    expect(find.byType(Image), findsWidgets);
+  });
 
-  testWidgets(
-    'group edit dialog shows image attach controls (#404)',
-    (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(
-              5,
-            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            eventGroupsProvider(5).overrideWith(
-              (ref) async => [
-                _testGroup(
-                  name: 'Pens',
-                  description: 'Collectible pens',
-                  createdBy: 1,
-                ),
-              ],
-            ),
-          ],
-          child: _localized(const EventDetailScreen(eventId: 5)),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('group edit dialog shows image attach controls (#404)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          eventGroupsProvider(5).overrideWith(
+            (ref) async => [
+              _testGroup(
+                name: 'Pens',
+                description: 'Collectible pens',
+                createdBy: 1,
+              ),
+            ],
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Edit Group'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Edit Group'));
+    await tester.pumpAndSettle();
 
-      final dialog = find.byType(AlertDialog);
-      expect(dialog, findsOneWidget);
-      expect(
-        find.descendant(of: dialog, matching: find.text('Description image')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: dialog, matching: find.text('Choose Image')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: dialog, matching: find.text('No image attached')),
-        findsOneWidget,
-      );
-    },
-  );
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    expect(
+      find.descendant(of: dialog, matching: find.text('Description image')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Choose Image')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('No image attached')),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'group creator sees bottom edit icon (not on tabs) and can open the '
@@ -547,87 +541,82 @@ void main() {
     },
   );
 
-  testWidgets(
-    'initialGroupName selects the matching group tab (#406)',
-    (tester) async {
-      final alpha = Merchandise()
-        ..id = 1
-        ..eventId = 5
-        ..name = 'AlphaItem'
-        ..groupName = 'Alpha'
-        ..creatorId = 1;
-      final zeta = Merchandise()
-        ..id = 2
-        ..eventId = 5
-        ..name = 'ZetaItem'
-        ..groupName = 'Zeta'
-        ..creatorId = 1;
+  testWidgets('initialGroupName selects the matching group tab (#406)', (
+    tester,
+  ) async {
+    final alpha = Merchandise()
+      ..id = 1
+      ..eventId = 5
+      ..name = 'AlphaItem'
+      ..groupName = 'Alpha'
+      ..creatorId = 1;
+    final zeta = Merchandise()
+      ..id = 2
+      ..eventId = 5
+      ..name = 'ZetaItem'
+      ..groupName = 'Zeta'
+      ..creatorId = 1;
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(5).overrideWith((ref) async => [alpha, zeta]),
-          ],
-          child: _localized(
-            const EventDetailScreen(eventId: 5, initialGroupName: 'Zeta'),
-          ),
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [alpha, zeta]),
+        ],
+        child: _localized(
+          const EventDetailScreen(eventId: 5, initialGroupName: 'Zeta'),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Natural sort puts Alpha before Zeta; favorite-group deep link must
-      // open Zeta (index 1), not the default first tab.
-      final tabCtrl = DefaultTabController.of(
-        tester.element(find.byType(TabBar)),
-      );
-      expect(tabCtrl.index, 1);
-      expect(find.text('ZetaItem'), findsOneWidget);
-      expect(find.text('AlphaItem'), findsNothing);
-    },
-  );
+    // Natural sort puts Alpha before Zeta; favorite-group deep link must
+    // open Zeta (index 1), not the default first tab.
+    final tabCtrl = DefaultTabController.of(
+      tester.element(find.byType(TabBar)),
+    );
+    expect(tabCtrl.index, 1);
+    expect(find.text('ZetaItem'), findsOneWidget);
+    expect(find.text('AlphaItem'), findsNothing);
+  });
 
-  testWidgets(
-    'unknown initialGroupName falls back to first group tab (#406)',
-    (tester) async {
-      final alpha = Merchandise()
-        ..id = 1
-        ..eventId = 5
-        ..name = 'AlphaItem'
-        ..groupName = 'Alpha'
-        ..creatorId = 1;
-      final zeta = Merchandise()
-        ..id = 2
-        ..eventId = 5
-        ..name = 'ZetaItem'
-        ..groupName = 'Zeta'
-        ..creatorId = 1;
+  testWidgets('unknown initialGroupName falls back to first group tab (#406)', (
+    tester,
+  ) async {
+    final alpha = Merchandise()
+      ..id = 1
+      ..eventId = 5
+      ..name = 'AlphaItem'
+      ..groupName = 'Alpha'
+      ..creatorId = 1;
+    final zeta = Merchandise()
+      ..id = 2
+      ..eventId = 5
+      ..name = 'ZetaItem'
+      ..groupName = 'Zeta'
+      ..creatorId = 1;
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(5).overrideWith((ref) async => [alpha, zeta]),
-          ],
-          child: _localized(
-            const EventDetailScreen(
-              eventId: 5,
-              initialGroupName: 'DoesNotExist',
-            ),
-          ),
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [alpha, zeta]),
+        ],
+        child: _localized(
+          const EventDetailScreen(eventId: 5, initialGroupName: 'DoesNotExist'),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final tabCtrl = DefaultTabController.of(
-        tester.element(find.byType(TabBar)),
-      );
-      expect(tabCtrl.index, 0);
-      expect(find.text('AlphaItem'), findsOneWidget);
-    },
-  );
+    final tabCtrl = DefaultTabController.of(
+      tester.element(find.byType(TabBar)),
+    );
+    expect(tabCtrl.index, 0);
+    expect(find.text('AlphaItem'), findsOneWidget);
+  });
 
   test('resolveInitialGroupTabIndex maps name or falls back (#406)', () {
     expect(resolveInitialGroupTabIndex(['A', 'B'], 'B'), 1);
@@ -653,8 +642,7 @@ void main() {
         client: MockClient((request) async {
           if (request.method == 'POST' &&
               request.url.path == '/api/v1/user/inventory') {
-            final body =
-                jsonDecode(request.body) as Map<String, dynamic>;
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
             inventoryPosts.add(body);
             return http.Response(
               jsonEncode({
@@ -734,8 +722,7 @@ void main() {
           }
           if (request.method == 'POST' &&
               request.url.path == '/api/v1/user/inventory') {
-            final body =
-                jsonDecode(request.body) as Map<String, dynamic>;
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
             inventoryPosts.add(body);
             return http.Response(
               jsonEncode({
@@ -919,5 +906,62 @@ void main() {
       'Bad': _testGroup(name: 'Bad', displayName: ''),
     };
     expect(groupDisplayName('Bad', empty), 'Bad');
+  });
+
+  // Regression for the 0.3.13 export-from-3-dots-menu wiring: the menu's
+  // onSelected called DefaultTabController.of on the State's build context,
+  // which is the controller's *parent* — the lookup threw at runtime and the
+  // export dialog never opened ("在庫エクスポート doesn't show anything").
+  testWidgets('3-dots export menu opens the export dialog for the active group '
+      '(#418 regression)', (tester) async {
+    final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+    final invJson = jsonEncode([
+      {
+        'merchId': 10,
+        'status': 'HAVE',
+        'quantity': 2,
+        'merchName': 'TestPen42',
+        'groupName': 'Pens',
+      },
+    ]);
+    final client = ApiClient(
+      config,
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/user/1/inventory')) {
+          return http.Response(invJson, 200);
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => client),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 2)]),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the 3-dots overflow menu (the only PopupMenuButton<String>).
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+
+    // The "Export inventory" item is present; tap it.
+    expect(find.text('Export inventory'), findsOneWidget);
+    await tester.tap(find.text('Export inventory'));
+    await tester.pumpAndSettle();
+
+    // The dialog opened with the active group's name in the title. This only
+    // happens if DefaultTabController.of resolved from a context under the
+    // controller and the active tab's group name was read successfully.
+    expect(find.text('Export inventory — Pens'), findsOneWidget);
+
+    // And the preview renders the user's inventory for that group.
+    final preview = tester.widget<SelectableText>(find.byType(SelectableText));
+    expect(preview.data, 'Own: TestPen42*2');
   });
 }
