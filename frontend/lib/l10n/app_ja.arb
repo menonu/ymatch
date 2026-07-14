@@ -190,5 +190,13 @@
   "noActiveTrades": "進行中の取引はありません。",
   "noCompletedTrades": "完了した取引はまだありません。",
   "howToHint": "取引ガイドはプロフィールタブにあります。ログイン後にタップして確認しましょう。",
-  "howToPreviewTabHint": "ログイン後に使用できます"
+  "howToPreviewTabHint": "ログイン後に使用できます",
+  "exportInventoryTitle": "在庫エクスポート",
+  "exportFormatLabel": "形式",
+  "exportFormatBasic": "基本",
+  "exportFormatCsv": "CSV",
+  "exportFormatMarkdown": "Markdown",
+  "exportCopy": "コピー",
+  "exportCopied": "クリップボードにコピーしました",
+  "exportEmpty": "エクスポート対象がありません"
 }

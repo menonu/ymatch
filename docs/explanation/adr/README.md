@@ -70,3 +70,4 @@ Record every ADR in the index below, newest last.
 | [0004](0004-rbac-permission-model.md) | Role-Based Access Control (RBAC) Permission Model | Accepted | 2026-07-05 |
 | [0005](0005-merch-create-permission.md) | Gate Merch Creation Behind `merch.create` | Accepted | 2026-07-08 |
 | [0006](0006-derive-user-role-from-user-roles.md) | Derive `User.role` from `user_roles` at Read Time (drop `users.role` mirror) | Accepted | 2026-07-10 |
+| [0007](0007-inventory-export-text-formats.md) | Client-Side Inventory Export with Text Formats | Accepted | 2026-07-13 |

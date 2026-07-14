@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import '../utils/image_helper.dart';
+import '../widgets/export_inventory_dialog.dart';
 import '../widgets/how_to_trade.dart';
 import 'add_merch_screen.dart';
 
@@ -355,12 +356,33 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           SnackBar(content: Text(l10n.noMissingItems)),
                         );
                       }
+                    } else if (value == 'export') {
+                      if (user == null) return;
+                      // Export the active tab's group (ADR 0007). The synthetic
+                      // "Other items" bucket maps to the empty group name.
+                      final tabCtrl = DefaultTabController.of(context);
+                      final index = tabCtrl.index.clamp(
+                        0,
+                        groupKeys.length - 1,
+                      );
+                      final groupName = groupKeys[index];
+                      final rawGroup = groupName == otherItems ? '' : groupName;
+                      await _showExportInventoryDialog(
+                        context,
+                        displayGroupName: groupName,
+                        rawGroup: rawGroup,
+                        user: user,
+                      );
                     }
                   },
                   itemBuilder: (BuildContext context) => [
                     PopupMenuItem(
                       value: 'want_missing',
                       child: Text(l10n.wantAllMissing),
+                    ),
+                    PopupMenuItem(
+                      value: 'export',
+                      child: Text(l10n.exportInventoryTitle),
                     ),
                   ],
                 ),
@@ -909,6 +931,26 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         initialPhotoUrl: meta != null && meta.hasPhotoUrl()
             ? meta.photoUrl
             : null,
+      ),
+    );
+  }
+
+  /// Export-inventory dialog (ADR 0007). Renders the user's own inventory for
+  /// [rawGroup] (empty string for the synthetic "Other items" bucket) as
+  /// text in the chosen format and copies it to the clipboard. [displayGroupName]
+  /// is shown in the title; [rawGroup] is the value used to filter inventory.
+  Future<void> _showExportInventoryDialog(
+    BuildContext context, {
+    required String displayGroupName,
+    required String rawGroup,
+    required User user,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => ExportInventoryDialog(
+        user: user,
+        displayGroupName: displayGroupName,
+        rawGroup: rawGroup,
       ),
     );
   }

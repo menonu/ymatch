@@ -593,4 +593,28 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get howToPreviewTabHint => 'ログイン後に使用できます';
+
+  @override
+  String get exportInventoryTitle => '在庫エクスポート';
+
+  @override
+  String get exportFormatLabel => '形式';
+
+  @override
+  String get exportFormatBasic => '基本';
+
+  @override
+  String get exportFormatCsv => 'CSV';
+
+  @override
+  String get exportFormatMarkdown => 'Markdown';
+
+  @override
+  String get exportCopy => 'コピー';
+
+  @override
+  String get exportCopied => 'クリップボードにコピーしました';
+
+  @override
+  String get exportEmpty => 'エクスポート対象がありません';
 }
