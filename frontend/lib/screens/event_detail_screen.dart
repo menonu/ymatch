@@ -58,16 +58,18 @@ int resolveInitialGroupTabIndex(
 /// The user-visible label for a group: its cosmetic `display_name` when set,
 /// otherwise the internal `group_name` key (#425). The key is unchanged by an
 /// "edit name" — only the rendered text swaps to `display_name`.
-String groupDisplayName(
-  String groupKey,
-  Map<String, MerchandiseGroup> groupByName,
-) {
-  final meta = groupByName[groupKey];
+String groupDisplayNameFor(String groupKey, MerchandiseGroup? meta) {
   if (meta != null && meta.hasDisplayName() && meta.displayName.isNotEmpty) {
     return meta.displayName;
   }
   return groupKey;
 }
+
+/// [groupDisplayName] resolved against a name → metadata map.
+String groupDisplayName(
+  String groupKey,
+  Map<String, MerchandiseGroup> groupByName,
+) => groupDisplayNameFor(groupKey, groupByName[groupKey]);
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   /// Whether the bottom-left group description panel is open (#128).
@@ -952,10 +954,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         eventId: widget.eventId,
         userId: user.id,
         groupName: groupName,
-        initialDisplayName:
-            meta != null && meta.hasDisplayName() && meta.displayName.isNotEmpty
-            ? meta.displayName
-            : groupName,
+        initialDisplayName: groupDisplayNameFor(groupName, meta),
         initialDescription: meta != null && meta.hasDescription()
             ? meta.description
             : '',
@@ -1774,18 +1773,11 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
     final messenger = ScaffoldMessenger.of(context);
     final errorColor = Theme.of(context).colorScheme.error;
 
-    // The display name is the group's user-visible label — never let it be
-    // empty (the key is immutable, so an empty label would be confusing).
+    // An empty display name clears it (the backend stores NULL), so the label
+    // reverts to the immutable group_name key — that is the UI's "reset to
+    // key" path (#425 AC #8). The field opens pre-filled with the current
+    // display name (or the key), so clearing is a deliberate action.
     final displayName = _nameCtrl.text.trim();
-    if (displayName.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.groupNameLabel),
-          backgroundColor: errorColor,
-        ),
-      );
-      return;
-    }
 
     setState(() => _saving = true);
     try {

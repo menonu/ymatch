@@ -727,6 +727,19 @@ async fn non_creator_non_editor_display_name_forbidden(pool: PgPool) {
         create_test_user_and_event(pool.clone(), "group-display-creator4", "Display Event 4").await;
     create_group_row(&pool, event_id, creator_id, "Buttons").await;
 
+    // Seed a display name as the creator so the no-op assertion below is
+    // load-bearing (a NULL→NULL result would not prove the forbidden edit was
+    // a no-op).
+    let _ = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Buttons", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Buttons", "description": "d", "displayName": "Creator Set"}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+
     // A plain viewer (no event role, no global override) cannot edit.
     let other_id = login_guest(&pool, "group-display-other", "tok").await;
     let resp = put_json(
@@ -740,7 +753,7 @@ async fn non_creator_non_editor_display_name_forbidden(pool: PgPool) {
     .await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 
-    // display_name must not have been written.
+    // display_name must be unchanged by the forbidden edit.
     let display: Option<String> = sqlx::query_scalar(
         "SELECT display_name FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
     )
@@ -749,9 +762,10 @@ async fn non_creator_non_editor_display_name_forbidden(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert!(
-        display.is_none(),
-        "forbidden edit must not set display_name"
+    assert_eq!(
+        display.as_deref(),
+        Some("Creator Set"),
+        "forbidden edit must not change display_name"
     );
 }
 
