@@ -32,7 +32,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT latest(conclusion) as 'Latest' FROM Span WHERE workflow_name IS NOT NULL FACET workflow_name SINCE 7 days ago"
+        query      = "SELECT latest(conclusion) as 'Latest' FROM GitHubAction WHERE level = 'workflow' FACET workflow_name SINCE 7 days ago"
       }
     }
 
@@ -120,7 +120,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT percentage(count(*), WHERE conclusion = 'success') as 'Success %' FROM Span WHERE workflow_name IS NOT NULL FACET workflow_name SINCE 30 days ago"
+        query      = "SELECT percentage(count(*), WHERE conclusion = 'success') as 'Success %' FROM GitHubAction WHERE level = 'workflow' FACET workflow_name SINCE 30 days ago"
       }
       warning  = 90
       critical = 70
@@ -149,7 +149,7 @@ resource "newrelic_one_dashboard" "production" {
       height = 2
       nrql_query {
         account_id = var.account_id
-        query      = "SELECT workflow_name as 'Workflow', name as 'Job', conclusion as 'Result', duration.ms/1000 as 'Duration (s)', head_branch as 'Branch' FROM Span WHERE workflow_name IS NOT NULL SINCE 30 days ago LIMIT 10"
+        query      = "SELECT workflow_name as 'Workflow', name as 'Job', conclusion as 'Result', duration_ms/1000 as 'Duration (s)', head_branch as 'Branch' FROM GitHubAction WHERE level = 'job' SINCE 30 days ago LIMIT 10"
       }
     }
   }

@@ -20,11 +20,10 @@ permissions:
   actions: read
   contents: read
 
-env:
-  GHA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
-  GHA_RUN_ID: ${{ github.event.workflow_run.id }}
-  GHA_RUN_NAME: ${{ github.event.workflow_run.name }}
+# Posts GitHubAction custom events via the Event API (same path as
+# DatabaseBackup / Deployment). The previous OTLP-based
+# newrelic-experimental/gha-new-relic-exporter never landed Spans in
+# this account (OTLP PERMISSION_DENIED / zero Span ingest) — see #419.
 
 jobs:
   new-relic-exporter:
@@ -32,8 +31,108 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ always() }}
     steps:
-      - uses: actions/checkout@v5
-      - name: New Relic Exporter
-        # v1.0.8+ pins ghapi==1.0.10 (sync). @1.0.1 had unpinned ghapi and
-        # broke when ghapi 2.0 made GhApi async by default (#382).
-        uses: newrelic-experimental/gha-new-relic-exporter@v1.0.8
+      - name: Export workflow run as GitHubAction events
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          NEW_RELIC_ACCOUNT_ID: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NEW_RELIC_LICENSE_KEY:-}" ] || [ -z "${NEW_RELIC_ACCOUNT_ID:-}" ]; then
+            echo "::error::NEW_RELIC_LICENSE_KEY and NEW_RELIC_ACCOUNT_ID secrets are required"
+            exit 1
+          fi
+
+          export RUN_JSON
+          export JOBS_JSON
+          RUN_JSON=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}")
+          JOBS_JSON=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs" --paginate)
+
+          EVENTS=$(python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime
+
+          def parse_ts(s):
+              if not s:
+                  return None
+              return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+          def duration_ms(started, completed):
+              a, b = parse_ts(started), parse_ts(completed)
+              if not a or not b:
+                  return 0
+              return max(0, int((b - a).total_seconds() * 1000))
+
+          run = json.loads(os.environ["RUN_JSON"])
+          jobs = (json.loads(os.environ["JOBS_JSON"]).get("jobs") or [])
+
+          workflow_name = run.get("name") or "unknown"
+          head_branch = run.get("head_branch") or ""
+          run_id = run.get("id")
+          html_url = run.get("html_url") or ""
+          event = run.get("event") or ""
+          actor = (run.get("actor") or {}).get("login") or ""
+          head_sha = run.get("head_sha") or ""
+          path = run.get("path") or ""
+
+          events = [{
+              "eventType": "GitHubAction",
+              "workflow_name": workflow_name,
+              "name": workflow_name,
+              "level": "workflow",
+              "conclusion": run.get("conclusion") or "unknown",
+              "status": run.get("status") or "unknown",
+              "head_branch": head_branch,
+              "run_id": run_id,
+              "html_url": html_url,
+              "event": event,
+              "actor": actor,
+              "head_sha": head_sha,
+              "path": path,
+              "duration_ms": duration_ms(run.get("run_started_at"), run.get("updated_at")),
+          }]
+
+          skip_jobs = {"export telemetry to new relic", "new-relic-exporter"}
+          for job in jobs:
+              jname = job.get("name") or "job"
+              if jname.lower() in skip_jobs:
+                  continue
+              events.append({
+                  "eventType": "GitHubAction",
+                  "workflow_name": workflow_name,
+                  "name": jname,
+                  "level": "job",
+                  "conclusion": job.get("conclusion") or "unknown",
+                  "status": job.get("status") or "unknown",
+                  "head_branch": head_branch,
+                  "run_id": run_id,
+                  "html_url": job.get("html_url") or html_url,
+                  "event": event,
+                  "actor": actor,
+                  "head_sha": head_sha,
+                  "path": path,
+                  "duration_ms": duration_ms(job.get("started_at"), job.get("completed_at")),
+              })
+
+          print(json.dumps(events))
+          PY
+          )
+
+          COUNT=$(echo "$EVENTS" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
+          echo "Posting ${COUNT} GitHubAction event(s) for run ${RUN_ID}"
+
+          HTTP_CODE=$(curl -sS -o /tmp/nr_resp.json -w "%{http_code}" \
+            -X POST "https://insights-collector.newrelic.com/v1/accounts/${NEW_RELIC_ACCOUNT_ID}/events" \
+            -H "Api-Key: ${NEW_RELIC_LICENSE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$EVENTS")
+
+          echo "New Relic Event API HTTP ${HTTP_CODE}: $(cat /tmp/nr_resp.json)"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::New Relic Event API rejected GitHubAction events (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
