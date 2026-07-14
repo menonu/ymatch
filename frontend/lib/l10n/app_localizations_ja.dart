@@ -303,6 +303,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get groupNameLabel => 'グループ名';
 
   @override
+  String get groupDisplayNameHelper => 'タブや情報パネルで内部キーの代わりに表示されます。';
+
+  @override
   String get groupDescription => '説明';
 
   @override

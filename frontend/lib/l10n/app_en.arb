@@ -439,7 +439,11 @@
   },
   "groupNameLabel": "Group name",
   "@groupNameLabel": {
-    "description": "Read-only label for the group name in the edit dialog"
+    "description": "Label for the editable group display name field in the edit dialog"
+  },
+  "groupDisplayNameHelper": "Shown instead of the internal group key on tabs and the info panel.",
+  "@groupDisplayNameHelper": {
+    "description": "Helper text under the group display name field explaining it is a cosmetic label"
   },
   "groupDescription": "Description",
   "@groupDescription": {

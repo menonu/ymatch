@@ -55,6 +55,20 @@ int resolveInitialGroupTabIndex(
   return i >= 0 ? i : 0;
 }
 
+/// The user-visible label for a group: its cosmetic `display_name` when set,
+/// otherwise the internal `group_name` key (#425). The key is unchanged by an
+/// "edit name" — only the rendered text swaps to `display_name`.
+String groupDisplayName(
+  String groupKey,
+  Map<String, MerchandiseGroup> groupByName,
+) {
+  final meta = groupByName[groupKey];
+  if (meta != null && meta.hasDisplayName() && meta.displayName.isNotEmpty) {
+    return meta.displayName;
+  }
+  return groupKey;
+}
+
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   /// Whether the bottom-left group description panel is open (#128).
   bool _groupInfoOpen = false;
@@ -79,6 +93,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final merchAsync = ref.watch(merchProvider(widget.eventId));
     final groupsAsync = ref.watch(eventGroupsProvider(widget.eventId));
     final user = ref.watch(currentUserProvider);
+    // #425: the caller's effective `group.edit` decision, used to show the
+    // Edit Group button for editors/moderators/admin (not just the creator).
+    // null while loading / fetch fails / not logged in — leaves button hidden
+    // unless the caller is the creator (checked per-group below).
+    final role = ref.watch(myEventRoleProvider(widget.eventId)).valueOrNull;
     final inventoryAsync = user != null
         ? ref.watch(inventoryProvider(user.id))
         : null;
@@ -405,7 +424,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                               groupKeys.asMap().entries.map((e) {
                                 return PopupMenuItem<int>(
                                   value: e.key,
-                                  child: Text(e.value),
+                                  child: Text(
+                                    groupDisplayName(e.value, groupByName),
+                                  ),
                                 );
                               }).toList(),
                         ),
@@ -432,7 +453,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                     return Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(name),
+                                        Text(groupDisplayName(name, groupByName)),
                                         const SizedBox(width: 4),
                                         GestureDetector(
                                           onTap: user == null
@@ -688,8 +709,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ],
                 ),
                 // Bottom-left controls (#128): Group info (everyone) + Edit
-                // group (creator of the active tab only). Tabs stay clean —
-                // no shield/edit icons there.
+                // group (creator of the active tab, or anyone the backend
+                // authorizes via `group.edit` — editors / moderator / admin,
+                // per `my-role` canEditGroup, #425). Tabs stay clean — no
+                // shield/edit icons there.
                 Positioned(
                   left: 16,
                   bottom: 16 + MediaQuery.paddingOf(context).bottom,
@@ -705,12 +728,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           );
                           final activeName = groupKeys[index];
                           final activeMeta = groupByName[activeName];
-                          final canEditActive =
+                          final isCreator =
                               user != null &&
                               activeMeta != null &&
                               activeMeta.hasCreatedBy() &&
-                              activeMeta.createdBy == user.id &&
-                              activeName != otherItems;
+                              activeMeta.createdBy == user.id;
+                          final canEditActive =
+                              user != null &&
+                              activeMeta != null &&
+                              activeName != otherItems &&
+                              (isCreator || (role?.canEditGroup ?? false));
 
                           return Row(
                             mainAxisSize: MainAxisSize.min,
@@ -846,7 +873,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            groupName,
+                            groupDisplayName(groupName, groupByName),
                             style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
@@ -925,6 +952,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         eventId: widget.eventId,
         userId: user.id,
         groupName: groupName,
+        initialDisplayName:
+            meta != null && meta.hasDisplayName() && meta.displayName.isNotEmpty
+            ? meta.displayName
+            : groupName,
         initialDescription: meta != null && meta.hasDescription()
             ? meta.description
             : '',
@@ -1668,6 +1699,10 @@ class _EditGroupDialog extends ConsumerStatefulWidget {
   final int eventId;
   final int userId;
   final String groupName;
+  // #425: editable cosmetic label. Pre-filled with the current display_name,
+  // falling back to the (immutable) group_name key so the field never opens
+  // empty. Saving writes `display_name`; the key is never sent.
+  final String initialDisplayName;
   final String initialDescription;
   final String? initialPhotoUrl;
 
@@ -1675,6 +1710,7 @@ class _EditGroupDialog extends ConsumerStatefulWidget {
     required this.eventId,
     required this.userId,
     required this.groupName,
+    required this.initialDisplayName,
     required this.initialDescription,
     this.initialPhotoUrl,
   });
@@ -1684,6 +1720,7 @@ class _EditGroupDialog extends ConsumerStatefulWidget {
 }
 
 class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
+  late final TextEditingController _nameCtrl;
   late final TextEditingController _descCtrl;
   bool _saving = false;
 
@@ -1700,12 +1737,14 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
   @override
   void initState() {
     super.initState();
+    _nameCtrl = TextEditingController(text: widget.initialDisplayName);
     _descCtrl = TextEditingController(text: widget.initialDescription);
     _previewUrl = widget.initialPhotoUrl;
   }
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -1735,6 +1774,19 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
     final messenger = ScaffoldMessenger.of(context);
     final errorColor = Theme.of(context).colorScheme.error;
 
+    // The display name is the group's user-visible label — never let it be
+    // empty (the key is immutable, so an empty label would be confusing).
+    final displayName = _nameCtrl.text.trim();
+    if (displayName.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.groupNameLabel),
+          backgroundColor: errorColor,
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       String? photoUrl;
@@ -1756,6 +1808,8 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
             eventId: widget.eventId,
             userId: widget.userId,
             groupName: widget.groupName,
+            displayName: displayName,
+            updateDisplayName: true,
             description: _descCtrl.text.trim(),
             photoUrl: photoUrl,
             updatePhoto: updatePhoto,
@@ -1788,14 +1842,19 @@ class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            InputDecorator(
-              decoration: InputDecoration(labelText: l10n.groupNameLabel),
-              child: Text(widget.groupName),
+            TextField(
+              controller: _nameCtrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: l10n.groupNameLabel,
+                helperText: l10n.groupDisplayNameHelper,
+              ),
+              textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _descCtrl,
-              autofocus: true,
               decoration: InputDecoration(
                 labelText: l10n.groupDescription,
                 hintText: l10n.groupDescriptionHint,

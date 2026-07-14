@@ -592,3 +592,326 @@ async fn test_merch_includes_group_description(pool: PgPool) {
         "Vinyl stickers"
     );
 }
+
+// --- #425: display_name (cosmetic group label) + can_edit_group gating ---
+
+/// POST a group row as `creator_id` and return immediately (response unused).
+async fn create_group_row(pool: &PgPool, event_id: i64, creator_id: i64, name: &str) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId": {}, "userId": {}, "groupName": "{}"}}"#,
+                    event_id, creator_id, name
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn creator_can_set_display_name(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator", "Display Event").await;
+    create_group_row(&pool, event_id, creator_id, "Pins").await;
+
+    // Set a display name; the internal group_name key must stay "Pins".
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Pins", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "d", "displayName": "Enamel Pins!"}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["groupName"].as_str().unwrap(), "Pins");
+    assert_eq!(group["displayName"].as_str().unwrap(), "Enamel Pins!");
+
+    // Persisted: listing reflects the display name, key unchanged.
+    let resp = get_request(&pool, &format!("/api/v1/events/{}/groups", event_id)).await;
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["groups"][0]["groupName"].as_str().unwrap(), "Pins");
+    assert_eq!(
+        body["groups"][0]["displayName"].as_str().unwrap(),
+        "Enamel Pins!"
+    );
+    let key: String =
+        sqlx::query_scalar("SELECT group_name FROM merchandise_groups WHERE event_id = $1")
+            .bind(event_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(key, "Pins");
+}
+
+#[sqlx::test]
+async fn editor_can_edit_display_name(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator2", "Display Event 2").await;
+    create_group_row(&pool, event_id, creator_id, "Stickers").await;
+
+    // A second user is made an event editor (event/editor grants group.edit).
+    let editor_id = login_guest(&pool, "group-display-editor", "tok").await;
+    assign_event_role(&pool, editor_id, event_id, "editor").await;
+
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Stickers", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Stickers", "description": "d", "displayName": "Vinyl Stickers"}}"#,
+            event_id, editor_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["displayName"].as_str().unwrap(), "Vinyl Stickers");
+}
+
+#[sqlx::test]
+async fn admin_and_moderator_can_edit_any_group_via_global_role(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator3", "Display Event 3").await;
+    create_group_row(&pool, event_id, creator_id, "Lanyards").await;
+
+    // Admin (superuser bypass) — not the creator, not an event member.
+    let admin_id = login_guest(&pool, "group-display-admin", "tok").await;
+    grant_global_role(&pool, admin_id, "admin").await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Lanyards", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Lanyards", "description": "d", "displayName": "Admin Renamed"}}"#,
+            event_id, admin_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["displayName"].as_str().unwrap(), "Admin Renamed");
+
+    // Moderator (group.edit.any satisfies group.edit).
+    let mod_id = login_guest(&pool, "group-display-mod", "tok").await;
+    grant_global_role(&pool, mod_id, "moderator").await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Lanyards", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Lanyards", "description": "d", "displayName": "Mod Renamed"}}"#,
+            event_id, mod_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(group["displayName"].as_str().unwrap(), "Mod Renamed");
+}
+
+#[sqlx::test]
+async fn non_creator_non_editor_display_name_forbidden(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator4", "Display Event 4").await;
+    create_group_row(&pool, event_id, creator_id, "Buttons").await;
+
+    // A plain viewer (no event role, no global override) cannot edit.
+    let other_id = login_guest(&pool, "group-display-other", "tok").await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Buttons", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Buttons", "description": "d", "displayName": "Hostile"}}"#,
+            event_id, other_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // display_name must not have been written.
+    let display: Option<String> = sqlx::query_scalar(
+        "SELECT display_name FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("Buttons")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        display.is_none(),
+        "forbidden edit must not set display_name"
+    );
+}
+
+#[sqlx::test]
+async fn edit_missing_group_display_name_404(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator5", "Display Event 5").await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Nope", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Nope", "description": "d", "displayName": "X"}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn empty_display_name_clears_it(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator6", "Display Event 6").await;
+    create_group_row(&pool, event_id, creator_id, "Patches").await;
+
+    // Set, then clear with an empty string.
+    let _ = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Patches", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Patches", "description": "d", "displayName": "Iron-On Patches"}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Patches", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Patches", "description": "d", "displayName": ""}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let group: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        group.get("displayName").is_none() || group["displayName"].is_null(),
+        "cleared display_name should be absent/null, got {:?}",
+        group.get("displayName")
+    );
+    let display: Option<String> = sqlx::query_scalar(
+        "SELECT display_name FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("Patches")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        display.is_none(),
+        "display_name column must be NULL after clear"
+    );
+}
+
+#[sqlx::test]
+async fn display_name_edit_does_not_touch_merch_or_matches(pool: PgPool) {
+    // The whole point of the display_name approach: the internal group_name
+    // key — and every soft reference to it — is unchanged by a "rename".
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator7", "Display Event 7").await;
+    let merch_id = create_merch(&pool, event_id, "Test Merch", "Keychains").await;
+    let peer_id = login_guest(&pool, "group-display-peer", "tok").await;
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name) \
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(creator_id as i32)
+    .bind(peer_id as i32)
+    .bind(event_id as i32)
+    .bind("Keychains")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // "Rename" by setting a display name.
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Keychains", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Keychains", "description": "d", "displayName": "Collector Keychains"}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Internal key + soft references are all still "Keychains".
+    let merch_group: String =
+        sqlx::query_scalar("SELECT group_name FROM merchandise WHERE id = $1")
+            .bind(merch_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(merch_group, "Keychains");
+    let match_group: String = sqlx::query_scalar("SELECT group_name FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(match_group, "Keychains");
+    let group_key: String = sqlx::query_scalar(
+        "SELECT group_name FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("Keychains")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(group_key, "Keychains");
+}
+
+#[sqlx::test]
+async fn my_event_role_reports_can_edit_group(pool: PgPool) {
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "group-display-creator8", "Display Event 8").await;
+
+    // A plain viewer (no roles) cannot edit groups on this event.
+    let viewer_id = login_guest(&pool, "group-display-viewer", "tok").await;
+    let resp = get_request(
+        &pool,
+        &format!("/api/v1/events/{}/my-role?user_id={}", event_id, viewer_id),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let role: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    // proto3 omits default-false bools, so an absent canEditGroup means false.
+    assert_eq!(role["canEditGroup"].as_bool().unwrap_or(false), false);
+
+    // An event editor can.
+    let editor_id = login_guest(&pool, "group-display-editor2", "tok").await;
+    assign_event_role(&pool, editor_id, event_id, "editor").await;
+    let resp = get_request(
+        &pool,
+        &format!("/api/v1/events/{}/my-role?user_id={}", event_id, editor_id),
+    )
+    .await;
+    let role: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(role["canEditGroup"].as_bool().unwrap_or(false), true);
+
+    // The event creator (event/creator grants group.edit) can too.
+    let resp = get_request(
+        &pool,
+        &format!("/api/v1/events/{}/my-role?user_id={}", event_id, creator_id),
+    )
+    .await;
+    let role: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(role["canEditGroup"].as_bool().unwrap_or(false), true);
+}

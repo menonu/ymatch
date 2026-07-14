@@ -95,6 +95,7 @@
   "newGroupName": "新しいグループ名",
   "newGroupHint": "例: キーホルダー",
   "groupNameLabel": "グループ名",
+  "groupDisplayNameHelper": "タブや情報パネルで内部キーの代わりに表示されます。",
   "groupDescription": "説明",
   "groupDescriptionHint": "このグループについてのメモ（任意）",
   "editGroup": "グループを編集",
