@@ -29,7 +29,7 @@ OCI/GCP budget alerts.
 │  Dashboard ──────────── Production Overview             │
 │                          Database Backups               │
 │                                                         │
-│  GitHub Actions ──────── CI/CD Telemetry (via exporter) │
+│  GitHub Actions ──────── GitHubAction events (Event API) │
 │                          DB Backup workflow → NR events  │
 │                          Auto-deploy workflow → NR events│
 │                          main E2E/coverage failure →     │
@@ -181,17 +181,49 @@ so you can verify the format even without a real Discord webhook.
 
 ### 4. GitHub Actions Exporter
 
-The `.github/workflows/newrelic-exporter.yml` workflow automatically sends
-CI/CD telemetry to New Relic whenever a watched workflow completes. This
-appears as distributed traces in New Relic.
+The `.github/workflows/newrelic-exporter.yml` workflow sends CI/CD
+telemetry to New Relic whenever a watched workflow completes. It posts
+**`GitHubAction` custom events** via the Event API (same path as
+`DatabaseBackup` / `Deployment`) — one workflow-level row plus one row
+per job.
+
+> **Why not OTLP spans?** The previous
+> `newrelic-experimental/gha-new-relic-exporter` path never landed
+> `Span` data in this account (OTLP `PERMISSION_DENIED` in Actions, and
+> zero Trace/Span ingest). Dashboard widgets now query `GitHubAction`
+> instead of `Span` (#419).
 
 **Watched workflows:** CI, Deploy (Production/Staging), Database Backup,
 Frontend E2E, Backend Coverage, Frontend Coverage.
 
+**Event fields (selected):** `workflow_name`, `name` (workflow or job),
+`level` (`workflow` | `job`), `conclusion`, `status`, `head_branch`,
+`run_id`, `duration_ms`, `html_url`, `actor`, `head_sha`.
+
+**Dashboard widgets:**
+| Widget | NRQL filter |
+|--------|-------------|
+| CI / CD Status | `FROM GitHubAction WHERE level = 'workflow'` → latest conclusion |
+| CI/CD Success Rate (30d) | same, success percentage |
+| Recent GitHub Actions Runs | `WHERE level = 'job'` table |
+
+**Useful NRQL:**
+
+```sql
+-- Latest conclusion per workflow
+SELECT latest(conclusion) FROM GitHubAction
+WHERE level = 'workflow' FACET workflow_name SINCE 7 days ago
+
+-- Success rate (30d)
+SELECT percentage(count(*), WHERE conclusion = 'success')
+FROM GitHubAction WHERE level = 'workflow'
+FACET workflow_name SINCE 30 days ago
+```
+
 **Required GitHub Secrets:**
 | Secret | Description |
 |--------|-------------|
-| `NEW_RELIC_LICENSE_KEY` | Ingest license key (NRAL suffix) |
+| `NEW_RELIC_LICENSE_KEY` | Ingest license key (NRAL) or Insights insert key (Event API) |
 | `NEW_RELIC_ACCOUNT_ID` | New Relic account ID |
 
 ### 4b. Post-merge E2E / coverage failure alerts (#281)
@@ -332,9 +364,9 @@ AND message LIKE '%ERROR%' TIMESERIES AUTO
 SELECT percentage(count(*), WHERE result = 'SUCCESS')
 FROM SyntheticCheck WHERE monitorName LIKE 'ymatch%' SINCE 7 days ago
 
--- GitHub Actions workflow duration
-SELECT latest(duration.ms)/1000 FROM Span
-WHERE otel.library.name = 'github-actions' FACET ghWorkflowName SINCE 30 days ago
+-- GitHub Actions workflow duration (seconds)
+SELECT latest(duration_ms)/1000 FROM GitHubAction
+WHERE level = 'workflow' FACET workflow_name SINCE 30 days ago
 ```
 
 ## Troubleshooting
