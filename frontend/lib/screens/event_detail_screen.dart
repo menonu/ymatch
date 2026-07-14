@@ -300,91 +300,108 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         ),
                       ],
                 ),
-                PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    if (value == 'want_missing') {
-                      if (user == null) return;
+                Builder(
+                  builder: (context) {
+                    // The AppBar is a descendant of DefaultTabController, so this
+                    // context resolves the active-tab controller. The State's own
+                    // build context is the controller's *parent* and would not
+                    // resolve — the export menu previously called
+                    // DefaultTabController.of on it, threw at runtime, and the
+                    // dialog never opened.
+                    final tabCtrl = DefaultTabController.of(context);
+                    return PopupMenuButton<String>(
+                      onSelected: (value) async {
+                        if (value == 'want_missing') {
+                          if (user == null) return;
 
-                      final currentInv = inventoryAsync?.valueOrNull ?? [];
-                      final ownedOrWantedIds = currentInv
-                          .where((inv) => inv.quantity > 0)
-                          .map((inv) => inv.merchId)
-                          .toSet();
+                          final currentInv = inventoryAsync?.valueOrNull ?? [];
+                          final ownedOrWantedIds = currentInv
+                              .where((inv) => inv.quantity > 0)
+                              .map((inv) => inv.merchId)
+                              .toSet();
 
-                      int addedCount = 0;
-                      int failedCount = 0;
-                      for (final item in merch) {
-                        if (!ownedOrWantedIds.contains(item.id)) {
-                          // Await each call so the count reflects what was
-                          // actually saved: updateItem rethrows on failure
-                          // (#239), so a failed POST doesn't count as added.
-                          try {
-                            await ref
-                                .read(inventoryProvider(user.id).notifier)
-                                .updateItem(item.id, 'WANT', 1);
-                            addedCount++;
-                          } catch (_) {
-                            failedCount++;
+                          int addedCount = 0;
+                          int failedCount = 0;
+                          for (final item in merch) {
+                            if (!ownedOrWantedIds.contains(item.id)) {
+                              // Await each call so the count reflects what was
+                              // actually saved: updateItem rethrows on failure
+                              // (#239), so a failed POST doesn't count as added.
+                              try {
+                                await ref
+                                    .read(inventoryProvider(user.id).notifier)
+                                    .updateItem(item.id, 'WANT', 1);
+                                addedCount++;
+                              } catch (_) {
+                                failedCount++;
+                              }
+                            }
                           }
-                        }
-                      }
 
-                      if (context.mounted &&
-                          addedCount > 0 &&
-                          failedCount > 0) {
-                        // Partial failure: surface both counts so the user
-                        // knows not everything was saved (#239).
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              l10n.addedToWantPartial(addedCount, failedCount),
-                            ),
-                          ),
-                        );
-                      } else if (context.mounted && addedCount > 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.addedMissingToWant(addedCount)),
-                          ),
-                        );
-                      } else if (context.mounted && failedCount > 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.couldNotAddToWant)),
-                        );
-                      } else if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.noMissingItems)),
-                        );
-                      }
-                    } else if (value == 'export') {
-                      if (user == null) return;
-                      // Export the active tab's group (ADR 0007). The synthetic
-                      // "Other items" bucket maps to the empty group name.
-                      final tabCtrl = DefaultTabController.of(context);
-                      final index = tabCtrl.index.clamp(
-                        0,
-                        groupKeys.length - 1,
-                      );
-                      final groupName = groupKeys[index];
-                      final rawGroup = groupName == otherItems ? '' : groupName;
-                      await _showExportInventoryDialog(
-                        context,
-                        displayGroupName: groupName,
-                        rawGroup: rawGroup,
-                        user: user,
-                      );
-                    }
+                          if (context.mounted &&
+                              addedCount > 0 &&
+                              failedCount > 0) {
+                            // Partial failure: surface both counts so the user
+                            // knows not everything was saved (#239).
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  l10n.addedToWantPartial(
+                                    addedCount,
+                                    failedCount,
+                                  ),
+                                ),
+                              ),
+                            );
+                          } else if (context.mounted && addedCount > 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  l10n.addedMissingToWant(addedCount),
+                                ),
+                              ),
+                            );
+                          } else if (context.mounted && failedCount > 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l10n.couldNotAddToWant)),
+                            );
+                          } else if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l10n.noMissingItems)),
+                            );
+                          }
+                        } else if (value == 'export') {
+                          if (user == null) return;
+                          // Export the active tab's group (ADR 0007). The synthetic
+                          // "Other items" bucket maps to the empty group name.
+                          final index = tabCtrl.index.clamp(
+                            0,
+                            groupKeys.length - 1,
+                          );
+                          final groupName = groupKeys[index];
+                          final rawGroup = groupName == otherItems
+                              ? ''
+                              : groupName;
+                          await _showExportInventoryDialog(
+                            context,
+                            displayGroupName: groupName,
+                            rawGroup: rawGroup,
+                            user: user,
+                          );
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => [
+                        PopupMenuItem(
+                          value: 'want_missing',
+                          child: Text(l10n.wantAllMissing),
+                        ),
+                        PopupMenuItem(
+                          value: 'export',
+                          child: Text(l10n.exportInventoryTitle),
+                        ),
+                      ],
+                    );
                   },
-                  itemBuilder: (BuildContext context) => [
-                    PopupMenuItem(
-                      value: 'want_missing',
-                      child: Text(l10n.wantAllMissing),
-                    ),
-                    PopupMenuItem(
-                      value: 'export',
-                      child: Text(l10n.exportInventoryTitle),
-                    ),
-                  ],
                 ),
               ],
               bottom: PreferredSize(
