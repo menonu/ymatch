@@ -27,7 +27,7 @@ Where tests live:
    * Fix or explain `[critical]` / `[major]` findings.
    * Resolve or accept `[minor]` / `[nit]` findings.
    * Re-run after changes.
-8. **Report & Wait**: Report the PR URL to the user and stop. **Do not merge.** Wait for human merge or explicit authorization. Cleanup worktree after merge
+8. **Report & Wait(only after 6+7)**: Report PR URL + CI status + review outcome + summary. **Do not merge.** Wait for human merge or explicit authorization. Cleanup worktree after merge
 
 See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
 
