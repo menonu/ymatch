@@ -58,6 +58,7 @@ message MerchandiseGroup {
   optional string created_at = 6;
   optional string updated_at = 7;
   optional string photo_url = 8; // optional description image (#404)
+  optional string display_name = 9; // cosmetic label; UI falls back to group_name when unset (#425)
 }
 
 message InventoryItem {
@@ -252,6 +253,9 @@ message UpdateGroupRequest {
   optional string description = 4;
   // When set: update photo_url (empty string clears). When unset: leave as-is.
   optional string photo_url = 5;
+  // Cosmetic label; empty string clears it (UI falls back to group_name).
+  // When unset: leave display_name as-is. group_name itself is never mutated (#425).
+  optional string display_name = 6;
 }
 
 message ListGroupsResponse {
@@ -283,4 +287,5 @@ message MyEventRoleResponse {
   string role = 1;           // event-scoped membership: "creator", "editor", or "none"
   bool global_override = 2;  // a global admin/moderator role is in effect on this event
   bool can_create_merch = 3; // the caller may create merch on this event
+  bool can_edit_group = 4;  // the caller may edit any group's info on this event (group.edit)
 }

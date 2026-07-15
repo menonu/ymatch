@@ -42,6 +42,7 @@ Merchandise _merch({required int creatorId}) => Merchandise()
 
 MerchandiseGroup _testGroup({
   required String name,
+  String? displayName,
   String? description,
   int? createdBy,
   String? photoUrl,
@@ -50,6 +51,7 @@ MerchandiseGroup _testGroup({
     ..id = 1
     ..eventId = 5
     ..groupName = name;
+  if (displayName != null) g.displayName = displayName;
   if (description != null) g.description = description;
   if (createdBy != null) g.createdBy = createdBy;
   if (photoUrl != null) g.photoUrl = photoUrl;
@@ -767,6 +769,144 @@ void main() {
       expect(inventoryPosts.first['merchId'], 10);
     },
   );
+
+  // --- Group display name + edit-button gating (#425) ---
+
+  testWidgets(
+    'non-creator with canEditGroup sees the bottom edit icon (#425)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 2)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 99, // not the current user (id=1)
+                ),
+              ],
+            ),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()..canEditGroup = true,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The edit button appears even though the viewer is not the creator —
+      // the backend authorizes editors/mods/admin via `group.edit`.
+      expect(find.byTooltip('Edit Group'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'non-creator without canEditGroup still sees no edit icon (#425)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 2)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  description: 'Collectible pens',
+                  createdBy: 99,
+                ),
+              ],
+            ),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()..canEditGroup = false,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Edit Group'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'edit dialog shows an editable name field seeded with the display name '
+    '(#425)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [
+                _testGroup(
+                  name: 'Pens',
+                  displayName: 'Enamel Pins!',
+                  description: 'Collectible pens',
+                  createdBy: 1,
+                ),
+              ],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The tab / panel show the display name, not the internal key.
+      expect(find.text('Enamel Pins!'), findsWidgets);
+      expect(find.text('Pens'), findsNothing);
+
+      await tester.tap(find.byTooltip('Edit Group'));
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      // The name field is editable (a TextField) and seeded with the display
+      // name. The dialog now has two TextFields (name + description).
+      final nameFields = find.descendant(
+        of: dialog,
+        matching: find.byType(TextField),
+      );
+      expect(nameFields, findsNWidgets(2));
+      expect(
+        find.descendant(of: dialog, matching: find.text('Enamel Pins!')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  test('groupDisplayName uses display_name when set, else the key (#425)', () {
+    final byName = <String, MerchandiseGroup>{
+      'Pens': _testGroup(name: 'Pens', displayName: 'Enamel Pins!'),
+      'Stickers': _testGroup(name: 'Stickers'),
+    };
+    expect(groupDisplayName('Pens', byName), 'Enamel Pins!');
+    // Unset display_name falls back to the key.
+    expect(groupDisplayName('Stickers', byName), 'Stickers');
+    // Unknown key falls back to itself.
+    expect(groupDisplayName('Nope', byName), 'Nope');
+    // Empty display_name falls back to the key.
+    final empty = <String, MerchandiseGroup>{
+      'Bad': _testGroup(name: 'Bad', displayName: ''),
+    };
+    expect(groupDisplayName('Bad', empty), 'Bad');
+  });
 
   // Regression for the 0.3.13 export-from-3-dots-menu wiring: the menu's
   // onSelected called DefaultTabController.of on the State's build context,

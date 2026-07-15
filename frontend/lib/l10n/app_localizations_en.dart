@@ -304,6 +304,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get groupNameLabel => 'Group name';
 
   @override
+  String get groupDisplayNameHelper =>
+      'Shown instead of the internal group key on tabs and the info panel.';
+
+  @override
   String get groupDescription => 'Description';
 
   @override

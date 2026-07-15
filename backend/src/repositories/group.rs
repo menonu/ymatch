@@ -26,8 +26,7 @@ pub struct AdminGroup {
 }
 
 /// SELECT list for the `merchandise_groups` table.
-const GROUP_COLUMNS: &str =
-    "id, event_id, group_name, description, created_by, created_at, updated_at, photo_url";
+const GROUP_COLUMNS: &str = "id, event_id, group_name, description, created_by, created_at, updated_at, photo_url, display_name";
 
 pub struct MerchandiseGroupRepository {
     pool: PgPool,
@@ -186,10 +185,15 @@ impl MerchandiseGroupRepository {
         Ok(group_from_row(&row))
     }
 
-    /// Update description (and optionally photo_url) of an existing group.
-    /// Returns `None` if the group row does not yet exist (caller should use
-    /// `create` first). When `req.photo_url` is `Some`, it is applied
-    /// (empty string clears the image). When `None`, photo_url is left as-is.
+    /// Update description (and optionally photo_url / display_name) of an
+    /// existing group. Returns `None` if the group row does not yet exist
+    /// (caller should use `create` first). The `group_name` key is never
+    /// mutated — "renaming" is done by setting `display_name` (#425).
+    ///
+    /// `photo_url` and `display_name` share the same partial-update semantic:
+    /// when `Some`, the value is applied (empty/whitespace string clears it to
+    /// NULL); when `None`, the column is left as-is. `description` is always
+    /// written (empty string clears, matching `create`).
     pub async fn update(
         &self,
         req: UpdateGroupRequest,
@@ -213,43 +217,45 @@ impl MerchandiseGroupRepository {
 
         let description = req.description.clone().unwrap_or_default();
 
-        let updated = if let Some(ref raw_photo) = req.photo_url {
-            let photo_url = {
-                let t = raw_photo.trim();
-                if t.is_empty() {
-                    None
-                } else {
-                    Some(t.to_string())
-                }
-            };
-            sqlx::query(&format!(
-                r#"UPDATE merchandise_groups
-                   SET description = $1, photo_url = $2, updated_at = NOW()
-                   WHERE event_id = $3 AND group_name = $4
-                   RETURNING {}"#,
-                GROUP_COLUMNS
-            ))
-            .bind(&description)
-            .bind(photo_url)
-            .bind(req.event_id)
-            .bind(&group_name)
-            .fetch_one(&self.pool)
-            .await?
-        } else {
-            sqlx::query(&format!(
-                r#"UPDATE merchandise_groups
-                   SET description = $1, updated_at = NOW()
-                   WHERE event_id = $2 AND group_name = $3
-                   RETURNING {}"#,
-                GROUP_COLUMNS
-            ))
-            .bind(&description)
-            .bind(req.event_id)
-            .bind(&group_name)
-            .fetch_one(&self.pool)
-            .await?
-        };
+        // Normalize the optional fields to: None = leave as-is,
+        // Some(None) = clear to NULL, Some(Some(v)) = set to trimmed v.
+        let photo_url: Option<Option<String>> = req.photo_url.as_deref().map(|raw| {
+            let t = raw.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        });
+        let display_name: Option<Option<String>> = req.display_name.as_deref().map(|raw| {
+            let t = raw.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        });
 
+        // Build the SET clause dynamically so omitted optional fields are
+        // left untouched (a partial update that only sends description does
+        // not clear photo_url / display_name).
+        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+            "UPDATE merchandise_groups SET description = ",
+        );
+        qb.push_bind(description);
+        qb.push(", updated_at = NOW()");
+        if let Some(photo) = photo_url {
+            qb.push(", photo_url = ").push_bind(photo);
+        }
+        if let Some(display) = display_name {
+            qb.push(", display_name = ").push_bind(display);
+        }
+        qb.push(" WHERE event_id = ").push_bind(req.event_id);
+        qb.push(" AND group_name = ").push_bind(&group_name);
+        qb.push(" RETURNING ");
+        qb.push(GROUP_COLUMNS);
+
+        let updated = qb.build().fetch_one(&self.pool).await?;
         Ok(Some(group_from_row(&updated)))
     }
 

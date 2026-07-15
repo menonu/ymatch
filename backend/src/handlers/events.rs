@@ -255,10 +255,13 @@ pub async fn list_event_members(
 /// Add Merch button (#366) instead of discovering the 403 on click.
 ///
 /// The response carries the caller's event-scoped membership (`role`), whether
-/// a global admin/moderator role is in effect (`global_override`), and the
+/// a global admin/moderator role is in effect (`global_override`), the
 /// **exact** `merch.create` decision the [`create_merch`](crate::handlers::merch)
-/// handler enforces (`can_create_merch`) — computed via the same
-/// [`RbacService::check`], so the frontend gate is not a re-derivation.
+/// handler enforces (`can_create_merch`), and the **exact** `group.edit`
+/// decision the [`update_event_group`](crate::handlers::groups) handler enforces
+/// for a non-creator (`can_edit_group`) — each computed via the same
+/// [`RbacService::check`], so the frontend gate is not a re-derivation. The
+/// group creator ownership short-circuit stays a frontend check.
 ///
 /// The event's existence is confirmed (404) before any role query, matching
 /// [`update_event`]'s 404-before-decide convention.
@@ -291,10 +294,16 @@ pub async fn get_my_event_role(
         .check(&user, &Scope::Event(event_id), Permission::MerchCreate)
         .await
         .is_ok();
+    let can_edit_group = state
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::GroupEdit)
+        .await
+        .is_ok();
 
     Ok(Json(MyEventRoleResponse {
         role,
         global_override,
         can_create_merch,
+        can_edit_group,
     }))
 }

@@ -105,6 +105,9 @@ pub struct MerchandiseGroup {
     /// optional description image (#404)
     #[prost(string, optional, tag = "8")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    /// cosmetic label; UI falls back to group_name when unset (#425)
+    #[prost(string, optional, tag = "9")]
+    pub display_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -454,6 +457,10 @@ pub struct UpdateGroupRequest {
     /// When set: update photo_url (empty string clears). When unset: leave as-is.
     #[prost(string, optional, tag = "5")]
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
+    /// Cosmetic label; empty string clears it (UI falls back to group_name).
+    /// When unset: leave display_name as-is. group_name itself is never mutated (#425).
+    #[prost(string, optional, tag = "6")]
+    pub display_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -501,4 +508,7 @@ pub struct MyEventRoleResponse {
     /// the caller may create merch on this event
     #[prost(bool, tag = "3")]
     pub can_create_merch: bool,
+    /// the caller may edit any group's info on this event (group.edit)
+    #[prost(bool, tag = "4")]
+    pub can_edit_group: bool,
 }

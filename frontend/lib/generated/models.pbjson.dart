@@ -340,6 +340,15 @@ const MerchandiseGroup$json = {
       '10': 'photoUrl',
       '17': true
     },
+    {
+      '1': 'display_name',
+      '3': 9,
+      '4': 1,
+      '5': 9,
+      '9': 5,
+      '10': 'displayName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_description'},
@@ -347,6 +356,7 @@ const MerchandiseGroup$json = {
     {'1': '_created_at'},
     {'1': '_updated_at'},
     {'1': '_photo_url'},
+    {'1': '_display_name'},
   ],
 };
 
@@ -356,9 +366,10 @@ final $typed_data.Uint8List merchandiseGroupDescriptor = $convert.base64Decode(
     'ZlbnRJZBIdCgpncm91cF9uYW1lGAMgASgJUglncm91cE5hbWUSJQoLZGVzY3JpcHRpb24YBCAB'
     'KAlIAFILZGVzY3JpcHRpb26IAQESIgoKY3JlYXRlZF9ieRgFIAEoBUgBUgljcmVhdGVkQnmIAQ'
     'ESIgoKY3JlYXRlZF9hdBgGIAEoCUgCUgljcmVhdGVkQXSIAQESIgoKdXBkYXRlZF9hdBgHIAEo'
-    'CUgDUgl1cGRhdGVkQXSIAQESIAoJcGhvdG9fdXJsGAggASgJSARSCHBob3RvVXJsiAEBQg4KDF'
-    '9kZXNjcmlwdGlvbkINCgtfY3JlYXRlZF9ieUINCgtfY3JlYXRlZF9hdEINCgtfdXBkYXRlZF9h'
-    'dEIMCgpfcGhvdG9fdXJs');
+    'CUgDUgl1cGRhdGVkQXSIAQESIAoJcGhvdG9fdXJsGAggASgJSARSCHBob3RvVXJsiAEBEiYKDG'
+    'Rpc3BsYXlfbmFtZRgJIAEoCUgFUgtkaXNwbGF5TmFtZYgBAUIOCgxfZGVzY3JpcHRpb25CDQoL'
+    'X2NyZWF0ZWRfYnlCDQoLX2NyZWF0ZWRfYXRCDQoLX3VwZGF0ZWRfYXRCDAoKX3Bob3RvX3VybE'
+    'IPCg1fZGlzcGxheV9uYW1l');
 
 @$core.Deprecated('Use inventoryItemDescriptor instead')
 const InventoryItem$json = {
@@ -1170,10 +1181,20 @@ const UpdateGroupRequest$json = {
       '10': 'photoUrl',
       '17': true
     },
+    {
+      '1': 'display_name',
+      '3': 6,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'displayName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_description'},
     {'1': '_photo_url'},
+    {'1': '_display_name'},
   ],
 };
 
@@ -1182,7 +1203,8 @@ final $typed_data.Uint8List updateGroupRequestDescriptor = $convert.base64Decode
     'ChJVcGRhdGVHcm91cFJlcXVlc3QSGQoIZXZlbnRfaWQYASABKAVSB2V2ZW50SWQSFwoHdXNlcl'
     '9pZBgCIAEoBVIGdXNlcklkEh0KCmdyb3VwX25hbWUYAyABKAlSCWdyb3VwTmFtZRIlCgtkZXNj'
     'cmlwdGlvbhgEIAEoCUgAUgtkZXNjcmlwdGlvbogBARIgCglwaG90b191cmwYBSABKAlIAVIIcG'
-    'hvdG9VcmyIAQFCDgoMX2Rlc2NyaXB0aW9uQgwKCl9waG90b191cmw=');
+    'hvdG9VcmyIAQESJgoMZGlzcGxheV9uYW1lGAYgASgJSAJSC2Rpc3BsYXlOYW1liAEBQg4KDF9k'
+    'ZXNjcmlwdGlvbkIMCgpfcGhvdG9fdXJsQg8KDV9kaXNwbGF5X25hbWU=');
 
 @$core.Deprecated('Use listGroupsResponseDescriptor instead')
 const ListGroupsResponse$json = {
@@ -1258,6 +1280,7 @@ const MyEventRoleResponse$json = {
     {'1': 'role', '3': 1, '4': 1, '5': 9, '10': 'role'},
     {'1': 'global_override', '3': 2, '4': 1, '5': 8, '10': 'globalOverride'},
     {'1': 'can_create_merch', '3': 3, '4': 1, '5': 8, '10': 'canCreateMerch'},
+    {'1': 'can_edit_group', '3': 4, '4': 1, '5': 8, '10': 'canEditGroup'},
   ],
 };
 
@@ -1265,4 +1288,4 @@ const MyEventRoleResponse$json = {
 final $typed_data.Uint8List myEventRoleResponseDescriptor = $convert.base64Decode(
     'ChNNeUV2ZW50Um9sZVJlc3BvbnNlEhIKBHJvbGUYASABKAlSBHJvbGUSJwoPZ2xvYmFsX292ZX'
     'JyaWRlGAIgASgIUg5nbG9iYWxPdmVycmlkZRIoChBjYW5fY3JlYXRlX21lcmNoGAMgASgIUg5j'
-    'YW5DcmVhdGVNZXJjaA==');
+    'YW5DcmVhdGVNZXJjaBIkCg5jYW5fZWRpdF9ncm91cBgEIAEoCFIMY2FuRWRpdEdyb3Vw');

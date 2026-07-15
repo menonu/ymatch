@@ -578,6 +578,7 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
     $core.String? createdAt,
     $core.String? updatedAt,
     $core.String? photoUrl,
+    $core.String? displayName,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -588,6 +589,7 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
     if (createdAt != null) result.createdAt = createdAt;
     if (updatedAt != null) result.updatedAt = updatedAt;
     if (photoUrl != null) result.photoUrl = photoUrl;
+    if (displayName != null) result.displayName = displayName;
     return result;
   }
 
@@ -612,6 +614,7 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'createdAt')
     ..aOS(7, _omitFieldNames ? '' : 'updatedAt')
     ..aOS(8, _omitFieldNames ? '' : 'photoUrl')
+    ..aOS(9, _omitFieldNames ? '' : 'displayName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -704,6 +707,15 @@ class MerchandiseGroup extends $pb.GeneratedMessage {
   $core.bool hasPhotoUrl() => $_has(7);
   @$pb.TagNumber(8)
   void clearPhotoUrl() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get displayName => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set displayName($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasDisplayName() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearDisplayName() => $_clearField(9);
 }
 
 class InventoryItem extends $pb.GeneratedMessage {
@@ -3018,6 +3030,7 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
     $core.String? groupName,
     $core.String? description,
     $core.String? photoUrl,
+    $core.String? displayName,
   }) {
     final result = create();
     if (eventId != null) result.eventId = eventId;
@@ -3025,6 +3038,7 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
     if (groupName != null) result.groupName = groupName;
     if (description != null) result.description = description;
     if (photoUrl != null) result.photoUrl = photoUrl;
+    if (displayName != null) result.displayName = displayName;
     return result;
   }
 
@@ -3046,6 +3060,7 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'groupName')
     ..aOS(4, _omitFieldNames ? '' : 'description')
     ..aOS(5, _omitFieldNames ? '' : 'photoUrl')
+    ..aOS(6, _omitFieldNames ? '' : 'displayName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3112,6 +3127,17 @@ class UpdateGroupRequest extends $pb.GeneratedMessage {
   $core.bool hasPhotoUrl() => $_has(4);
   @$pb.TagNumber(5)
   void clearPhotoUrl() => $_clearField(5);
+
+  /// Cosmetic label; empty string clears it (UI falls back to group_name).
+  /// When unset: leave display_name as-is. group_name itself is never mutated (#425).
+  @$pb.TagNumber(6)
+  $core.String get displayName => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set displayName($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasDisplayName() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearDisplayName() => $_clearField(6);
 }
 
 class ListGroupsResponse extends $pb.GeneratedMessage {
@@ -3307,11 +3333,13 @@ class MyEventRoleResponse extends $pb.GeneratedMessage {
     $core.String? role,
     $core.bool? globalOverride,
     $core.bool? canCreateMerch,
+    $core.bool? canEditGroup,
   }) {
     final result = create();
     if (role != null) result.role = role;
     if (globalOverride != null) result.globalOverride = globalOverride;
     if (canCreateMerch != null) result.canCreateMerch = canCreateMerch;
+    if (canEditGroup != null) result.canEditGroup = canEditGroup;
     return result;
   }
 
@@ -3331,6 +3359,7 @@ class MyEventRoleResponse extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'role')
     ..aOB(2, _omitFieldNames ? '' : 'globalOverride')
     ..aOB(3, _omitFieldNames ? '' : 'canCreateMerch')
+    ..aOB(4, _omitFieldNames ? '' : 'canEditGroup')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3378,6 +3407,15 @@ class MyEventRoleResponse extends $pb.GeneratedMessage {
   $core.bool hasCanCreateMerch() => $_has(2);
   @$pb.TagNumber(3)
   void clearCanCreateMerch() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get canEditGroup => $_getBF(3);
+  @$pb.TagNumber(4)
+  set canEditGroup($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCanEditGroup() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCanEditGroup() => $_clearField(4);
 }
 
 const $core.bool _omitFieldNames =

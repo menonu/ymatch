@@ -600,10 +600,15 @@ class GroupController extends StateNotifier<AsyncValue<void>> {
     required int eventId,
     required int userId,
     required String groupName,
+    // Cosmetic label (#425). Always sent by the edit dialog (the name field is
+    // never empty); empty string clears display_name → UI falls back to the
+    // immutable group_name key.
+    String? displayName,
     String? description,
     // null = leave photo unchanged; non-null (including '') = set/clear (#404).
     String? photoUrl,
     bool updatePhoto = false,
+    bool updateDisplayName = false,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -613,6 +618,9 @@ class GroupController extends StateNotifier<AsyncValue<void>> {
         ..groupName = groupName;
       // Always send description so clearing the field is possible.
       payload.description = description ?? '';
+      if (updateDisplayName) {
+        payload.displayName = displayName ?? '';
+      }
       if (updatePhoto) {
         payload.photoUrl = photoUrl ?? '';
       }
