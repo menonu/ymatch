@@ -131,6 +131,137 @@ void main() {
   );
 
   testWidgets(
+    'Groups tab shows displayName and falls back to groupName (#430)',
+    (WidgetTester tester) async {
+      final deletedPaths = <String>[];
+      final groups = <AdminGroup>[
+        const AdminGroup(
+          eventId: 42,
+          eventName: 'Test Event',
+          groupName: 'pins-key',
+          displayName: 'Enamel Pins!',
+          itemCount: 2,
+        ),
+        const AdminGroup(
+          eventId: 42,
+          eventName: 'Test Event',
+          groupName: 'stickers-key',
+          itemCount: 1,
+        ),
+      ];
+
+      final mockClient = MockClient((request) async {
+        if (request.method == 'DELETE' &&
+            request.url.path.startsWith('/api/v1/admin/events/')) {
+          deletedPaths.add(
+            '${request.url.path}?${request.url.query}',
+          );
+          return http.Response('', 200);
+        }
+        return http.Response('[]', 200);
+      });
+      final api = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: mockClient,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            apiClientProvider.overrideWith((ref) => api),
+            adminGroupsProvider.overrideWith((ref) async => groups),
+            adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+            adminUsersProvider.overrideWith((ref) async => <User>[]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            backendSystemStatusProvider.overrideWith((ref) async => <String, dynamic>{}),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Groups'));
+      await tester.pumpAndSettle();
+
+      // List title uses displayName when set, otherwise the key.
+      expect(find.text('Enamel Pins!'), findsOneWidget);
+      expect(find.text('pins-key'), findsNothing);
+      expect(find.text('stickers-key'), findsOneWidget);
+
+      // Remove confirmation also shows the friendly label.
+      await tester.tap(find.byTooltip('Remove group').first);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Remove “Enamel Pins!” from “Test Event”?'),
+        findsOneWidget,
+      );
+
+      // DELETE still targets the immutable group_name key, not the label.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Remove'));
+      await tester.pumpAndSettle();
+      final encoded = Uri.encodeComponent('pins-key');
+      expect(deletedPaths, [
+        '/api/v1/admin/events/42/groups/$encoded?user_id=7',
+      ]);
+    },
+  );
+
+  test('AdminGroup.label falls back when displayName is null or empty (#430)', () {
+    expect(
+      const AdminGroup(
+        eventId: 1,
+        eventName: 'E',
+        groupName: 'key',
+        displayName: 'Nice',
+        itemCount: 0,
+      ).label,
+      'Nice',
+    );
+    expect(
+      const AdminGroup(
+        eventId: 1,
+        eventName: 'E',
+        groupName: 'key',
+        itemCount: 0,
+      ).label,
+      'key',
+    );
+    expect(
+      const AdminGroup(
+        eventId: 1,
+        eventName: 'E',
+        groupName: 'key',
+        displayName: '',
+        itemCount: 0,
+      ).label,
+      'key',
+    );
+  });
+
+  test('AdminGroup.fromJson parses optional displayName (#430)', () {
+    final withName = AdminGroup.fromJson({
+      'eventId': 1,
+      'eventName': 'E',
+      'groupName': 'key',
+      'displayName': 'Label',
+      'itemCount': 2,
+    });
+    expect(withName.displayName, 'Label');
+    expect(withName.label, 'Label');
+
+    final without = AdminGroup.fromJson({
+      'eventId': 1,
+      'eventName': 'E',
+      'groupName': 'key',
+      'itemCount': 0,
+    });
+    expect(without.displayName, isNull);
+    expect(without.label, 'key');
+  });
+
+  testWidgets(
     'Items tab resolves relative photoUrl via buildImage (#331)',
     (WidgetTester tester) async {
       final merch = Merchandise()
