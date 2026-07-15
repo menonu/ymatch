@@ -198,6 +198,27 @@ impl EventRepository {
         Ok(row.map(|r| r.get::<Option<i32>, _>("creator_id")))
     }
 
+    /// Set `events.creator_id` for admin ownership transfer (#432).
+    /// Runs on the caller's open transaction so it commits with the
+    /// matching `user_roles` swap. Returns `false` if the event is missing.
+    pub async fn set_creator<'c, E>(
+        &self,
+        exec: E,
+        event_id: i32,
+        new_creator_id: i32,
+    ) -> Result<bool, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let affected = sqlx::query("UPDATE events SET creator_id = $1 WHERE id = $2")
+            .bind(new_creator_id)
+            .bind(event_id)
+            .execute(exec)
+            .await?
+            .rows_affected();
+        Ok(affected > 0)
+    }
+
     /// Search events by name (case-insensitive). Returns at most `limit`
     /// results, all of which are published.
     pub async fn search(

@@ -737,14 +737,23 @@ class AdminGroup {
     required this.eventName,
     required this.groupName,
     this.displayName,
+    this.creatorId,
+    this.creatorUsername,
     required this.itemCount,
   });
 
   final int eventId;
   final String eventName;
   final String groupName;
+
   /// Cosmetic label; UI falls back to [groupName] when null/empty (#430).
   final String? displayName;
+
+  /// Group ownership short-circuit (`created_by`); null if unowned (#432).
+  final int? creatorId;
+
+  /// Username of [creatorId] when set (#432).
+  final String? creatorUsername;
   final int itemCount;
 
   /// User-visible label: [displayName] when set, otherwise the key (#430).
@@ -754,13 +763,45 @@ class AdminGroup {
     return groupName;
   }
 
+  /// Display string for the group creator on the admin Groups tab (#432).
+  String get creatorLabel {
+    final name = creatorUsername;
+    if (name != null && name.isNotEmpty) {
+      return creatorId != null ? '$name ($creatorId)' : name;
+    }
+    if (creatorId != null) return 'ID $creatorId';
+    return 'Unowned';
+  }
+
   factory AdminGroup.fromJson(Map<String, dynamic> json) => AdminGroup(
     eventId: json['eventId'] as int,
     eventName: json['eventName'] as String,
     groupName: json['groupName'] as String,
     displayName: json['displayName'] as String?,
+    creatorId: json['creatorId'] as int?,
+    creatorUsername: json['creatorUsername'] as String?,
     itemCount: json['itemCount'] as int,
   );
+}
+
+/// Event-scoped member row from list members APIs (#432).
+class EventMemberInfo {
+  const EventMemberInfo({
+    required this.userId,
+    required this.role,
+    this.username,
+  });
+
+  final int userId;
+  final String role;
+  final String? username;
+
+  factory EventMemberInfo.fromJson(Map<String, dynamic> json) =>
+      EventMemberInfo(
+        userId: json['userId'] as int,
+        role: json['role'] as String,
+        username: json['username'] as String?,
+      );
 }
 
 final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
@@ -920,6 +961,97 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       // #266 / pr-review: rethrow for consistent mutation failure surfacing.
+      rethrow;
+    }
+  }
+
+  /// Transfer event ownership (`PUT /admin/events/:id/creator`) (#432).
+  Future<void> transferEventCreator(
+    int eventId,
+    int adminUserId,
+    int newCreatorId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.put(
+        '/api/v1/admin/events/$eventId/creator?user_id=$adminUserId',
+        {'newCreatorId': newCreatorId},
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Transfer group ownership (`PUT /admin/events/:id/groups/:name/creator`) (#432).
+  Future<void> transferGroupCreator(
+    int eventId,
+    String groupName,
+    int adminUserId,
+    int newCreatorId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final encoded = Uri.encodeComponent(groupName);
+      await client.put(
+        '/api/v1/admin/events/$eventId/groups/$encoded/creator?user_id=$adminUserId',
+        {'newCreatorId': newCreatorId},
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// List event members via admin path (#432).
+  Future<List<EventMemberInfo>> listEventMembers(
+    int eventId,
+    int adminUserId,
+  ) async {
+    final json = await client.get(
+      '/api/v1/admin/events/$eventId/members?user_id=$adminUserId',
+    );
+    final members = (json as Map<String, dynamic>)['members'] as List? ?? [];
+    return members
+        .map((e) => EventMemberInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Assign event editor via admin path (#432).
+  Future<void> assignEventEditor(
+    int eventId,
+    int targetUserId,
+    int adminUserId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.post(
+        '/api/v1/admin/events/$eventId/members/$targetUserId?user_id=$adminUserId',
+        {},
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Revoke event editor via admin path (#432). Never removes creator role.
+  Future<void> revokeEventEditor(
+    int eventId,
+    int targetUserId,
+    int adminUserId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.delete(
+        '/api/v1/admin/events/$eventId/members/$targetUserId?user_id=$adminUserId',
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
       rethrow;
     }
   }

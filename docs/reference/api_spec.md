@@ -495,6 +495,102 @@ Update a user's role.
 - **Response**: `200 OK`
 - **Permissions**: **Admin only** (moderators cannot change roles).
 
+### PUT /api/v1/admin/events/:id/creator
+
+Transfer event ownership (`events.creator_id` + event-scoped `creator` role).
+Does **not** auto-promote the previous creator to `editor` (#432).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Request Body**:
+  ```json
+  { "newCreatorId": 42 }
+  ```
+- **Response**: `200 OK`
+- **Errors**: `400` if already the creator or target is banned; `404` if event or target user missing; `403` if caller lacks permission.
+- **Permissions**: Admin or moderator (`event.creator.transfer`).
+
+### PUT /api/v1/admin/events/:id/groups/:group_name/creator
+
+Transfer item-group ownership (`merchandise_groups.created_by`) (#432).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Request Body**:
+  ```json
+  { "newCreatorId": 42 }
+  ```
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator (`group.creator.transfer`).
+
+### GET /api/v1/admin/events/:id/members
+
+List event-scoped role assignments (creator + editors) via the admin path (#432).
+Separate from the creator-only `GET /events/:id/members` so global moderators
+can inspect membership without holding `event.member.manage`.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+  ```json
+  {
+    "members": [
+      { "userId": 1, "role": "creator", "username": "alice" },
+      { "userId": 2, "role": "editor", "username": "bob" }
+    ]
+  }
+  ```
+- **Permissions**: Admin or moderator (`event.member.manage.any`).
+
+### POST /api/v1/admin/events/:id/members/:target_id
+
+Assign the event-scoped `editor` role (idempotent) (#432).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator (`event.member.manage.any`).
+
+### DELETE /api/v1/admin/events/:id/members/:target_id
+
+Revoke the event-scoped `editor` role (idempotent). Never removes the
+event `creator` role (#432).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+- **Permissions**: Admin or moderator (`event.member.manage.any`).
+
+### GET /api/v1/admin/groups
+
+List all item groups for the moderation dashboard.
+
+- **Response**: `200 OK` — Array of objects:
+  ```json
+  [
+    {
+      "eventId": 1,
+      "eventName": "Live 2025",
+      "groupName": "pins-key",
+      "displayName": "Enamel Pins",
+      "creatorId": 3,
+      "creatorUsername": "alice",
+      "itemCount": 12
+    }
+  ]
+  ```
+- `displayName`, `creatorId`, and `creatorUsername` are omitted when unset.
+
 ---
 
 ## 8. Search

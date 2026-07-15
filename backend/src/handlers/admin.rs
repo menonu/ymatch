@@ -14,6 +14,13 @@ pub struct AdminQuery {
     pub user_id: Option<i32>,
 }
 
+/// Body for admin creator-transfer endpoints (#432).
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferCreatorRequest {
+    pub new_creator_id: i32,
+}
+
 /// Resolve the caller from the `user_id` query param and require they hold
 /// `permission` in the global scope (ADR 0004 §3). This is the RBAC entry
 /// point for the admin endpoints: `user.read`, `user.ban`, `user.unban`,
@@ -194,4 +201,151 @@ pub async fn get_user_details(
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
     Ok(Json(user))
+}
+
+/// Validate that `new_creator_id` exists and is not banned (#432).
+async fn require_active_target_user(state: &AppState, new_creator_id: i32) -> Result<(), AppError> {
+    let target = state
+        .users
+        .get_by_id(new_creator_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Target user not found"))?;
+    if target.is_banned.unwrap_or(false) {
+        return Err(AppError::bad_request("Target user is banned"));
+    }
+    Ok(())
+}
+
+/// Transfer event ownership (`PUT /api/v1/admin/events/:id/creator`).
+/// Atomically updates `events.creator_id` and swaps the event-scoped
+/// `creator` role. Does **not** auto-promote the previous creator to
+/// `editor` (#432).
+pub async fn transfer_event_creator(
+    State(state): State<AppState>,
+    Path(event_id): Path<i32>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    Json(payload): Json<TransferCreatorRequest>,
+) -> Result<StatusCode, AppError> {
+    require_global(&state, query.user_id, Permission::EventCreatorTransfer).await?;
+
+    // 404 before probing target so a missing event is not leaked as a
+    // target-user 404 to an authorized caller with a bad id.
+    let previous = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+
+    if previous == Some(payload.new_creator_id) {
+        return Err(AppError::bad_request("User is already the event creator"));
+    }
+
+    require_active_target_user(&state, payload.new_creator_id).await?;
+
+    let mut tx = state.pool.begin().await?;
+    let updated = state
+        .events
+        .set_creator(&mut *tx, event_id, payload.new_creator_id)
+        .await?;
+    if !updated {
+        return Err(AppError::not_found("Event not found"));
+    }
+    state
+        .rbac
+        .transfer_event_creator_role(&mut tx, event_id, previous, payload.new_creator_id)
+        .await?;
+    tx.commit().await?;
+    Ok(StatusCode::OK)
+}
+
+/// Transfer item-group ownership (`PUT /api/v1/admin/events/:id/groups/:name/creator`).
+/// Updates `merchandise_groups.created_by` only — group ownership is a
+/// column short-circuit, not an RBAC role (#432).
+pub async fn transfer_group_creator(
+    State(state): State<AppState>,
+    Path((event_id, group_name)): Path<(i32, String)>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    Json(payload): Json<TransferCreatorRequest>,
+) -> Result<StatusCode, AppError> {
+    require_global(&state, query.user_id, Permission::GroupCreatorTransfer).await?;
+
+    let current = state
+        .groups
+        .get_creator(event_id, &group_name)
+        .await?
+        .ok_or_else(|| AppError::not_found("Group not found"))?;
+
+    if current == Some(payload.new_creator_id) {
+        return Err(AppError::bad_request("User is already the group creator"));
+    }
+
+    require_active_target_user(&state, payload.new_creator_id).await?;
+
+    if !state
+        .groups
+        .set_creator(event_id, &group_name, payload.new_creator_id)
+        .await?
+    {
+        return Err(AppError::not_found("Group not found"));
+    }
+    Ok(StatusCode::OK)
+}
+
+/// List event members via the admin path
+/// (`GET /api/v1/admin/events/:id/members`). Gated by
+/// `event.member.manage.any` so global moderators can inspect membership
+/// without holding the creator-only `event.member.manage` permission (#432).
+pub async fn admin_list_event_members(
+    State(state): State<AppState>,
+    Path(event_id): Path<i32>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<Json<ListEventMembersResponse>, AppError> {
+    require_global(&state, query.user_id, Permission::EventMemberManageAny).await?;
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    let members = state.rbac.list_event_members(event_id).await?;
+    Ok(Json(ListEventMembersResponse { members }))
+}
+
+/// Assign an event editor via the admin path
+/// (`POST /api/v1/admin/events/:id/members/:target_id`) (#432).
+pub async fn admin_assign_event_member(
+    State(state): State<AppState>,
+    Path((event_id, target_id)): Path<(i32, i32)>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<StatusCode, AppError> {
+    require_global(&state, query.user_id, Permission::EventMemberManageAny).await?;
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    state
+        .users
+        .get_by_id(target_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Target user not found"))?;
+    state.rbac.assign_event_editor(target_id, event_id).await?;
+    Ok(StatusCode::OK)
+}
+
+/// Revoke an event editor via the admin path
+/// (`DELETE /api/v1/admin/events/:id/members/:target_id`). Never removes
+/// the event `creator` role — the SQL filters to `editor` only (#432).
+pub async fn admin_revoke_event_member(
+    State(state): State<AppState>,
+    Path((event_id, target_id)): Path<(i32, i32)>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+) -> Result<StatusCode, AppError> {
+    require_global(&state, query.user_id, Permission::EventMemberManageAny).await?;
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    state.rbac.revoke_event_editor(target_id, event_id).await?;
+    Ok(StatusCode::OK)
 }

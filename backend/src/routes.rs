@@ -340,8 +340,27 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             "/api/v1/admin/events/:id/groups/:group_name",
             delete(handlers::delete_group),
         )
+        // #432: transfer group ownership (created_by).
+        .route(
+            "/api/v1/admin/events/:id/groups/:group_name/creator",
+            put(handlers::transfer_group_creator),
+        )
         .route("/api/v1/admin/matches", get(handlers::list_all_matches))
         .route("/api/v1/admin/events/:id", delete(handlers::delete_event))
+        // #432: transfer event ownership (creator_id + event/creator role).
+        .route(
+            "/api/v1/admin/events/:id/creator",
+            put(handlers::transfer_event_creator),
+        )
+        // #432: admin-path event member management (moderator + admin).
+        .route(
+            "/api/v1/admin/events/:id/members",
+            get(handlers::admin_list_event_members),
+        )
+        .route(
+            "/api/v1/admin/events/:id/members/:target_id",
+            post(handlers::admin_assign_event_member).delete(handlers::admin_revoke_event_member),
+        )
         .route("/api/v1/admin/merch/:id", delete(handlers::delete_merch))
         .route("/api/v1/admin/matches/:id", delete(handlers::delete_match))
         .route("/api/v1/admin/users/:id", get(handlers::get_user_details))

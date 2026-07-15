@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/models.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 import '../utils/image_helper.dart';
@@ -201,9 +202,9 @@ class _AdminUsersTab extends ConsumerWidget {
                         await action();
                         ref.invalidate(adminUsersProvider);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(successLabel)),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(successLabel)));
                         }
                       } catch (e) {
                         // #266: privileged admin actions must show failure feedback.
@@ -228,11 +229,7 @@ class _AdminUsersTab extends ConsumerWidget {
                           'Enter reason (optional)',
                         );
                         await runAdminAction(
-                          () => admin.banUser(
-                            user.id,
-                            adminId,
-                            reason: reason,
-                          ),
+                          () => admin.banUser(user.id, adminId, reason: reason),
                           'User banned',
                         );
                         break;
@@ -244,11 +241,7 @@ class _AdminUsersTab extends ConsumerWidget {
                         break;
                       case 'role_admin':
                         await runAdminAction(
-                          () => admin.updateUserRole(
-                            user.id,
-                            adminId,
-                            'admin',
-                          ),
+                          () => admin.updateUserRole(user.id, adminId, 'admin'),
                           'Role updated to admin',
                         );
                         break;
@@ -264,11 +257,7 @@ class _AdminUsersTab extends ConsumerWidget {
                         break;
                       case 'role_user':
                         await runAdminAction(
-                          () => admin.updateUserRole(
-                            user.id,
-                            adminId,
-                            'user',
-                          ),
+                          () => admin.updateUserRole(user.id, adminId, 'user'),
                           'Role updated to user',
                         );
                         break;
@@ -345,94 +334,181 @@ class _AdminEventsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(eventsProvider);
+    final usersAsync = ref.watch(adminUsersProvider);
+    final currentUser = ref.watch(currentUserProvider);
 
     return eventsAsync.when(
       data: (events) {
         if (events.isEmpty) {
           return const Center(child: Text('No events found.'));
         }
-        return ListView.builder(
-          itemCount: events.length,
-          itemBuilder: (context, index) {
-            final event = events[index];
-            final isDraft = event.hasStatus() && event.status == 'draft';
-            return ListTile(
-              leading: Icon(Icons.event, color: isDraft ? Colors.orange : null),
-              title: Row(
-                children: [
-                  Expanded(child: Text(event.name)),
-                  if (isDraft)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[100],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'DRAFT',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange[800],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              subtitle: Text(
-                'ID: ${event.id} | Creator: ${event.hasCreatorId() ? event.creatorId : 'Unknown'} | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}',
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Event?'),
-                      content: const Text(
-                        'Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    try {
-                      final client = ref.read(apiClientProvider);
-                      final user = ref.read(currentUserProvider);
-                      final userId = user?.id ?? 0;
-                      await client.delete(
-                        '/api/v1/admin/events/${event.id}?user_id=$userId',
-                      );
-                      ref.invalidate(eventsProvider);
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Event deleted')),
-                        );
-                    } catch (e) {
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to delete: $e')),
-                        );
-                    }
-                  }
-                },
-              ),
-            );
+        final usersById = <int, User>{};
+        usersAsync.whenData((users) {
+          for (final u in users) {
+            usersById[u.id] = u;
+          }
+        });
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(eventsProvider);
+            ref.invalidate(adminUsersProvider);
           },
+          child: ListView.builder(
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
+              final isDraft = event.hasStatus() && event.status == 'draft';
+              final creatorId = event.hasCreatorId() ? event.creatorId : null;
+              final creatorUser = creatorId != null
+                  ? usersById[creatorId]
+                  : null;
+              final creatorLabel = creatorUser != null
+                  ? '${creatorUser.username} ($creatorId)'
+                  : (creatorId != null ? 'ID $creatorId' : 'Unknown');
+
+              return ListTile(
+                leading: Icon(
+                  Icons.event,
+                  color: isDraft ? Colors.orange : null,
+                ),
+                title: Row(
+                  children: [
+                    Expanded(child: Text(event.name)),
+                    if (isDraft)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[100],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'DRAFT',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                subtitle: Text(
+                  'ID: ${event.id} | Creator: $creatorLabel | Views: ${event.hasUniqueViews() ? event.uniqueViews : 0}',
+                ),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    final adminId = currentUser?.id ?? 0;
+                    final admin = ref.read(adminControllerProvider.notifier);
+                    Future<void> runAction(
+                      Future<void> Function() action,
+                      String successLabel,
+                    ) async {
+                      try {
+                        await action();
+                        ref.invalidate(eventsProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(successLabel)));
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                          );
+                        }
+                      }
+                    }
+
+                    switch (value) {
+                      case 'change_creator':
+                        final selected = await _pickUser(
+                          context,
+                          ref,
+                          title: 'Change event creator',
+                          excludeUserId: creatorId,
+                        );
+                        if (selected == null) return;
+                        await runAction(
+                          () => admin.transferEventCreator(
+                            event.id,
+                            adminId,
+                            selected.id,
+                          ),
+                          'Event creator updated',
+                        );
+                        break;
+                      case 'manage_editors':
+                        await _showManageEditorsDialog(
+                          context,
+                          ref,
+                          eventId: event.id,
+                          eventName: event.name,
+                          adminUserId: adminId,
+                        );
+                        break;
+                      case 'delete':
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Event?'),
+                            content: const Text(
+                              'Are you sure you want to delete this event? This will cascade and delete all related merchandise and inventory.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          await runAction(
+                            () => admin.deleteEvent(event.id, adminId),
+                            'Event deleted',
+                          );
+                        }
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'change_creator',
+                      child: Text('Change creator'),
+                    ),
+                    PopupMenuItem(
+                      value: 'manage_editors',
+                      child: Text('Manage editors'),
+                    ),
+                    PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -447,87 +523,386 @@ class _AdminGroupsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(adminGroupsProvider);
+    final currentUser = ref.watch(currentUserProvider);
     return groupsAsync.when(
       data: (groups) {
         if (groups.isEmpty) {
           return const Center(child: Text('No groups found.'));
         }
-        return ListView.builder(
-          itemCount: groups.length,
-          itemBuilder: (context, index) {
-            final group = groups[index];
-            // #430: show cosmetic displayName when set; delete still uses
-            // the immutable groupName key in the URL.
-            final label = group.label;
-            return ListTile(
-              leading: const Icon(Icons.folder_outlined),
-              title: Text(label),
-              subtitle: Text(
-                '${group.eventName} (Event ID: ${group.eventId}) | ${group.itemCount} live items',
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                tooltip: 'Remove group',
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Remove item group?'),
-                      content: Text(
-                        'Remove “$label” from “${group.eventName}”? '
-                        'All of its items will be hidden, and its matches and favourites will be removed. This cannot be undone.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text('Remove'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed != true) return;
-                  try {
-                    final userId = ref.read(currentUserProvider)?.id ?? 0;
-                    final encodedName = Uri.encodeComponent(group.groupName);
-                    await ref
-                        .read(apiClientProvider)
-                        .delete(
-                          '/api/v1/admin/events/${group.eventId}/groups/$encodedName?user_id=$userId',
-                        );
-                    ref.invalidate(adminGroupsProvider);
-                    ref.invalidate(adminMerchProvider);
-                    ref.invalidate(adminMatchesProvider);
-                    ref.invalidate(eventsProvider);
-                    ref.invalidate(favoriteGroupsProvider);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Item group removed')),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to remove group: $e')),
-                      );
-                    }
-                  }
-                },
-              ),
-            );
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(adminGroupsProvider);
           },
+          child: ListView.builder(
+            itemCount: groups.length,
+            itemBuilder: (context, index) {
+              final group = groups[index];
+              // #430: show cosmetic displayName when set; delete still uses
+              // the immutable groupName key in the URL.
+              final label = group.label;
+              return ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(label),
+                subtitle: Text(
+                  '${group.eventName} (Event ID: ${group.eventId}) | '
+                  'Creator: ${group.creatorLabel} | ${group.itemCount} live items',
+                ),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    final adminId = currentUser?.id ?? 0;
+                    final admin = ref.read(adminControllerProvider.notifier);
+                    Future<void> runAction(
+                      Future<void> Function() action,
+                      String successLabel,
+                    ) async {
+                      try {
+                        await action();
+                        ref.invalidate(adminGroupsProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(successLabel)));
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                          );
+                        }
+                      }
+                    }
+
+                    switch (value) {
+                      case 'change_creator':
+                        final selected = await _pickUser(
+                          context,
+                          ref,
+                          title: 'Change group creator',
+                          excludeUserId: group.creatorId,
+                        );
+                        if (selected == null) return;
+                        await runAction(
+                          () => admin.transferGroupCreator(
+                            group.eventId,
+                            group.groupName,
+                            adminId,
+                            selected.id,
+                          ),
+                          'Group creator updated',
+                        );
+                        break;
+                      case 'delete':
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Remove item group?'),
+                            content: Text(
+                              'Remove “$label” from “${group.eventName}”? '
+                              'All of its items will be hidden, and its matches and favourites will be removed. This cannot be undone.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                child: const Text('Remove'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true) return;
+                        try {
+                          final userId = ref.read(currentUserProvider)?.id ?? 0;
+                          final encodedName = Uri.encodeComponent(
+                            group.groupName,
+                          );
+                          await ref
+                              .read(apiClientProvider)
+                              .delete(
+                                '/api/v1/admin/events/${group.eventId}/groups/$encodedName?user_id=$userId',
+                              );
+                          ref.invalidate(adminGroupsProvider);
+                          ref.invalidate(adminMerchProvider);
+                          ref.invalidate(adminMatchesProvider);
+                          ref.invalidate(eventsProvider);
+                          ref.invalidate(favoriteGroupsProvider);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Item group removed'),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to remove group: $e'),
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.error,
+                              ),
+                            );
+                          }
+                        }
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'change_creator',
+                      child: Text('Change creator'),
+                    ),
+                    PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Remove',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error: $error')),
     );
   }
+}
+
+/// Shared user picker for admin ownership transfer (#432).
+Future<User?> _pickUser(
+  BuildContext context,
+  WidgetRef ref, {
+  required String title,
+  int? excludeUserId,
+}) async {
+  final users = await ref.read(adminUsersProvider.future);
+  final candidates =
+      users
+          .where((u) => excludeUserId == null || u.id != excludeUserId)
+          .where((u) => !(u.hasIsBanned() && u.isBanned))
+          .toList()
+        ..sort((a, b) => a.username.compareTo(b.username));
+
+  if (!context.mounted) return null;
+  return showDialog<User>(
+    context: context,
+    builder: (context) {
+      var filter = '';
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final filtered = filter.isEmpty
+              ? candidates
+              : candidates
+                    .where(
+                      (u) =>
+                          u.username.toLowerCase().contains(
+                            filter.toLowerCase(),
+                          ) ||
+                          '${u.id}'.contains(filter),
+                    )
+                    .toList();
+          return AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 360,
+              child: Column(
+                children: [
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Search by username or id',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (v) => setState(() => filter = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(child: Text('No users found'))
+                        : ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final u = filtered[index];
+                              final role = u.hasRole() ? u.role : 'user';
+                              return ListTile(
+                                title: Text(u.username),
+                                subtitle: Text('ID: ${u.id} | $role'),
+                                onTap: () => Navigator.pop(context, u),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+/// Dialog to list / add / remove event editors via admin API (#432).
+Future<void> _showManageEditorsDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  required int eventId,
+  required String eventName,
+  required int adminUserId,
+}) async {
+  final admin = ref.read(adminControllerProvider.notifier);
+
+  Future<List<EventMemberInfo>> loadMembers() =>
+      admin.listEventMembers(eventId, adminUserId);
+
+  await showDialog<void>(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text('Editors — $eventName'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 360,
+              child: FutureBuilder<List<EventMemberInfo>>(
+                future: loadMembers(),
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) {
+                    return Text('Error: ${snap.error}');
+                  }
+                  final members = snap.data ?? [];
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: members.isEmpty
+                            ? const Center(child: Text('No members'))
+                            : ListView.builder(
+                                itemCount: members.length,
+                                itemBuilder: (context, index) {
+                                  final m = members[index];
+                                  final label =
+                                      m.username != null &&
+                                          m.username!.isNotEmpty
+                                      ? '${m.username} (${m.userId})'
+                                      : 'ID ${m.userId}';
+                                  return ListTile(
+                                    title: Text(label),
+                                    subtitle: Text(m.role),
+                                    trailing: m.role == 'editor'
+                                        ? IconButton(
+                                            icon: const Icon(
+                                              Icons.remove_circle_outline,
+                                              color: Colors.red,
+                                            ),
+                                            tooltip: 'Remove editor',
+                                            onPressed: () async {
+                                              try {
+                                                await admin.revokeEventEditor(
+                                                  eventId,
+                                                  m.userId,
+                                                  adminUserId,
+                                                );
+                                                setState(() {});
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Error: $e',
+                                                      ),
+                                                      backgroundColor: Theme.of(
+                                                        context,
+                                                      ).colorScheme.error,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                          )
+                                        : null,
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('Add editor'),
+                          onPressed: () async {
+                            final selected = await _pickUser(
+                              context,
+                              ref,
+                              title: 'Add event editor',
+                            );
+                            if (selected == null) return;
+                            try {
+                              await admin.assignEventEditor(
+                                eventId,
+                                selected.id,
+                                adminUserId,
+                              );
+                              setState(() {});
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.error,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 class _AdminItemsTab extends ConsumerWidget {

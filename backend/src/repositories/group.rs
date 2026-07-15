@@ -25,6 +25,12 @@ pub struct AdminGroup {
     /// Cosmetic label; UI falls back to `group_name` when unset (#430).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    /// Group ownership short-circuit (`created_by`); None if unowned (#432).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_id: Option<i32>,
+    /// Username of `creator_id` when set (#432).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_username: Option<String>,
     pub item_count: i64,
 }
 
@@ -58,12 +64,15 @@ impl MerchandiseGroupRepository {
     pub async fn list_all_for_admin(&self) -> Result<Vec<AdminGroup>, AppError> {
         let rows = sqlx::query(
             r#"SELECT g.event_id, e.name AS event_name, g.group_name, g.display_name,
+                      g.created_by AS creator_id, u.username AS creator_username,
                       COUNT(m.id) FILTER (WHERE m.is_deleted = false) AS item_count
                FROM merchandise_groups g
                JOIN events e ON e.id = g.event_id
+               LEFT JOIN users u ON u.id = g.created_by
                LEFT JOIN merchandise m
                  ON m.event_id = g.event_id AND m.group_name = g.group_name
-               GROUP BY g.event_id, e.name, g.group_name, g.display_name
+               GROUP BY g.event_id, e.name, g.group_name, g.display_name,
+                        g.created_by, u.username
                ORDER BY e.name ASC, g.group_name ASC"#,
         )
         .fetch_all(&self.pool)
@@ -75,9 +84,33 @@ impl MerchandiseGroupRepository {
                 event_name: row.get("event_name"),
                 group_name: row.get("group_name"),
                 display_name: row.get("display_name"),
+                creator_id: row.get("creator_id"),
+                creator_username: row.get("creator_username"),
                 item_count: row.get("item_count"),
             })
             .collect())
+    }
+
+    /// Set `created_by` for admin group-ownership transfer (#432).
+    /// Returns `false` if the group row does not exist.
+    pub async fn set_creator(
+        &self,
+        event_id: i32,
+        group_name: &str,
+        new_creator_id: i32,
+    ) -> Result<bool, AppError> {
+        let affected = sqlx::query(
+            "UPDATE merchandise_groups
+             SET created_by = $1, updated_at = NOW()
+             WHERE event_id = $2 AND group_name = $3",
+        )
+        .bind(new_creator_id)
+        .bind(event_id)
+        .bind(group_name)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(affected > 0)
     }
 
     /// Remove a group's user-visible state as one transaction. Merchandise is
