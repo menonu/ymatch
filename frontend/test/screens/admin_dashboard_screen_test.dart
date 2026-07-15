@@ -68,9 +68,7 @@ void main() {
       final mockClient = MockClient((request) async {
         if (request.method == 'DELETE' &&
             request.url.path.startsWith('/api/v1/admin/events/')) {
-          deletedPaths.add(
-            '${request.url.path}?${request.url.query}',
-          );
+          deletedPaths.add('${request.url.path}?${request.url.query}');
           return http.Response('', 200);
         }
         return http.Response('[]', 200);
@@ -83,14 +81,18 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            authProvider.overrideWith(
+              (ref) => _MockAuthController(_adminUser()),
+            ),
             apiClientProvider.overrideWith((ref) => api),
             adminGroupsProvider.overrideWith((ref) async => groups),
             adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
             adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
             adminUsersProvider.overrideWith((ref) async => <User>[]),
             eventsProvider.overrideWith((ref) async => <Event>[]),
-            backendSystemStatusProvider.overrideWith((ref) async => <String, dynamic>{}),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
           ],
           child: const MaterialApp(home: AdminDashboardScreen()),
         ),
@@ -103,12 +105,16 @@ void main() {
 
       expect(find.text('test-group'), findsOneWidget);
       expect(
-        find.text('Test Event (Event ID: 42) | 3 live items'),
+        find.text(
+          'Test Event (Event ID: 42) | Creator: Unowned | 3 live items',
+        ),
         findsOneWidget,
       );
 
       // Cancel leaves data and does not call DELETE.
-      await tester.tap(find.byTooltip('Remove group'));
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
       await tester.pumpAndSettle();
       expect(find.text('Remove item group?'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
@@ -117,7 +123,9 @@ void main() {
       expect(find.text('test-group'), findsOneWidget);
 
       // Confirm removal issues the URL-encoded DELETE and shows success.
-      await tester.tap(find.byTooltip('Remove group'));
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ElevatedButton, 'Remove'));
       await tester.pumpAndSettle();
@@ -153,9 +161,7 @@ void main() {
       final mockClient = MockClient((request) async {
         if (request.method == 'DELETE' &&
             request.url.path.startsWith('/api/v1/admin/events/')) {
-          deletedPaths.add(
-            '${request.url.path}?${request.url.query}',
-          );
+          deletedPaths.add('${request.url.path}?${request.url.query}');
           return http.Response('', 200);
         }
         return http.Response('[]', 200);
@@ -168,14 +174,18 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            authProvider.overrideWith(
+              (ref) => _MockAuthController(_adminUser()),
+            ),
             apiClientProvider.overrideWith((ref) => api),
             adminGroupsProvider.overrideWith((ref) async => groups),
             adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
             adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
             adminUsersProvider.overrideWith((ref) async => <User>[]),
             eventsProvider.overrideWith((ref) async => <Event>[]),
-            backendSystemStatusProvider.overrideWith((ref) async => <String, dynamic>{}),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
           ],
           child: const MaterialApp(home: AdminDashboardScreen()),
         ),
@@ -191,7 +201,9 @@ void main() {
       expect(find.text('stickers-key'), findsOneWidget);
 
       // Remove confirmation also shows the friendly label.
-      await tester.tap(find.byTooltip('Remove group').first);
+      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove').last);
       await tester.pumpAndSettle();
       expect(
         find.textContaining('Remove “Enamel Pins!” from “Test Event”?'),
@@ -208,37 +220,218 @@ void main() {
     },
   );
 
-  test('AdminGroup.label falls back when displayName is null or empty (#430)', () {
-    expect(
+  testWidgets('Groups tab change creator issues PUT with newCreatorId (#432)', (
+    WidgetTester tester,
+  ) async {
+    final putPaths = <String>[];
+    String? putBody;
+    final groups = <AdminGroup>[
       const AdminGroup(
-        eventId: 1,
-        eventName: 'E',
-        groupName: 'key',
-        displayName: 'Nice',
-        itemCount: 0,
-      ).label,
-      'Nice',
+        eventId: 42,
+        eventName: 'Test Event',
+        groupName: 'pins',
+        creatorId: 1,
+        creatorUsername: 'alice',
+        itemCount: 1,
+      ),
+    ];
+    final users = <User>[
+      User()
+        ..id = 1
+        ..username = 'alice'
+        ..role = 'user',
+      User()
+        ..id = 9
+        ..username = 'bob'
+        ..role = 'user',
+    ];
+
+    final mockClient = MockClient((request) async {
+      if (request.method == 'PUT' && request.url.path.contains('/creator')) {
+        putPaths.add('${request.url.path}?${request.url.query}');
+        putBody = request.body;
+        return http.Response('', 200);
+      }
+      return http.Response('[]', 200);
+    });
+    final api = ApiClient(
+      ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+      client: mockClient,
     );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+          apiClientProvider.overrideWith((ref) => api),
+          adminGroupsProvider.overrideWith((ref) async => groups),
+          adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+          adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+          adminUsersProvider.overrideWith((ref) async => users),
+          eventsProvider.overrideWith((ref) async => <Event>[]),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Groups'));
+    await tester.pumpAndSettle();
+
     expect(
-      const AdminGroup(
-        eventId: 1,
-        eventName: 'E',
-        groupName: 'key',
-        itemCount: 0,
-      ).label,
-      'key',
+      find.text(
+        'Test Event (Event ID: 42) | Creator: alice (1) | 1 live items',
+      ),
+      findsOneWidget,
     );
-    expect(
-      const AdminGroup(
-        eventId: 1,
-        eventName: 'E',
-        groupName: 'key',
-        displayName: '',
-        itemCount: 0,
-      ).label,
-      'key',
-    );
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change creator'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Change group creator'), findsOneWidget);
+    await tester.tap(find.text('bob'));
+    await tester.pumpAndSettle();
+
+    expect(putPaths, ['/api/v1/admin/events/42/groups/pins/creator?user_id=7']);
+    expect(putBody, contains('newCreatorId'));
+    expect(putBody, contains('9'));
+    expect(find.text('Group creator updated'), findsOneWidget);
   });
+
+  testWidgets('Events tab change creator and manage editors (#432)', (
+    WidgetTester tester,
+  ) async {
+    final putPaths = <String>[];
+    final postPaths = <String>[];
+    final event = Event()
+      ..id = 11
+      ..name = 'Live Event'
+      ..creatorId = 1
+      ..status = 'published';
+    final users = <User>[
+      User()
+        ..id = 1
+        ..username = 'alice'
+        ..role = 'user',
+      User()
+        ..id = 2
+        ..username = 'carol'
+        ..role = 'user',
+    ];
+
+    final mockClient = MockClient((request) async {
+      if (request.method == 'PUT' && request.url.path.endsWith('/creator')) {
+        putPaths.add('${request.url.path}?${request.url.query}');
+        return http.Response('', 200);
+      }
+      if (request.method == 'GET' && request.url.path.endsWith('/members')) {
+        return http.Response(
+          '{"members":[{"userId":1,"role":"creator","username":"alice"}]}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (request.method == 'POST' && request.url.path.contains('/members/')) {
+        postPaths.add('${request.url.path}?${request.url.query}');
+        return http.Response('', 200);
+      }
+      return http.Response('[]', 200);
+    });
+    final api = ApiClient(
+      ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+      client: mockClient,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+          apiClientProvider.overrideWith((ref) => api),
+          adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+          adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+          adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+          adminUsersProvider.overrideWith((ref) async => users),
+          eventsProvider.overrideWith((ref) async => [event]),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Events'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Creator: alice (1)'), findsOneWidget);
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change creator'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('carol'));
+    await tester.pumpAndSettle();
+
+    expect(putPaths, ['/api/v1/admin/events/11/creator?user_id=7']);
+    expect(find.text('Event creator updated'), findsOneWidget);
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage editors'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Editors — Live Event'), findsOneWidget);
+    expect(find.text('alice (1)'), findsOneWidget);
+    expect(find.text('creator'), findsOneWidget);
+
+    await tester.tap(find.text('Add editor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('carol'));
+    await tester.pumpAndSettle();
+
+    expect(postPaths, ['/api/v1/admin/events/11/members/2?user_id=7']);
+  });
+
+  test(
+    'AdminGroup.label falls back when displayName is null or empty (#430)',
+    () {
+      expect(
+        const AdminGroup(
+          eventId: 1,
+          eventName: 'E',
+          groupName: 'key',
+          displayName: 'Nice',
+          itemCount: 0,
+        ).label,
+        'Nice',
+      );
+      expect(
+        const AdminGroup(
+          eventId: 1,
+          eventName: 'E',
+          groupName: 'key',
+          itemCount: 0,
+        ).label,
+        'key',
+      );
+      expect(
+        const AdminGroup(
+          eventId: 1,
+          eventName: 'E',
+          groupName: 'key',
+          displayName: '',
+          itemCount: 0,
+        ).label,
+        'key',
+      );
+    },
+  );
 
   test('AdminGroup.fromJson parses optional displayName (#430)', () {
     final withName = AdminGroup.fromJson({
@@ -261,109 +454,134 @@ void main() {
     expect(without.label, 'key');
   });
 
-  testWidgets(
-    'Items tab resolves relative photoUrl via buildImage (#331)',
-    (WidgetTester tester) async {
-      final merch = Merchandise()
-        ..id = 10
-        ..eventId = 5
-        ..name = 'RelativePhotoMerch'
-        ..groupName = 'Pins'
-        ..photoUrl = 'uploads/abc.png';
+  test('AdminGroup.fromJson and creatorLabel (#432)', () {
+    final full = AdminGroup.fromJson({
+      'eventId': 1,
+      'eventName': 'E',
+      'groupName': 'key',
+      'creatorId': 5,
+      'creatorUsername': 'bob',
+      'itemCount': 1,
+    });
+    expect(full.creatorId, 5);
+    expect(full.creatorUsername, 'bob');
+    expect(full.creatorLabel, 'bob (5)');
 
-      final mockClient = MockClient(
-        (request) async => http.Response('[]', 200),
-      );
-      final api = ApiClient(
-        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
-        client: mockClient,
-      );
+    final idOnly = AdminGroup.fromJson({
+      'eventId': 1,
+      'eventName': 'E',
+      'groupName': 'key',
+      'creatorId': 5,
+      'itemCount': 0,
+    });
+    expect(idOnly.creatorLabel, 'ID 5');
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
-            apiClientProvider.overrideWith((ref) => api),
-            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
-            adminMerchProvider.overrideWith((ref) async => [merch]),
-            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
-            adminUsersProvider.overrideWith((ref) async => <User>[]),
-            eventsProvider.overrideWith((ref) async => <Event>[]),
-            backendSystemStatusProvider.overrideWith(
-              (ref) async => <String, dynamic>{},
-            ),
-          ],
-          child: const MaterialApp(home: AdminDashboardScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+    final unowned = AdminGroup.fromJson({
+      'eventId': 1,
+      'eventName': 'E',
+      'groupName': 'key',
+      'itemCount': 0,
+    });
+    expect(unowned.creatorLabel, 'Unowned');
+  });
 
-      await tester.tap(find.text('Items'));
-      await tester.pumpAndSettle();
+  testWidgets('Items tab resolves relative photoUrl via buildImage (#331)', (
+    WidgetTester tester,
+  ) async {
+    final merch = Merchandise()
+      ..id = 10
+      ..eventId = 5
+      ..name = 'RelativePhotoMerch'
+      ..groupName = 'Pins'
+      ..photoUrl = 'uploads/abc.png';
 
-      expect(find.text('RelativePhotoMerch'), findsOneWidget);
+    final mockClient = MockClient((request) async => http.Response('[]', 200));
+    final api = ApiClient(
+      ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+      client: mockClient,
+    );
 
-      // buildImage → resolveImageUrl turns relative paths into absolute
-      // backend URLs (non-web tests resolve to http://localhost:3000/...).
-      // Direct Image.network(item.photoUrl) would leave "uploads/abc.png"
-      // unresolved and fail to load.
-      final Image image = tester.widget(find.byType(Image));
-      expect(image.image, isA<NetworkImage>());
-      expect(
-        (image.image as NetworkImage).url,
-        'http://localhost:3000/uploads/abc.png',
-      );
-      expect(image.fit, BoxFit.contain);
-      expect(image.width, 50);
-      expect(image.height, 50);
-    },
-  );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+          apiClientProvider.overrideWith((ref) => api),
+          adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+          adminMerchProvider.overrideWith((ref) async => [merch]),
+          adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+          adminUsersProvider.overrideWith((ref) async => <User>[]),
+          eventsProvider.overrideWith((ref) async => <Event>[]),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-  testWidgets(
-    'Items tab shows placeholder when photoUrl is empty (#331)',
-    (WidgetTester tester) async {
-      final merch = Merchandise()
-        ..id = 11
-        ..eventId = 5
-        ..name = 'NoPhotoMerch'
-        ..groupName = 'Pins';
+    await tester.tap(find.text('Items'));
+    await tester.pumpAndSettle();
 
-      final mockClient = MockClient(
-        (request) async => http.Response('[]', 200),
-      );
-      final api = ApiClient(
-        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
-        client: mockClient,
-      );
+    expect(find.text('RelativePhotoMerch'), findsOneWidget);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
-            apiClientProvider.overrideWith((ref) => api),
-            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
-            adminMerchProvider.overrideWith((ref) async => [merch]),
-            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
-            adminUsersProvider.overrideWith((ref) async => <User>[]),
-            eventsProvider.overrideWith((ref) async => <Event>[]),
-            backendSystemStatusProvider.overrideWith(
-              (ref) async => <String, dynamic>{},
-            ),
-          ],
-          child: const MaterialApp(home: AdminDashboardScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+    // buildImage → resolveImageUrl turns relative paths into absolute
+    // backend URLs (non-web tests resolve to http://localhost:3000/...).
+    // Direct Image.network(item.photoUrl) would leave "uploads/abc.png"
+    // unresolved and fail to load.
+    final Image image = tester.widget(find.byType(Image));
+    expect(image.image, isA<NetworkImage>());
+    expect(
+      (image.image as NetworkImage).url,
+      'http://localhost:3000/uploads/abc.png',
+    );
+    expect(image.fit, BoxFit.contain);
+    expect(image.width, 50);
+    expect(image.height, 50);
+  });
 
-      await tester.tap(find.text('Items'));
-      await tester.pumpAndSettle();
+  testWidgets('Items tab shows placeholder when photoUrl is empty (#331)', (
+    WidgetTester tester,
+  ) async {
+    final merch = Merchandise()
+      ..id = 11
+      ..eventId = 5
+      ..name = 'NoPhotoMerch'
+      ..groupName = 'Pins';
 
-      expect(find.text('NoPhotoMerch'), findsOneWidget);
-      expect(find.byType(Image), findsNothing);
-      // buildImage default placeholder uses image_outlined, not Icons.image.
-      expect(find.byIcon(Icons.image_outlined), findsOneWidget);
-    },
-  );
+    final mockClient = MockClient((request) async => http.Response('[]', 200));
+    final api = ApiClient(
+      ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+      client: mockClient,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+          apiClientProvider.overrideWith((ref) => api),
+          adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+          adminMerchProvider.overrideWith((ref) async => [merch]),
+          adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+          adminUsersProvider.overrideWith((ref) async => <User>[]),
+          eventsProvider.overrideWith((ref) async => <Event>[]),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Items'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('NoPhotoMerch'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    // buildImage default placeholder uses image_outlined, not Icons.image.
+    expect(find.byIcon(Icons.image_outlined), findsOneWidget);
+  });
 
   testWidgets(
     'Users tab role-change failure shows error SnackBar (no success) (#395)',
@@ -388,7 +606,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            authProvider.overrideWith(
+              (ref) => _MockAuthController(_adminUser()),
+            ),
             apiClientProvider.overrideWith((ref) => api),
             adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
             adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
@@ -439,7 +659,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+            authProvider.overrideWith(
+              (ref) => _MockAuthController(_adminUser()),
+            ),
             apiClientProvider.overrideWith((ref) => api),
             adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
             adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
@@ -458,9 +680,7 @@ void main() {
       await tester.tap(find.text('Debug'));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.text('Generate Test Event (50 items in 5 tabs)'),
-      );
+      await tester.tap(find.text('Generate Test Event (50 items in 5 tabs)'));
       await tester.pumpAndSettle();
       expect(find.text('Generate Data?'), findsOneWidget);
       await tester.tap(find.widgetWithText(ElevatedButton, 'Generate'));

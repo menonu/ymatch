@@ -66,6 +66,9 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 | `group.edit.any` | admin, moderator | `group.edit` (the event-scope check) | — (override; satisfies `group.edit`) |
 | `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`) |
 | `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`) |
+| `event.creator.transfer` | admin, moderator | `event.creator.transfer` | `admin::transfer_event_creator` (`PUT /admin/events/:id/creator`) |
+| `group.creator.transfer` | admin, moderator | `group.creator.transfer` | `admin::transfer_group_creator` (`PUT /admin/events/:id/groups/:name/creator`) |
+| `event.member.manage.any` | admin, moderator | `event.member.manage.any` | Admin members path (`GET/POST/DELETE /admin/events/:id/members…`). **Not** an override of `event.member.manage` — the creator-only members API is unchanged. |
 | `system.kill_switch` | admin | `system.kill_switch` | — (defined; no consumer wired yet) |
 
 ## Event-scope permissions
@@ -92,10 +95,14 @@ also satisfies each event-scope check.
 ## Granting roles
 
 - **Event `creator`** is auto-assigned at event creation (inside the event-insert
-  transaction) and is not removable via the API (only the admin bypass can
-  revoke it).
+  transaction). The public members API never removes it; global staff reassign
+  ownership via `PUT /admin/events/:id/creator` (`event.creator.transfer`) (#432).
 - **Event `editor`** is assigned/revoked via the event-member API, guarded by
-  `event.member.manage` (the creator).
+  `event.member.manage` (the creator), **or** via the admin members path
+  (`event.member.manage.any`) for moderators/admins (#432).
+- **Group `created_by`** is set at group creation (ownership short-circuit for
+  `group.edit`). Global staff reassign it via
+  `PUT /admin/events/:id/groups/:name/creator` (`group.creator.transfer`) (#432).
 - **Global `user`/`moderator`/`admin`** are granted per-environment with
   [`scripts/grant_role.sh <username> <role>`](../how_to/grant_roles.md), which
   writes `users.role` and the `user_roles` global row in one transaction so the

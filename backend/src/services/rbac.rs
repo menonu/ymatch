@@ -78,6 +78,17 @@ pub enum Permission {
     /// Delete a match (global moderation action). Admin + moderator.
     /// Has no `*.any` form — it is itself the global-scope permission.
     MatchDelete,
+    /// Transfer event ownership (`events.creator_id` + `event/creator` role).
+    /// Admin + moderator. Gates `PUT /admin/events/:id/creator` (#432).
+    EventCreatorTransfer,
+    /// Transfer item-group ownership (`merchandise_groups.created_by`).
+    /// Admin + moderator. Gates `PUT /admin/events/:id/groups/:name/creator` (#432).
+    GroupCreatorTransfer,
+    /// List/assign/revoke event editors via the **admin** members path.
+    /// Admin + moderator. Deliberately separate from [`Permission::EventMemberManage`]
+    /// (no `*.any` override on that permission) so the creator-only
+    /// `/events/:id/members` API stays creator + admin-bypass only (#432).
+    EventMemberManageAny,
     /// Toggle service kill-switches. Admin.
     SystemKillSwitch,
     // --- event scope ---
@@ -118,6 +129,9 @@ impl Permission {
             Permission::GroupEditAny => "group.edit.any",
             Permission::GroupDelete => "group.delete",
             Permission::MatchDelete => "match.delete",
+            Permission::EventCreatorTransfer => "event.creator.transfer",
+            Permission::GroupCreatorTransfer => "group.creator.transfer",
+            Permission::EventMemberManageAny => "event.member.manage.any",
             Permission::SystemKillSwitch => "system.kill_switch",
             Permission::EventEdit => "event.edit",
             Permission::EventDelete => "event.delete",
@@ -158,6 +172,10 @@ impl Permission {
             Permission::GroupEditAny => &["group.edit.any"],
             Permission::GroupDelete => &["group.delete"],
             Permission::MatchDelete => &["match.delete"],
+            Permission::EventCreatorTransfer => &["event.creator.transfer"],
+            Permission::GroupCreatorTransfer => &["group.creator.transfer"],
+            // Not an override of EventMemberManage — separate admin-path permission.
+            Permission::EventMemberManageAny => &["event.member.manage.any"],
             Permission::SystemKillSwitch => &["system.kill_switch"],
             Permission::EventMemberManage => &["event.member.manage"],
         }
@@ -301,6 +319,9 @@ mod tests {
                 "group.edit.any",
                 "group.delete",
                 "match.delete",
+                "event.creator.transfer",
+                "group.creator.transfer",
+                "event.member.manage.any",
                 "system.kill_switch",
             ]),
         );
@@ -319,6 +340,9 @@ mod tests {
                 "group.edit.any",
                 "group.delete",
                 "match.delete",
+                "event.creator.transfer",
+                "group.creator.transfer",
+                "event.member.manage.any",
             ]),
         );
         perms_by_role.insert(USER, HashSet::new());
@@ -494,9 +518,26 @@ mod tests {
     }
 
     #[test]
-    fn moderator_cannot_manage_event_members() {
+    fn moderator_cannot_manage_event_members_via_creator_permission() {
         // No *.any override for event.member.manage; moderator is not the creator.
+        // Admin staff use EventMemberManageAny on the admin members path instead (#432).
         denied(&[MODERATOR], Permission::EventMemberManage);
+        ok(&[MODERATOR], Permission::EventMemberManageAny);
+        ok(&[ADMIN], Permission::EventMemberManageAny);
+        denied(&[CREATOR], Permission::EventMemberManageAny);
+        denied(&[USER], Permission::EventMemberManageAny);
+    }
+
+    #[test]
+    fn moderator_can_transfer_event_and_group_creators() {
+        // #432: global staff can reassign ownership via admin endpoints.
+        ok(&[MODERATOR], Permission::EventCreatorTransfer);
+        ok(&[MODERATOR], Permission::GroupCreatorTransfer);
+        ok(&[ADMIN], Permission::EventCreatorTransfer);
+        ok(&[ADMIN], Permission::GroupCreatorTransfer);
+        denied(&[CREATOR], Permission::EventCreatorTransfer);
+        denied(&[EDITOR], Permission::GroupCreatorTransfer);
+        denied(&[USER], Permission::EventCreatorTransfer);
     }
 
     #[test]

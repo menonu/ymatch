@@ -126,7 +126,11 @@ void main() {
       // logout() is `void ... async` (fire-and-forget); pump the microtask
       // queue until its body has cleared the state.
       container.read(authProvider.notifier).logout();
-      for (var i = 0; i < 50 && container.read(authProvider).value != null; i++) {
+      for (
+        var i = 0;
+        i < 50 && container.read(authProvider).value != null;
+        i++
+      ) {
         await Future<void>.delayed(Duration.zero);
       }
       expect(container.read(authProvider).value, isNull);
@@ -135,7 +139,8 @@ void main() {
     test('updateUsername updates state with the returned user', () async {
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/api/v1/users/1') {
+          if (request.method == 'PUT' &&
+              request.url.path == '/api/v1/users/1') {
             return _ok({'id': 1, 'username': 'alice2', 'uuid': 'u-1'});
           }
           return _okEmpty();
@@ -256,7 +261,8 @@ void main() {
       var postCalls = 0;
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'POST' && request.url.path == '/api/v1/events') {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/events') {
             postCalls++;
             return _ok({'id': 1, 'name': 'Fest'});
           }
@@ -281,7 +287,8 @@ void main() {
     test('addEvent failure -> state error AND rethrows (#266)', () async {
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'POST' && request.url.path == '/api/v1/events') {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/events') {
             return http.Response('Conflict', 409);
           }
           return _okEmpty();
@@ -305,7 +312,8 @@ void main() {
     test('registerView is fire-and-forget (no throw on failure)', () async {
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'POST' && request.url.path == '/api/v1/events/1/view') {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/events/1/view') {
             return http.Response('Internal Server Error', 500);
           }
           return _okEmpty();
@@ -491,7 +499,8 @@ void main() {
     test('adminMerchProvider fetches merch', () async {
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'GET' && request.url.path == '/api/v1/admin/merch') {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/admin/merch') {
             return _ok([
               {'id': 1, 'name': 'M1'},
             ]);
@@ -651,40 +660,35 @@ void main() {
       addTearDown(container.dispose);
 
       await expectLater(
-        container
-            .read(adminControllerProvider.notifier)
-            .unbanUser(5, 1),
+        container.read(adminControllerProvider.notifier).unbanUser(5, 1),
         throwsA(isA<Exception>()),
       );
       expect(container.read(adminControllerProvider).hasError, isTrue);
     });
 
-    test(
-      'updateUserRole failure -> state error AND rethrows (#395)',
-      () async {
-        final api = _apiWith(
-          client: MockClient((request) async {
-            if (request.method == 'POST' &&
-                request.url.path == '/api/v1/admin/users/5/role') {
-              return http.Response('Forbidden', 403);
-            }
-            return _okEmpty();
-          }),
-        );
-        final container = ProviderContainer(
-          overrides: [apiClientProvider.overrideWith((ref) => api)],
-        );
-        addTearDown(container.dispose);
+    test('updateUserRole failure -> state error AND rethrows (#395)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/admin/users/5/role') {
+            return http.Response('Forbidden', 403);
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
 
-        await expectLater(
-          container
-              .read(adminControllerProvider.notifier)
-              .updateUserRole(5, 1, 'moderator'),
-          throwsA(isA<Exception>()),
-        );
-        expect(container.read(adminControllerProvider).hasError, isTrue);
-      },
-    );
+      await expectLater(
+        container
+            .read(adminControllerProvider.notifier)
+            .updateUserRole(5, 1, 'moderator'),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
 
     test('publishEvent failure -> state error AND rethrows (#395)', () async {
       final api = _apiWith(
@@ -702,9 +706,7 @@ void main() {
       addTearDown(container.dispose);
 
       await expectLater(
-        container
-            .read(adminControllerProvider.notifier)
-            .publishEvent(3, 1),
+        container.read(adminControllerProvider.notifier).publishEvent(3, 1),
         throwsA(isA<Exception>()),
       );
       expect(container.read(adminControllerProvider).hasError, isTrue);
@@ -726,9 +728,7 @@ void main() {
       addTearDown(container.dispose);
 
       await expectLater(
-        container
-            .read(adminControllerProvider.notifier)
-            .publishMerch(1, 9, 1),
+        container.read(adminControllerProvider.notifier).publishMerch(1, 9, 1),
         throwsA(isA<Exception>()),
       );
       expect(container.read(adminControllerProvider).hasError, isTrue);
@@ -750,9 +750,7 @@ void main() {
       addTearDown(container.dispose);
 
       await expectLater(
-        container
-            .read(adminControllerProvider.notifier)
-            .deleteEvent(3, 1),
+        container.read(adminControllerProvider.notifier).deleteEvent(3, 1),
         throwsA(isA<Exception>()),
       );
       expect(container.read(adminControllerProvider).hasError, isTrue);
@@ -774,9 +772,7 @@ void main() {
       addTearDown(container.dispose);
 
       await expectLater(
-        container
-            .read(adminControllerProvider.notifier)
-            .deleteMerch(9, 1),
+        container.read(adminControllerProvider.notifier).deleteMerch(9, 1),
         throwsA(isA<Exception>()),
       );
       expect(container.read(adminControllerProvider).hasError, isTrue);
@@ -798,12 +794,116 @@ void main() {
       addTearDown(container.dispose);
 
       await expectLater(
-        container
-            .read(adminControllerProvider.notifier)
-            .deleteMatch(4, 1),
+        container.read(adminControllerProvider.notifier).deleteMatch(4, 1),
         throwsA(isA<Exception>()),
       );
       expect(container.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('transferEventCreator success and failure rethrow (#432)', () async {
+      var putCalls = 0;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'PUT' &&
+              request.url.path == '/api/v1/admin/events/3/creator') {
+            putCalls++;
+            expect(request.body, contains('newCreatorId'));
+            return _okEmpty();
+          }
+          return http.Response('nope', 404);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(adminControllerProvider.notifier)
+          .transferEventCreator(3, 1, 9);
+      expect(putCalls, 1);
+      expect(container.read(adminControllerProvider).hasError, isFalse);
+
+      final failApi = _apiWith(
+        client: MockClient((request) async => http.Response('Forbidden', 403)),
+      );
+      final failContainer = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => failApi)],
+      );
+      addTearDown(failContainer.dispose);
+      await expectLater(
+        failContainer
+            .read(adminControllerProvider.notifier)
+            .transferEventCreator(3, 1, 9),
+        throwsA(isA<Exception>()),
+      );
+      expect(failContainer.read(adminControllerProvider).hasError, isTrue);
+    });
+
+    test('transferGroupCreator encodes group name (#432)', () async {
+      String? path;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'PUT') {
+            path = request.url.path;
+            return _okEmpty();
+          }
+          return http.Response('nope', 404);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(adminControllerProvider.notifier)
+          .transferGroupCreator(5, 'a/b', 1, 2);
+      expect(path, '/api/v1/admin/events/5/groups/a%2Fb/creator');
+    });
+
+    test('listEventMembers / assign / revoke (#432)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/admin/events/8/members') {
+            return _ok({
+              'members': [
+                {'userId': 1, 'role': 'creator', 'username': 'alice'},
+                {'userId': 2, 'role': 'editor', 'username': 'bob'},
+              ],
+            });
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/admin/events/8/members/2') {
+            return _okEmpty();
+          }
+          if (request.method == 'DELETE' &&
+              request.url.path == '/api/v1/admin/events/8/members/2') {
+            return _okEmpty();
+          }
+          return http.Response('nope', 404);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final members = await container
+          .read(adminControllerProvider.notifier)
+          .listEventMembers(8, 1);
+      expect(members.length, 2);
+      expect(members.first.role, 'creator');
+      expect(members.first.username, 'alice');
+
+      await container
+          .read(adminControllerProvider.notifier)
+          .assignEventEditor(8, 2, 1);
+      await container
+          .read(adminControllerProvider.notifier)
+          .revokeEventEditor(8, 2, 1);
+      expect(container.read(adminControllerProvider).hasError, isFalse);
     });
   });
 
@@ -839,10 +939,7 @@ void main() {
         client: MockClient((request) async {
           if (request.method == 'GET' &&
               request.url.path == '/api/v1/matches/user/7/counts') {
-            return _ok(<String, Object>{
-              'pendingMatches': 3,
-              'total': 5,
-            });
+            return _ok(<String, Object>{'pendingMatches': 3, 'total': 5});
           }
           return _okEmpty();
         }),
@@ -863,39 +960,43 @@ void main() {
   // ---- MatchController (#241) ----
 
   group('MatchController', () {
-    test('submitOffer POSTs OfferTradeRequest proto body and clears error',
-        () async {
-      String? capturedBody;
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' &&
-              request.url.path == '/api/v1/matches/9/offer') {
-            capturedBody = request.body;
+    test(
+      'submitOffer POSTs OfferTradeRequest proto body and clears error',
+      () async {
+        String? capturedBody;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/matches/9/offer') {
+              capturedBody = request.body;
+              return _okEmpty();
+            }
             return _okEmpty();
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      final item = OfferItem()
-        ..merchId = 1
-        ..giverUserId = 7
-        ..quantity = 1;
-      await container
-          .read(matchControllerProvider.notifier)
-          .submitOffer(7, 9, [item]);
+        final item = OfferItem()
+          ..merchId = 1
+          ..giverUserId = 7
+          ..quantity = 1;
+        await container.read(matchControllerProvider.notifier).submitOffer(
+          7,
+          9,
+          [item],
+        );
 
-      expect(container.read(matchControllerProvider).hasError, isFalse);
-      expect(capturedBody, isNotNull);
-      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
-      expect(body['userId'], 7);
-      expect(body['items'], isA<List>());
-      expect((body['items'] as List).first['merchId'], 1);
-    });
+        expect(container.read(matchControllerProvider).hasError, isFalse);
+        expect(capturedBody, isNotNull);
+        final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(body['userId'], 7);
+        expect(body['items'], isA<List>());
+        expect((body['items'] as List).first['merchId'], 1);
+      },
+    );
 
     test('updateStatus POSTs UpdateMatchStatusRequest proto body', () async {
       String? capturedBody;
@@ -977,93 +1078,103 @@ void main() {
   // ---- ChatController / messagesProvider (#245) ----
 
   group('ChatController', () {
-    test('sendMessage POSTs SendMessageRequest proto body and invalidates',
-        () async {
-      String? capturedBody;
-      var getCount = 0;
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' &&
-              request.url.path == '/api/v1/matches/9/messages') {
-            capturedBody = request.body;
+    test(
+      'sendMessage POSTs SendMessageRequest proto body and invalidates',
+      () async {
+        String? capturedBody;
+        var getCount = 0;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/matches/9/messages') {
+              capturedBody = request.body;
+              return _okEmpty();
+            }
+            // Invalidation re-fetches messages after a successful send.
+            if (request.method == 'GET' &&
+                request.url.path == '/api/v1/matches/9/messages') {
+              getCount++;
+              return _ok([]);
+            }
             return _okEmpty();
-          }
-          // Invalidation re-fetches messages after a successful send.
-          if (request.method == 'GET' &&
-              request.url.path == '/api/v1/matches/9/messages') {
-            getCount++;
-            return _ok([]);
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      // Keep messagesProvider alive so invalidate re-runs the future
-      // (autoDispose would otherwise drop it between reads).
-      final sub = container.listen(messagesProvider(9), (_, __) {});
-      addTearDown(sub.close);
-      await container.read(messagesProvider(9).future);
-      expect(getCount, 1);
+        // Keep messagesProvider alive so invalidate re-runs the future
+        // (autoDispose would otherwise drop it between reads).
+        final sub = container.listen(messagesProvider(9), (_, __) {});
+        addTearDown(sub.close);
+        await container.read(messagesProvider(9).future);
+        expect(getCount, 1);
 
-      await container
-          .read(chatControllerProvider.notifier)
-          .sendMessage(9, 7, 'hello');
+        await container
+            .read(chatControllerProvider.notifier)
+            .sendMessage(9, 7, 'hello');
 
-      expect(container.read(chatControllerProvider).hasError, isFalse);
-      expect(capturedBody, isNotNull);
-      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
-      expect(body['matchId'], 9);
-      expect(body['senderId'], 7);
-      expect(body['content'], 'hello');
+        expect(container.read(chatControllerProvider).hasError, isFalse);
+        expect(capturedBody, isNotNull);
+        final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+        expect(body['matchId'], 9);
+        expect(body['senderId'], 7);
+        expect(body['content'], 'hello');
 
-      // Wait for the post-invalidate re-fetch kicked off by the listener.
-      await container.read(messagesProvider(9).future);
-      expect(getCount, greaterThanOrEqualTo(2),
-          reason: 'sendMessage should invalidate messagesProvider');
-    });
+        // Wait for the post-invalidate re-fetch kicked off by the listener.
+        await container.read(messagesProvider(9).future);
+        expect(
+          getCount,
+          greaterThanOrEqualTo(2),
+          reason: 'sendMessage should invalidate messagesProvider',
+        );
+      },
+    );
 
-    test('sendMessage failure sets error state (no rethrow, no invalidate)',
-        () async {
-      var getCount = 0;
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' &&
-              request.url.path == '/api/v1/matches/9/messages') {
-            return http.Response('bad message', 422);
-          }
-          if (request.method == 'GET' &&
-              request.url.path == '/api/v1/matches/9/messages') {
-            getCount++;
-            return _ok([]);
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+    test(
+      'sendMessage failure sets error state (no rethrow, no invalidate)',
+      () async {
+        var getCount = 0;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/matches/9/messages') {
+              return http.Response('bad message', 422);
+            }
+            if (request.method == 'GET' &&
+                request.url.path == '/api/v1/matches/9/messages') {
+              getCount++;
+              return _ok([]);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      final sub = container.listen(messagesProvider(9), (_, __) {});
-      addTearDown(sub.close);
-      await container.read(messagesProvider(9).future);
-      expect(getCount, 1);
+        final sub = container.listen(messagesProvider(9), (_, __) {});
+        addTearDown(sub.close);
+        await container.read(messagesProvider(9).future);
+        expect(getCount, 1);
 
-      // Completes without throwing — screen listens on state for SnackBars.
-      await container
-          .read(chatControllerProvider.notifier)
-          .sendMessage(9, 7, 'hello');
+        // Completes without throwing — screen listens on state for SnackBars.
+        await container
+            .read(chatControllerProvider.notifier)
+            .sendMessage(9, 7, 'hello');
 
-      expect(container.read(chatControllerProvider).hasError, isTrue);
-      // Failure path must not invalidate.
-      await container.read(messagesProvider(9).future);
-      expect(getCount, 1,
-          reason: 'failed send must not invalidate messagesProvider');
-    });
+        expect(container.read(chatControllerProvider).hasError, isTrue);
+        // Failure path must not invalidate.
+        await container.read(messagesProvider(9).future);
+        expect(
+          getCount,
+          1,
+          reason: 'failed send must not invalidate messagesProvider',
+        );
+      },
+    );
   });
 
   group('messagesProvider', () {
@@ -1073,12 +1184,7 @@ void main() {
           if (request.method == 'GET' &&
               request.url.path == '/api/v1/matches/9/messages') {
             return _ok([
-              {
-                'id': 1,
-                'matchId': 9,
-                'senderId': 7,
-                'content': 'hi',
-              },
+              {'id': 1, 'matchId': 9, 'senderId': 7, 'content': 'hi'},
             ]);
           }
           return _okEmpty();
@@ -1221,22 +1327,26 @@ void main() {
       expect(await container.read(backendHealthProvider.future), isFalse);
     });
 
-    test('is healthy when the backend responds a non-connection error (401)', () async {
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'GET' && request.url.path == '/api/v1/events') {
-            return http.Response('Unauthorized', 401);
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
+    test(
+      'is healthy when the backend responds a non-connection error (401)',
+      () async {
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'GET' &&
+                request.url.path == '/api/v1/events') {
+              return http.Response('Unauthorized', 401);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
 
-      // 401 means the backend is reachable (just rejecting the request).
-      expect(await container.read(backendHealthProvider.future), isTrue);
-    });
+        // 401 means the backend is reachable (just rejecting the request).
+        expect(await container.read(backendHealthProvider.future), isTrue);
+      },
+    );
   });
 }

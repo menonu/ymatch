@@ -48,7 +48,7 @@ used throughout this document.
 | `ChatScreen` | `screens/chat_screen.dart` | Messaging within a trade match |
 | `MapPickerScreen` | `screens/map_picker_screen.dart` | Location selection via OpenStreetMap |
 | `ProfileScreen` | `screens/profile_screen.dart` | User profile, UUID, trading instructions |
-| `AdminDashboardScreen` | `screens/admin_dashboard_screen.dart` | Admin panel with 6 tabs (System, Users, Events, Items, Matches, Debug) |
+| `AdminDashboardScreen` | `screens/admin_dashboard_screen.dart` | Admin panel with 7 tabs (System, Users, Events, Groups, Items, Matches, Debug). Events/Groups support change creator + manage editors (#432). |
 
 ## Navigation
 

@@ -742,3 +742,294 @@ async fn test_non_admin_cannot_ban(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+// ---------------------------------------------------------------------------
+// #432: admin transfer event/group creator + admin event members path
+// ---------------------------------------------------------------------------
+
+#[sqlx::test]
+async fn test_admin_transfer_event_creator_success(pool: PgPool) {
+    let old_creator = login_guest(&pool, "xfer-evt-old", "t").await;
+    let event_id = create_event(&pool, "Xfer Event Creator", old_creator).await;
+    let new_creator = login_guest(&pool, "xfer-evt-new", "t").await;
+    let staff = login_guest(&pool, "xfer-evt-staff", "t").await;
+    grant_global_role(&pool, staff, "moderator").await;
+
+    assert!(has_event_role(&pool, old_creator, event_id, "creator").await);
+    assert!(!has_event_role(&pool, new_creator, event_id, "creator").await);
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/creator?user_id={}",
+            event_id, staff
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, new_creator),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK, "transfer should succeed");
+
+    let creator_id: Option<i32> = sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(creator_id, Some(new_creator as i32));
+    assert!(
+        has_event_role(&pool, new_creator, event_id, "creator").await,
+        "new creator must hold event/creator"
+    );
+    assert!(
+        !has_event_role(&pool, old_creator, event_id, "creator").await,
+        "previous creator must lose event/creator"
+    );
+    assert!(
+        !has_event_role(&pool, old_creator, event_id, "editor").await,
+        "previous creator is not auto-promoted to editor"
+    );
+}
+
+#[sqlx::test]
+async fn test_admin_transfer_event_creator_rbac_and_validation(pool: PgPool) {
+    let creator = login_guest(&pool, "xfer-evt-val-c", "t").await;
+    let event_id = create_event(&pool, "Xfer Event Val", creator).await;
+    let plain = login_guest(&pool, "xfer-evt-val-plain", "t").await;
+    let target = login_guest(&pool, "xfer-evt-val-tgt", "t").await;
+    let staff = login_guest(&pool, "xfer-evt-val-staff", "t").await;
+    grant_global_role(&pool, staff, "admin").await;
+
+    // Plain user → 403.
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/creator?user_id={}",
+            event_id, plain
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Missing event → 404.
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/admin/events/999999/creator?user_id={}", staff),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // Missing target user → 404.
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/creator?user_id={}",
+            event_id, staff
+        ),
+        r#"{"newCreatorId": 999999}"#,
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // Already the creator → 400.
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/creator?user_id={}",
+            event_id, staff
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, creator),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Banned target → 400.
+    let banned = login_guest(&pool, "xfer-evt-val-banned", "t").await;
+    sqlx::query("UPDATE users SET is_banned = true WHERE id = $1")
+        .bind(banned as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/creator?user_id={}",
+            event_id, staff
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, banned),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test]
+async fn test_admin_transfer_group_creator_success(pool: PgPool) {
+    let creator = login_guest(&pool, "xfer-grp-old", "t").await;
+    let event_id = create_event(&pool, "Xfer Group Creator Event", creator).await;
+    // create_merch inserts the group with created_by = event creator.
+    let _merch = create_merch(&pool, event_id, "Item A", "group-a").await;
+    let new_creator = login_guest(&pool, "xfer-grp-new", "t").await;
+    let staff = login_guest(&pool, "xfer-grp-staff", "t").await;
+    grant_global_role(&pool, staff, "moderator").await;
+
+    let before: Option<i32> = sqlx::query_scalar(
+        "SELECT created_by FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("group-a")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(before, Some(creator as i32));
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/groups/group-a/creator?user_id={}",
+            event_id, staff
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, new_creator),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "group transfer should succeed"
+    );
+
+    let after: Option<i32> = sqlx::query_scalar(
+        "SELECT created_by FROM merchandise_groups WHERE event_id = $1 AND group_name = $2",
+    )
+    .bind(event_id as i32)
+    .bind("group-a")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(after, Some(new_creator as i32));
+
+    // Admin groups list surfaces creatorUsername.
+    let expected_username: String = sqlx::query_scalar("SELECT username FROM users WHERE id = $1")
+        .bind(new_creator as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let resp = get_request(&pool, "/api/v1/admin/groups").await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let groups = body.as_array().unwrap();
+    let g = groups
+        .iter()
+        .find(|g| g["groupName"] == "group-a")
+        .expect("group-a in admin list");
+    assert_eq!(g["creatorId"], new_creator);
+    assert_eq!(g["creatorUsername"].as_str().unwrap(), expected_username);
+}
+
+#[sqlx::test]
+async fn test_admin_transfer_group_creator_rbac(pool: PgPool) {
+    let creator = login_guest(&pool, "xfer-grp-rbac-c", "t").await;
+    let event_id = create_event(&pool, "Xfer Group Rbac Event", creator).await;
+    let _merch = create_merch(&pool, event_id, "Item B", "group-b").await;
+    let plain = login_guest(&pool, "xfer-grp-rbac-plain", "t").await;
+    let target = login_guest(&pool, "xfer-grp-rbac-tgt", "t").await;
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/groups/group-b/creator?user_id={}",
+            event_id, plain
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Missing group → 404 (with staff auth).
+    let staff = login_guest(&pool, "xfer-grp-rbac-staff", "t").await;
+    grant_global_role(&pool, staff, "admin").await;
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/groups/no-such/creator?user_id={}",
+            event_id, staff
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn test_admin_event_members_path(pool: PgPool) {
+    let creator = login_guest(&pool, "adm-mem-creator", "t").await;
+    let event_id = create_event(&pool, "Admin Members Event", creator).await;
+    let editor = login_guest(&pool, "adm-mem-editor", "t").await;
+    let staff = login_guest(&pool, "adm-mem-staff", "t").await;
+    let plain = login_guest(&pool, "adm-mem-plain", "t").await;
+    grant_global_role(&pool, staff, "moderator").await;
+
+    // Moderator can list via admin path (unlike /events/:id/members).
+    let resp = get_request(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/members?user_id={}",
+            event_id, staff
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(body["members"].as_array().unwrap().len(), 1);
+
+    // Plain user cannot.
+    let resp = get_request(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/members?user_id={}",
+            event_id, plain
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Moderator can assign editor.
+    let resp = post_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/members/{}?user_id={}",
+            event_id, editor, staff
+        ),
+        "",
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(has_event_role(&pool, editor, event_id, "editor").await);
+
+    // Moderator can revoke editor; creator role is untouched.
+    let resp = delete_request(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/members/{}?user_id={}",
+            event_id, editor, staff
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(!has_event_role(&pool, editor, event_id, "editor").await);
+
+    let resp = delete_request(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/members/{}?user_id={}",
+            event_id, creator, staff
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(
+        has_event_role(&pool, creator, event_id, "creator").await,
+        "revoking editor must never remove creator"
+    );
+}

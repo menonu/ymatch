@@ -90,11 +90,7 @@ impl RbacRepository {
         user_id: i32,
         event_id: i32,
     ) -> Result<(), AppError> {
-        let role_id: i32 = sqlx::query_scalar(
-            "SELECT id FROM roles WHERE scope_type = 'event' AND name = 'creator'",
-        )
-        .fetch_one(&mut *exec)
-        .await?;
+        let role_id = Self::event_creator_role_id(exec).await?;
         sqlx::query(
             "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
              VALUES ($1, $2, 'event', $3)
@@ -105,6 +101,61 @@ impl RbacRepository {
         .bind(event_id)
         .execute(&mut *exec)
         .await?;
+        Ok(())
+    }
+
+    /// Look up the `event/creator` role id on the caller's transaction
+    /// connection (so unseeded catalog fails inside the same txn).
+    async fn event_creator_role_id(exec: &mut PgConnection) -> Result<i32, AppError> {
+        let role_id: i32 = sqlx::query_scalar(
+            "SELECT id FROM roles WHERE scope_type = 'event' AND name = 'creator'",
+        )
+        .fetch_one(&mut *exec)
+        .await?;
+        Ok(role_id)
+    }
+
+    /// Revoke the `event/creator` role from `user_id` for `event_id` (#432).
+    /// Used only by the admin event-creator transfer path — the public
+    /// members API never removes the creator role. Idempotent: a no-op if
+    /// the user does not hold the role.
+    pub async fn revoke_event_creator(
+        &self,
+        exec: &mut PgConnection,
+        user_id: i32,
+        event_id: i32,
+    ) -> Result<(), AppError> {
+        let role_id = Self::event_creator_role_id(exec).await?;
+        sqlx::query(
+            "DELETE FROM user_roles
+             WHERE user_id = $1 AND role_id = $2 AND scope_type = 'event' AND scope_id = $3",
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(event_id)
+        .execute(&mut *exec)
+        .await?;
+        Ok(())
+    }
+
+    /// Atomically transfer the event-scoped `creator` role from
+    /// `previous_creator_id` (if any) to `new_creator_id` (#432). Does not
+    /// touch `events.creator_id` — the caller updates that column in the same
+    /// transaction. Does not auto-grant `editor` to the previous creator.
+    pub async fn transfer_event_creator_role(
+        &self,
+        exec: &mut PgConnection,
+        event_id: i32,
+        previous_creator_id: Option<i32>,
+        new_creator_id: i32,
+    ) -> Result<(), AppError> {
+        if let Some(prev) = previous_creator_id
+            && prev != new_creator_id
+        {
+            self.revoke_event_creator(exec, prev, event_id).await?;
+        }
+        self.assign_event_creator(exec, new_creator_id, event_id)
+            .await?;
         Ok(())
     }
 
