@@ -1058,6 +1058,24 @@ abstract class AppLocalizations {
   /// **'Update Inventory'**
   String get updateInventory;
 
+  /// Body text in the apply-inventory confirmation dialog (#429)
+  ///
+  /// In en, this message translates to:
+  /// **'Apply this completed trade to your inventory. By default, items you gave decrease both Trade (TRADE) and Owned (HAVE).'**
+  String get applyInventoryConfirmBody;
+
+  /// Checkbox: leave giver HAVE unchanged when applying inventory (#429)
+  ///
+  /// In en, this message translates to:
+  /// **'Do not update owned (HAVE) quantity'**
+  String get skipHaveDecrementLabel;
+
+  /// Subtitle under the skip-HAVE checkbox (#429)
+  ///
+  /// In en, this message translates to:
+  /// **'Only decrease Trade (TRADE). Use when HAVE is tracked separately.'**
+  String get skipHaveDecrementHint;
+
   /// Label shown when a trade's inventory was already applied
   ///
   /// In en, this message translates to:

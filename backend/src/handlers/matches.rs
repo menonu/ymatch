@@ -65,7 +65,7 @@ pub async fn apply_trade_inventory(
 ) -> Result<StatusCode, AppError> {
     state
         .match_lifecycle
-        .apply_inventory(match_id, payload.user_id)
+        .apply_inventory(match_id, payload.user_id, payload.skip_have_decrement)
         .await?;
     Ok(StatusCode::OK)
 }
@@ -80,7 +80,7 @@ pub async fn match_notification_counts(
 
 #[cfg(test)]
 mod tests {
-    use crate::generated::ymatch::OfferTradeRequest;
+    use crate::generated::ymatch::{ApplyInventoryRequest, OfferTradeRequest};
 
     #[test]
     fn offer_trade_request_deserializes_from_proto3_json() {
@@ -92,5 +92,23 @@ mod tests {
         assert_eq!(req.items[0].merch_id, 7);
         assert_eq!(req.items[0].giver_user_id, 42);
         assert_eq!(req.items[0].quantity, 3);
+    }
+
+    #[test]
+    fn apply_inventory_request_defaults_skip_have_to_false() {
+        let json = r#"{"userId": 7}"#;
+        let req: ApplyInventoryRequest =
+            serde_json::from_str(json).expect("userId-only body should deserialize");
+        assert_eq!(req.user_id, 7);
+        assert!(!req.skip_have_decrement);
+    }
+
+    #[test]
+    fn apply_inventory_request_deserializes_skip_have_flag() {
+        let json = r#"{"userId": 7, "skipHaveDecrement": true}"#;
+        let req: ApplyInventoryRequest =
+            serde_json::from_str(json).expect("camelCase skipHaveDecrement should deserialize");
+        assert_eq!(req.user_id, 7);
+        assert!(req.skip_have_decrement);
     }
 }

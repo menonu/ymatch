@@ -179,6 +179,9 @@ message OfferItem {
 
 message ApplyInventoryRequest {
   int32 user_id = 1;
+  // When true, the giver's HAVE is left unchanged (legacy). Default false:
+  // giver TRADE and HAVE both decrease by leg qty (#429).
+  bool skip_have_decrement = 2;
 }
 
 message NotificationCounts {

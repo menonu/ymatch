@@ -2158,9 +2158,11 @@ class OfferItem extends $pb.GeneratedMessage {
 class ApplyInventoryRequest extends $pb.GeneratedMessage {
   factory ApplyInventoryRequest({
     $core.int? userId,
+    $core.bool? skipHaveDecrement,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
+    if (skipHaveDecrement != null) result.skipHaveDecrement = skipHaveDecrement;
     return result;
   }
 
@@ -2178,6 +2180,7 @@ class ApplyInventoryRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOB(2, _omitFieldNames ? '' : 'skipHaveDecrement')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2208,6 +2211,17 @@ class ApplyInventoryRequest extends $pb.GeneratedMessage {
   $core.bool hasUserId() => $_has(0);
   @$pb.TagNumber(1)
   void clearUserId() => $_clearField(1);
+
+  /// When true, the giver's HAVE is left unchanged (legacy). Default false:
+  /// giver TRADE and HAVE both decrease by leg qty (#429).
+  @$pb.TagNumber(2)
+  $core.bool get skipHaveDecrement => $_getBF(1);
+  @$pb.TagNumber(2)
+  set skipHaveDecrement($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSkipHaveDecrement() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSkipHaveDecrement() => $_clearField(2);
 }
 
 class NotificationCounts extends $pb.GeneratedMessage {

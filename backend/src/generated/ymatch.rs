@@ -324,6 +324,10 @@ pub struct OfferItem {
 pub struct ApplyInventoryRequest {
     #[prost(int32, tag = "1")]
     pub user_id: i32,
+    /// When true, the giver's HAVE is left unchanged (legacy). Default false:
+    /// giver TRADE and HAVE both decrease by leg qty (#429).
+    #[prost(bool, tag = "2")]
+    pub skip_have_decrement: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

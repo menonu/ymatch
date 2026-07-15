@@ -530,6 +530,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateInventory => 'Update Inventory';
 
   @override
+  String get applyInventoryConfirmBody =>
+      'Apply this completed trade to your inventory. By default, items you gave decrease both Trade (TRADE) and Owned (HAVE).';
+
+  @override
+  String get skipHaveDecrementLabel => 'Do not update owned (HAVE) quantity';
+
+  @override
+  String get skipHaveDecrementHint =>
+      'Only decrease Trade (TRADE). Use when HAVE is tracked separately.';
+
+  @override
   String get inventoryUpdated => 'Inventory Updated';
 
   @override

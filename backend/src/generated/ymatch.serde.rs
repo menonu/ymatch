@@ -9,9 +9,15 @@ impl serde::Serialize for ApplyInventoryRequest {
         if self.user_id != 0 {
             len += 1;
         }
+        if self.skip_have_decrement {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.ApplyInventoryRequest", len)?;
         if self.user_id != 0 {
             struct_ser.serialize_field("userId", &self.user_id)?;
+        }
+        if self.skip_have_decrement {
+            struct_ser.serialize_field("skipHaveDecrement", &self.skip_have_decrement)?;
         }
         struct_ser.end()
     }
@@ -25,11 +31,14 @@ impl<'de> serde::Deserialize<'de> for ApplyInventoryRequest {
         const FIELDS: &[&str] = &[
             "user_id",
             "userId",
+            "skip_have_decrement",
+            "skipHaveDecrement",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             UserId,
+            SkipHaveDecrement,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -52,6 +61,7 @@ impl<'de> serde::Deserialize<'de> for ApplyInventoryRequest {
                     {
                         match value {
                             "userId" | "user_id" => Ok(GeneratedField::UserId),
+                            "skipHaveDecrement" | "skip_have_decrement" => Ok(GeneratedField::SkipHaveDecrement),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -72,6 +82,7 @@ impl<'de> serde::Deserialize<'de> for ApplyInventoryRequest {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut user_id__ = None;
+                let mut skip_have_decrement__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::UserId => {
@@ -82,10 +93,17 @@ impl<'de> serde::Deserialize<'de> for ApplyInventoryRequest {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
+                        GeneratedField::SkipHaveDecrement => {
+                            if skip_have_decrement__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("skipHaveDecrement"));
+                            }
+                            skip_have_decrement__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(ApplyInventoryRequest {
                     user_id: user_id__.unwrap_or_default(),
+                    skip_have_decrement: skip_have_decrement__.unwrap_or_default(),
                 })
             }
         }

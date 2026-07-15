@@ -264,13 +264,19 @@ impl MatchLifecycleService {
     /// match. Each side applies independently; the per-user flag
     /// (`user{1,2}_inventory_applied_at`) prevents double-application.
     ///
-    /// Legs are absolute (#297): for each leg `(giver, merch, qty)`, the
-    /// giver's TRADE decreases by qty and the receiver's HAVE increases by
-    /// qty. The pure side selection lives in [`apply_inventory_delta`] (so it
-    /// can be unit-tested without a database); the transaction-bearing part
-    /// is covered by the integration test
-    /// `test_trade_lifecycle_offer_accept_complete_apply`.
-    pub async fn apply_inventory(&self, match_id: i32, user_id: i32) -> Result<(), AppError> {
+    /// Legs are absolute (#297 / #429): for each leg `(giver, merch, qty)`,
+    /// by default the giver's TRADE **and** HAVE decrease by qty and the
+    /// receiver's HAVE increases by qty. When `skip_have_decrement` is true,
+    /// the giver's HAVE is left unchanged (legacy). The pure side selection
+    /// lives in [`apply_inventory_delta`] (so it can be unit-tested without a
+    /// database); the transaction-bearing part is covered by the integration
+    /// test `test_trade_lifecycle_offer_accept_complete_apply`.
+    pub async fn apply_inventory(
+        &self,
+        match_id: i32,
+        user_id: i32,
+        skip_have_decrement: bool,
+    ) -> Result<(), AppError> {
         let snapshot = self
             .matches
             .get_status_snapshot(match_id)
@@ -308,11 +314,15 @@ impl MatchLifecycleService {
         let mut tx = self.pool.begin().await?;
 
         for item in &items {
-            // Absolute leg (#297): giver gives qty of merch to the receiver.
-            //   requesting == giver    -> decrement own TRADE
-            //   requesting == receiver -> increment own HAVE
-            let (delta_trade, delta_have) =
-                apply_inventory_delta(item.giver_user_id, user_id, item.quantity);
+            // Absolute leg (#297/#429):
+            //   requesting == giver    -> TRADE −qty, and HAVE −qty unless skip
+            //   requesting == receiver -> HAVE +qty
+            let (delta_trade, delta_have) = apply_inventory_delta(
+                item.giver_user_id,
+                user_id,
+                item.quantity,
+                skip_have_decrement,
+            );
             if delta_trade == 0 && delta_have == 0 {
                 continue;
             }
@@ -489,17 +499,27 @@ fn validate_status_transition(new_status: &str, current_status: &str) -> Result<
     }
 }
 
-/// Map `(giver_id, requesting_user_id, quantity) -> (delta_trade, delta_have)`.
+/// Map `(giver_id, requesting_user_id, quantity, skip_have_decrement) ->
+/// (delta_trade, delta_have)`.
 ///
-/// Absolute legs (#297): the giver's TRADE decreases by qty and the
-/// receiver's HAVE increases by qty. For the requesting user, return the
-/// side that applies to them: if they are the giver → `(qty, 0)` (their
-/// TRADE decreases); if they are the receiver → `(0, qty)` (their HAVE
-/// increases). Factored out as a pure function so it can be unit-tested
-/// without a database.
-fn apply_inventory_delta(giver_id: i32, requesting_user_id: i32, quantity: i32) -> (i32, i32) {
+/// Absolute legs (#297 / #429):
+/// - **Giver** (default): TRADE decreases by qty and HAVE decreases by qty
+///   → `(qty, -qty)`.
+/// - **Giver** with `skip_have_decrement`: TRADE decreases only → `(qty, 0)`.
+/// - **Receiver**: HAVE increases by qty → `(0, qty)`.
+///
+/// `delta_have` is signed: positive increments HAVE, negative decrements
+/// HAVE (see `InventoryRepository::apply_trade_delta`). Factored out as a
+/// pure function so it can be unit-tested without a database.
+fn apply_inventory_delta(
+    giver_id: i32,
+    requesting_user_id: i32,
+    quantity: i32,
+    skip_have_decrement: bool,
+) -> (i32, i32) {
     if giver_id == requesting_user_id {
-        (quantity, 0)
+        let have_delta = if skip_have_decrement { 0 } else { -quantity };
+        (quantity, have_delta)
     } else {
         (0, quantity)
     }
@@ -526,24 +546,33 @@ mod tests {
             .collect()
     }
 
-    // --- apply_inventory_delta (giver-absolute, #297) ---
+    // --- apply_inventory_delta (giver-absolute, #297 / #429) ---
 
     #[test]
-    fn giver_is_requester_decrements_own_trade() {
-        // Requesting user is the giver: their TRADE decreases by qty.
-        assert_eq!(apply_inventory_delta(1, 1, 3), (3, 0));
+    fn giver_default_decrements_trade_and_have() {
+        // Requesting user is the giver: TRADE −qty and HAVE −qty (#429).
+        assert_eq!(apply_inventory_delta(1, 1, 3, false), (3, -3));
+    }
+
+    #[test]
+    fn giver_skip_have_decrements_trade_only() {
+        // Opt-out: leave HAVE unchanged (pre-#429 behavior).
+        assert_eq!(apply_inventory_delta(1, 1, 3, true), (3, 0));
     }
 
     #[test]
     fn receiver_increments_own_have() {
         // Requesting user is the receiver: their HAVE increases by qty.
-        assert_eq!(apply_inventory_delta(2, 1, 5), (0, 5));
+        // skip_have_decrement is irrelevant for the receiver.
+        assert_eq!(apply_inventory_delta(2, 1, 5, false), (0, 5));
+        assert_eq!(apply_inventory_delta(2, 1, 5, true), (0, 5));
     }
 
     #[test]
     fn zero_quantity_is_noop() {
-        assert_eq!(apply_inventory_delta(1, 1, 0), (0, 0));
-        assert_eq!(apply_inventory_delta(2, 1, 0), (0, 0));
+        assert_eq!(apply_inventory_delta(1, 1, 0, false), (0, 0));
+        assert_eq!(apply_inventory_delta(2, 1, 0, false), (0, 0));
+        assert_eq!(apply_inventory_delta(1, 1, 0, true), (0, 0));
     }
 
     // --- validate_legs (want-quantity cap, giver model) ---

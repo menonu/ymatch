@@ -72,3 +72,4 @@ Record every ADR in the index below, newest last.
 | [0006](0006-derive-user-role-from-user-roles.md) | Derive `User.role` from `user_roles` at Read Time (drop `users.role` mirror) | Accepted | 2026-07-10 |
 | [0007](0007-inventory-export-text-formats.md) | Client-Side Inventory Export with Text Formats | Accepted | 2026-07-13 |
 | [0008](0008-merchandise-deletion-semantics.md) | Merchandise Deletion Semantics and the `CANCELLED` Match Status | Accepted | 2026-07-14 |
+| [0009](0009-apply-inventory-decrements-giver-have.md) | Apply Inventory Decrements Giver HAVE by Default | Accepted | 2026-07-15 |

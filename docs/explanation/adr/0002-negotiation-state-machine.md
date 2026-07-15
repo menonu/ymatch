@@ -1,6 +1,6 @@
 # ADR 0002: Balanced Negotiation State Machine
 
-- **Status**: Accepted
+- **Status**: Superseded in part by [ADR 0009](0009-apply-inventory-decrements-giver-have.md) (apply-inventory giver HAVE delta only; negotiation state machine unchanged)
 - **Date**: 2026-06-29
 - **Supersedes**: —
 
