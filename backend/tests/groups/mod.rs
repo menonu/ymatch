@@ -929,3 +929,53 @@ async fn my_event_role_reports_can_edit_group(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(role["canEditGroup"].as_bool().unwrap_or(false), true);
 }
+
+// --- #430: admin dashboard list includes display_name ---
+
+#[sqlx::test]
+async fn admin_groups_list_includes_display_name_with_fallback(pool: PgPool) {
+    // Two groups under one event: one with a cosmetic label, one without.
+    // GET /api/v1/admin/groups must surface displayName when set and omit it
+    // (or leave it null/absent) when unset so the dashboard can fall back to
+    // the immutable group_name key.
+    let (creator_id, event_id) =
+        create_test_user_and_event(pool.clone(), "admin-list-display", "Admin List Event").await;
+    create_group_row(&pool, event_id, creator_id, "Pins").await;
+    create_group_row(&pool, event_id, creator_id, "Stickers").await;
+
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups/Pins", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "d", "displayName": "Enamel Pins!"}}"#,
+            event_id, creator_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let resp = get_request(&pool, "/api/v1/admin/groups").await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let groups = body.as_array().expect("admin groups list is an array");
+
+    let pins = groups
+        .iter()
+        .find(|g| g["groupName"].as_str() == Some("Pins"))
+        .expect("Pins group present");
+    assert_eq!(pins["eventId"].as_i64().unwrap(), event_id);
+    assert_eq!(pins["groupName"].as_str().unwrap(), "Pins");
+    assert_eq!(pins["displayName"].as_str().unwrap(), "Enamel Pins!");
+
+    let stickers = groups
+        .iter()
+        .find(|g| g["groupName"].as_str() == Some("Stickers"))
+        .expect("Stickers group present");
+    assert_eq!(stickers["groupName"].as_str().unwrap(), "Stickers");
+    assert!(
+        stickers.get("displayName").is_none() || stickers["displayName"].is_null(),
+        "unset display_name must be absent/null so UI falls back to group_name, got {:?}",
+        stickers.get("displayName")
+    );
+}

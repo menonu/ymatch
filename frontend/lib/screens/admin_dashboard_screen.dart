@@ -456,9 +456,12 @@ class _AdminGroupsTab extends ConsumerWidget {
           itemCount: groups.length,
           itemBuilder: (context, index) {
             final group = groups[index];
+            // #430: show cosmetic displayName when set; delete still uses
+            // the immutable groupName key in the URL.
+            final label = group.label;
             return ListTile(
               leading: const Icon(Icons.folder_outlined),
-              title: Text(group.groupName),
+              title: Text(label),
               subtitle: Text(
                 '${group.eventName} (Event ID: ${group.eventId}) | ${group.itemCount} live items',
               ),
@@ -471,7 +474,7 @@ class _AdminGroupsTab extends ConsumerWidget {
                     builder: (context) => AlertDialog(
                       title: const Text('Remove item group?'),
                       content: Text(
-                        'Remove “${group.groupName}” from “${group.eventName}”? '
+                        'Remove “$label” from “${group.eventName}”? '
                         'All of its items will be hidden, and its matches and favourites will be removed. This cannot be undone.',
                       ),
                       actions: [

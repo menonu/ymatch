@@ -736,18 +736,29 @@ class AdminGroup {
     required this.eventId,
     required this.eventName,
     required this.groupName,
+    this.displayName,
     required this.itemCount,
   });
 
   final int eventId;
   final String eventName;
   final String groupName;
+  /// Cosmetic label; UI falls back to [groupName] when null/empty (#430).
+  final String? displayName;
   final int itemCount;
+
+  /// User-visible label: [displayName] when set, otherwise the key (#430).
+  String get label {
+    final d = displayName;
+    if (d != null && d.isNotEmpty) return d;
+    return groupName;
+  }
 
   factory AdminGroup.fromJson(Map<String, dynamic> json) => AdminGroup(
     eventId: json['eventId'] as int,
     eventName: json['eventName'] as String,
     groupName: json['groupName'] as String,
+    displayName: json['displayName'] as String?,
     itemCount: json['itemCount'] as int,
   );
 }

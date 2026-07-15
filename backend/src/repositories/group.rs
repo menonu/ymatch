@@ -22,6 +22,9 @@ pub struct AdminGroup {
     pub event_id: i32,
     pub event_name: String,
     pub group_name: String,
+    /// Cosmetic label; UI falls back to `group_name` when unset (#430).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     pub item_count: i64,
 }
 
@@ -54,13 +57,13 @@ impl MerchandiseGroupRepository {
     /// List every group with enough context for the moderation dashboard.
     pub async fn list_all_for_admin(&self) -> Result<Vec<AdminGroup>, AppError> {
         let rows = sqlx::query(
-            r#"SELECT g.event_id, e.name AS event_name, g.group_name,
+            r#"SELECT g.event_id, e.name AS event_name, g.group_name, g.display_name,
                       COUNT(m.id) FILTER (WHERE m.is_deleted = false) AS item_count
                FROM merchandise_groups g
                JOIN events e ON e.id = g.event_id
                LEFT JOIN merchandise m
                  ON m.event_id = g.event_id AND m.group_name = g.group_name
-               GROUP BY g.event_id, e.name, g.group_name
+               GROUP BY g.event_id, e.name, g.group_name, g.display_name
                ORDER BY e.name ASC, g.group_name ASC"#,
         )
         .fetch_all(&self.pool)
@@ -71,6 +74,7 @@ impl MerchandiseGroupRepository {
                 event_id: row.get("event_id"),
                 event_name: row.get("event_name"),
                 group_name: row.get("group_name"),
+                display_name: row.get("display_name"),
                 item_count: row.get("item_count"),
             })
             .collect())
