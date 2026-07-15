@@ -872,13 +872,20 @@ const ApplyInventoryRequest$json = {
   '1': 'ApplyInventoryRequest',
   '2': [
     {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {
+      '1': 'skip_have_decrement',
+      '3': 2,
+      '4': 1,
+      '5': 8,
+      '10': 'skipHaveDecrement'
+    },
   ],
 };
 
 /// Descriptor for `ApplyInventoryRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List applyInventoryRequestDescriptor =
-    $convert.base64Decode(
-        'ChVBcHBseUludmVudG9yeVJlcXVlc3QSFwoHdXNlcl9pZBgBIAEoBVIGdXNlcklk');
+final $typed_data.Uint8List applyInventoryRequestDescriptor = $convert.base64Decode(
+    'ChVBcHBseUludmVudG9yeVJlcXVlc3QSFwoHdXNlcl9pZBgBIAEoBVIGdXNlcklkEi4KE3NraX'
+    'BfaGF2ZV9kZWNyZW1lbnQYAiABKAhSEXNraXBIYXZlRGVjcmVtZW50');
 
 @$core.Deprecated('Use notificationCountsDescriptor instead')
 const NotificationCounts$json = {

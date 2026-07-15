@@ -387,6 +387,50 @@ async fn test_inventory_apply_trade_delta_increment_only(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
+    let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
+
+    // Seed a HAVE row of 5, then decrement by 2 via signed delta_have.
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'HAVE', 5)",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -2)
+        .await
+        .unwrap();
+    let qty: (i32,) = sqlx::query_as(
+        "SELECT quantity FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'HAVE'",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(qty.0, 3, "HAVE started at 5, decremented by 2");
+
+    // Over-decrement clamps at 0.
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -10)
+        .await
+        .unwrap();
+    let qty: (i32,) = sqlx::query_as(
+        "SELECT quantity FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'HAVE'",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(qty.0, 0, "HAVE decrement clamps at 0");
+}
+
+#[sqlx::test]
 async fn test_multiple_conn_calls_share_one_transaction(pool: PgPool) {
     // This is the key test for the `&mut PgConnection` pattern:
     // several repo calls sharing one `tx` must each release their

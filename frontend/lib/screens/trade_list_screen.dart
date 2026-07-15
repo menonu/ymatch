@@ -79,9 +79,55 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
 
   Future<void> _applyInventory(int userId, int matchId) async {
     final l10n = AppLocalizations.of(context)!;
+    var skipHaveDecrement = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: Text(l10n.updateInventory),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.applyInventoryConfirmBody),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: skipHaveDecrement,
+                    onChanged: (v) =>
+                        setLocal(() => skipHaveDecrement = v ?? false),
+                    title: Text(l10n.skipHaveDecrementLabel),
+                    subtitle: Text(l10n.skipHaveDecrementHint),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text(l10n.updateInventory),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
     await ref
         .read(matchControllerProvider.notifier)
-        .applyInventory(userId, matchId);
+        .applyInventory(
+          userId,
+          matchId,
+          skipHaveDecrement: skipHaveDecrement,
+        );
     // Success snackbar only; failures are handled by the controller listen.
     if (mounted && !ref.read(matchControllerProvider).hasError) {
       ScaffoldMessenger.of(

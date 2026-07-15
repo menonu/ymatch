@@ -86,7 +86,10 @@ stateDiagram-v2
 
 After `COMPLETED`, each party may **apply inventory** as a separate, idempotent
 step (status stays `COMPLETED`; not a further state-machine transition —
-[ADR 0002](../adr/0002-negotiation-state-machine.md)).
+[ADR 0002](../adr/0002-negotiation-state-machine.md), apply deltas per
+[ADR 0009](../adr/0009-apply-inventory-decrements-giver-have.md): by default
+giver `TRADE −qty` **and** `HAVE −qty`, receiver `HAVE +qty`; optional
+`skip_have_decrement` leaves giver HAVE unchanged).
 
 ```mermaid
 sequenceDiagram

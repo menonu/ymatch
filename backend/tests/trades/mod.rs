@@ -104,12 +104,15 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let merch_b_id = merch_b["id"].as_i64().unwrap();
 
-    // 3. User1: TRADE Card A, WANT Card B; User2: TRADE Card B, WANT Card A
-    for (uid, mid, status) in [
-        (user1_id, merch_a_id, "TRADE"),
-        (user1_id, merch_b_id, "WANT"),
-        (user2_id, merch_b_id, "TRADE"),
-        (user2_id, merch_a_id, "WANT"),
+    // 3. User1: TRADE+HAVE Card A, WANT Card B; User2: TRADE+HAVE Card B, WANT Card A.
+    // HAVE is seeded so default apply (#429) can assert giver HAVE decrement.
+    for (uid, mid, status, qty) in [
+        (user1_id, merch_a_id, "TRADE", 1),
+        (user1_id, merch_a_id, "HAVE", 2),
+        (user1_id, merch_b_id, "WANT", 1),
+        (user2_id, merch_b_id, "TRADE", 1),
+        (user2_id, merch_b_id, "HAVE", 2),
+        (user2_id, merch_a_id, "WANT", 1),
     ] {
         let app = backend::routes::create_router(pool.clone(), test_storage());
         let resp = app
@@ -119,8 +122,8 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
                     .uri("/api/v1/user/inventory")
                     .header("content-type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": 1}}"#,
-                        uid, mid, status
+                        r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": {}}}"#,
+                        uid, mid, status, qty
                     )))
                     .unwrap(),
             )
@@ -247,7 +250,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // 10. Verify User1: gave Card A (TRADE=0), received Card B (HAVE=1)
+    // 10. Verify User1: gave Card A (TRADE=0, HAVE 2→1), received Card B (HAVE=1)
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -271,6 +274,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
             .unwrap_or(0)
             == 0,
         "User1 TRADE Card A should be 0"
+    );
+    let u1_have_a = inv1
+        .iter()
+        .find(|i| i["merchId"] == merch_a_id && i["status"] == "HAVE");
+    assert_eq!(
+        u1_have_a
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(-1),
+        1,
+        "User1 HAVE Card A should decrement 2→1 by default (#429)"
     );
     let u1_have_b = inv1
         .iter()
@@ -363,7 +376,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Verify User2: gave Card B (TRADE=0), received Card A (HAVE=1)
+    // Verify User2: gave Card B (TRADE=0, HAVE 2→1), received Card A (HAVE=1)
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -387,6 +400,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
             .unwrap_or(0)
             == 0,
         "User2 TRADE Card B should be 0"
+    );
+    let u2_have_b = inv2
+        .iter()
+        .find(|i| i["merchId"] == merch_b_id && i["status"] == "HAVE");
+    assert_eq!(
+        u2_have_b
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(-1),
+        1,
+        "User2 HAVE Card B should decrement 2→1 by default (#429)"
     );
     let u2_have_a = inv2
         .iter()
@@ -421,6 +444,126 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+/// #429: `skipHaveDecrement: true` leaves giver HAVE unchanged (legacy).
+#[sqlx::test]
+async fn test_apply_inventory_skip_have_decrement(pool: PgPool) {
+    let user1_id = login_guest(&pool, "u1-skip-have", "tok1").await;
+    let user2_id = login_guest(&pool, "u2-skip-have", "tok2").await;
+    let event_id = create_event(&pool, "Skip HAVE Event", user1_id).await;
+    let card_a = create_merch(&pool, event_id, "Skip A", "skip-group").await;
+    let card_b = create_merch(&pool, event_id, "Skip B", "skip-group").await;
+
+    set_inventory(&pool, user1_id, card_a, "TRADE", 1).await;
+    set_inventory(&pool, user1_id, card_a, "HAVE", 2).await;
+    set_inventory(&pool, user1_id, card_b, "WANT", 1).await;
+    set_inventory(&pool, user2_id, card_b, "TRADE", 1).await;
+    set_inventory(&pool, user2_id, card_b, "HAVE", 2).await;
+    set_inventory(&pool, user2_id, card_a, "WANT", 1).await;
+
+    backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let match_id = matches[0]["id"].as_i64().unwrap();
+
+    let offer_body = format!(
+        r#"{{"userId": {}, "items": [
+            {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+            {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
+        ]}}"#,
+        user1_id, card_a, user1_id, card_b, user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &offer_body
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "COMPLETED", "userId": {}}}"#, user1_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    // Apply with skipHaveDecrement for user1 (giver of Card A).
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/apply-inventory", match_id),
+            &format!(r#"{{"userId": {}, "skipHaveDecrement": true}}"#, user1_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/user/{}/inventory", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let inv1: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    // quantity may be omitted when 0 (proto3 JSON default); use json_i64.
+    let trade_a = inv1
+        .iter()
+        .find(|i| json_i64(i, "merchId") == card_a && i["status"] == "TRADE")
+        .map(|i| json_i64(i, "quantity"))
+        .unwrap_or(-1);
+    let have_a = inv1
+        .iter()
+        .find(|i| json_i64(i, "merchId") == card_a && i["status"] == "HAVE")
+        .map(|i| json_i64(i, "quantity"))
+        .unwrap_or(-1);
+    assert_eq!(trade_a, 0, "TRADE still decrements with skip flag");
+    assert_eq!(
+        have_a, 2,
+        "HAVE must remain 2 when skipHaveDecrement is true"
+    );
+    let have_b = inv1
+        .iter()
+        .find(|i| json_i64(i, "merchId") == card_b && i["status"] == "HAVE")
+        .map(|i| json_i64(i, "quantity"))
+        .unwrap_or(-1);
+    assert_eq!(have_b, 1, "receiver HAVE still increments");
 }
 
 #[sqlx::test]

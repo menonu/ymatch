@@ -310,6 +310,32 @@ Update the status of a match.
 - **Allowed values**: `ACCEPTED`, `REJECTED`, `COMPLETED`
 - **Response**: `200 OK`
 
+### POST /api/v1/matches/:id/apply-inventory
+
+Apply this user's inventory deltas for a **COMPLETED** match. Each participant
+applies independently; a second apply for the same user returns `409 Conflict`.
+
+Per absolute leg `(giver_user_id, merch_id, quantity)` ([ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md)):
+
+| Party | Default | `skipHaveDecrement: true` |
+|-------|---------|---------------------------|
+| Giver | `TRADE −qty`, `HAVE −qty` (clamped at 0) | `TRADE −qty` only |
+| Receiver | `HAVE +qty` | same (flag ignored) |
+
+- **Request Body**:
+  ```json
+  {
+    "userId": 1,
+    "skipHaveDecrement": false
+  }
+  ```
+  - `userId` (required): applying user (must be a match participant).
+  - `skipHaveDecrement` (optional, default `false`): when `true`, do not
+    decrement the giver's HAVE (legacy).
+- **Response**: `200 OK`
+- **Errors**: `400` if match is not `COMPLETED`; `403` if not a participant;
+  `404` if match missing; `409` if this user already applied.
+
 ---
 
 ## 6. Messages

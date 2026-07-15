@@ -1004,10 +1004,21 @@ class MatchController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> applyInventory(int userId, int matchId) async {
+  /// Apply completed-trade inventory for [userId] on [matchId].
+  ///
+  /// When [skipHaveDecrement] is false (default, #429), the giver's HAVE
+  /// is decremented along with TRADE. When true, only TRADE is decremented
+  /// (legacy opt-out).
+  Future<void> applyInventory(
+    int userId,
+    int matchId, {
+    bool skipHaveDecrement = false,
+  }) async {
     state = const AsyncValue.loading();
     try {
-      final payload = ApplyInventoryRequest()..userId = userId;
+      final payload = ApplyInventoryRequest()
+        ..userId = userId
+        ..skipHaveDecrement = skipHaveDecrement;
       await client.post(
         '/api/v1/matches/$matchId/apply-inventory',
         payload.toProto3Json() as Map<String, dynamic>,

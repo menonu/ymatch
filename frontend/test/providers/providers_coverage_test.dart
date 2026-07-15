@@ -948,6 +948,35 @@ void main() {
       expect(container.read(matchControllerProvider).hasError, isFalse);
       final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
       expect(body['userId'], 7);
+      // Default false is omitted by proto3 JSON (or emitted as false).
+      expect(body['skipHaveDecrement'] ?? false, isFalse);
+    });
+
+    test('applyInventory sends skipHaveDecrement when true', () async {
+      String? capturedBody;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/matches/9/apply-inventory') {
+            capturedBody = request.body;
+            return _okEmpty();
+          }
+          return _okEmpty();
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(matchControllerProvider.notifier)
+          .applyInventory(7, 9, skipHaveDecrement: true);
+
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(body['userId'], 7);
+      expect(body['skipHaveDecrement'], isTrue);
     });
 
     test('mutation failure sets error state (no rethrow)', () async {

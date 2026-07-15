@@ -65,10 +65,11 @@ Record every ADR in the index below, newest last.
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [0001](0001-match-scoped-to-item-group.md) | Matches Are Scoped to a Single Item Group | Accepted | 2026-06-29 |
-| [0002](0002-negotiation-state-machine.md) | Balanced Negotiation State Machine | Accepted | 2026-06-29 |
+| [0002](0002-negotiation-state-machine.md) | Balanced Negotiation State Machine | Superseded in part by [0009](0009-apply-inventory-decrements-giver-have.md) | 2026-06-29 |
 | [0003](0003-subset-woff2-japanese-font.md) | Subset WOFF2 Japanese Font Bundled in Repo | Accepted | 2026-07-01 |
 | [0004](0004-rbac-permission-model.md) | Role-Based Access Control (RBAC) Permission Model | Accepted | 2026-07-05 |
 | [0005](0005-merch-create-permission.md) | Gate Merch Creation Behind `merch.create` | Accepted | 2026-07-08 |
 | [0006](0006-derive-user-role-from-user-roles.md) | Derive `User.role` from `user_roles` at Read Time (drop `users.role` mirror) | Accepted | 2026-07-10 |
 | [0007](0007-inventory-export-text-formats.md) | Client-Side Inventory Export with Text Formats | Accepted | 2026-07-13 |
 | [0008](0008-merchandise-deletion-semantics.md) | Merchandise Deletion Semantics and the `CANCELLED` Match Status | Accepted | 2026-07-14 |
+| [0009](0009-apply-inventory-decrements-giver-have.md) | Apply Inventory Decrements Giver HAVE by Default | Accepted | 2026-07-15 |

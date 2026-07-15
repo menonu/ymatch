@@ -100,15 +100,19 @@ impl InventoryRepository {
     }
 
     /// Apply a trade-delta to a user's inventory inside the
-    /// caller's transaction. Decrements the TRADE row by
-    /// `delta_trade` (clamped at 0) and upserts the HAVE row by
-    /// `delta_have`. Either delta may be 0 to skip that side.
+    /// caller's transaction.
+    ///
+    /// - `delta_trade` (> 0): decrement the TRADE row by that amount
+    ///   (clamped at 0). `<= 0` skips TRADE.
+    /// - `delta_have` (signed, #429):
+    ///   - `> 0`: upsert/increment the HAVE row by that amount
+    ///   - `< 0`: decrement the HAVE row by `|delta_have|` (clamped at 0)
+    ///   - `0`: skip HAVE
     ///
     /// Implemented as a single CTE so the generic `Executor` parameter
     /// (consumed by `.execute()`) is used exactly once per call. The
-    /// `WHERE $1 > 0` / `WHERE $4 > 0` clauses short-circuit the
-    /// affected CTE branch when a delta is 0 — semantically identical
-    /// to the previous if-guarded two-query version.
+    /// `$1 > 0` / `$4 > 0` / `$4 < 0` predicates short-circuit unused
+    /// branches.
     pub async fn apply_trade_delta<'c, E>(
         &self,
         exec: E,
@@ -128,12 +132,18 @@ impl InventoryRepository {
                 WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE' AND $1 > 0
                 RETURNING 1
             ),
-            have_update AS (
+            have_inc AS (
                 INSERT INTO inventory (user_id, merch_id, status, quantity)
                 SELECT $2, $3, 'HAVE', $4
                 WHERE $4 > 0
                 ON CONFLICT (user_id, merch_id, status)
                 DO UPDATE SET quantity = inventory.quantity + $4
+                RETURNING 1
+            ),
+            have_dec AS (
+                UPDATE inventory
+                SET quantity = GREATEST(quantity + $4, 0)
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE' AND $4 < 0
                 RETURNING 1
             )
             SELECT 1
