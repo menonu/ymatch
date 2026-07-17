@@ -147,7 +147,9 @@ void main() {
   );
 
   test(
-    'deleteMerchByCreator DELETEs /events/{id}/merch/{id} and removes it',
+    // ADR 0008: delete is soft-delete only. The creator is a holder, so
+    // the row remains on GET /events/{id}/merch marked isDeleted=true.
+    'deleteMerchByCreator DELETEs /events/{id}/merch/{id} and soft-deletes it',
     () async {
       final container = makeContainer();
       addTearDown(container.dispose);
@@ -163,10 +165,21 @@ void main() {
         '/api/v1/events/$eventId/merch?user_id=$userId',
       );
       final merch = (list as List).cast<Map<String, dynamic>>();
+      final deleted = merch.where((m) => m['id'] == merchId).toList();
       expect(
-        merch.any((m) => m['id'] == merchId),
+        deleted,
+        hasLength(1),
+        reason: 'creator (holder) still sees soft-deleted merch (ADR 0008)',
+      );
+      expect(
+        deleted.single['isDeleted'],
+        isTrue,
+        reason: 'soft-deleted merch is marked isDeleted for holders',
+      );
+      expect(
+        deleted.single['tradeEnabled'],
         isFalse,
-        reason: 'merch should be removed after delete',
+        reason: 'soft-delete always disables trade',
       );
     },
   );
