@@ -20,7 +20,7 @@ Where tests live:
 1. **Issue**: `gh issue create` (Must be first)
 2. **Branch**: Create a branch and worktree
 3. **TDD**: Follow Red -> Green -> Refactor
-4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `flutter analyze`
+4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `dart format --output=none --set-exit-if-changed . && flutter analyze` (from `frontend/`)
 5. **Push & PR**: Commit, push, and run `gh pr create`
 6. **CI Test**: Verify all CI checks pass successfully
 7. **Review**: Run `/pr-review <PR>` (project skill: [`.claude/skills/pr-review/`](./.claude/skills/pr-review/)); if the skill cannot be invoked, follow the [PR Review Guide](./docs/how_to/pr_review.md) (context gathering, rubric, methodology, comment format, severities).
@@ -93,7 +93,7 @@ task backend:test            # Backend integration tests
 task frontend:test           # Flutter unit/widget tests
 task backend:coverage        # Backend tests + coverage (HTML + lcov.info)
 cd backend && cargo fmt -- --check && cargo clippy -- -D warnings
-cd frontend && flutter analyze
+cd frontend && dart format --output=none --set-exit-if-changed . && flutter analyze
 gh # for github related operation
 ```
 

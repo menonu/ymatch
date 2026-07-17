@@ -111,6 +111,14 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Run dart format
+        # Fail if any Dart source under frontend/ is not dart-format clean.
+        # Mirrors backend `cargo fmt -- --check`. Scope is the whole job
+        # working-directory (lib/, test/, integration_test/, and generated
+        # paths). No path exclusions — if generated files drift, re-run
+        # the generators or format them in-repo.
+        run: dart format --output=none --set-exit-if-changed .
+
       - name: Run tests
         # Bare `flutter test` — backend-dependent suites (integration +
         # e2e) are skipped at the suite level by dart_test.yaml, the
