@@ -102,7 +102,8 @@ impl MatchRepository {
                  ON u.id = (CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END)
                JOIN events e ON e.id = m.event_id
                WHERE (m.user1_id = $1 OR m.user2_id = $1)
-                 AND m.status NOT IN ('REJECTED', 'CANCELLED')
+                 -- ADR 0010: surface CANCELLED under Done; keep REJECTED hidden.
+                 AND m.status <> 'REJECTED'
                ORDER BY m.created_at DESC"#;
         let match_rows = sqlx::query(match_sql)
             .bind(user_id)
@@ -681,6 +682,298 @@ impl MatchRepository {
             return Err(AppError::not_found("Match disappeared mid-apply"));
         }
         Ok(())
+    }
+
+    // ---- ADR 0010: mutual capacity + system cancel ----
+
+    /// Active match scopes for capacity re-evaluation (ADR 0010).
+    /// Status ∈ {PENDING, OFFERED, ACCEPTED}.
+    pub async fn list_active_scopes_for_user<'c, E>(
+        &self,
+        exec: E,
+        user_id: i32,
+    ) -> Result<Vec<ActiveMatchScope>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let rows = sqlx::query(
+            r#"SELECT id, user1_id, user2_id, event_id, group_name
+               FROM matches
+               WHERE (user1_id = $1 OR user2_id = $1)
+                 AND status IN ('PENDING', 'OFFERED', 'ACCEPTED')"#,
+        )
+        .bind(user_id)
+        .fetch_all(exec)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| ActiveMatchScope {
+                id: r.get("id"),
+                user1_id: r.get("user1_id"),
+                user2_id: r.get("user2_id"),
+                event_id: r.get("event_id"),
+                group_name: r.get("group_name"),
+            })
+            .collect())
+    }
+
+    /// Active match scopes in a single event+group (ADR 0010 / merch delete).
+    pub async fn list_active_scopes_for_group<'c, E>(
+        &self,
+        exec: E,
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<Vec<ActiveMatchScope>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let rows = sqlx::query(
+            r#"SELECT id, user1_id, user2_id, event_id, group_name
+               FROM matches
+               WHERE event_id = $1 AND group_name = $2
+                 AND status IN ('PENDING', 'OFFERED', 'ACCEPTED')"#,
+        )
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_all(exec)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| ActiveMatchScope {
+                id: r.get("id"),
+                user1_id: r.get("user1_id"),
+                user2_id: r.get("user2_id"),
+                event_id: r.get("event_id"),
+                group_name: r.get("group_name"),
+            })
+            .collect())
+    }
+
+    /// Match ids that reference `merch_id` via `match_items` and are still active.
+    pub async fn list_active_ids_referencing_merch<'c, E>(
+        &self,
+        exec: E,
+        merch_id: i32,
+    ) -> Result<Vec<i32>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let rows = sqlx::query_scalar(
+            r#"SELECT m.id
+               FROM matches m
+               WHERE m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                 AND EXISTS (
+                   SELECT 1 FROM match_items mi
+                   WHERE mi.match_id = m.id AND mi.merch_id = $1
+                 )"#,
+        )
+        .bind(merch_id)
+        .fetch_all(exec)
+        .await?;
+        Ok(rows)
+    }
+
+    /// ADR 0010 mutual capacity in one direction:
+    /// `Σ LEAST(giver.TRADE, receiver.WANT)` over live merch in the match group.
+    pub async fn mutual_capacity<'c, E>(
+        &self,
+        exec: E,
+        giver_user_id: i32,
+        receiver_user_id: i32,
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<i32, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let cap: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(LEAST(t.quantity, w.quantity)), 0)
+            FROM inventory t
+            JOIN inventory w
+              ON w.merch_id = t.merch_id
+             AND w.user_id = $2
+             AND w.status = 'WANT'
+             AND w.quantity > 0
+            JOIN merchandise m ON m.id = t.merch_id
+            WHERE t.user_id = $1
+              AND t.status = 'TRADE'
+              AND t.quantity > 0
+              AND m.event_id = $3
+              AND m.group_name = $4
+              AND m.is_deleted = false
+              AND m.trade_enabled = true
+            "#,
+        )
+        .bind(giver_user_id)
+        .bind(receiver_user_id)
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_one(exec)
+        .await?;
+        Ok(cap as i32)
+    }
+
+    /// System-cancel active matches and post one SYSTEM message each.
+    ///
+    /// Only rows still in `PENDING`/`OFFERED`/`ACCEPTED` are updated (idempotent
+    /// if an id was already terminal). `message` distinguishes inventory-capacity
+    /// cancel (ADR 0010) from merch-delete cancel (ADR 0008).
+    pub async fn system_cancel_matches<'c, E>(
+        &self,
+        exec: E,
+        match_ids: &[i32],
+        message: &str,
+    ) -> Result<i64, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        if match_ids.is_empty() {
+            return Ok(0);
+        }
+        let row: (i64,) = sqlx::query_as(
+            r#"
+            WITH cancelled AS (
+                UPDATE matches
+                SET status = 'CANCELLED'
+                WHERE id = ANY($1)
+                  AND status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                RETURNING id, user1_id
+            ),
+            msgs AS (
+                INSERT INTO messages (match_id, sender_id, content, message_type)
+                SELECT id, user1_id, $2, 'SYSTEM'
+                FROM cancelled
+                RETURNING 1
+            )
+            SELECT COUNT(*)::bigint FROM cancelled
+            "#,
+        )
+        .bind(match_ids)
+        .bind(message)
+        .fetch_one(exec)
+        .await?;
+        Ok(row.0)
+    }
+
+    /// Whether either mutual capacity is zero (ADR 0010 cancel predicate).
+    pub async fn scope_requires_cancel(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        scope: &ActiveMatchScope,
+    ) -> Result<bool, AppError> {
+        let cap1 = self
+            .mutual_capacity(
+                &mut *conn,
+                scope.user1_id,
+                scope.user2_id,
+                scope.event_id,
+                &scope.group_name,
+            )
+            .await?;
+        let cap2 = self
+            .mutual_capacity(
+                &mut *conn,
+                scope.user2_id,
+                scope.user1_id,
+                scope.event_id,
+                &scope.group_name,
+            )
+            .await?;
+        Ok(capacity_requires_cancel(cap1, cap2))
+    }
+
+    /// After merch soft-delete: cancel matches that reference the item via
+    /// `match_items` (ADR 0008) **or** that now have zero mutual capacity in
+    /// the item's group (ADR 0010 — covers legs-less `PENDING`).
+    pub async fn cancel_after_merch_delete(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        merch_id: i32,
+        event_id: i32,
+        group_name: Option<&str>,
+        message: &str,
+    ) -> Result<(), AppError> {
+        use std::collections::HashSet;
+
+        let mut ids: HashSet<i32> = self
+            .list_active_ids_referencing_merch(&mut *conn, merch_id)
+            .await?
+            .into_iter()
+            .collect();
+
+        if let Some(group) = group_name {
+            let scopes = self
+                .list_active_scopes_for_group(&mut *conn, event_id, group)
+                .await?;
+            for scope in &scopes {
+                if ids.contains(&scope.id) {
+                    continue;
+                }
+                if self.scope_requires_cancel(&mut *conn, scope).await? {
+                    ids.insert(scope.id);
+                }
+            }
+        }
+
+        if !ids.is_empty() {
+            let list: Vec<i32> = ids.into_iter().collect();
+            self.system_cancel_matches(&mut *conn, &list, message)
+                .await?;
+        }
+        Ok(())
+    }
+}
+
+/// Lightweight active-match row used for ADR 0010 capacity re-evaluation.
+#[derive(Debug, Clone)]
+pub struct ActiveMatchScope {
+    pub id: i32,
+    pub user1_id: i32,
+    pub user2_id: i32,
+    pub event_id: i32,
+    pub group_name: String,
+}
+
+/// ADR 0010: cancel when either mutual capacity is zero (or negative).
+/// Both sides positive (including unbalanced 2:1) keeps the match.
+pub fn capacity_requires_cancel(cap1: i32, cap2: i32) -> bool {
+    cap1 <= 0 || cap2 <= 0
+}
+
+/// SYSTEM message when mutual inventory capacity hits zero (ADR 0010).
+pub const CANCEL_MSG_INVENTORY_CAPACITY: &str =
+    "This match was cancelled because inventory no longer supports a mutual trade.";
+
+/// SYSTEM message when a referenced merch item is soft-deleted (ADR 0008).
+pub const CANCEL_MSG_MERCH_DELETED: &str =
+    "This match was cancelled because a traded item was deleted.";
+
+#[cfg(test)]
+mod capacity_tests {
+    use super::capacity_requires_cancel;
+
+    #[test]
+    fn keeps_when_both_positive_including_unbalanced() {
+        assert!(!capacity_requires_cancel(2, 2));
+        assert!(!capacity_requires_cancel(2, 1));
+        assert!(!capacity_requires_cancel(1, 2));
+        assert!(!capacity_requires_cancel(1, 1));
+    }
+
+    #[test]
+    fn cancels_when_either_side_zero() {
+        assert!(capacity_requires_cancel(2, 0));
+        assert!(capacity_requires_cancel(0, 2));
+        assert!(capacity_requires_cancel(1, 0));
+        assert!(capacity_requires_cancel(0, 1));
+        assert!(capacity_requires_cancel(0, 0));
+    }
+
+    #[test]
+    fn cancels_when_negative_defensive() {
+        assert!(capacity_requires_cancel(-1, 2));
+        assert!(capacity_requires_cancel(2, -1));
     }
 }
 

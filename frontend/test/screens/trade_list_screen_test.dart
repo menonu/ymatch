@@ -403,7 +403,7 @@ void main() {
     },
   );
 
-  testWidgets('CANCELLED matches are hidden from all tabs (ADR 0008 / #423)', (
+  testWidgets('CANCELLED matches appear only on Done tab (ADR 0010 / #452)', (
     WidgetTester tester,
   ) async {
     final cancelled = TradeMatch()
@@ -428,11 +428,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Match tab: only the PENDING card is shown; cancelled is excluded.
+    // Match tab: only the PENDING card; CANCELLED excluded from actionable tabs.
     expect(find.text('Make Offer'), findsOneWidget);
     expect(find.text('Gone Pen'), findsNothing);
-    // The pending match still appears once.
     expect(find.textContaining('Give Pen'), findsWidgets);
+
+    // Done tab surfaces CANCELLED for history (ADR 0010).
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('CANCELLED'), findsOneWidget);
+    expect(find.textContaining('Gone Pen'), findsOneWidget);
+    expect(find.text('Make Offer'), findsNothing);
   });
 }
 

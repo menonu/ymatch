@@ -706,6 +706,10 @@
   "@statusCompleted": {
     "description": "Match status chip: completed"
   },
+  "statusCancelled": "CANCELLED",
+  "@statusCancelled": {
+    "description": "Match status chip: system-cancelled (inventory/merch invalidation)"
+  },
   "youGive": "You give:",
   "@youGive": {
     "description": "Label above items the user would give (potential match)"

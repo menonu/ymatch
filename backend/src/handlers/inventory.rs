@@ -1,18 +1,21 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::repositories::inventory::InventoryRepository;
+use crate::services::match_lifecycle::MatchLifecycleService;
 use axum::{
     Json,
     extract::{Path, State},
 };
 use std::sync::Arc;
 
+/// Upsert inventory. WANT/TRADE writes re-evaluate match mutual capacity
+/// (ADR 0010) via [`MatchLifecycleService::update_inventory`].
 pub async fn update_inventory(
-    State(inventory): State<Arc<InventoryRepository>>,
+    State(lifecycle): State<Arc<MatchLifecycleService>>,
     Json(payload): Json<UpdateInventoryRequest>,
 ) -> Result<Json<InventoryItem>, AppError> {
-    let item = inventory
-        .upsert(
+    let item = lifecycle
+        .update_inventory(
             payload.user_id,
             payload.merch_id,
             &payload.status,

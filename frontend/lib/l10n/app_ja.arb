@@ -160,6 +160,7 @@
   "statusOffered": "オファー中",
   "statusAccepted": "承認済",
   "statusCompleted": "完了",
+  "statusCancelled": "無効",
   "youGive": "あなたが渡すもの:",
   "youReceive": "あなたが受け取るもの:",
   "giveLabel": "渡す:",

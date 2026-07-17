@@ -497,6 +497,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusCompleted => 'COMPLETED';
 
   @override
+  String get statusCancelled => 'CANCELLED';
+
+  @override
   String get youGive => 'You give:';
 
   @override
