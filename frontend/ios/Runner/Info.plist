@@ -45,5 +45,8 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Chat map picker: GPS "my location" (#448) — when-in-use only -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ymatch uses your location so you can pin a meetup point in trade chat.</string>
 </dict>
 </plist>

@@ -1363,6 +1363,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'editor'**
   String get roleEditor;
+
+  /// App bar title on the chat map location picker (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Pick location'**
+  String get mapPickerTitle;
+
+  /// Hint text for the map place search field (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Search place or address'**
+  String get mapSearchHint;
+
+  /// Tooltip for the GPS my-location button on the map picker (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Use my current location'**
+  String get mapMyLocationTooltip;
+
+  /// Snackbar when GPS permission is denied (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission denied. Enable it in settings to use your position.'**
+  String get mapLocationPermissionDenied;
+
+  /// Snackbar when device location services are disabled (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Location services are turned off on this device.'**
+  String get mapLocationServiceDisabled;
+
+  /// Snackbar when GPS position cannot be obtained (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Could not get your current location.'**
+  String get mapLocationUnavailable;
+
+  /// Snackbar when place search returns no results (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'No places found for that search.'**
+  String get mapSearchNoResults;
+
+  /// Snackbar when place search request fails (#448)
+  ///
+  /// In en, this message translates to:
+  /// **'Place search failed. Try again.'**
+  String get mapSearchFailed;
 }
 
 class _AppLocalizationsDelegate

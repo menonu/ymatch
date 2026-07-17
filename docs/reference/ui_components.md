@@ -23,7 +23,7 @@ used throughout this document.
 | `AddMerchScreen` | Add Merch (new item form) | アイテム追加 |
 | `TradeListScreen` | Matches tab — trade list | マッチタブ — 取引一覧 |
 | `ChatScreen` | Chat (within a match) | チャット（マッチ内） |
-| `MapPickerScreen` | Location picker | 位置選択 |
+| `MapPickerScreen` | Location picker (tap / search / GPS) | 位置選択（タップ / 検索 / GPS） |
 | `ProfileScreen` | Profile tab | プロフィールタブ |
 | `AdminDashboardScreen` | Admin tab (admin/mod only) | 管理タブ（管理者/モデレータのみ） |
 
@@ -46,7 +46,7 @@ used throughout this document.
 | `AddMerchScreen` | `screens/add_merch_screen.dart` | New merchandise form with group selection, image picker |
 | `TradeListScreen` | `screens/trade_list_screen.dart` | Trade matches across 5 status tabs |
 | `ChatScreen` | `screens/chat_screen.dart` | Messaging within a trade match |
-| `MapPickerScreen` | `screens/map_picker_screen.dart` | Location selection via OpenStreetMap |
+| `MapPickerScreen` | `screens/map_picker_screen.dart` | Location selection via OpenStreetMap; tap pin, place search (Nominatim), GPS my-location (#448) |
 | `ProfileScreen` | `screens/profile_screen.dart` | User profile, UUID, trading instructions |
 | `AdminDashboardScreen` | `screens/admin_dashboard_screen.dart` | Admin panel with 7 tabs (System, Users, Events, Groups, Items, Matches, Debug). Events/Groups support change creator + manage editors (#432). |
 

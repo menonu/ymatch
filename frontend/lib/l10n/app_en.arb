@@ -975,5 +975,38 @@
   "roleEditor": "editor",
   "@roleEditor": {
     "description": "Event-scoped role label for editor in member list (#442)"
+  },
+
+  "mapPickerTitle": "Pick location",
+  "@mapPickerTitle": {
+    "description": "App bar title on the chat map location picker (#448)"
+  },
+  "mapSearchHint": "Search place or address",
+  "@mapSearchHint": {
+    "description": "Hint text for the map place search field (#448)"
+  },
+  "mapMyLocationTooltip": "Use my current location",
+  "@mapMyLocationTooltip": {
+    "description": "Tooltip for the GPS my-location button on the map picker (#448)"
+  },
+  "mapLocationPermissionDenied": "Location permission denied. Enable it in settings to use your position.",
+  "@mapLocationPermissionDenied": {
+    "description": "Snackbar when GPS permission is denied (#448)"
+  },
+  "mapLocationServiceDisabled": "Location services are turned off on this device.",
+  "@mapLocationServiceDisabled": {
+    "description": "Snackbar when device location services are disabled (#448)"
+  },
+  "mapLocationUnavailable": "Could not get your current location.",
+  "@mapLocationUnavailable": {
+    "description": "Snackbar when GPS position cannot be obtained (#448)"
+  },
+  "mapSearchNoResults": "No places found for that search.",
+  "@mapSearchNoResults": {
+    "description": "Snackbar when place search returns no results (#448)"
+  },
+  "mapSearchFailed": "Place search failed. Try again.",
+  "@mapSearchFailed": {
+    "description": "Snackbar when place search request fails (#448)"
   }
 }
