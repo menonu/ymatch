@@ -22,11 +22,11 @@ Where tests live:
 3. **TDD**: Follow Red -> Green -> Refactor
 4. **Lint**: Run `cargo fmt -- --check && cargo clippy -- -D warnings` and `dart format --output=none --set-exit-if-changed . && flutter analyze` (from `frontend/`)
 5. **Push & PR**: Commit, push, and run `gh pr create`
-6. **CI Test**: Verify all CI checks pass successfully
-7. **Review**: Run `/pr-review <PR>` (project skill: [`.claude/skills/pr-review/`](./.claude/skills/pr-review/)); if the skill cannot be invoked, follow the [PR Review Guide](./docs/how_to/pr_review.md) (context gathering, rubric, methodology, comment format, severities).
+6. **Review**: Run `/pr-review <PR>` (project skill: [`.claude/skills/pr-review/`](./.claude/skills/pr-review/)); if the skill cannot be invoked, follow the [PR Review Guide](./docs/how_to/pr_review.md) (context gathering, rubric, methodology, comment format, severities).
    * Fix or explain `[critical]` / `[major]` findings.
    * Resolve or accept `[minor]` / `[nit]` findings.
    * Re-run after changes.
+7. **CI Test**: Verify all CI checks pass successfully
 8. **Report & Wait(only after 6+7)**: Report PR URL + CI status + review outcome + summary. **Do not merge.** Wait for human merge or explicit authorization. Cleanup worktree after merge
 
 See [Development Workflow Guide](./docs/how_to/development_workflow.md) for full details.
