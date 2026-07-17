@@ -9,7 +9,8 @@ use std::sync::Arc;
 ///
 /// `async fn` in traits is not `dyn`-compatible in edition 2024 without an
 /// explicit `BoxFuture`-style return position. We keep `Arc<dyn ImageStorage>`
-/// for runtime backend selection, so each method returns a boxed future.
+/// for dyn-compat and a future object-store plug-in, so each method returns a
+/// boxed future.
 pub type StorageFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Abstraction for image storage backends.
@@ -33,14 +34,12 @@ pub trait ImageStorage: Send + Sync {
 #[derive(Debug)]
 pub enum StorageError {
     Io(String),
-    Remote(String),
 }
 
 impl std::fmt::Display for StorageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StorageError::Io(msg) => write!(f, "IO error: {}", msg),
-            StorageError::Remote(msg) => write!(f, "Remote error: {}", msg),
         }
     }
 }

@@ -41,7 +41,7 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 | Interface | Protocol | Notes |
 |-----------|----------|--------|
 | Browser ↔ API | HTTPS JSON REST | Base path `/api/v1`; see [API spec](../../reference/api_spec.md). |
-| Browser ↔ images | HTTPS | `/uploads/*` via API static files when `IMAGE_STORAGE=local`. |
+| Browser ↔ images | HTTPS | `/uploads/*` via API static files (`UPLOAD_DIR`). |
 | API ↔ Postgres | TCP SQL | Connection string from env (`DATABASE_URL`). |
 | CI ↔ VM | SSH + Docker | GitHub Actions deploy workflows. |
 | Ops ↔ OCI | OCI API / Terraform | Infra and Object Storage; secrets never in git. |
