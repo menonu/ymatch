@@ -4,7 +4,7 @@
 //! the match state machine. Repositories are single-statement; this
 //! service is the only place we open `pool.begin()`.
 //!
-//! State machine (#297 negotiation + ADR 0008 cancel):
+//! State machine (#297 negotiation + ADR 0008 / ADR 0010 cancel):
 //!
 //! ```text
 //!     PENDING ──propose──> OFFERED ──counter──> OFFERED ── …
@@ -14,9 +14,9 @@
 //!        └──reject──> REJECTED
 //!     ACCEPTED ──complete──> COMPLETED
 //!
-//!     PENDING  ──cancel (system, item deleted)──► CANCELLED
-//!     OFFERED  ──cancel (system, item deleted)──► CANCELLED
-//!     ACCEPTED ──cancel (system, item deleted)──► CANCELLED
+//!     PENDING  ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
+//!     OFFERED  ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
+//!     ACCEPTED ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
 //! ```
 //!
 //! `OFFERED` is the "proposal on the table" state; `offered_by` is the last
@@ -25,19 +25,20 @@
 //! (unspecified legs persist). Accept is the non-proposer's and requires a
 //! balanced proposal (Σ qty each side gives equal and > 0).
 //!
-//! `CANCELLED` is system-driven only (merchandise soft-delete invalidates
-//! active matches that reference the item — ADR 0008). It is **not**
+//! `CANCELLED` is system-driven only: merchandise soft-delete (ADR 0008) or
+//! mutual inventory capacity collapsing to zero (ADR 0010). It is **not**
 //! reachable via [`MatchLifecycleService::change_status`].
 //!
 //! The apply-inventory step runs *after* COMPLETED and updates the
 //! `inventory` table based on the offer's `match_items` legs. Each side
 //! applies independently; the per-user flag (`user{1,2}_inventory_applied_at`)
-//! prevents double-application.
+//! prevents double-application. TRADE decrements from apply also re-evaluate
+//! the acting user's other active matches (ADR 0010).
 
 use crate::error::AppError;
 use crate::generated::ymatch::{InventoryItem, OfferItem, OfferTradeRequest};
 use crate::repositories::inventory::InventoryRepository;
-use crate::repositories::match_::MatchRepository;
+use crate::repositories::match_::{CANCEL_MSG_INVENTORY_CAPACITY, MatchRepository};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -48,14 +49,6 @@ const STATUS_COMPLETED: &str = "COMPLETED";
 const STATUS_REJECTED: &str = "REJECTED";
 /// System-only terminal status (item deleted / capacity zero). Not user-reachable.
 pub const STATUS_CANCELLED: &str = "CANCELLED";
-
-/// SYSTEM message when mutual inventory capacity hits zero (ADR 0010).
-pub const CANCEL_MSG_INVENTORY_CAPACITY: &str =
-    "This match was cancelled because inventory no longer supports a mutual trade.";
-
-/// SYSTEM message when a referenced merch item is soft-deleted (ADR 0008).
-pub const CANCEL_MSG_MERCH_DELETED: &str =
-    "This match was cancelled because a traded item was deleted.";
 
 /// Service for the match state machine.
 ///
@@ -333,6 +326,9 @@ impl MatchLifecycleService {
         // `user{1,2}_inventory_applied_at IS NOT NULL` and refuses to
         // re-apply.
         let mut tx = self.pool.begin().await?;
+        // ADR 0010: TRADE decrements can zero mutual capacity for *other*
+        // active matches the user is still negotiating.
+        let mut traded = false;
 
         for item in &items {
             // Absolute leg (#297/#429):
@@ -347,6 +343,9 @@ impl MatchLifecycleService {
             if delta_trade == 0 && delta_have == 0 {
                 continue;
             }
+            if delta_trade > 0 {
+                traded = true;
+            }
             self.inventory
                 .apply_trade_delta(&mut *tx, user_id, item.merch_id, delta_trade, delta_have)
                 .await?;
@@ -355,6 +354,10 @@ impl MatchLifecycleService {
         self.matches
             .mark_inventory_applied(&mut *tx, match_id, is_user1)
             .await?;
+
+        if traded {
+            self.cancel_zero_capacity_for_user(&mut tx, user_id).await?;
+        }
 
         tx.commit().await?;
         Ok(())

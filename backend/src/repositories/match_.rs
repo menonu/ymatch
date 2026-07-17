@@ -941,6 +941,14 @@ pub fn capacity_requires_cancel(cap1: i32, cap2: i32) -> bool {
     cap1 <= 0 || cap2 <= 0
 }
 
+/// SYSTEM message when mutual inventory capacity hits zero (ADR 0010).
+pub const CANCEL_MSG_INVENTORY_CAPACITY: &str =
+    "This match was cancelled because inventory no longer supports a mutual trade.";
+
+/// SYSTEM message when a referenced merch item is soft-deleted (ADR 0008).
+pub const CANCEL_MSG_MERCH_DELETED: &str =
+    "This match was cancelled because a traded item was deleted.";
+
 #[cfg(test)]
 mod capacity_tests {
     use super::capacity_requires_cancel;

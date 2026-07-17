@@ -20,8 +20,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::{CreateMerchRequest, Merchandise, UpdateMerchRequest};
 use crate::handlers::mappers::merch_from_row;
-use crate::repositories::match_::MatchRepository;
-use crate::services::match_lifecycle::CANCEL_MSG_MERCH_DELETED;
+use crate::repositories::match_::{CANCEL_MSG_MERCH_DELETED, MatchRepository};
 use sqlx::{PgPool, Row};
 
 /// Whether a `sqlx::Error` is a Postgres unique-violation (SQLSTATE 23505).
@@ -383,14 +382,15 @@ impl MerchandiseRepository {
         }
     }
 
-    /// Soft-delete merchandise and cancel active matches that reference it
-    /// (ADR 0008 / #423).
+    /// Soft-delete merchandise and cancel affected active matches
+    /// (ADR 0008 / ADR 0010 / #423).
     ///
     /// Always sets `is_deleted = true, trade_enabled = false` — never issues
     /// `DELETE FROM merchandise`. In the same transaction, every
-    /// `PENDING`/`OFFERED`/`ACCEPTED` match that has a `match_items` row for
-    /// this merch (give or receive side) is set to `CANCELLED`, and a system
-    /// `messages` row is posted into each cancelled match thread.
+    /// `PENDING`/`OFFERED`/`ACCEPTED` match that either has a `match_items`
+    /// row for this merch, or is in the merch's event+group with mutual
+    /// capacity now zero (legs-less `PENDING` — ADR 0010), is set to
+    /// `CANCELLED` with a system `messages` row in the match thread.
     ///
     /// `COMPLETED` matches are left as history. Used by the admin path
     /// (`DELETE /admin/merch/:id`) and by [`Self::delete_merch`] for the
