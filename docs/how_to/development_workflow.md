@@ -78,8 +78,11 @@ Your branch must pass all local checks before you push it to GitHub.
 - **Flutter Frontend**:
   ```bash
   cd frontend
+  dart format --output=none --set-exit-if-changed .
   flutter analyze
   ```
+  Prefer formatting only intentionally edited files (or a dedicated format
+  commit). CI still requires the whole `frontend/` tree to be `dart format`-clean.
 
 ### 2. Run Test Suites
 Ensure all tests pass. If you've modified the database structure, make sure database migrations are included.

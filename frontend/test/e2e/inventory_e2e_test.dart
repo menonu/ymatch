@@ -128,14 +128,16 @@ void main() {
     expect(match['quantity'], isPositive);
   }
 
-  test('inventoryProvider GETs /user/{id}/inventory and returns a list',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'inventoryProvider GETs /user/{id}/inventory and returns a list',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final items = await container.read(inventoryProvider(userId).future);
-    expect(items, isA<List>());
-  });
+      final items = await container.read(inventoryProvider(userId).future);
+      expect(items, isA<List>());
+    },
+  );
 
   test('updateItem POSTs to /user/inventory with status=HAVE', () async {
     final container = makeContainer();

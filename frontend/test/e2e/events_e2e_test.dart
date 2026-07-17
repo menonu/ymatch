@@ -112,29 +112,33 @@ void main() {
     expect(events, isA<List>());
   });
 
-  test('favoriteGroupsProvider GETs /api/v1/user/{id}/favorite_groups',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'favoriteGroupsProvider GETs /api/v1/user/{id}/favorite_groups',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final favs = await container.read(favoriteGroupsProvider.future);
-    expect(favs, isA<List>());
-  });
+      final favs = await container.read(favoriteGroupsProvider.future);
+      expect(favs, isA<List>());
+    },
+  );
 
-  test('addEvent POSTs to /events and the event appears in GET /events',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'addEvent POSTs to /events and the event appears in GET /events',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final name = _uniqueName('e2e_events_add');
-    await container
-        .read(eventsControllerProvider.notifier)
-        .addEvent(name, userId);
+      final name = _uniqueName('e2e_events_add');
+      await container
+          .read(eventsControllerProvider.notifier)
+          .addEvent(name, userId);
 
-    // No exception = the body shape was accepted. Verify via direct GET.
-    final eventId = await findEventIdByName(name);
-    expect(eventId, isPositive);
-  });
+      // No exception = the body shape was accepted. Verify via direct GET.
+      final eventId = await findEventIdByName(name);
+      expect(eventId, isPositive);
+    },
+  );
 
   test('toggleFavorite POSTs to /events/{id}/favorite', () async {
     final container = makeContainer();
@@ -172,8 +176,7 @@ void main() {
     final r = await api.get('/api/v1/user/$userId/favorite_groups');
     final groups = (r as List).cast<Map<String, dynamic>>();
     expect(
-      groups.any((g) =>
-          g['eventId'] == eventId && g['groupName'] == 'default'),
+      groups.any((g) => g['eventId'] == eventId && g['groupName'] == 'default'),
       isTrue,
       reason: 'group "default" should appear in /favorite_groups',
     );
@@ -197,8 +200,7 @@ void main() {
         .registerView(eventId, userId);
   });
 
-  test('updateEvent PUTs to /events/{id} and the new name persists',
-      () async {
+  test('updateEvent PUTs to /events/{id} and the new name persists', () async {
     final container = makeContainer();
     addTearDown(container.dispose);
 

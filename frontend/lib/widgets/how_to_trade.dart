@@ -28,10 +28,9 @@ class HowToTradeContent extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               l10n.howToTrade,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -63,7 +62,9 @@ class HowToTradeStep extends StatelessWidget {
             height: 24,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -175,7 +176,8 @@ class _DownArrowPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DownArrowPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(_DownArrowPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 /// Draws a dashed (dotted) rounded-rectangle outline over its child — used to
@@ -238,8 +240,9 @@ class _DashedBorderPainter extends CustomPainter {
     for (final metric in source.computeMetrics()) {
       var distance = 0.0;
       while (distance < metric.length) {
-        final len =
-            distance + dash < metric.length ? dash : metric.length - distance;
+        final len = distance + dash < metric.length
+            ? dash
+            : metric.length - distance;
         dest.addPath(metric.extractPath(distance, distance + len), Offset.zero);
         distance += dash + gap;
       }

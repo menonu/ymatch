@@ -45,7 +45,8 @@ void main() {
     () async {
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/api/v1/users/1') {
+          if (request.method == 'PUT' &&
+              request.url.path == '/api/v1/users/1') {
             return _ok({'id': 1, 'username': 'alice2', 'uuid': 'u-1'});
           }
           return http.Response('', 200);

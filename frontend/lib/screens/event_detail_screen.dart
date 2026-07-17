@@ -472,7 +472,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                     return Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(groupDisplayName(name, groupByName)),
+                                        Text(
+                                          groupDisplayName(name, groupByName),
+                                        ),
                                         const SizedBox(width: 4),
                                         GestureDetector(
                                           onTap: user == null

@@ -25,7 +25,8 @@ void main() {
       expect(
         fontFamily,
         'NotoSansJP',
-        reason: 'Expected "NotoSansJP" (the family name registered in '
+        reason:
+            'Expected "NotoSansJP" (the family name registered in '
             'pubspec.yaml and loaded by CanvasKit from the asset bundle)',
       );
     });
@@ -53,7 +54,8 @@ void main() {
         expect(
           family,
           family.trim(),
-          reason: 'fontFamilyFallback entry "$family" has leading/trailing '
+          reason:
+              'fontFamilyFallback entry "$family" has leading/trailing '
               'whitespace — this breaks CSS generic-family resolution',
         );
       }

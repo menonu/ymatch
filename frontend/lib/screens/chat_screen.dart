@@ -68,9 +68,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.listen<AsyncValue<void>>(chatControllerProvider, (previous, next) {
       if (!next.hasError) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.failedToSend(next.error.toString())),
-        ),
+        SnackBar(content: Text(l10n.failedToSend(next.error.toString()))),
       );
     });
 

@@ -29,7 +29,12 @@ class AppTheme {
       // on every platform, avoiding 中華フォント (Chinese-style glyphs) on
       // Android browsers without a Japanese system font.
       fontFamily: 'NotoSansJP',
-      fontFamilyFallback: const ['Yu Gothic', 'Hiragino Sans', 'Meiryo', 'sans-serif'],
+      fontFamilyFallback: const [
+        'Yu Gothic',
+        'Hiragino Sans',
+        'Meiryo',
+        'sans-serif',
+      ],
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         primary: primaryColor,

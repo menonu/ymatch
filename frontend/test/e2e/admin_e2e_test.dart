@@ -134,64 +134,85 @@ void main() {
     return (userId: userId, eventId: eventId, merchId: merchId);
   }
 
-  test('adminMerchProvider GETs /api/v1/admin/merch and returns a list',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'adminMerchProvider GETs /api/v1/admin/merch and returns a list',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final items = await container.read(adminMerchProvider.future);
-    expect(items, isA<List>(),
-        reason: 'adminMerchProvider should return a list');
-  });
+      final items = await container.read(adminMerchProvider.future);
+      expect(
+        items,
+        isA<List>(),
+        reason: 'adminMerchProvider should return a list',
+      );
+    },
+  );
 
-  test('adminMatchesProvider GETs /api/v1/admin/matches and returns a list',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'adminMatchesProvider GETs /api/v1/admin/matches and returns a list',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final matches = await container.read(adminMatchesProvider.future);
-    expect(matches, isA<List>(),
-        reason: 'adminMatchesProvider should return a list');
-  });
+      final matches = await container.read(adminMatchesProvider.future);
+      expect(
+        matches,
+        isA<List>(),
+        reason: 'adminMatchesProvider should return a list',
+      );
+    },
+  );
 
-  test('adminUsersProvider GETs /api/v1/users and returns a list',
-      () async {
+  test('adminUsersProvider GETs /api/v1/users and returns a list', () async {
     final container = makeContainer();
     addTearDown(container.dispose);
 
     final users = await container.read(adminUsersProvider.future);
-    expect(users, isA<List>(),
-        reason: 'adminUsersProvider should return a list');
+    expect(
+      users,
+      isA<List>(),
+      reason: 'adminUsersProvider should return a list',
+    );
   });
 
-  test('AdminController.banUser bans and unbanUser unbans the target',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'AdminController.banUser bans and unbanUser unbans the target',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final targetId = await createRegularUser();
+      final targetId = await createRegularUser();
 
-    await container
-        .read(adminControllerProvider.notifier)
-        .banUser(targetId, adminUserId, reason: 'e2e test ban');
+      await container
+          .read(adminControllerProvider.notifier)
+          .banUser(targetId, adminUserId, reason: 'e2e test ban');
 
-    final banned =
-        await api.get('/api/v1/admin/users/$targetId?user_id=$adminUserId');
-    expect((banned as Map)['isBanned'], isTrue,
-        reason: 'target user should be banned');
+      final banned = await api.get(
+        '/api/v1/admin/users/$targetId?user_id=$adminUserId',
+      );
+      expect(
+        (banned as Map)['isBanned'],
+        isTrue,
+        reason: 'target user should be banned',
+      );
 
-    await container
-        .read(adminControllerProvider.notifier)
-        .unbanUser(targetId, adminUserId);
+      await container
+          .read(adminControllerProvider.notifier)
+          .unbanUser(targetId, adminUserId);
 
-    final unbanned =
-        await api.get('/api/v1/admin/users/$targetId?user_id=$adminUserId');
-    expect((unbanned as Map)['isBanned'], isFalse,
-        reason: 'target user should be unbanned');
-  });
+      final unbanned = await api.get(
+        '/api/v1/admin/users/$targetId?user_id=$adminUserId',
+      );
+      expect(
+        (unbanned as Map)['isBanned'],
+        isFalse,
+        reason: 'target user should be unbanned',
+      );
+    },
+  );
 
-  test('AdminController.updateUserRole changes the target role',
-      () async {
+  test('AdminController.updateUserRole changes the target role', () async {
     final container = makeContainer();
     addTearDown(container.dispose);
 
@@ -201,54 +222,57 @@ void main() {
         .read(adminControllerProvider.notifier)
         .updateUserRole(targetId, adminUserId, 'moderator');
 
-    final updated =
-        await api.get('/api/v1/admin/users/$targetId?user_id=$adminUserId');
+    final updated = await api.get(
+      '/api/v1/admin/users/$targetId?user_id=$adminUserId',
+    );
     expect((updated as Map)['role'], 'moderator');
   });
 
   test(
-      'admin dashboard DELETE /api/v1/admin/events/{id} removes the event',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+    'admin dashboard DELETE /api/v1/admin/events/{id} removes the event',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    // Use an event with no merch so the DB FK on merchandise doesn't
-    // block the delete.
-    final ids = await createEventOnly();
+      // Use an event with no merch so the DB FK on merchandise doesn't
+      // block the delete.
+      final ids = await createEventOnly();
 
-    // Same direct delete the admin dashboard screen uses.
-    await api.delete(
-      '/api/v1/admin/events/${ids.eventId}?user_id=$adminUserId',
-    );
+      // Same direct delete the admin dashboard screen uses.
+      await api.delete(
+        '/api/v1/admin/events/${ids.eventId}?user_id=$adminUserId',
+      );
 
-    // Verify the event is gone via the public events list.
-    final allEvents = (await api.get('/api/v1/events') as List)
-        .cast<Map<String, dynamic>>();
-    expect(
-      allEvents.any((e) => e['id'] == ids.eventId),
-      isFalse,
-      reason: 'event should be deleted',
-    );
-  });
+      // Verify the event is gone via the public events list.
+      final allEvents = (await api.get('/api/v1/events') as List)
+          .cast<Map<String, dynamic>>();
+      expect(
+        allEvents.any((e) => e['id'] == ids.eventId),
+        isFalse,
+        reason: 'event should be deleted',
+      );
+    },
+  );
 
   test(
-      'admin dashboard DELETE /api/v1/admin/merch/{id} removes the merch',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+    'admin dashboard DELETE /api/v1/admin/merch/{id} removes the merch',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final ids = await createEventAndMerch();
+      final ids = await createEventAndMerch();
 
-    await api.delete(
-      '/api/v1/admin/merch/${ids.merchId}?user_id=$adminUserId',
-    );
+      await api.delete(
+        '/api/v1/admin/merch/${ids.merchId}?user_id=$adminUserId',
+      );
 
-    final allMerch = await api.get('/api/v1/admin/merch');
-    final merchList = (allMerch as List).cast<Map<String, dynamic>>();
-    expect(
-      merchList.any((m) => m['id'] == ids.merchId),
-      isFalse,
-      reason: 'merch should be deleted',
-    );
-  });
+      final allMerch = await api.get('/api/v1/admin/merch');
+      final merchList = (allMerch as List).cast<Map<String, dynamic>>();
+      expect(
+        merchList.any((m) => m['id'] == ids.merchId),
+        isFalse,
+        reason: 'merch should be deleted',
+      );
+    },
+  );
 }

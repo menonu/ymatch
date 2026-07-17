@@ -218,131 +218,139 @@ void main() {
   test(
     'end-to-end: full trade lifecycle through real ApiClient (#202 regression)',
     () async {
-    final made = _apiWithRecorder();
-    final api = made.api;
-    final recorder = made.recorder;
-    final helper = _ApiWithStatus(api, recorder);
+      final made = _apiWithRecorder();
+      final api = made.api;
+      final recorder = made.recorder;
+      final helper = _ApiWithStatus(api, recorder);
 
-    // 1. Wait for the backend to be reachable.
-    final ready = await _waitForBackend(api);
-    expect(ready, isTrue, reason: 'Backend not reachable at $_baseUrl');
+      // 1. Wait for the backend to be reachable.
+      final ready = await _waitForBackend(api);
+      expect(ready, isTrue, reason: 'Backend not reachable at $_baseUrl');
 
-    // 2. The event + merch are created by the seeded moderator (the only
-    //    actor that passes the `event.create` / `merch.create` gates); two
-    //    FRESH guests cross-trade them, so the match forms between the
-    //    distinct-per-file guests (race-free under concurrent e2e files).
-    final modId = await loginE2EModerator(api);
-    final eventId = await _createEvent(
-      api,
-      name: 'E2E event ${DateTime.now().millisecondsSinceEpoch}',
-      creatorId: modId,
-    );
-    final cardA = await _createMerch(
-      api,
-      eventId: eventId,
-      name: 'Card A',
-      creatorId: modId,
-      groupName: 'e2e-cards',
-    );
-    final cardB = await _createMerch(
-      api,
-      eventId: eventId,
-      name: 'Card B',
-      creatorId: modId,
-      groupName: 'e2e-cards',
-    );
-    final u1Id = await _guestLogin(api);
-    final u2Id = await _guestLogin(api);
-    expect(u1Id, isNot(u2Id));
+      // 2. The event + merch are created by the seeded moderator (the only
+      //    actor that passes the `event.create` / `merch.create` gates); two
+      //    FRESH guests cross-trade them, so the match forms between the
+      //    distinct-per-file guests (race-free under concurrent e2e files).
+      final modId = await loginE2EModerator(api);
+      final eventId = await _createEvent(
+        api,
+        name: 'E2E event ${DateTime.now().millisecondsSinceEpoch}',
+        creatorId: modId,
+      );
+      final cardA = await _createMerch(
+        api,
+        eventId: eventId,
+        name: 'Card A',
+        creatorId: modId,
+        groupName: 'e2e-cards',
+      );
+      final cardB = await _createMerch(
+        api,
+        eventId: eventId,
+        name: 'Card B',
+        creatorId: modId,
+        groupName: 'e2e-cards',
+      );
+      final u1Id = await _guestLogin(api);
+      final u2Id = await _guestLogin(api);
+      expect(u1Id, isNot(u2Id));
 
-    // 4. Set up the cross-trade inventory. The auto-matcher
-    //    (backend/src/matching.rs) looks for users with status
-    //    'TRADE' (what they offer) and 'WANT' (what they're looking
-    //    for). 'HAVE' is for items the user keeps; the matcher
-    //    ignores them.
-    //    user1: TRADEs Card A, WANTs Card B.
-    //    user2: TRADEs Card B, WANTs Card A.
-    await _setInventory(api, userId: u1Id, merchId: cardA, status: 'TRADE');
-    await _setInventory(api, userId: u1Id, merchId: cardB, status: 'WANT');
-    await _setInventory(api, userId: u2Id, merchId: cardB, status: 'TRADE');
-    await _setInventory(api, userId: u2Id, merchId: cardA, status: 'WANT');
+      // 4. Set up the cross-trade inventory. The auto-matcher
+      //    (backend/src/matching.rs) looks for users with status
+      //    'TRADE' (what they offer) and 'WANT' (what they're looking
+      //    for). 'HAVE' is for items the user keeps; the matcher
+      //    ignores them.
+      //    user1: TRADEs Card A, WANTs Card B.
+      //    user2: TRADEs Card B, WANTs Card A.
+      await _setInventory(api, userId: u1Id, merchId: cardA, status: 'TRADE');
+      await _setInventory(api, userId: u1Id, merchId: cardB, status: 'WANT');
+      await _setInventory(api, userId: u2Id, merchId: cardB, status: 'TRADE');
+      await _setInventory(api, userId: u2Id, merchId: cardA, status: 'WANT');
 
-    // 5. Wait for the auto-matcher to produce a PENDING match.
-    final matchId = await _waitForPendingMatch(
-      api,
-      userId: u1Id,
-      eventId: eventId,
-    );
-    expect(matchId, isPositive);
+      // 5. Wait for the auto-matcher to produce a PENDING match.
+      final matchId = await _waitForPendingMatch(
+        api,
+        userId: u1Id,
+        eventId: eventId,
+      );
+      expect(matchId, isPositive);
 
-    // 6. THE #202 REGRESSION CHECK: submit an offer using the EXACT
-    //    shape the Flutter app sends. We use the generated proto
-    //    message's `toProto3Json()` (camelCase) so any future
-    //    backend casing regression is caught.
-    //    Legs are absolute (#297): each leg is (giverUserId, merchId,
-    //    quantity). u1 gives Card A (giverUserId = u1Id); u1 receives
-    //    Card B, i.e. u2 gives it (giverUserId = u2Id). One-for-one is
-    //    balanced, so the non-proposer (u2) can accept.
-    final offerReq = pb.OfferTradeRequest(
-      userId: u1Id,
-      items: [
-        pb.OfferItem(merchId: cardA, giverUserId: u1Id, quantity: 1),
-        pb.OfferItem(merchId: cardB, giverUserId: u2Id, quantity: 1),
-      ],
-    );
-    final offerBody = offerReq.toProto3Json() as Map;
+      // 6. THE #202 REGRESSION CHECK: submit an offer using the EXACT
+      //    shape the Flutter app sends. We use the generated proto
+      //    message's `toProto3Json()` (camelCase) so any future
+      //    backend casing regression is caught.
+      //    Legs are absolute (#297): each leg is (giverUserId, merchId,
+      //    quantity). u1 gives Card A (giverUserId = u1Id); u1 receives
+      //    Card B, i.e. u2 gives it (giverUserId = u2Id). One-for-one is
+      //    balanced, so the non-proposer (u2) can accept.
+      final offerReq = pb.OfferTradeRequest(
+        userId: u1Id,
+        items: [
+          pb.OfferItem(merchId: cardA, giverUserId: u1Id, quantity: 1),
+          pb.OfferItem(merchId: cardB, giverUserId: u2Id, quantity: 1),
+        ],
+      );
+      final offerBody = offerReq.toProto3Json() as Map;
 
-    //    Sanity-check: the keys are camelCase. If the proto compiler
-    //    ever flips to snake_case (or the frontend's toProto3Json()
-    //    implementation changes), this assertion will fail.
-    expect(offerBody.keys, containsAll(['userId', 'items']));
-    final firstItem = (offerBody['items'] as List).first as Map;
-    expect(firstItem.keys, containsAll(['merchId', 'giverUserId', 'quantity']));
+      //    Sanity-check: the keys are camelCase. If the proto compiler
+      //    ever flips to snake_case (or the frontend's toProto3Json()
+      //    implementation changes), this assertion will fail.
+      expect(offerBody.keys, containsAll(['userId', 'items']));
+      final firstItem = (offerBody['items'] as List).first as Map;
+      expect(
+        firstItem.keys,
+        containsAll(['merchId', 'giverUserId', 'quantity']),
+      );
 
-    //    Cast to typed map for the API client.
-    final offerBodyTyped = Map<String, dynamic>.from(offerBody);
+      //    Cast to typed map for the API client.
+      final offerBodyTyped = Map<String, dynamic>.from(offerBody);
 
-    //    Send the offer. This is the request that 422'd in #202.
-    //    helper._post throws if the backend returns non-2xx; the
-    //    status check below then confirms 200.
-    final offerStatus = await helper._post(
-      '/api/v1/matches/$matchId/offer',
-      offerBodyTyped,
-    );
-    expect(offerStatus, 200,
+      //    Send the offer. This is the request that 422'd in #202.
+      //    helper._post throws if the backend returns non-2xx; the
+      //    status check below then confirms 200.
+      final offerStatus = await helper._post(
+        '/api/v1/matches/$matchId/offer',
+        offerBodyTyped,
+      );
+      expect(
+        offerStatus,
+        200,
         reason:
-            'offer should succeed; a 422 here means the #202 regression has returned');
+            'offer should succeed; a 422 here means the #202 regression has returned',
+      );
 
-    // 7. The OTHER user accepts the offer. The status endpoint is
-    //    POST /api/v1/matches/:id/status (not PUT), so use _post.
-    //    #297: accept must come from the non-proposer (u2, since u1
-    //    opened the offer) and the proposal must be balanced — the
-    //    one-for-one legs above satisfy both. The body carries
-    //    `userId` for authorization (UpdateMatchStatusRequest.user_id).
-    final acceptStatus = await helper._post(
-      '/api/v1/matches/$matchId/status',
-      {'status': 'ACCEPTED', 'userId': u2Id},
-    );
-    expect(acceptStatus, 200);
+      // 7. The OTHER user accepts the offer. The status endpoint is
+      //    POST /api/v1/matches/:id/status (not PUT), so use _post.
+      //    #297: accept must come from the non-proposer (u2, since u1
+      //    opened the offer) and the proposal must be balanced — the
+      //    one-for-one legs above satisfy both. The body carries
+      //    `userId` for authorization (UpdateMatchStatusRequest.user_id).
+      final acceptStatus = await helper._post(
+        '/api/v1/matches/$matchId/status',
+        {'status': 'ACCEPTED', 'userId': u2Id},
+      );
+      expect(acceptStatus, 200);
 
-    // 8. Mark the trade COMPLETED. The state machine allows
-    //    ACCEPTED → COMPLETED (one transition); a second COMPLETED
-    //    would be rejected with "Can only complete ACCEPTED matches".
-    //    Either user can drive this transition.
-    final complete = await helper._post(
-      '/api/v1/matches/$matchId/status',
-      {'status': 'COMPLETED', 'userId': u1Id},
-    );
-    expect(complete, 200);
+      // 8. Mark the trade COMPLETED. The state machine allows
+      //    ACCEPTED → COMPLETED (one transition); a second COMPLETED
+      //    would be rejected with "Can only complete ACCEPTED matches".
+      //    Either user can drive this transition.
+      final complete = await helper._post('/api/v1/matches/$matchId/status', {
+        'status': 'COMPLETED',
+        'userId': u1Id,
+      });
+      expect(complete, 200);
 
-    // 9. Each user applies the inventory delta. This is the
-    //    "trade actually happened" step. The apply endpoint
-    //    requires the requester's user_id; only user1 or user2
-    //    of the match can apply.
-    final apply1 = await helper._post(
-      '/api/v1/matches/$matchId/apply-inventory',
-      {'userId': u1Id},
-    );
-    expect(apply1, 200);
-  }, timeout: const Timeout(Duration(minutes: 2)));
+      // 9. Each user applies the inventory delta. This is the
+      //    "trade actually happened" step. The apply endpoint
+      //    requires the requester's user_id; only user1 or user2
+      //    of the match can apply.
+      final apply1 = await helper._post(
+        '/api/v1/matches/$matchId/apply-inventory',
+        {'userId': u1Id},
+      );
+      expect(apply1, 200);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 }

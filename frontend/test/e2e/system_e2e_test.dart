@@ -39,33 +39,37 @@ Future<bool> _waitForBackend(ApiClient api) async {
 }
 
 void main() {
-  test('GET /api/v1/system/status returns backend_version + resources', () async {
-    final api = _api();
+  test(
+    'GET /api/v1/system/status returns backend_version + resources',
+    () async {
+      final api = _api();
 
-    final ready = await _waitForBackend(api);
-    expect(
-      ready,
-      isTrue,
-      reason: 'Backend not reachable; start the e2e stack first',
-    );
+      final ready = await _waitForBackend(api);
+      expect(
+        ready,
+        isTrue,
+        reason: 'Backend not reachable; start the e2e stack first',
+      );
 
-    final r = await api.get('/api/v1/system/status');
-    expect(r, isA<Map>(), reason: 'status response should be a JSON object');
+      final r = await api.get('/api/v1/system/status');
+      expect(r, isA<Map>(), reason: 'status response should be a JSON object');
 
-    final map = r as Map;
-    expect(
-      map['backend_version'],
-      isA<String>(),
-      reason: 'backend_version must be present and a string',
-    );
-    expect(
-      map['backend_version']!.isNotEmpty,
-      isTrue,
-      reason: 'backend_version must not be empty',
-    );
-    // resources is optional; if present, must be a Map.
-    if (map.containsKey('resources')) {
-      expect(map['resources'], anyOf(isNull, isA<Map>()));
-    }
-  }, timeout: const Timeout(Duration(minutes: 1)));
+      final map = r as Map;
+      expect(
+        map['backend_version'],
+        isA<String>(),
+        reason: 'backend_version must be present and a string',
+      );
+      expect(
+        map['backend_version']!.isNotEmpty,
+        isTrue,
+        reason: 'backend_version must not be empty',
+      );
+      // resources is optional; if present, must be a Map.
+      if (map.containsKey('resources')) {
+        expect(map['resources'], anyOf(isNull, isA<Map>()));
+      }
+    },
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
 }
