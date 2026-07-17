@@ -16,7 +16,7 @@ class MapPickerScreen extends StatefulWidget {
     this.initialLocation = DefaultLocationService.defaultCenter,
   });
 
-  /// When null, a [DefaultLocationService] is created.
+  /// When null, a [DefaultLocationService] is created (owned by this screen).
   final LocationService? locationService;
 
   /// Initial map center and pin (defaults to Tokyo).
@@ -27,7 +27,8 @@ class MapPickerScreen extends StatefulWidget {
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
-  late final LocationService _locationService;
+  LocationService? _ownedLocationService;
+  late LocationService _locationService;
   late final MapController _mapController;
   late final TextEditingController _searchController;
 
@@ -37,21 +38,42 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _locating = false;
   bool _mapReady = false;
 
+  /// When set, camera moves here once the map reports ready (or immediately
+  /// if already ready). Avoids leaving the pin off-screen after a fast GPS
+  /// / search result before [onMapReady].
+  LatLng? _pendingCameraTarget;
+
   static const double _pickZoom = 15.0;
 
   @override
   void initState() {
     super.initState();
-    _locationService = widget.locationService ?? DefaultLocationService();
+    if (widget.locationService != null) {
+      _locationService = widget.locationService!;
+    }
     _mapController = MapController();
     _searchController = TextEditingController();
     _selectedLocation = widget.initialLocation;
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Injected service is already set in initState; owned default waits for
+    // locale so Nominatim Accept-Language matches the UI language.
+    if (widget.locationService != null || _ownedLocationService != null) {
+      return;
+    }
+    final lang = Localizations.localeOf(context).languageCode;
+    _ownedLocationService = DefaultLocationService(acceptLanguage: lang);
+    _locationService = _ownedLocationService!;
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _mapController.dispose();
+    _ownedLocationService?.dispose();
     super.dispose();
   }
 
@@ -59,8 +81,21 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     setState(() {
       _selectedLocation = point;
     });
-    if (moveCamera && _mapReady) {
+    if (!moveCamera) return;
+    if (_mapReady) {
       _mapController.move(point, _pickZoom);
+      _pendingCameraTarget = null;
+    } else {
+      _pendingCameraTarget = point;
+    }
+  }
+
+  void _onMapReady() {
+    _mapReady = true;
+    final pending = _pendingCameraTarget;
+    if (pending != null) {
+      _mapController.move(pending, _pickZoom);
+      _pendingCameraTarget = null;
     }
   }
 
@@ -173,9 +208,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             options: MapOptions(
               initialCenter: _selectedLocation,
               initialZoom: 13.0,
-              onMapReady: () {
-                _mapReady = true;
-              },
+              onMapReady: _onMapReady,
               onTap: (tapPosition, point) {
                 setState(() {
                   _selectedLocation = point;

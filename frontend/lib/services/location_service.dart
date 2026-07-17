@@ -39,6 +39,9 @@ abstract class LocationService {
 
   /// Geocode [query] into place suggestions (empty list when nothing matches).
   Future<List<PlaceSuggestion>> searchPlaces(String query);
+
+  /// Release owned resources (e.g. HTTP clients). Safe to call multiple times.
+  void dispose() {}
 }
 
 /// Production [LocationService]: `geolocator` + OpenStreetMap Nominatim.
@@ -51,14 +54,22 @@ class DefaultLocationService implements LocationService {
     this.userAgent =
         'ymatch/1.0 (merchandise trade; https://github.com/menonu/ymatch)',
     this.acceptLanguage = 'en',
-  }) : _httpClient = httpClient ?? http.Client();
+  }) : _ownsHttpClient = httpClient == null,
+       _httpClient = httpClient ?? http.Client();
 
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
   final String userAgent;
+
+  /// BCP 47 language tag for Nominatim `Accept-Language` (e.g. `en`, `ja`).
   final String acceptLanguage;
+
+  bool _disposed = false;
 
   /// Tokyo city-hall area — same default as the original map picker.
   static const LatLng defaultCenter = LatLng(35.6895, 139.6917);
+
+  static const Duration _gpsTimeout = Duration(seconds: 15);
 
   @override
   Future<LatLng> getCurrentPosition() async {
@@ -80,11 +91,10 @@ class DefaultLocationService implements LocationService {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: _gpsTimeout,
         ),
       );
       return LatLng(position.latitude, position.longitude);
-    } on LocationException {
-      rethrow;
     } catch (e) {
       throw LocationException(LocationErrorKind.unavailable, e.toString());
     }
@@ -138,6 +148,15 @@ class DefaultLocationService implements LocationService {
       rethrow;
     } catch (e) {
       throw LocationException(LocationErrorKind.searchFailed, e.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    if (_ownsHttpClient) {
+      _httpClient.close();
     }
   }
 }

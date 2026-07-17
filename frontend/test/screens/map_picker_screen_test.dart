@@ -41,6 +41,9 @@ class _FakeLocationService implements LocationService {
     if (searchError != null) throw searchError!;
     return searchResults;
   }
+
+  @override
+  void dispose() {}
 }
 
 Widget _wrap(Widget child) => MaterialApp(
