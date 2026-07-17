@@ -696,4 +696,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roleEditor => 'editor';
+
+  @override
+  String get mapPickerTitle => 'Pick location';
+
+  @override
+  String get mapSearchHint => 'Search place or address';
+
+  @override
+  String get mapMyLocationTooltip => 'Use my current location';
+
+  @override
+  String get mapLocationPermissionDenied =>
+      'Location permission denied. Enable it in settings to use your position.';
+
+  @override
+  String get mapLocationServiceDisabled =>
+      'Location services are turned off on this device.';
+
+  @override
+  String get mapLocationUnavailable => 'Could not get your current location.';
+
+  @override
+  String get mapSearchNoResults => 'No places found for that search.';
+
+  @override
+  String get mapSearchFailed => 'Place search failed. Try again.';
 }

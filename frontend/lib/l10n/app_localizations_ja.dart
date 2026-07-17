@@ -689,4 +689,28 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get roleEditor => '編集者';
+
+  @override
+  String get mapPickerTitle => '場所を選択';
+
+  @override
+  String get mapSearchHint => '場所や住所を検索';
+
+  @override
+  String get mapMyLocationTooltip => '現在地を使う';
+
+  @override
+  String get mapLocationPermissionDenied => '位置情報の許可が拒否されました。設定から有効にしてください。';
+
+  @override
+  String get mapLocationServiceDisabled => 'この端末の位置情報サービスがオフです。';
+
+  @override
+  String get mapLocationUnavailable => '現在地を取得できませんでした。';
+
+  @override
+  String get mapSearchNoResults => '該当する場所が見つかりませんでした。';
+
+  @override
+  String get mapSearchFailed => '場所の検索に失敗しました。もう一度お試しください。';
 }

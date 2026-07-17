@@ -222,5 +222,14 @@
   "confirmTransferCreatorAction": "譲渡する",
   "pickEditorTitle": "イベント編集者を追加",
   "roleCreator": "作成者",
-  "roleEditor": "編集者"
+  "roleEditor": "編集者",
+
+  "mapPickerTitle": "場所を選択",
+  "mapSearchHint": "場所や住所を検索",
+  "mapMyLocationTooltip": "現在地を使う",
+  "mapLocationPermissionDenied": "位置情報の許可が拒否されました。設定から有効にしてください。",
+  "mapLocationServiceDisabled": "この端末の位置情報サービスがオフです。",
+  "mapLocationUnavailable": "現在地を取得できませんでした。",
+  "mapSearchNoResults": "該当する場所が見つかりませんでした。",
+  "mapSearchFailed": "場所の検索に失敗しました。もう一度お試しください。"
 }

@@ -113,7 +113,10 @@ BottomNavBar
 
 - Full-screen `FlutterMap` (OpenStreetMap tiles)
 - Tap to place marker
+- Place/address search (OSM Nominatim) — selecting a result moves pin + camera
+- "My location" control — device GPS (permission-gated); snackbar on denial/failure
 - "Confirm" button returns `LatLng`
+- Default center: Tokyo when GPS is unavailable
 
 ### ProfileScreen
 
