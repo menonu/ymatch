@@ -311,12 +311,13 @@ ssh -i ~/.ssh/oci_ymatch_v3 ubuntu@$(terraform output -raw instance_v2_public_ip
 
 ## Image Storage
 
-On OCI, images use **local storage** (`IMAGE_STORAGE=local`):
+On OCI, images use **local storage** only (`UPLOAD_DIR`, volume `uploads`):
 - Stored in Docker volume `uploads`
 - Served at `https://<IP>.nip.io/uploads/<uuid>.<ext>`
 - Caddy proxies `/uploads/*` to the backend
 
-This differs from the GCP deployment which uses Google Cloud Storage.
+Compose may still set `IMAGE_STORAGE=local` for clarity; other values are
+ignored (Firebase/GCS image storage was removed — #458).
 
 ## Differences from GCP Deployment
 

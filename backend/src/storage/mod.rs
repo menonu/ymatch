@@ -1,7 +1,5 @@
-mod firebase;
 mod local;
 
-pub use firebase::FirebaseStorage;
 pub use local::LocalFileStorage;
 
 use std::pin::Pin;
@@ -49,23 +47,16 @@ impl std::fmt::Display for StorageError {
 
 impl std::error::Error for StorageError {}
 
-/// Build an ImageStorage backend based on the IMAGE_STORAGE env var.
-pub async fn create_storage() -> Arc<dyn ImageStorage> {
-    let backend = std::env::var("IMAGE_STORAGE").unwrap_or_else(|_| "local".to_string());
-    match backend.as_str() {
-        "firebase" => {
-            let bucket = std::env::var("FIREBASE_STORAGE_BUCKET")
-                .expect("FIREBASE_STORAGE_BUCKET must be set when IMAGE_STORAGE=firebase");
-            Arc::new(
-                FirebaseStorage::new(bucket)
-                    .await
-                    .expect("Failed to initialize Firebase Storage"),
-            )
-        }
-        _ => {
-            let upload_dir =
-                std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-            Arc::new(LocalFileStorage::new(upload_dir))
-        }
+/// Build the local image storage backend.
+///
+/// Reads `UPLOAD_DIR` (default `./uploads`). Only local filesystem storage is
+/// supported; a former Firebase/GCS path was removed (issue #458).
+pub fn create_storage() -> Arc<dyn ImageStorage> {
+    if let Ok(backend) = std::env::var("IMAGE_STORAGE")
+        && backend != "local"
+    {
+        tracing::warn!("IMAGE_STORAGE={backend} is no longer supported; using local storage only");
     }
+    let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    Arc::new(LocalFileStorage::new(upload_dir))
 }

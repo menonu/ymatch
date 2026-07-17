@@ -75,12 +75,14 @@ Negotiation and inventory effects are **not** in the matcher — they live in
 
 ## Image strategy
 
-`ImageStorage` trait with runtime selection:
+`ImageStorage` trait with a single supported backend today:
 
-| `IMAGE_STORAGE` | Backend | Used for |
-|-----------------|---------|----------|
-| `local` (default on OCI compose) | Files under `UPLOAD_DIR`, served as `/uploads/...` | Dev + current prod/staging |
-| Firebase/GCS implementation | Object upload via Google APIs | Optional / legacy path |
+| Backend | Implementation | Used for |
+|---------|----------------|----------|
+| Local files (only) | Files under `UPLOAD_DIR`, served as `/uploads/...` | Dev + current prod/staging |
+
+A former Firebase/GCS path was removed (#458). The trait is kept so a future
+object-store backend can plug in without changing the image HTTP API.
 
 ## Auth strategy
 

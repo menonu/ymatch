@@ -63,9 +63,7 @@ pub async fn delete_image(
     State(storage): State<Arc<dyn ImageStorage>>,
     Path(filename): Path<String>,
 ) -> Result<Json<Value>, AppError> {
-    // Reconstruct a URL-like identifier to pass to the storage backend
-    // For local: the storage will extract filename from the URL
-    // For firebase: we need to reconstruct the full URL
+    // Reconstruct a path-like identifier; LocalFileStorage extracts the filename.
     let url = format!("images/{}", filename);
 
     storage.delete(&url).await?;
