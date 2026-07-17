@@ -67,11 +67,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
         .updateStatus(userId, matchId, newStatus);
   }
 
-  Future<void> _submitOffer(
-    int userId,
-    int matchId,
-    List<OfferItem> items,
-  ) {
+  Future<void> _submitOffer(int userId, int matchId, List<OfferItem> items) {
     return ref
         .read(matchControllerProvider.notifier)
         .submitOffer(userId, matchId, items);
@@ -123,11 +119,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
 
     await ref
         .read(matchControllerProvider.notifier)
-        .applyInventory(
-          userId,
-          matchId,
-          skipHaveDecrement: skipHaveDecrement,
-        );
+        .applyInventory(userId, matchId, skipHaveDecrement: skipHaveDecrement);
     // Success snackbar only; failures are handled by the controller listen.
     if (mounted && !ref.read(matchControllerProvider).hasError) {
       ScaffoldMessenger.of(
@@ -677,9 +669,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                     ? () => _updateStatus(user.id, match.id, 'ACCEPTED')
                     : null,
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: Text(balanced
-                    ? l10n.accept
-                    : l10n.acceptBalanceHint),
+                child: Text(balanced ? l10n.accept : l10n.acceptBalanceHint),
               ),
             ],
           ),
@@ -931,9 +921,8 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                         onToggle: (v) => setDialogState(
                           () => giveOn[item.merchId] = v ?? false,
                         ),
-                        onQty: (q) => setDialogState(
-                          () => giveQty[item.merchId] = q,
-                        ),
+                        onQty: (q) =>
+                            setDialogState(() => giveQty[item.merchId] = q),
                       ),
                     ),
                   ],
@@ -955,9 +944,8 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                         onToggle: (v) => setDialogState(
                           () => receiveOn[item.merchId] = v ?? false,
                         ),
-                        onQty: (q) => setDialogState(
-                          () => receiveQty[item.merchId] = q,
-                        ),
+                        onQty: (q) =>
+                            setDialogState(() => receiveQty[item.merchId] = q),
                       ),
                     ),
                   ],
@@ -1019,9 +1007,7 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           IconButton(
             icon: const Icon(Icons.remove, size: 18),
             visualDensity: VisualDensity.compact,
-            onPressed: selected && qty > 1
-                ? () => onQty(qty - 1)
-                : null,
+            onPressed: selected && qty > 1 ? () => onQty(qty - 1) : null,
           ),
           SizedBox(
             width: 28,

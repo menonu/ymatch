@@ -138,27 +138,26 @@ void main() {
     },
   );
 
-  testWidgets(
-    'LoginScreen virtual Profile tab is disabled — tapping shows '
-    '"Available after login" and does not open the guide (#336)',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [authProvider.overrideWith((ref) => MockAuthController())],
-          child: _localized(const LoginScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('LoginScreen virtual Profile tab is disabled — tapping shows '
+      '"Available after login" and does not open the guide (#336)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [authProvider.overrideWith((ref) => MockAuthController())],
+        child: _localized(const LoginScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Profile'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
 
-      // Tapping the virtual tab tells the user it is available after login…
-      expect(find.text('Available after login'), findsOneWidget);
-      // …and does NOT open the how-to guide.
-      expect(find.text('How to Trade'), findsNothing);
-    },
-  );
+    // Tapping the virtual tab tells the user it is available after login…
+    expect(find.text('Available after login'), findsOneWidget);
+    // …and does NOT open the how-to guide.
+    expect(find.text('How to Trade'), findsNothing);
+  });
 }
 
 class MockAuthController extends StateNotifier<AsyncValue<User?>>

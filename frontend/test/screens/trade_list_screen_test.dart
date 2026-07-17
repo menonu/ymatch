@@ -31,44 +31,43 @@ TradeMatch _pendingMatch() => TradeMatch()
   ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
 void main() {
-  testWidgets(
-    'offer dialog shows no mode switcher and both sections (#303)',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
-          ],
-          child: _localized(const TradeListScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('offer dialog shows no mode switcher and both sections (#303)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: _localized(const TradeListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // The Match tab (default) lists PENDING matches; open the offer dialog.
-      await tester.tap(find.text('Make Offer'));
-      await tester.pumpAndSettle();
+    // The Match tab (default) lists PENDING matches; open the offer dialog.
+    await tester.tap(find.text('Make Offer'));
+    await tester.pumpAndSettle();
 
-      // The 3-mode SegmentedButton is gone (#303).
-      expect(find.byType(SegmentedButton), findsNothing);
+    // The 3-mode SegmentedButton is gone (#303).
+    expect(find.byType(SegmentedButton), findsNothing);
 
-      // A plain-language balance explanation is shown.
-      expect(
-        find.text(
-          'A trade can be completed when the number of items you give and '
-          'receive are balanced.',
-        ),
-        findsOneWidget,
-      );
+    // A plain-language balance explanation is shown.
+    expect(
+      find.text(
+        'A trade can be completed when the number of items you give and '
+        'receive are balanced.',
+      ),
+      findsOneWidget,
+    );
 
-      // Both give and receive sections are always visible (no mode toggle).
-      expect(find.text('Items you give:'), findsOneWidget);
-      expect(find.text('Items you receive:'), findsOneWidget);
-    },
-  );
+    // Both give and receive sections are always visible (no mode toggle).
+    expect(find.text('Items you give:'), findsOneWidget);
+    expect(find.text('Items you receive:'), findsOneWidget);
+  });
 
   testWidgets(
     'offer dialog shows the Japanese balance explanation under ja locale (#303)',
@@ -78,9 +77,9 @@ void main() {
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
           ],
           child: MaterialApp(
             locale: const Locale('ja'),
@@ -97,10 +96,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(SegmentedButton), findsNothing);
-      expect(
-        find.text('渡す数と受け取る数が釣り合っていれば、取引できます。'),
-        findsOneWidget,
-      );
+      expect(find.text('渡す数と受け取る数が釣り合っていれば、取引できます。'), findsOneWidget);
 
       // Both sections always visible under ja too (parity with the EN test).
       expect(find.text('渡すアイテム:'), findsOneWidget);
@@ -116,9 +112,9 @@ void main() {
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
           ],
           child: _localized(const TradeListScreen()),
         ),
@@ -140,9 +136,9 @@ void main() {
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
           ],
           child: _localized(const TradeListScreen()),
         ),
@@ -168,32 +164,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'match card shows the "メッセージ" button under ja locale (#310)',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
-          ],
-          child: MaterialApp(
-            locale: const Locale('ja'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const TradeListScreen(),
-          ),
+  testWidgets('match card shows the "メッセージ" button under ja locale (#310)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [_pendingMatch()]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: MaterialApp(
+          locale: const Locale('ja'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const TradeListScreen(),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('メッセージ'), findsOneWidget);
-      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
-    },
-  );
+    expect(find.text('メッセージ'), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+  });
 
   // #314: a completed match stays conversable — the Message button and card
   // tap remain available on the Done tab, just like on the other tabs.
@@ -206,68 +201,66 @@ void main() {
     ..userHaves.add(_item(10, 'Give Pen', 3, 1))
     ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
-  testWidgets(
-    'completed match card shows the Message button (#314)',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
-          ],
-          child: _localized(const TradeListScreen()),
+  testWidgets('completed match card shows the Message button (#314)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: _localized(const TradeListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Switch to the Done (completed) tab — the only place completed matches
+    // surface. Scope the tab text to the TabBar so the finder stays
+    // unambiguous even if a future l10n string collides with a card label.
+    await tester.tap(
+      find.descendant(of: find.byType(TabBar), matching: find.text('Done')),
+    );
+    await tester.pumpAndSettle();
+
+    // The Message affordance is present on a completed match too (#314).
+    expect(find.text('Message'), findsOneWidget);
+  });
+
+  testWidgets('completed match card shows the メッセージ button under ja (#314)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: MaterialApp(
+          locale: const Locale('ja'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const TradeListScreen(),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Switch to the Done (completed) tab — the only place completed matches
-      // surface. Scope the tab text to the TabBar so the finder stays
-      // unambiguous even if a future l10n string collides with a card label.
-      await tester.tap(
-        find.descendant(of: find.byType(TabBar), matching: find.text('Done')),
-      );
-      await tester.pumpAndSettle();
+    // Under ja, `tabDone` and `statusCompleted` are both "完了", so scope
+    // to the TabBar to avoid matching the status chip on the completed card.
+    await tester.tap(
+      find.descendant(of: find.byType(TabBar), matching: find.text('完了')),
+    );
+    await tester.pumpAndSettle();
 
-      // The Message affordance is present on a completed match too (#314).
-      expect(find.text('Message'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'completed match card shows the メッセージ button under ja (#314)',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
-          ],
-          child: MaterialApp(
-            locale: const Locale('ja'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const TradeListScreen(),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Under ja, `tabDone` and `statusCompleted` are both "完了", so scope
-      // to the TabBar to avoid matching the status chip on the completed card.
-      await tester.tap(
-        find.descendant(of: find.byType(TabBar), matching: find.text('完了')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('メッセージ'), findsOneWidget);
-    },
-  );
+    expect(find.text('メッセージ'), findsOneWidget);
+  });
 
   testWidgets(
     'match screen AppBar has a reload button that refetches matches (#335)',
@@ -284,9 +277,9 @@ void main() {
               matchFetchCount++;
               return matchFetchCount == 1 ? [_pendingMatch()] : const [];
             }),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
           ],
           child: _localized(const TradeListScreen()),
         ),
@@ -331,9 +324,9 @@ void main() {
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
           ],
           child: _localized(const TradeListScreen()),
         ),
@@ -349,32 +342,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'match card shows localized event：group under ja (#322)',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
-          ],
-          child: MaterialApp(
-            locale: const Locale('ja'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const TradeListScreen(),
-          ),
+  testWidgets('match card shows localized event：group under ja (#322)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: MaterialApp(
+          locale: const Locale('ja'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const TradeListScreen(),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Fullwidth colon under ja.
-      expect(find.text('TokyoFest：BoosterBox'), findsOneWidget);
-    },
-  );
+    // Fullwidth colon under ja.
+    expect(find.text('TokyoFest：BoosterBox'), findsOneWidget);
+  });
 
   testWidgets(
     'match card guard: a group without an event renders no label (#322)',
@@ -395,9 +387,9 @@ void main() {
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
             matchesProvider(1).overrideWith((ref) async => [match]),
-            notificationCountsProvider(1).overrideWith(
-              (ref) async => NotificationCounts(),
-            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
           ],
           child: _localized(const TradeListScreen()),
         ),
@@ -412,7 +404,9 @@ void main() {
   );
 }
 
-User _user() => User()..id = 1..username = 'me';
+User _user() => User()
+  ..id = 1
+  ..username = 'me';
 
 class MockAuthController extends StateNotifier<AsyncValue<User?>>
     implements AuthController {

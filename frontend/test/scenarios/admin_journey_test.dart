@@ -213,270 +213,264 @@ void main() {
       },
     );
 
-    testWidgets(
-      'Scenario 2: Draft Event Creation -> Publish',
-      (tester) async {
-        int eventCounter = 1;
-        int merchCounter = 1;
+    testWidgets('Scenario 2: Draft Event Creation -> Publish', (tester) async {
+      int eventCounter = 1;
+      int merchCounter = 1;
 
-        final mockEvents = <Map<String, dynamic>>[];
-        final mockMerch = <Map<String, dynamic>>[];
+      final mockEvents = <Map<String, dynamic>>[];
+      final mockMerch = <Map<String, dynamic>>[];
 
-        final mockClient = MockClient((request) async {
-          final path = request.url.path;
-          final method = request.method;
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
+        final method = request.method;
 
-          if (path == '/api/v1/auth/guest') {
-            return http.Response(
-              jsonEncode({
+        if (path == '/api/v1/auth/guest') {
+          return http.Response(
+            jsonEncode({
+              'id': 1,
+              'username': 'admin_user',
+              'device_token': 'mock-admin-token',
+              'created_at': DateTime.now().toIso8601String(),
+              'role': 'admin',
+              'is_banned': false,
+            }),
+            200,
+          );
+        }
+
+        if (path == '/api/v1/system/status') {
+          return http.Response(
+            jsonEncode({
+              'backend_version': 'test',
+              'resources': {
+                'total_memory_bytes': 8589934592,
+                'used_memory_bytes': 4294967296,
+                'cpu_usage_percent': 25.0,
+                'uptime_seconds': 3600,
+              },
+            }),
+            200,
+          );
+        }
+
+        if (path == '/api/v1/events') {
+          if (method == 'GET') {
+            return http.Response(jsonEncode(mockEvents), 200);
+          } else if (method == 'POST') {
+            final body = jsonDecode(request.body);
+            final newEvent = {
+              'id': eventCounter++,
+              'name': body['name'],
+              'creator_id': body['creator_id'],
+              'created_at': DateTime.now().toIso8601String(),
+              'status': 'draft',
+            };
+            mockEvents.add(newEvent);
+            return http.Response(jsonEncode(newEvent), 200);
+          }
+        }
+
+        // Publish event
+        final publishEventMatch = RegExp(
+          r'^/api/v1/events/(\d+)/publish$',
+        ).firstMatch(path);
+        if (publishEventMatch != null && method == 'POST') {
+          final eventId = int.parse(publishEventMatch.group(1)!);
+          final event = mockEvents.firstWhere((e) => e['id'] == eventId);
+          event['status'] = 'published';
+          return http.Response(jsonEncode(event), 200);
+        }
+
+        // Event merch
+        final merchMatch = RegExp(
+          r'^/api/v1/events/(\d+)/merch$',
+        ).firstMatch(path);
+        if (merchMatch != null) {
+          if (method == 'GET') {
+            return http.Response(jsonEncode(mockMerch), 200);
+          } else if (method == 'POST') {
+            final body = jsonDecode(request.body);
+            final newMerch = {
+              'id': merchCounter++,
+              'event_id': body['event_id'],
+              'name': body['name'],
+              'group_name': body['group_name'] ?? '',
+              'photo_url': body['photo_url'] ?? '',
+              'status': 'draft',
+              'is_deleted': false,
+              'trade_enabled': true,
+              'creator_id': 1,
+            };
+            mockMerch.add(newMerch);
+            return http.Response(jsonEncode(newMerch), 200);
+          }
+        }
+
+        // Publish merch
+        final publishMerchMatch = RegExp(
+          r'^/api/v1/events/(\d+)/merch/(\d+)/publish$',
+        ).firstMatch(path);
+        if (publishMerchMatch != null && method == 'POST') {
+          final merchId = int.parse(publishMerchMatch.group(2)!);
+          final merch = mockMerch.firstWhere((m) => m['id'] == merchId);
+          merch['status'] = 'published';
+          return http.Response(jsonEncode(merch), 200);
+        }
+
+        if (path == '/api/v1/users' && method == 'GET') {
+          return http.Response(
+            jsonEncode([
+              {
                 'id': 1,
                 'username': 'admin_user',
-                'device_token': 'mock-admin-token',
-                'created_at': DateTime.now().toIso8601String(),
                 'role': 'admin',
                 'is_banned': false,
-              }),
-              200,
-            );
-          }
-
-          if (path == '/api/v1/system/status') {
-            return http.Response(
-              jsonEncode({
-                'backend_version': 'test',
-                'resources': {
-                  'total_memory_bytes': 8589934592,
-                  'used_memory_bytes': 4294967296,
-                  'cpu_usage_percent': 25.0,
-                  'uptime_seconds': 3600,
-                },
-              }),
-              200,
-            );
-          }
-
-          if (path == '/api/v1/events') {
-            if (method == 'GET') {
-              return http.Response(jsonEncode(mockEvents), 200);
-            } else if (method == 'POST') {
-              final body = jsonDecode(request.body);
-              final newEvent = {
-                'id': eventCounter++,
-                'name': body['name'],
-                'creator_id': body['creator_id'],
                 'created_at': DateTime.now().toIso8601String(),
-                'status': 'draft',
-              };
-              mockEvents.add(newEvent);
-              return http.Response(jsonEncode(newEvent), 200);
-            }
-          }
+              },
+            ]),
+            200,
+          );
+        }
 
-          // Publish event
-          final publishEventMatch = RegExp(
-            r'^/api/v1/events/(\d+)/publish$',
-          ).firstMatch(path);
-          if (publishEventMatch != null && method == 'POST') {
-            final eventId = int.parse(publishEventMatch.group(1)!);
-            final event = mockEvents.firstWhere((e) => e['id'] == eventId);
-            event['status'] = 'published';
-            return http.Response(jsonEncode(event), 200);
-          }
+        return http.Response('Not Found: $path', 404);
+      });
 
-          // Event merch
-          final merchMatch = RegExp(
-            r'^/api/v1/events/(\d+)/merch$',
-          ).firstMatch(path);
-          if (merchMatch != null) {
-            if (method == 'GET') {
-              return http.Response(jsonEncode(mockMerch), 200);
-            } else if (method == 'POST') {
-              final body = jsonDecode(request.body);
-              final newMerch = {
-                'id': merchCounter++,
-                'event_id': body['event_id'],
-                'name': body['name'],
-                'group_name': body['group_name'] ?? '',
-                'photo_url': body['photo_url'] ?? '',
-                'status': 'draft',
-                'is_deleted': false,
-                'trade_enabled': true,
-                'creator_id': 1,
-              };
-              mockMerch.add(newMerch);
-              return http.Response(jsonEncode(newMerch), 200);
-            }
-          }
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) {
+              final config = ref.watch(configServiceProvider);
+              return ApiClient(config, client: mockClient);
+            }),
+          ],
+          child: const MyApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-          // Publish merch
-          final publishMerchMatch = RegExp(
-            r'^/api/v1/events/(\d+)/merch/(\d+)/publish$',
-          ).firstMatch(path);
-          if (publishMerchMatch != null && method == 'POST') {
-            final merchId = int.parse(publishMerchMatch.group(2)!);
-            final merch = mockMerch.firstWhere((m) => m['id'] == merchId);
-            merch['status'] = 'published';
-            return http.Response(jsonEncode(merch), 200);
-          }
+      // 1. Login as admin
+      await tester.tap(find.text('Start as New User'));
+      await tester.pumpAndSettle();
 
-          if (path == '/api/v1/users' && method == 'GET') {
-            return http.Response(
-              jsonEncode([
-                {
-                  'id': 1,
-                  'username': 'admin_user',
-                  'role': 'admin',
-                  'is_banned': false,
-                  'created_at': DateTime.now().toIso8601String(),
-                },
-              ]),
-              200,
-            );
-          }
+      // 2. Create a draft event via mock backend
+      final createEventResponse = await mockClient.post(
+        Uri.parse('http://localhost:3000/api/v1/events'),
+        body: jsonEncode({'name': 'Draft Comic Con', 'creator_id': 1}),
+      );
+      expect(createEventResponse.statusCode, 200);
+      final createdEvent = jsonDecode(createEventResponse.body);
+      expect(createdEvent['status'], 'draft');
+      expect(createdEvent['name'], 'Draft Comic Con');
 
-          return http.Response('Not Found: $path', 404);
-        });
+      // 3. Publish the event
+      final publishResponse = await mockClient.post(
+        Uri.parse(
+          'http://localhost:3000/api/v1/events/${createdEvent['id']}/publish',
+        ),
+        body: jsonEncode({'user_id': 1}),
+      );
+      expect(publishResponse.statusCode, 200);
+      final publishedEvent = jsonDecode(publishResponse.body);
+      expect(publishedEvent['status'], 'published');
 
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              apiClientProvider.overrideWith((ref) {
-                final config = ref.watch(configServiceProvider);
-                return ApiClient(config, client: mockClient);
-              }),
-            ],
-            child: const MyApp(),
-          ),
-        );
-        await tester.pumpAndSettle();
+      // 4. Create draft merch
+      final createMerchResponse = await mockClient.post(
+        Uri.parse(
+          'http://localhost:3000/api/v1/events/${createdEvent['id']}/merch',
+        ),
+        body: jsonEncode({
+          'event_id': createdEvent['id'],
+          'name': 'Limited Poster',
+        }),
+      );
+      expect(createMerchResponse.statusCode, 200);
+      final createdMerch = jsonDecode(createMerchResponse.body);
+      expect(createdMerch['status'], 'draft');
+      expect(createdMerch['is_deleted'], false);
+      expect(createdMerch['trade_enabled'], true);
+      expect(createdMerch['creator_id'], 1);
 
-        // 1. Login as admin
-        await tester.tap(find.text('Start as New User'));
-        await tester.pumpAndSettle();
+      // 5. Publish the merch
+      final publishMerchResponse = await mockClient.post(
+        Uri.parse(
+          'http://localhost:3000/api/v1/events/${createdEvent['id']}/merch/${createdMerch['id']}/publish',
+        ),
+      );
+      expect(publishMerchResponse.statusCode, 200);
+      final publishedMerch = jsonDecode(publishMerchResponse.body);
+      expect(publishedMerch['status'], 'published');
 
-        // 2. Create a draft event via mock backend
-        final createEventResponse = await mockClient.post(
-          Uri.parse('http://localhost:3000/api/v1/events'),
-          body: jsonEncode({'name': 'Draft Comic Con', 'creator_id': 1}),
-        );
-        expect(createEventResponse.statusCode, 200);
-        final createdEvent = jsonDecode(createEventResponse.body);
-        expect(createdEvent['status'], 'draft');
-        expect(createdEvent['name'], 'Draft Comic Con');
+      // 6. Verify final state
+      expect(mockEvents.length, 1);
+      expect(mockEvents[0]['status'], 'published');
+      expect(mockMerch.length, 1);
+      expect(mockMerch[0]['status'], 'published');
+    });
 
-        // 3. Publish the event
-        final publishResponse = await mockClient.post(
-          Uri.parse(
-            'http://localhost:3000/api/v1/events/${createdEvent['id']}/publish',
-          ),
-          body: jsonEncode({'user_id': 1}),
-        );
-        expect(publishResponse.statusCode, 200);
-        final publishedEvent = jsonDecode(publishResponse.body);
-        expect(publishedEvent['status'], 'published');
+    testWidgets('Scenario 3: Banned user fields in response', (tester) async {
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
 
-        // 4. Create draft merch
-        final createMerchResponse = await mockClient.post(
-          Uri.parse(
-            'http://localhost:3000/api/v1/events/${createdEvent['id']}/merch',
-          ),
-          body: jsonEncode({
-            'event_id': createdEvent['id'],
-            'name': 'Limited Poster',
-          }),
-        );
-        expect(createMerchResponse.statusCode, 200);
-        final createdMerch = jsonDecode(createMerchResponse.body);
-        expect(createdMerch['status'], 'draft');
-        expect(createdMerch['is_deleted'], false);
-        expect(createdMerch['trade_enabled'], true);
-        expect(createdMerch['creator_id'], 1);
+        if (path == '/api/v1/auth/guest') {
+          return http.Response(
+            jsonEncode({
+              'id': 1,
+              'username': 'banned_user',
+              'device_token': 'mock-token',
+              'created_at': DateTime.now().toIso8601String(),
+              'role': 'user',
+              'is_banned': true,
+              'ban_reason': 'Policy violation',
+              'banned_until': '2025-12-31T00:00:00Z',
+            }),
+            200,
+          );
+        }
 
-        // 5. Publish the merch
-        final publishMerchResponse = await mockClient.post(
-          Uri.parse(
-            'http://localhost:3000/api/v1/events/${createdEvent['id']}/merch/${createdMerch['id']}/publish',
-          ),
-        );
-        expect(publishMerchResponse.statusCode, 200);
-        final publishedMerch = jsonDecode(publishMerchResponse.body);
-        expect(publishedMerch['status'], 'published');
+        if (path == '/api/v1/system/status') {
+          return http.Response(
+            jsonEncode({
+              'backend_version': 'test',
+              'resources': {
+                'total_memory_bytes': 8589934592,
+                'used_memory_bytes': 4294967296,
+                'cpu_usage_percent': 25.0,
+                'uptime_seconds': 3600,
+              },
+            }),
+            200,
+          );
+        }
 
-        // 6. Verify final state
-        expect(mockEvents.length, 1);
-        expect(mockEvents[0]['status'], 'published');
-        expect(mockMerch.length, 1);
-        expect(mockMerch[0]['status'], 'published');
-      },
-    );
+        if (path == '/api/v1/events') {
+          return http.Response(jsonEncode([]), 200);
+        }
 
-    testWidgets(
-      'Scenario 3: Banned user fields in response',
-      (tester) async {
-        final mockClient = MockClient((request) async {
-          final path = request.url.path;
+        return http.Response('Not Found: $path', 404);
+      });
 
-          if (path == '/api/v1/auth/guest') {
-            return http.Response(
-              jsonEncode({
-                'id': 1,
-                'username': 'banned_user',
-                'device_token': 'mock-token',
-                'created_at': DateTime.now().toIso8601String(),
-                'role': 'user',
-                'is_banned': true,
-                'ban_reason': 'Policy violation',
-                'banned_until': '2025-12-31T00:00:00Z',
-              }),
-              200,
-            );
-          }
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) {
+              final config = ref.watch(configServiceProvider);
+              return ApiClient(config, client: mockClient);
+            }),
+          ],
+          child: const MyApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-          if (path == '/api/v1/system/status') {
-            return http.Response(
-              jsonEncode({
-                'backend_version': 'test',
-                'resources': {
-                  'total_memory_bytes': 8589934592,
-                  'used_memory_bytes': 4294967296,
-                  'cpu_usage_percent': 25.0,
-                  'uptime_seconds': 3600,
-                },
-              }),
-              200,
-            );
-          }
-
-          if (path == '/api/v1/events') {
-            return http.Response(jsonEncode([]), 200);
-          }
-
-          return http.Response('Not Found: $path', 404);
-        });
-
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              apiClientProvider.overrideWith((ref) {
-                final config = ref.watch(configServiceProvider);
-                return ApiClient(config, client: mockClient);
-              }),
-            ],
-            child: const MyApp(),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        // Verify the banned user response is parsed correctly
-        final response = await mockClient.post(
-          Uri.parse('http://localhost:3000/api/v1/auth/guest'),
-        );
-        final userData = jsonDecode(response.body);
-        expect(userData['is_banned'], true);
-        expect(userData['ban_reason'], 'Policy violation');
-        expect(userData['banned_until'], '2025-12-31T00:00:00Z');
-        expect(userData['role'], 'user');
-      },
-    );
+      // Verify the banned user response is parsed correctly
+      final response = await mockClient.post(
+        Uri.parse('http://localhost:3000/api/v1/auth/guest'),
+      );
+      final userData = jsonDecode(response.body);
+      expect(userData['is_banned'], true);
+      expect(userData['ban_reason'], 'Policy violation');
+      expect(userData['banned_until'], '2025-12-31T00:00:00Z');
+      expect(userData['role'], 'user');
+    });
   });
 }

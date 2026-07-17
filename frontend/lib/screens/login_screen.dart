@@ -57,13 +57,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Text(
                           l10n.appName,
                           textAlign: TextAlign.center,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.indigo,
-                            letterSpacing: -1,
-                          ),
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo,
+                                letterSpacing: -1,
+                              ),
                         ),
                         const SizedBox(height: 8),
                         Text(

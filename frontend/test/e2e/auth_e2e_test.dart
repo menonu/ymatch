@@ -41,8 +41,7 @@ Future<bool> _waitForBackend(ApiClient api) async {
   return false;
 }
 
-String _uniqueUsername() =>
-    'e2e_auth_${DateTime.now().microsecondsSinceEpoch}';
+String _uniqueUsername() => 'e2e_auth_${DateTime.now().microsecondsSinceEpoch}';
 
 void main() {
   // AuthController reads SharedPreferences and Uri.base in its
@@ -73,86 +72,94 @@ void main() {
     );
   }
 
-  test('AuthController.guestLogin posts to /auth/guest and sets the user',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'AuthController.guestLogin posts to /auth/guest and sets the user',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final uuid =
-        'e2e-auth-guest-${DateTime.now().microsecondsSinceEpoch}';
-    await container.read(authProvider.notifier).guestLogin(uuid);
+      final uuid = 'e2e-auth-guest-${DateTime.now().microsecondsSinceEpoch}';
+      await container.read(authProvider.notifier).guestLogin(uuid);
 
-    final state = container.read(authProvider);
-    expect(state.hasValue, isTrue);
-    expect(state.value, isNotNull);
-    expect(state.value!.id, isPositive);
-    expect(state.value!.uuid, uuid);
-  });
+      final state = container.read(authProvider);
+      expect(state.hasValue, isTrue);
+      expect(state.value, isNotNull);
+      expect(state.value!.id, isPositive);
+      expect(state.value!.uuid, uuid);
+    },
+  );
 
-  test('AuthController.signup posts to /auth/signup and sets the user',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'AuthController.signup posts to /auth/signup and sets the user',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final username = _uniqueUsername();
-    await container
-        .read(authProvider.notifier)
-        .signup(username, 'test-password-1234');
+      final username = _uniqueUsername();
+      await container
+          .read(authProvider.notifier)
+          .signup(username, 'test-password-1234');
 
-    final state = container.read(authProvider);
-    expect(state.hasValue, isTrue);
-    expect(state.value, isNotNull);
-    expect(state.value!.username, username);
-  });
+      final state = container.read(authProvider);
+      expect(state.hasValue, isTrue);
+      expect(state.value, isNotNull);
+      expect(state.value!.username, username);
+    },
+  );
 
-  test('AuthController.login posts to /auth/login with the right body',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'AuthController.login posts to /auth/login with the right body',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final username = _uniqueUsername();
-    final password = 'test-password-1234';
+      final username = _uniqueUsername();
+      final password = 'test-password-1234';
 
-    // Signup first (login needs an existing user).
-    await container.read(authProvider.notifier).signup(username, password);
-    final afterSignup = container.read(authProvider).value;
-    expect(afterSignup, isNotNull);
+      // Signup first (login needs an existing user).
+      await container.read(authProvider.notifier).signup(username, password);
+      final afterSignup = container.read(authProvider).value;
+      expect(afterSignup, isNotNull);
 
-    // Now logout (clears state) and login.
-    container.read(authProvider.notifier).logout();
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(container.read(authProvider).value, isNull,
-        reason: 'logout should clear the user');
+      // Now logout (clears state) and login.
+      container.read(authProvider.notifier).logout();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        container.read(authProvider).value,
+        isNull,
+        reason: 'logout should clear the user',
+      );
 
-    await container
-        .read(authProvider.notifier)
-        .login(username, password);
-    final afterLogin = container.read(authProvider);
-    expect(afterLogin.hasValue, isTrue);
-    expect(afterLogin.value, isNotNull);
-    expect(afterLogin.value!.id, afterSignup!.id);
-    expect(afterLogin.value!.username, username);
-  });
+      await container.read(authProvider.notifier).login(username, password);
+      final afterLogin = container.read(authProvider);
+      expect(afterLogin.hasValue, isTrue);
+      expect(afterLogin.value, isNotNull);
+      expect(afterLogin.value!.id, afterSignup!.id);
+      expect(afterLogin.value!.username, username);
+    },
+  );
 
-  test('AuthController.updateUsername Puts to /users/{id} and updates the state',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'AuthController.updateUsername Puts to /users/{id} and updates the state',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    // Use guest login (easiest way to get a userId without signup).
-    final uuid = 'e2e-auth-upd-${DateTime.now().microsecondsSinceEpoch}';
-    await container.read(authProvider.notifier).guestLogin(uuid);
-    final userId = container.read(authProvider).value!.id;
+      // Use guest login (easiest way to get a userId without signup).
+      final uuid = 'e2e-auth-upd-${DateTime.now().microsecondsSinceEpoch}';
+      await container.read(authProvider.notifier).guestLogin(uuid);
+      final userId = container.read(authProvider).value!.id;
 
-    final newUsername = _uniqueUsername();
-    await container
-        .read(authProvider.notifier)
-        .updateUsername(userId, newUsername);
+      final newUsername = _uniqueUsername();
+      await container
+          .read(authProvider.notifier)
+          .updateUsername(userId, newUsername);
 
-    final state = container.read(authProvider);
-    expect(state.hasValue, isTrue);
-    expect(state.value, isNotNull);
-    expect(state.value!.username, newUsername);
-    expect(state.value!.id, userId);
-  });
+      final state = container.read(authProvider);
+      expect(state.hasValue, isTrue);
+      expect(state.value, isNotNull);
+      expect(state.value!.username, newUsername);
+      expect(state.value!.id, userId);
+    },
+  );
 }

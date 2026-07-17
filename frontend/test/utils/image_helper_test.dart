@@ -25,9 +25,13 @@ void main() {
       );
 
       final Image image = tester.widget(find.byType(Image));
-      expect(image.fit, BoxFit.contain,
-          reason: 'Uploaded images must render in full with transparent '
-              'padding, not center-cropped via BoxFit.cover');
+      expect(
+        image.fit,
+        BoxFit.contain,
+        reason:
+            'Uploaded images must render in full with transparent '
+            'padding, not center-cropped via BoxFit.cover',
+      );
     });
 
     testWidgets('explicit fit argument is respected (#329)', (tester) async {

@@ -15,7 +15,9 @@ Widget _localized(Widget child, {Locale? locale}) => MaterialApp(
   home: child,
 );
 
-User _user() => User()..id = 1..username = 'me';
+User _user() => User()
+  ..id = 1
+  ..username = 'me';
 
 void main() {
   testWidgets(
@@ -33,10 +35,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Step 1 references the real bottom-nav tab name (アイテム, not イベント).
-      expect(
-        find.text('アイテムタブを開き、あなたのイベントを見つけます。'),
-        findsOneWidget,
-      );
+      expect(find.text('アイテムタブを開き、あなたのイベントを見つけます。'), findsOneWidget);
 
       // Step 2 uses the in-app status terms (求 / 譲) and never the old
       // HAVE/WANT labels, which do not appear anywhere on the JA screen.

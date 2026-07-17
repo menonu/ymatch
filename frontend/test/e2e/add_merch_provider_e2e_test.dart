@@ -67,9 +67,7 @@ void main() {
 
       // 2. Set up a Riverpod container with the live API client.
       final container = ProviderContainer(
-        overrides: [
-          apiClientProvider.overrideWith((ref) => api),
-        ],
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
       );
       addTearDown(container.dispose);
 
@@ -90,13 +88,7 @@ void main() {
       //    the rethrow propagates here, failing the test).
       await container
           .read(merchControllerProvider.notifier)
-          .addMerch(
-            eventId,
-            'Test merch',
-            '',
-            'e2e-227-group',
-            userId,
-          );
+          .addMerch(eventId, 'Test merch', '', 'e2e-227-group', userId);
 
       // 5. THE ASSERTION: the merch was actually created.
       //    This is what the user sees in the UI (or rather, what

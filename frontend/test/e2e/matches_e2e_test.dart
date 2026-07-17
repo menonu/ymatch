@@ -142,8 +142,11 @@ void main() {
       }
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    expect(matchId, isPositive,
-        reason: 'No PENDING match appeared within 90s — matcher did not run');
+    expect(
+      matchId,
+      isPositive,
+      reason: 'No PENDING match appeared within 90s — matcher did not run',
+    );
   });
 
   ProviderContainer makeContainer() {
@@ -172,72 +175,80 @@ void main() {
     return (m['inventoryApplied'] ?? false) as bool;
   }
 
-  test('matchesProvider GETs /matches/user/{id} and returns the PENDING match',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'matchesProvider GETs /matches/user/{id} and returns the PENDING match',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final matches =
-        await container.read(matchesProvider(user1Id).future);
-    expect(matches, isA<List>());
-    final pending = matches
-        .where((m) => m.id == matchId && m.status == 'PENDING')
-        .toList();
-    expect(pending, hasLength(1),
-        reason: 'setUpAll should have produced a PENDING match visible to '
-            'matchesProvider for user1');
-  });
+      final matches = await container.read(matchesProvider(user1Id).future);
+      expect(matches, isA<List>());
+      final pending = matches
+          .where((m) => m.id == matchId && m.status == 'PENDING')
+          .toList();
+      expect(
+        pending,
+        hasLength(1),
+        reason:
+            'setUpAll should have produced a PENDING match visible to '
+            'matchesProvider for user1',
+      );
+    },
+  );
 
   test(
-      'notificationCountsProvider GETs /matches/user/{id}/counts and returns counts',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+    'notificationCountsProvider GETs /matches/user/{id}/counts and returns counts',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final counts =
-        await container.read(notificationCountsProvider(user1Id).future);
-    // NotificationCounts is a proto message; a non-null value with
-    // pendingMatches >= 1 proves the wire contract is right (the
-    // setUpAll match contributes to the pending count for user1).
-    expect(counts.pendingMatches, greaterThanOrEqualTo(1));
-  });
+      final counts = await container.read(
+        notificationCountsProvider(user1Id).future,
+      );
+      // NotificationCounts is a proto message; a non-null value with
+      // pendingMatches >= 1 proves the wire contract is right (the
+      // setUpAll match contributes to the pending count for user1).
+      expect(counts.pendingMatches, greaterThanOrEqualTo(1));
+    },
+  );
 
   test(
-      'full match lifecycle via MatchController: offer → accept → complete → apply-inventory',
-      () async {
-    // Drive mutations through MatchController so the test locks the
-    // same proto body shapes and invalidation path as trade_list_screen.
-    final container = makeContainer();
-    addTearDown(container.dispose);
-    final controller = container.read(matchControllerProvider.notifier);
+    'full match lifecycle via MatchController: offer → accept → complete → apply-inventory',
+    () async {
+      // Drive mutations through MatchController so the test locks the
+      // same proto body shapes and invalidation path as trade_list_screen.
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(matchControllerProvider.notifier);
 
-    // 1. PENDING → OFFERED
-    await controller.submitOffer(user1Id, matchId, [
-      pb.OfferItem()
-        ..merchId = cardA
-        ..giverUserId = user1Id
-        ..quantity = 1,
-      pb.OfferItem()
-        ..merchId = cardB
-        ..giverUserId = user2Id
-        ..quantity = 1,
-    ]);
-    expect(container.read(matchControllerProvider).hasError, isFalse);
-    expect(await getMatchStatus(matchId), 'OFFERED');
+      // 1. PENDING → OFFERED
+      await controller.submitOffer(user1Id, matchId, [
+        pb.OfferItem()
+          ..merchId = cardA
+          ..giverUserId = user1Id
+          ..quantity = 1,
+        pb.OfferItem()
+          ..merchId = cardB
+          ..giverUserId = user2Id
+          ..quantity = 1,
+      ]);
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      expect(await getMatchStatus(matchId), 'OFFERED');
 
-    // 2. OFFERED → ACCEPTED  (non-proposer accepts)
-    await controller.updateStatus(user2Id, matchId, 'ACCEPTED');
-    expect(container.read(matchControllerProvider).hasError, isFalse);
-    expect(await getMatchStatus(matchId), 'ACCEPTED');
+      // 2. OFFERED → ACCEPTED  (non-proposer accepts)
+      await controller.updateStatus(user2Id, matchId, 'ACCEPTED');
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      expect(await getMatchStatus(matchId), 'ACCEPTED');
 
-    // 3. ACCEPTED → COMPLETED
-    await controller.updateStatus(user1Id, matchId, 'COMPLETED');
-    expect(container.read(matchControllerProvider).hasError, isFalse);
-    expect(await getMatchStatus(matchId), 'COMPLETED');
+      // 3. ACCEPTED → COMPLETED
+      await controller.updateStatus(user1Id, matchId, 'COMPLETED');
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      expect(await getMatchStatus(matchId), 'COMPLETED');
 
-    // 4. Apply inventory
-    await controller.applyInventory(user1Id, matchId);
-    expect(container.read(matchControllerProvider).hasError, isFalse);
-    expect(await getInventoryApplied(matchId), isTrue);
-  });
+      // 4. Apply inventory
+      await controller.applyInventory(user1Id, matchId);
+      expect(container.read(matchControllerProvider).hasError, isFalse);
+      expect(await getInventoryApplied(matchId), isTrue);
+    },
+  );
 }

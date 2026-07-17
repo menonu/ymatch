@@ -87,18 +87,13 @@ void main() {
     );
   }
 
-  Future<int> addMerch(
-    ProviderContainer container,
-    String name,
-  ) async {
+  Future<int> addMerch(ProviderContainer container, String name) async {
     await container
         .read(merchControllerProvider.notifier)
         .addMerch(eventId, name, '', 'e2e-group', userId);
 
     // Find the newly-created merch (the merch provider is cached).
-    final list = await api.get(
-      '/api/v1/events/$eventId/merch?user_id=$userId',
-    );
+    final list = await api.get('/api/v1/events/$eventId/merch?user_id=$userId');
     final merch = (list as List).cast<Map<String, dynamic>>();
     final match = merch.firstWhere(
       (m) => m['name'] == name,
@@ -115,8 +110,7 @@ void main() {
     expect(merch, isA<List>());
   });
 
-  test('addMerch POSTs to /events/{id}/merch and the merch appears',
-      () async {
+  test('addMerch POSTs to /events/{id}/merch and the merch appears', () async {
     final container = makeContainer();
     addTearDown(container.dispose);
 
@@ -125,51 +119,55 @@ void main() {
     expect(merchId, isPositive);
   });
 
-  test('updateMerch PUTs to /events/{id}/merch/{id} and the new name persists',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'updateMerch PUTs to /events/{id}/merch/{id} and the new name persists',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final name = _uniqueName('e2e_merch_update');
-    final merchId = await addMerch(container, name);
+      final name = _uniqueName('e2e_merch_update');
+      final merchId = await addMerch(container, name);
 
-    final updated = '${name}_renamed';
-    await container
-        .read(merchControllerProvider.notifier)
-        .updateMerch(eventId, merchId, userId, name: updated);
+      final updated = '${name}_renamed';
+      await container
+          .read(merchControllerProvider.notifier)
+          .updateMerch(eventId, merchId, userId, name: updated);
 
-    // merchProvider is cached, so verify via direct API.
-    final list = await api.get(
-      '/api/v1/events/$eventId/merch?user_id=$userId',
-    );
-    final merch = (list as List).cast<Map<String, dynamic>>();
-    final renamed = merch.firstWhere(
-      (m) => m['id'] == merchId,
-      orElse: () => throw StateError('merch $merchId not found'),
-    );
-    expect(renamed['name'], updated);
-  });
+      // merchProvider is cached, so verify via direct API.
+      final list = await api.get(
+        '/api/v1/events/$eventId/merch?user_id=$userId',
+      );
+      final merch = (list as List).cast<Map<String, dynamic>>();
+      final renamed = merch.firstWhere(
+        (m) => m['id'] == merchId,
+        orElse: () => throw StateError('merch $merchId not found'),
+      );
+      expect(renamed['name'], updated);
+    },
+  );
 
-  test('deleteMerchByCreator DELETEs /events/{id}/merch/{id} and removes it',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+  test(
+    'deleteMerchByCreator DELETEs /events/{id}/merch/{id} and removes it',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final name = _uniqueName('e2e_merch_delete');
-    final merchId = await addMerch(container, name);
+      final name = _uniqueName('e2e_merch_delete');
+      final merchId = await addMerch(container, name);
 
-    await container
-        .read(merchControllerProvider.notifier)
-        .deleteMerchByCreator(eventId, merchId, userId);
+      await container
+          .read(merchControllerProvider.notifier)
+          .deleteMerchByCreator(eventId, merchId, userId);
 
-    final list = await api.get(
-      '/api/v1/events/$eventId/merch?user_id=$userId',
-    );
-    final merch = (list as List).cast<Map<String, dynamic>>();
-    expect(
-      merch.any((m) => m['id'] == merchId),
-      isFalse,
-      reason: 'merch should be removed after delete',
-    );
-  });
+      final list = await api.get(
+        '/api/v1/events/$eventId/merch?user_id=$userId',
+      );
+      final merch = (list as List).cast<Map<String, dynamic>>();
+      expect(
+        merch.any((m) => m['id'] == merchId),
+        isFalse,
+        reason: 'merch should be removed after delete',
+      );
+    },
+  );
 }

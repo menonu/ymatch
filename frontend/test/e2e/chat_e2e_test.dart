@@ -137,8 +137,11 @@ void main() {
       }
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    expect(matchId, isPositive,
-        reason: 'No PENDING match appeared within 90s — matcher did not run');
+    expect(
+      matchId,
+      isPositive,
+      reason: 'No PENDING match appeared within 90s — matcher did not run',
+    );
   });
 
   ProviderContainer makeContainer() {
@@ -148,38 +151,45 @@ void main() {
   }
 
   test(
-      'messagesProvider GETs /matches/{id}/messages and returns a list',
-      () async {
-    final container = makeContainer();
-    addTearDown(container.dispose);
+    'messagesProvider GETs /matches/{id}/messages and returns a list',
+    () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
 
-    final messages =
-        await container.read(messagesProvider(matchId).future);
-    expect(messages, isA<List>(),
-        reason: 'messagesProvider should return a list for the match');
-  });
+      final messages = await container.read(messagesProvider(matchId).future);
+      expect(
+        messages,
+        isA<List>(),
+        reason: 'messagesProvider should return a list for the match',
+      );
+    },
+  );
 
   test(
-      'ChatController.sendMessage POSTs SendMessageRequest and refreshes messages',
-      () async {
-    // Drive the mutation through ChatController so the test locks the
-    // same proto body shape and invalidation path as chat_screen.
-    final container = makeContainer();
-    addTearDown(container.dispose);
-    final controller = container.read(chatControllerProvider.notifier);
+    'ChatController.sendMessage POSTs SendMessageRequest and refreshes messages',
+    () async {
+      // Drive the mutation through ChatController so the test locks the
+      // same proto body shape and invalidation path as chat_screen.
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(chatControllerProvider.notifier);
 
-    final content = 'e2e_chat_${DateTime.now().microsecondsSinceEpoch}';
+      final content = 'e2e_chat_${DateTime.now().microsecondsSinceEpoch}';
 
-    await controller.sendMessage(matchId, user1Id, content);
-    expect(container.read(chatControllerProvider).hasError, isFalse);
+      await controller.sendMessage(matchId, user1Id, content);
+      expect(container.read(chatControllerProvider).hasError, isFalse);
 
-    // Verify the message appears via the provider (the same GET path
-    // the screen polls every 3 seconds).
-    final messages = await container.read(messagesProvider(matchId).future);
-    final sent = messages
-        .where((m) => m.senderId == user1Id && m.content == content)
-        .toList();
-    expect(sent, hasLength(1),
-        reason: 'the sent message should be visible via messagesProvider');
-  });
+      // Verify the message appears via the provider (the same GET path
+      // the screen polls every 3 seconds).
+      final messages = await container.read(messagesProvider(matchId).future);
+      final sent = messages
+          .where((m) => m.senderId == user1Id && m.content == content)
+          .toList();
+      expect(
+        sent,
+        hasLength(1),
+        reason: 'the sent message should be visible via messagesProvider',
+      );
+    },
+  );
 }
