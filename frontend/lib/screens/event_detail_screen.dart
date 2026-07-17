@@ -1027,90 +1027,109 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
     final isOwner =
         user != null && item.hasCreatorId() && item.creatorId == user.id;
+    final isDeleted = item.hasIsDeleted() && item.isDeleted;
+    final l10n = AppLocalizations.of(context)!;
 
-    return GestureDetector(
-      onLongPress: isOwner ? () => _showMerchActions(context, ref, item) : null,
-      child: Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: buildImage(
-                      item.hasPhotoUrl() ? item.photoUrl : null,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  if (isOwner)
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: Icon(
-                        Icons.edit_note,
-                        size: 14,
-                        color: Colors.blue[400],
+    return Opacity(
+      opacity: isDeleted ? 0.65 : 1.0,
+      child: GestureDetector(
+        onLongPress: (isOwner && !isDeleted)
+            ? () => _showMerchActions(context, ref, item)
+            : null,
+        child: Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: buildImage(
+                        item.hasPhotoUrl() ? item.photoUrl : null,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Text(
-                item.name,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+                    if (isDeleted)
+                      Positioned(
+                        top: 2,
+                        left: 2,
+                        child: _DeletedBadge(label: l10n.itemDeleted),
+                      ),
+                    if (isOwner && !isDeleted)
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: Icon(
+                          Icons.edit_note,
+                          size: 14,
+                          color: Colors.blue[400],
+                        ),
+                      ),
+                  ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
               ),
-            ),
-            Row(
-              children: [
-                if (showHave)
-                  Expanded(
-                    child: _buildGridCounter(
-                      context,
-                      AppLocalizations.of(context)!.haveShort,
-                      haveQty,
-                      AppTheme.haveColor,
-                      (q) => _updateInv(ref, user, item.id, 'HAVE', q),
-                    ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Text(
+                  item.name,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
                   ),
-                if (showWantTrade) ...[
-                  Expanded(
-                    child: _buildGridCounter(
-                      context,
-                      AppLocalizations.of(context)!.wantShort,
-                      wantQty,
-                      AppTheme.wantColor,
-                      (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              Row(
+                children: [
+                  if (showHave)
+                    Expanded(
+                      child: _buildGridCounter(
+                        context,
+                        l10n.haveShort,
+                        haveQty,
+                        AppTheme.haveColor,
+                        isDeleted
+                            ? null
+                            : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _buildGridCounter(
-                      context,
-                      AppLocalizations.of(context)!.tradeShort,
-                      tradeQty,
-                      AppTheme.tradeColor,
-                      (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                  if (showWantTrade) ...[
+                    Expanded(
+                      child: _buildGridCounter(
+                        context,
+                        l10n.wantShort,
+                        wantQty,
+                        AppTheme.wantColor,
+                        isDeleted
+                            ? null
+                            : (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: _buildGridCounter(
+                        context,
+                        l10n.tradeShort,
+                        tradeQty,
+                        AppTheme.tradeColor,
+                        isDeleted
+                            ? null
+                            : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1121,8 +1140,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     String label,
     int qty,
     Color color,
-    Function(int) onUpdate,
+    void Function(int)? onUpdate,
   ) {
+    final enabled = onUpdate != null;
     return Container(
       decoration: BoxDecoration(
         color: qty > 0 ? color.withValues(alpha: 0.1) : Colors.transparent,
@@ -1149,14 +1169,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+                  onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
                   child: Container(
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Icon(
                       Icons.remove,
                       size: 12,
-                      color: qty > 0 ? color : Colors.grey,
+                      color: enabled && qty > 0 ? color : Colors.grey,
                     ),
                   ),
                 ),
@@ -1171,11 +1191,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               ),
               Expanded(
                 child: InkWell(
-                  onTap: () => onUpdate(qty + 1),
+                  onTap: enabled ? () => onUpdate(qty + 1) : null,
                   child: Container(
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Icon(Icons.add, size: 12, color: color),
+                    child: Icon(
+                      Icons.add,
+                      size: 12,
+                      color: enabled ? color : Colors.grey,
+                    ),
                   ),
                 ),
               ),
@@ -1209,69 +1233,96 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
     final isOwner =
         user != null && item.hasCreatorId() && item.creatorId == user.id;
+    final isDeleted = item.hasIsDeleted() && item.isDeleted;
+    final l10n = AppLocalizations.of(context)!;
 
-    return GestureDetector(
-      onLongPress: isOwner ? () => _showMerchActions(context, ref, item) : null,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+    return Opacity(
+      opacity: isDeleted ? 0.65 : 1.0,
+      child: GestureDetector(
+        onLongPress: (isOwner && !isDeleted)
+            ? () => _showMerchActions(context, ref, item)
+            : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: buildImage(
-                item.hasPhotoUrl() ? item.photoUrl : null,
-                width: 28,
-                height: 28,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                item.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: buildImage(
+                  item.hasPhotoUrl() ? item.photoUrl : null,
+                  width: 28,
+                  height: 28,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            if (isOwner)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        item.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isDeleted) ...[
+                      const SizedBox(width: 6),
+                      _DeletedBadge(label: l10n.itemDeleted),
+                    ],
+                  ],
+                ),
               ),
-            if (showHave)
-              _buildCompactCounter(
-                context,
-                AppLocalizations.of(context)!.haveShort,
-                haveQty,
-                AppTheme.haveColor,
-                (q) => _updateInv(ref, user, item.id, 'HAVE', q),
-              ),
-            if (showHave && showWantTrade) const SizedBox(width: 4),
-            if (showWantTrade) ...[
-              _buildCompactCounter(
-                context,
-                AppLocalizations.of(context)!.wantShort,
-                wantQty,
-                AppTheme.wantColor,
-                (q) => _updateInv(ref, user, item.id, 'WANT', q),
-              ),
-              const SizedBox(width: 4),
-              _buildCompactCounter(
-                context,
-                AppLocalizations.of(context)!.tradeShort,
-                tradeQty,
-                AppTheme.tradeColor,
-                (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-              ),
+              if (isOwner && !isDeleted)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    Icons.edit_note,
+                    size: 14,
+                    color: Colors.blue[400],
+                  ),
+                ),
+              if (showHave)
+                _buildCompactCounter(
+                  context,
+                  l10n.haveShort,
+                  haveQty,
+                  AppTheme.haveColor,
+                  isDeleted
+                      ? null
+                      : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                ),
+              if (showHave && showWantTrade) const SizedBox(width: 4),
+              if (showWantTrade) ...[
+                _buildCompactCounter(
+                  context,
+                  l10n.wantShort,
+                  wantQty,
+                  AppTheme.wantColor,
+                  isDeleted
+                      ? null
+                      : (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                ),
+                const SizedBox(width: 4),
+                _buildCompactCounter(
+                  context,
+                  l10n.tradeShort,
+                  tradeQty,
+                  AppTheme.tradeColor,
+                  isDeleted
+                      ? null
+                      : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1282,8 +1333,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     String label,
     int qty,
     Color color,
-    Function(int) onUpdate,
+    void Function(int)? onUpdate,
   ) {
+    final enabled = onUpdate != null;
     return Container(
       height: 26,
       decoration: BoxDecoration(
@@ -1295,13 +1347,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           InkWell(
-            onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+            onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Icon(
                 Icons.remove,
                 size: 12,
-                color: qty > 0 ? color : Colors.grey[400],
+                color: enabled && qty > 0 ? color : Colors.grey[400],
               ),
             ),
           ),
@@ -1314,10 +1366,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             ),
           ),
           InkWell(
-            onTap: () => onUpdate(qty + 1),
+            onTap: enabled ? () => onUpdate(qty + 1) : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Icon(Icons.add, size: 12, color: color),
+              child: Icon(
+                Icons.add,
+                size: 12,
+                color: enabled ? color : Colors.grey[400],
+              ),
             ),
           ),
         ],
@@ -1348,108 +1404,139 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
     final isOwner =
         user != null && item.hasCreatorId() && item.creatorId == user.id;
+    final isDeleted = item.hasIsDeleted() && item.isDeleted;
+    final l10n = AppLocalizations.of(context)!;
 
-    return GestureDetector(
-      onLongPress: isOwner ? () => _showMerchActions(context, ref, item) : null,
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // #203: removed ReorderableDragStartListener wrapper; the
-              // image is no longer a drag handle. Long-press on the
-              // card (handled by the outer GestureDetector) is now the
-              // only way to trigger the owner's edit/delete menu.
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: buildImage(
-                    item.hasPhotoUrl() ? item.photoUrl : null,
+    return Opacity(
+      opacity: isDeleted ? 0.65 : 1.0,
+      child: GestureDetector(
+        onLongPress: (isOwner && !isDeleted)
+            ? () => _showMerchActions(context, ref, item)
+            : null,
+        child: Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // #203: removed ReorderableDragStartListener wrapper; the
+                // image is no longer a drag handle. Long-press on the
+                // card (handled by the outer GestureDetector) is now the
+                // only way to trigger the owner's edit/delete menu.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
                     width: 72,
                     height: 72,
-                    fit: BoxFit.contain,
+                    child: buildImage(
+                      item.hasPhotoUrl() ? item.photoUrl : null,
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        if (isOwner)
-                          Tooltip(
-                            message: AppLocalizations.of(
-                              context,
-                            )!.youCreatedThisItem,
-                            child: Icon(
-                              Icons.edit_note,
-                              size: 18,
-                              color: Colors.blue[400],
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (showHave)
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
                           Expanded(
-                            flex: 5,
-                            child: _buildStepper(
-                              label: 'HAVE',
-                              displayLabel: AppLocalizations.of(context)!.have,
-                              color: AppTheme.haveColor,
-                              qty: haveQty,
-                              onUpdate: (q) =>
-                                  _updateInv(ref, user, item.id, 'HAVE', q),
+                            child: Text(
+                              item.name,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
-                        if (showHave && showWantTrade) const Spacer(flex: 1),
-                        if (showWantTrade) ...[
-                          Expanded(
-                            flex: 5,
-                            child: _buildStepper(
-                              label: 'WANT',
-                              displayLabel: AppLocalizations.of(context)!.want,
-                              color: AppTheme.wantColor,
-                              qty: wantQty,
-                              onUpdate: (q) =>
-                                  _updateInv(ref, user, item.id, 'WANT', q),
+                          if (isDeleted)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _DeletedBadge(label: l10n.itemDeleted),
                             ),
-                          ),
-                          const Spacer(flex: 1),
-                          Expanded(
-                            flex: 5,
-                            child: _buildStepper(
-                              label: 'TRADE',
-                              displayLabel: AppLocalizations.of(context)!.trade,
-                              color: AppTheme.tradeColor,
-                              qty: tradeQty,
-                              onUpdate: (q) =>
-                                  _updateInv(ref, user, item.id, 'TRADE', q),
+                          if (isOwner && !isDeleted)
+                            Tooltip(
+                              message: l10n.youCreatedThisItem,
+                              child: Icon(
+                                Icons.edit_note,
+                                size: 18,
+                                color: Colors.blue[400],
+                              ),
                             ),
-                          ),
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (showHave)
+                            Expanded(
+                              flex: 5,
+                              child: _buildStepper(
+                                label: 'HAVE',
+                                displayLabel: l10n.have,
+                                color: AppTheme.haveColor,
+                                qty: haveQty,
+                                onUpdate: isDeleted
+                                    ? null
+                                    : (q) => _updateInv(
+                                        ref,
+                                        user,
+                                        item.id,
+                                        'HAVE',
+                                        q,
+                                      ),
+                              ),
+                            ),
+                          if (showHave && showWantTrade) const Spacer(flex: 1),
+                          if (showWantTrade) ...[
+                            Expanded(
+                              flex: 5,
+                              child: _buildStepper(
+                                label: 'WANT',
+                                displayLabel: l10n.want,
+                                color: AppTheme.wantColor,
+                                qty: wantQty,
+                                onUpdate: isDeleted
+                                    ? null
+                                    : (q) => _updateInv(
+                                        ref,
+                                        user,
+                                        item.id,
+                                        'WANT',
+                                        q,
+                                      ),
+                              ),
+                            ),
+                            const Spacer(flex: 1),
+                            Expanded(
+                              flex: 5,
+                              child: _buildStepper(
+                                label: 'TRADE',
+                                displayLabel: l10n.trade,
+                                color: AppTheme.tradeColor,
+                                qty: tradeQty,
+                                onUpdate: isDeleted
+                                    ? null
+                                    : (q) => _updateInv(
+                                        ref,
+                                        user,
+                                        item.id,
+                                        'TRADE',
+                                        q,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1607,8 +1694,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     required String displayLabel,
     required Color color,
     required int qty,
-    required Function(int) onUpdate,
+    void Function(int)? onUpdate,
   }) {
+    final enabled = onUpdate != null;
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -1624,7 +1712,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: qty > 0 ? () => onUpdate(qty - 1) : null,
+                  onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
                   child: Container(color: Colors.transparent),
                 ),
               ),
@@ -1632,7 +1720,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 child: GestureDetector(
                   key: Key('stepper_inc_$label'),
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => onUpdate(qty + 1),
+                  onTap: enabled ? () => onUpdate(qty + 1) : null,
                   child: Container(color: Colors.transparent),
                 ),
               ),
@@ -1651,7 +1739,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   '−',
                   style: TextStyle(
                     fontSize: 9,
-                    color: qty > 0
+                    color: enabled && qty > 0
                         ? color.withValues(alpha: 0.5)
                         : Colors.grey.withValues(alpha: 0.3),
                     fontWeight: FontWeight.bold,
@@ -1670,7 +1758,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   '+',
                   style: TextStyle(
                     fontSize: 9,
-                    color: color.withValues(alpha: 0.5),
+                    color: enabled
+                        ? color.withValues(alpha: 0.5)
+                        : Colors.grey.withValues(alpha: 0.3),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1965,6 +2055,32 @@ int _naturalCompare(String a, String b) {
     if (cmp != 0) return cmp;
   }
   return a.length.compareTo(b.length);
+}
+
+/// Small badge marking soft-deleted merch (ADR 0008 / holder-only).
+class _DeletedBadge extends StatelessWidget {
+  final String label;
+
+  const _DeletedBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: Colors.grey[700],
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 }
 
 /// Dialog for editing a merch item's name and image (#205).

@@ -349,8 +349,7 @@ async fn test_admin_list_all_matches_returns_array(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_admin_delete_merch_succeeds(pool: PgPool) {
-    // #180: admin delete goes through MerchandiseRepository::delete_by_id
-    // (hard-delete when no inventory references the row).
+    // #180 / ADR 0008: admin delete always soft-deletes (no hard-delete branch).
     let (user_id, event_id) =
         create_test_user_and_event(pool.clone(), "admin-deleterch", "Admin DeleteMerch").await;
 
@@ -396,13 +395,15 @@ async fn test_admin_delete_merch_succeeds(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Verify the merch row is gone (hard delete — no inventory).
-    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM merchandise WHERE id = $1")
-        .bind(merch_id as i32)
-        .fetch_optional(&pool)
-        .await
-        .unwrap();
-    assert!(row.is_none(), "merch should be deleted");
+    let row: Option<(bool, bool)> =
+        sqlx::query_as("SELECT is_deleted, trade_enabled FROM merchandise WHERE id = $1")
+            .bind(merch_id as i32)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+    let (is_deleted, trade_enabled) = row.expect("merch row should remain after soft delete");
+    assert!(is_deleted, "merch should be soft-deleted");
+    assert!(!trade_enabled, "soft-deleted merch must disable trade");
 }
 
 #[sqlx::test]

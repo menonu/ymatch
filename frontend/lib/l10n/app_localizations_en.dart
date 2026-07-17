@@ -636,4 +636,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportEmpty => 'Nothing selected to export';
+
+  @override
+  String get itemDeleted => 'Deleted';
+
+  @override
+  String get matchCancelledSystemMessage =>
+      'This match was cancelled because a traded item was deleted.';
 }

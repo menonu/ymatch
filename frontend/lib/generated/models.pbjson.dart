@@ -407,11 +407,21 @@ const InventoryItem$json = {
       '10': 'groupName',
       '17': true
     },
+    {
+      '1': 'is_deleted',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '9': 3,
+      '10': 'isDeleted',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_merch_name'},
     {'1': '_photo_url'},
     {'1': '_group_name'},
+    {'1': '_is_deleted'},
   ],
 };
 
@@ -421,8 +431,9 @@ final $typed_data.Uint8List inventoryItemDescriptor = $convert.base64Decode(
     'QSGQoIbWVyY2hfaWQYAyABKAVSB21lcmNoSWQSFgoGc3RhdHVzGAQgASgJUgZzdGF0dXMSGgoI'
     'cXVhbnRpdHkYBSABKAVSCHF1YW50aXR5EiIKCm1lcmNoX25hbWUYBiABKAlIAFIJbWVyY2hOYW'
     '1liAEBEiAKCXBob3RvX3VybBgHIAEoCUgBUghwaG90b1VybIgBARIiCgpncm91cF9uYW1lGAgg'
-    'ASgJSAJSCWdyb3VwTmFtZYgBAUINCgtfbWVyY2hfbmFtZUIMCgpfcGhvdG9fdXJsQg0KC19ncm'
-    '91cF9uYW1l');
+    'ASgJSAJSCWdyb3VwTmFtZYgBARIiCgppc19kZWxldGVkGAkgASgISANSCWlzRGVsZXRlZIgBAU'
+    'INCgtfbWVyY2hfbmFtZUIMCgpfcGhvdG9fdXJsQg0KC19ncm91cF9uYW1lQg0KC19pc19kZWxl'
+    'dGVk');
 
 @$core.Deprecated('Use tradeMatchDescriptor instead')
 const TradeMatch$json = {

@@ -67,16 +67,22 @@ impl InventoryRepository {
             merch_name: Some("".to_string()),
             photo_url: None,
             group_name: None,
+            is_deleted: None,
         })
     }
 
     /// List all inventory rows for a user, joined to `merchandise` for
-    /// `merch_name` / `photo_url` / `group_name`.
+    /// `merch_name` / `photo_url` / `group_name` / `is_deleted`.
+    ///
+    /// ADR 0008: holders keep seeing soft-deleted merch in their inventory
+    /// (marked via `is_deleted`). WANT rows for deleted merch remain too
+    /// (inert; matching already excludes them). Search is live-only.
     pub async fn list_for_user(&self, user_id: i32) -> Result<Vec<InventoryItem>, AppError> {
         let rows = sqlx::query(
             r#"SELECT
                    i.id, i.user_id, i.merch_id, i.status, i.quantity,
-                   m.name as merch_name, m.photo_url, m.group_name
+                   m.name as merch_name, m.photo_url, m.group_name,
+                   m.is_deleted
                FROM inventory i
                JOIN merchandise m ON i.merch_id = m.id
                WHERE i.user_id = $1"#,
@@ -95,6 +101,7 @@ impl InventoryRepository {
                 merch_name: Some(row.get("merch_name")),
                 photo_url: row.get("photo_url"),
                 group_name: row.get("group_name"),
+                is_deleted: Some(row.get("is_deleted")),
             })
             .collect())
     }

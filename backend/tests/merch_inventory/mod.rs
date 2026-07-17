@@ -153,9 +153,30 @@ async fn test_create_merch_duplicate_name_after_soft_delete_reusable(pool: PgPoo
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // The soft-deleted row must not occupy the name: re-creating "a" succeeds.
+    // The soft-deleted row must not occupy the name: re-creating "a" succeeds
+    // as a *new* row (ADR 0008: no revival).
     let merch_id2 = create_merch(&pool, event_id, "a", "G").await;
     assert!(merch_id2 > 0);
+    assert_ne!(
+        merch_id2, merch_id,
+        "re-creation must insert a new row, not revive the soft-deleted one"
+    );
+    let old_still_deleted: bool =
+        sqlx::query_scalar("SELECT is_deleted FROM merchandise WHERE id = $1")
+            .bind(merch_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        old_still_deleted,
+        "original soft-deleted row must stay deleted"
+    );
+    let new_is_live: bool = sqlx::query_scalar("SELECT is_deleted FROM merchandise WHERE id = $1")
+        .bind(merch_id2 as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!new_is_live, "new row must be live");
 }
 
 #[sqlx::test]
@@ -604,8 +625,9 @@ async fn test_soft_delete_merch_with_inventory(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
-    // Create user + event + merch
+async fn test_soft_delete_merch_without_inventory(pool: PgPool) {
+    // ADR 0008: delete is always soft-delete — no inventory is no longer a
+    // hard-delete trigger.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -613,7 +635,7 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "harddel-user"}"#))
+                .body(Body::from(r#"{"uuid": "softdel-noinv-user"}"#))
                 .unwrap(),
         )
         .await
@@ -622,7 +644,6 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let user_id = user["id"].as_i64().unwrap();
 
-    // ADR 0004 §4: event creation is moderator/admin-only.
     grant_global_role(&pool, user_id, "moderator").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -632,7 +653,7 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
                 .uri("/api/v1/events")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "HardDel Event", "creatorId": {}}}"#,
+                    r#"{{"name": "SoftDel NoInv Event", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -651,7 +672,7 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
                 .uri(&format!("/api/v1/events/{}/merch", event_id))
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name": "HardDel Item", "groupName": "Test", "creatorId": {}}}"#,
+                    r#"{{"name": "SoftDel NoInv Item", "groupName": "Test", "creatorId": {}}}"#,
                     user_id
                 )))
                 .unwrap(),
@@ -662,7 +683,6 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let merch_id = merch["id"].as_i64().unwrap();
 
-    // Delete merch (no inventory → hard delete)
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -679,13 +699,14 @@ async fn test_hard_delete_merch_without_inventory(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Verify merch is completely gone
-    let row = sqlx::query("SELECT id FROM merchandise WHERE id = $1")
+    let row = sqlx::query("SELECT is_deleted, trade_enabled FROM merchandise WHERE id = $1")
         .bind(merch_id as i32)
         .fetch_optional(&pool)
         .await
-        .unwrap();
-    assert!(row.is_none());
+        .unwrap()
+        .expect("row must remain after soft-delete");
+    assert!(sqlx::Row::get::<bool, _>(&row, "is_deleted"));
+    assert!(!sqlx::Row::get::<bool, _>(&row, "trade_enabled"));
 }
 
 #[sqlx::test]
@@ -894,5 +915,372 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
         resp.status(),
         StatusCode::OK,
         "apply-inventory must not panic on NULL photo_url (issue #224)"
+    );
+}
+
+// --- ADR 0008 / #423: soft-delete cancels active matches + holder visibility ---
+
+/// Seed a match between two users with a match_items leg on `merch_id`.
+async fn seed_match_with_item(
+    pool: &PgPool,
+    user1: i64,
+    user2: i64,
+    event_id: i64,
+    group_name: &str,
+    merch_id: i64,
+    giver: i64,
+    status: &str,
+) -> i64 {
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id",
+    )
+    .bind(user1 as i32)
+    .bind(user2 as i32)
+    .bind(event_id as i32)
+    .bind(group_name)
+    .bind(status)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO match_items (match_id, giver_user_id, merch_id, quantity)
+         VALUES ($1, $2, $3, 1)",
+    )
+    .bind(match_id)
+    .bind(giver as i32)
+    .bind(merch_id as i32)
+    .execute(pool)
+    .await
+    .unwrap();
+    match_id as i64
+}
+
+#[sqlx::test]
+async fn test_delete_merch_cancels_active_matches_leaves_completed(pool: PgPool) {
+    // ADR 0008: soft-delete moves PENDING/OFFERED/ACCEPTED matches that
+    // reference the merch via match_items to CANCELLED; COMPLETED stays;
+    // a SYSTEM message is posted per cancelled match.
+    // Each match needs a unique (user1, user2, event, group) pair.
+    let (creator, event_id) =
+        create_test_user_and_event(pool.clone(), "cancel-del-creator", "Cancel Del Event").await;
+    let peer1 = login_guest(&pool, "cancel-del-peer1", "t").await;
+    let peer2 = login_guest(&pool, "cancel-del-peer2", "t").await;
+    let peer3 = login_guest(&pool, "cancel-del-peer3", "t").await;
+    let peer4 = login_guest(&pool, "cancel-del-peer4", "t").await;
+
+    let merch_id = create_merch(&pool, event_id, "Cancel Target", "G").await;
+    // qty-0 inventory + match_items would FK-fail the old hard-delete path;
+    // soft-delete always succeeds.
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity)
+         VALUES ($1, $2, 'HAVE', 0)
+         ON CONFLICT (user_id, merch_id, status) DO UPDATE SET quantity = 0",
+    )
+    .bind(creator as i32)
+    .bind(merch_id as i32)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let pending = seed_match_with_item(
+        &pool, creator, peer1, event_id, "G", merch_id, creator, "PENDING",
+    )
+    .await;
+    let offered = seed_match_with_item(
+        &pool, creator, peer2, event_id, "G", merch_id, creator, "OFFERED",
+    )
+    .await;
+    let accepted = seed_match_with_item(
+        &pool, creator, peer3, event_id, "G", merch_id, creator, "ACCEPTED",
+    )
+    .await;
+    let completed = seed_match_with_item(
+        &pool,
+        creator,
+        peer4,
+        event_id,
+        "G",
+        merch_id,
+        creator,
+        "COMPLETED",
+    )
+    .await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, creator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "delete with match_items must succeed"
+    );
+
+    for (id, expected) in [
+        (pending, "CANCELLED"),
+        (offered, "CANCELLED"),
+        (accepted, "CANCELLED"),
+        (completed, "COMPLETED"),
+    ] {
+        let s: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+            .bind(id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(s, expected, "match {id} status");
+    }
+
+    for id in [pending, offered, accepted] {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM messages
+             WHERE match_id = $1 AND message_type = 'SYSTEM'",
+        )
+        .bind(id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            count, 1,
+            "cancelled match {id} should have one SYSTEM message"
+        );
+    }
+    let completed_msgs: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM messages
+         WHERE match_id = $1 AND message_type = 'SYSTEM'",
+    )
+    .bind(completed as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(completed_msgs, 0, "COMPLETED must not get a cancel message");
+
+    // Cancelled matches excluded from the user's active list.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/matches/user/{}", creator))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let statuses: Vec<&str> = matches
+        .iter()
+        .map(|m| m["status"].as_str().unwrap_or(""))
+        .collect();
+    assert!(
+        !statuses.iter().any(|s| *s == "CANCELLED"),
+        "CANCELLED must be hidden from active list, got {statuses:?}"
+    );
+    assert!(
+        statuses.iter().any(|s| *s == "COMPLETED"),
+        "COMPLETED history should still list"
+    );
+}
+
+#[sqlx::test]
+async fn test_deleted_merch_holder_visibility(pool: PgPool) {
+    // ADR 0008: creator + HAVE-holder see deleted merch (marked); others do not.
+    // Search excludes deleted even for the holder.
+    let (creator, event_id) =
+        create_test_user_and_event(pool.clone(), "holder-vis-creator", "Holder Vis Event").await;
+    let holder = login_guest(&pool, "holder-vis-holder", "t").await;
+    let stranger = login_guest(&pool, "holder-vis-stranger", "t").await;
+
+    let merch_id = create_merch(&pool, event_id, "HolderVis Item", "G").await;
+    set_inventory(&pool, holder, merch_id, "HAVE", 2).await;
+
+    // Soft-delete as creator.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, creator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Creator sees it, marked deleted.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/events/{}/merch?user_id={}",
+                    event_id, creator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let found = items.iter().find(|m| m["id"].as_i64() == Some(merch_id));
+    assert!(found.is_some(), "creator must see deleted merch");
+    assert_eq!(found.unwrap()["isDeleted"], true);
+
+    // HAVE-holder sees it marked deleted.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/events/{}/merch?user_id={}",
+                    event_id, holder
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let found = items.iter().find(|m| m["id"].as_i64() == Some(merch_id));
+    assert!(found.is_some(), "HAVE-holder must see deleted merch");
+    assert_eq!(found.unwrap()["isDeleted"], true);
+
+    // Holder inventory marks isDeleted.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/user/{}/inventory", holder))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let inv: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let row = inv
+        .iter()
+        .find(|i| i["merchId"].as_i64() == Some(merch_id))
+        .expect("holder inventory must still list deleted merch");
+    assert_eq!(row["isDeleted"], true);
+
+    // Stranger does not see it in the event merch list.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/events/{}/merch?user_id={}",
+                    event_id, stranger
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        items.iter().all(|m| m["id"].as_i64() != Some(merch_id)),
+        "non-holder must not see deleted merch"
+    );
+
+    // Search is live-only — even the holder cannot find the deleted name.
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/search?q=HolderVis")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let results: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        results.iter().all(|r| r["id"].as_i64() != Some(merch_id)),
+        "search must exclude soft-deleted merch"
+    );
+}
+
+#[sqlx::test]
+async fn test_offer_rejects_soft_deleted_merch(pool: PgPool) {
+    // ADR 0008 / review: PENDING matches may survive without match_items, but
+    // proposing a soft-deleted merch id must fail.
+    let (creator, event_id) =
+        create_test_user_and_event(pool.clone(), "offer-del-creator", "Offer Del Event").await;
+    let peer = login_guest(&pool, "offer-del-peer", "t").await;
+
+    let merch_id = create_merch(&pool, event_id, "OfferDel Item", "G").await;
+    set_inventory(&pool, creator, merch_id, "TRADE", 2).await;
+    set_inventory(&pool, peer, merch_id, "WANT", 2).await;
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, 'G', 'PENDING') RETURNING id",
+    )
+    .bind(creator as i32)
+    .bind(peer as i32)
+    .bind(event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Soft-delete (no match_items → match stays PENDING).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, creator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        status, "PENDING",
+        "PENDING without legs is not auto-cancelled"
+    );
+
+    // Offer of the deleted merch must be rejected.
+    let body = format!(
+        r#"{{"userId": {}, "items": [{{"merchId": {}, "giverUserId": {}, "quantity": 1}}]}}"#,
+        creator, merch_id, creator
+    );
+    let resp = post_json(&pool, &format!("/api/v1/matches/{}/offer", match_id), &body).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "offer of soft-deleted merch must fail"
     );
 }

@@ -1249,6 +1249,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing selected to export'**
   String get exportEmpty;
+
+  /// Badge on soft-deleted merchandise visible only to holders (ADR 0008)
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get itemDeleted;
+
+  /// Fallback label for SYSTEM message_type rows posted when merch deletion cancels a match
+  ///
+  /// In en, this message translates to:
+  /// **'This match was cancelled because a traded item was deleted.'**
+  String get matchCancelledSystemMessage;
 }
 
 class _AppLocalizationsDelegate

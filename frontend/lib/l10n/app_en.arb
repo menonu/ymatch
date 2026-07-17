@@ -891,5 +891,14 @@
   "exportEmpty": "Nothing selected to export",
   "@exportEmpty": {
     "description": "Hint shown in the export dialog preview when no status is checked or no items match"
+  },
+
+  "itemDeleted": "Deleted",
+  "@itemDeleted": {
+    "description": "Badge on soft-deleted merchandise visible only to holders (ADR 0008)"
+  },
+  "matchCancelledSystemMessage": "This match was cancelled because a traded item was deleted.",
+  "@matchCancelledSystemMessage": {
+    "description": "Fallback label for SYSTEM message_type rows posted when merch deletion cancels a match"
   }
 }

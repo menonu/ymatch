@@ -37,21 +37,24 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     TradeTab tab,
     int userId,
   ) {
+    // ADR 0008: CANCELLED is system-only and never surfaces in the UI.
+    // Backend list already excludes it; filter defensively on the client too.
+    final active = matches.where((m) => m.status != 'CANCELLED');
     switch (tab) {
       case TradeTab.match_:
-        return matches.where((m) => m.status == 'PENDING').toList();
+        return active.where((m) => m.status == 'PENDING').toList();
       case TradeTab.offerOut:
-        return matches
+        return active
             .where((m) => m.status == 'OFFERED' && m.offeredBy == userId)
             .toList();
       case TradeTab.offerIn:
-        return matches
+        return active
             .where((m) => m.status == 'OFFERED' && m.offeredBy != userId)
             .toList();
       case TradeTab.active:
-        return matches.where((m) => m.status == 'ACCEPTED').toList();
+        return active.where((m) => m.status == 'ACCEPTED').toList();
       case TradeTab.completed:
-        return matches.where((m) => m.status == 'COMPLETED').toList();
+        return active.where((m) => m.status == 'COMPLETED').toList();
     }
   }
 

@@ -70,13 +70,16 @@ message InventoryItem {
   optional string merch_name = 6;
   optional string photo_url = 7;
   optional string group_name = 8;
+  // ADR 0008: true when the linked merchandise row is soft-deleted.
+  // Present on holder inventory lists so the UI can badge deleted items.
+  optional bool is_deleted = 9;
 }
 
 message TradeMatch {
   int32 id = 1;
   int32 user1_id = 2;
   int32 user2_id = 3;
-  string status = 4; // "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED"
+  string status = 4; // "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED", "CANCELLED"
   optional string created_at = 5;
 
   optional User other_user = 6;

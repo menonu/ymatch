@@ -630,4 +630,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get exportEmpty => 'エクスポート対象がありません';
+
+  @override
+  String get itemDeleted => '削除済み';
+
+  @override
+  String get matchCancelledSystemMessage => '取引アイテムが削除されたため、このマッチはキャンセルされました。';
 }
