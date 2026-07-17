@@ -99,7 +99,8 @@ awk -v totals_file="$TOTALS_FILE" '
     n = path
     gsub(/\\/, "/", n)
     if (n ~ /(^|\/)lib\/generated\//) return 1
-    if (n ~ /(^|\/)lib\/l10n\/app_localizations(_[a-z]+)?\.dart$/) return 1
+    # Match documented glob app_localizations*.dart (any locale segment).
+    if (n ~ /(^|\/)lib\/l10n\/app_localizations[^\/]*\.dart$/) return 1
     return 0
   }
 

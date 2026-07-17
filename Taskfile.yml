@@ -144,9 +144,31 @@ tasks:
       - cmd: 'echo "HTML:  backend/coverage/html/index.html"'
       - cmd: 'echo "lcov:  backend/coverage/lcov.info"'
 
+  frontend:coverage-script-check:
+    desc: Fixture check for scripts/frontend_coverage_report.sh (#453)
+    cmds:
+      # Cheap regression guard for exclude rules / threshold math (no Flutter).
+      - |
+        set -euo pipefail
+        out=$(mktemp)
+        trap 'rm -f "$out"' EXIT
+        sample=scripts/testdata/frontend_coverage_sample.lcov
+        # Fixture: kept 3/5 = 60% after dropping generated + l10n.
+        scripts/frontend_coverage_report.sh "$sample" --output "$out" --threshold 60
+        set +e
+        scripts/frontend_coverage_report.sh "$sample" --output "$out" --threshold 61
+        status=$?
+        set -e
+        if [ "$status" -eq 0 ]; then
+          echo "expected threshold 61 to fail" >&2
+          exit 1
+        fi
+        echo "frontend_coverage_report.sh fixture OK"
+
   frontend:coverage:
     desc: Generate frontend coverage report (HTML + filtered lcov; excludes generated)
     dir: frontend
+    deps: [frontend:coverage-script-check]
     cmds:
       # Filters lib/generated + gen-l10n via scripts/frontend_coverage_report.sh
       # (#453). Optional HTML needs `genhtml` from the lcov package

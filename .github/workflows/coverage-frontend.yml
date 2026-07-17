@@ -77,14 +77,13 @@ jobs:
           raw=frontend/coverage/lcov.info
           filtered=frontend/coverage/lcov.filtered.info
           if [ ! -s "$raw" ]; then
-            echo "::error::coverage/lcov.info is missing or empty"
+            echo "::error::${raw} is missing or empty"
             exit 1
           fi
 
-          # Filters generated sources, prints human summary, fails under floor.
-          scripts/frontend_coverage_report.sh "$raw" \
-            --threshold "$THRESHOLD" \
-            --output "$filtered"
+          # Filter first (always write step summary, even if the floor fails —
+          # mirrors coverage.yml writing the report before the gate).
+          scripts/frontend_coverage_report.sh "$raw" --output "$filtered"
 
           read -r lh lf <<< "$(awk '
             /^LF:/ { lf += substr($0, 4) }
@@ -102,3 +101,12 @@ jobs:
             echo "|---|---|---|---|---|"
             echo "| Lines (filtered) | ${lh} | ${lf} | ${pct}% | ${THRESHOLD}% |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # Gate after the summary so failed runs still show covered/total/%.
+          awk -v c="$pct" -v t="$THRESHOLD" 'BEGIN {
+            if (c + 0 < t + 0) {
+              printf "::error::Coverage %s%% is below threshold %s%%\n", c, t
+              exit 1
+            }
+            print "OK (threshold " t "%)"
+          }'
