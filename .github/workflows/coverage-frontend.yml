@@ -1,11 +1,9 @@
 name: Frontend Coverage
 
 # Mirrors the backend coverage workflow (coverage.yml) for the
-# Flutter frontend (#184). Runs `flutter test --coverage` (excluding
-# backend-dependent suites) and reports line coverage as a markdown
-# box in the run's job summary. No threshold gate yet — frontend
-# coverage is currently low; a floor would block all runs. Revisit
-# after #185 adds more unit/widget tests.
+# Flutter frontend (#184, #453). Runs `flutter test --coverage`
+# (excluding backend-dependent suites), drops generated sources from
+# the LCOV report, and gates line coverage on a conservative floor.
 #
 # Runs **post-merge on `main`** only (plus a manual `workflow_dispatch`)
 # to keep the PR feedback loop fast — see #279. PR validation is
@@ -56,34 +54,51 @@ jobs:
 
       - name: Run tests with coverage
         # Excludes backend-dependent suites (integration + e2e) — they
-        # need a live server. Once #254 lands, dart_test.yaml skips
-        # these at the suite level and the `--exclude-tags` flags become
-        # redundant (can drop them for plain `flutter test --coverage`).
+        # need a live server. dart_test.yaml also skips these at the
+        # suite level; --exclude-tags keeps the intent explicit here.
         run: flutter test --exclude-tags=integration --exclude-tags=e2e --coverage
 
-      # Parse coverage/lcov.info (standard LCOV format) directly with
-      # awk for a stable, dependency-free summary in the step output
-      # and the PR's GITHUB_STEP_SUMMARY. Dart's coverage emits line
-      # data (LF/LH) but no function/branch records, so only line
-      # coverage is reported.
+      # Filter generated code out of lcov.info, print a markdown box to
+      # GITHUB_STEP_SUMMARY, and fail if filtered line coverage is below
+      # the floor. See scripts/frontend_coverage_report.sh (#453).
+      #
+      # Floor history:
+      #   none (#184 visibility only)
+      #   → 68% (#453 — post-exclusion baseline on main was ~71.5%;
+      #     leave ~3 pts headroom so only real drops fail. Bump as
+      #     widget coverage improves — see #454.)
       - name: Coverage summary
+        working-directory: .
+        env:
+          # Line-coverage floor on the *filtered* set (hand-written lib/).
+          THRESHOLD: "68"
         run: |
-          lcov=coverage/lcov.info
-          if [ ! -s "$lcov" ]; then
+          set -euo pipefail
+          raw=frontend/coverage/lcov.info
+          filtered=frontend/coverage/lcov.filtered.info
+          if [ ! -s "$raw" ]; then
             echo "::error::coverage/lcov.info is missing or empty"
             exit 1
           fi
-          read lh lf <<< "$(awk '/^LF:/ { lf += substr($0,4) } /^LH:/ { lh += substr($0,4) } END { printf "%d %d", lh, lf }' "$lcov")"
-          if [ "$lf" -gt 0 ]; then
-            pct=$(awk -v lh="$lh" -v lf="$lf" 'BEGIN { printf "%.2f", lh*100/lf }')
-          else
-            pct="0.00"
-          fi
-          echo "Line coverage: ${lh}/${lf} (${pct}%)"
+
+          # Filters generated sources, prints human summary, fails under floor.
+          scripts/frontend_coverage_report.sh "$raw" \
+            --threshold "$THRESHOLD" \
+            --output "$filtered"
+
+          read -r lh lf <<< "$(awk '
+            /^LF:/ { lf += substr($0, 4) }
+            /^LH:/ { lh += substr($0, 4) }
+            END { printf "%d %d", lh, lf }
+          ' "$filtered")"
+          pct=$(awk -v lh="$lh" -v lf="$lf" 'BEGIN { printf "%.2f", lh * 100 / lf }')
+
           {
             echo "## Frontend coverage"
             echo
-            echo "| Metric | Covered | Total | % |"
-            echo "|---|---|---|---|"
-            echo "| Lines | ${lh} | ${lf} | ${pct}% |"
+            echo "Generated sources excluded: \`lib/generated/**\`, \`lib/l10n/app_localizations*.dart\`."
+            echo
+            echo "| Metric | Covered | Total | % | Floor |"
+            echo "|---|---|---|---|---|"
+            echo "| Lines (filtered) | ${lh} | ${lf} | ${pct}% | ${THRESHOLD}% |"
           } >> "$GITHUB_STEP_SUMMARY"

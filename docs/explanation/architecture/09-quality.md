@@ -40,8 +40,17 @@ task backend:test
 task frontend:test        # excludes e2e tags locally when configured
 ```
 
-Coverage workflows: backend line-coverage gate on `main`; frontend coverage
-workflow exists for visibility.
+Coverage workflows (post-merge on `main`, plus `workflow_dispatch`; see #279):
+
+| Stack | Workflow | What is measured | Floor |
+|-------|----------|------------------|-------|
+| Backend | `coverage.yml` | `cargo llvm-cov`, ignores `generated/` | **70%** lines |
+| Frontend | `coverage-frontend.yml` | `flutter test --coverage`, then filter via `scripts/frontend_coverage_report.sh` (drops `lib/generated/**` and gen-l10n) | **68%** filtered lines (#453) |
+
+Local: `task backend:coverage` / `task frontend:coverage`. Interpret frontend
+numbers from `frontend/coverage/lcov.filtered.info`, not the raw
+`lcov.info` (protobuf + l10n inflate the denominator). See
+[Developer Quickstart](../../tutorials/developer_quickstart.md#coverage-reports).
 
 ## Performance notes
 

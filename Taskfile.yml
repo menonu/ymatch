@@ -145,17 +145,25 @@ tasks:
       - cmd: 'echo "lcov:  backend/coverage/lcov.info"'
 
   frontend:coverage:
-    desc: Generate frontend coverage report (HTML + lcov.info)
+    desc: Generate frontend coverage report (HTML + filtered lcov; excludes generated)
     dir: frontend
     cmds:
-      # Requires `lcov` locally for genhtml/summary
+      # Filters lib/generated + gen-l10n via scripts/frontend_coverage_report.sh
+      # (#453). Optional HTML needs `genhtml` from the lcov package
       # (sudo apt-get install lcov). Mirrors backend:coverage.
       - flutter pub get
       - flutter test --exclude-tags=integration --exclude-tags=e2e --coverage
-      - genhtml coverage/lcov.info -o coverage/html
-      - lcov --summary coverage/lcov.info
-      - cmd: 'echo "HTML:  frontend/coverage/html/index.html"'
-      - cmd: 'echo "lcov:  frontend/coverage/lcov.info"'
+      # Filter from repo root so the script path resolves when dir: frontend.
+      - cmd: '../scripts/frontend_coverage_report.sh coverage/lcov.info --output coverage/lcov.filtered.info'
+      - cmd: |
+          if command -v genhtml >/dev/null 2>&1; then
+            genhtml coverage/lcov.filtered.info -o coverage/html
+            echo "HTML:  frontend/coverage/html/index.html"
+          else
+            echo "genhtml not installed — skip HTML (sudo apt-get install lcov)"
+          fi
+      - cmd: 'echo "raw lcov:      frontend/coverage/lcov.info"'
+      - cmd: 'echo "filtered lcov: frontend/coverage/lcov.filtered.info"'
 
   # ─── Terraform (secrets via TF_VAR_* from gitignored .env) ───────────
   # See docs/how_to/terraform_apply.md. Each task sources the module's
