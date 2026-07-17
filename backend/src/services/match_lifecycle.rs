@@ -121,13 +121,16 @@ impl MatchLifecycleService {
             .map(|i| i.merch_id)
             .collect::<std::collections::HashSet<_>>()
             .len();
+        // ADR 0001 + ADR 0008: every leg must be live, tradeable merch in the
+        // match's group. Soft-deleted rows fail this count (see
+        // `count_merch_in_group`), so a crafted offer of a deleted item is 400.
         let in_group = self
             .matches
             .count_merch_in_group(&mut *tx, &merch_ids, locked.event_id, &locked.group_name)
             .await?;
         if (in_group as usize) != distinct_merch {
             return Err(AppError::bad_request(
-                "All offered items must belong to the match's group",
+                "All offered items must be live merchandise in the match's group",
             ));
         }
 

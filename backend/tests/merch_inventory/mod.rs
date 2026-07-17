@@ -1221,3 +1221,66 @@ async fn test_deleted_merch_holder_visibility(pool: PgPool) {
         "search must exclude soft-deleted merch"
     );
 }
+
+#[sqlx::test]
+async fn test_offer_rejects_soft_deleted_merch(pool: PgPool) {
+    // ADR 0008 / review: PENDING matches may survive without match_items, but
+    // proposing a soft-deleted merch id must fail.
+    let (creator, event_id) =
+        create_test_user_and_event(pool.clone(), "offer-del-creator", "Offer Del Event").await;
+    let peer = login_guest(&pool, "offer-del-peer", "t").await;
+
+    let merch_id = create_merch(&pool, event_id, "OfferDel Item", "G").await;
+    set_inventory(&pool, creator, merch_id, "TRADE", 2).await;
+    set_inventory(&pool, peer, merch_id, "WANT", 2).await;
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, 'G', 'PENDING') RETURNING id",
+    )
+    .bind(creator as i32)
+    .bind(peer as i32)
+    .bind(event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Soft-delete (no match_items → match stays PENDING).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_id, creator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        status, "PENDING",
+        "PENDING without legs is not auto-cancelled"
+    );
+
+    // Offer of the deleted merch must be rejected.
+    let body = format!(
+        r#"{{"userId": {}, "items": [{{"merchId": {}, "giverUserId": {}, "quantity": 1}}]}}"#,
+        creator, merch_id, creator
+    );
+    let resp = post_json(&pool, &format!("/api/v1/matches/{}/offer", match_id), &body).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "offer of soft-deleted merch must fail"
+    );
+}

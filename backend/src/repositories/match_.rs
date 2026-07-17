@@ -140,6 +140,9 @@ impl MatchRepository {
             WHERE i.user_id = $1
               AND i.status = 'TRADE' AND i.quantity > 0
               AND w.user_id <> $1
+              -- ADR 0008: soft-deleted merch is not tradeable; keep it out of
+              -- offer candidates even when a PENDING match still exists.
+              AND m.is_deleted = false AND m.trade_enabled = true
         "#;
         let have_rows = sqlx::query(have_sql)
             .bind(user_id)
@@ -167,6 +170,7 @@ impl MatchRepository {
             WHERE i.user_id <> $1
               AND i.status = 'TRADE' AND i.quantity > 0
               AND w.user_id = $1
+              AND m.is_deleted = false AND m.trade_enabled = true
         "#;
         let want_rows = sqlx::query(want_sql)
             .bind(user_id)
@@ -504,8 +508,9 @@ impl MatchRepository {
     }
 
     /// Count how many of the given merch ids belong to a given group
-    /// (ADR 0001). Used by the offer/counter-offer path to validate that
-    /// every proposed leg is within the match's group before upserting.
+    /// (ADR 0001) **and are live / tradeable** (ADR 0008). Used by the
+    /// offer/counter-offer path to validate that every proposed leg is within
+    /// the match's group and is not soft-deleted before upserting.
     pub async fn count_merch_in_group<'c, E>(
         &self,
         exec: E,
@@ -518,7 +523,8 @@ impl MatchRepository {
     {
         let row: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM merchandise
-             WHERE id = ANY($1) AND event_id = $2 AND group_name = $3",
+             WHERE id = ANY($1) AND event_id = $2 AND group_name = $3
+               AND is_deleted = false AND trade_enabled = true",
         )
         .bind(merch_ids)
         .bind(event_id)

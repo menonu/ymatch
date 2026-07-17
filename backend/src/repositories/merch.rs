@@ -312,8 +312,10 @@ impl MerchandiseRepository {
             }
         }
 
+        // ADR 0008: soft-deleted rows are immutable via the update API.
         let sql = format!(
-            "UPDATE merchandise SET {} WHERE id = $1 AND event_id = $2 RETURNING {}, '' AS group_description",
+            "UPDATE merchandise SET {} WHERE id = $1 AND event_id = $2 AND is_deleted = false \
+             RETURNING {}, '' AS group_description",
             sets.join(", "),
             MERCH_COLUMNS
         );
@@ -367,8 +369,10 @@ impl MerchandiseRepository {
 
     /// Flip a draft merch row to published.
     pub async fn publish(&self, event_id: i32, merch_id: i32) -> Result<Option<()>, AppError> {
+        // ADR 0008: soft-deleted rows cannot be republished.
         let affected = sqlx::query(
-            "UPDATE merchandise SET status = 'published' WHERE id = $1 AND event_id = $2",
+            "UPDATE merchandise SET status = 'published' \
+             WHERE id = $1 AND event_id = $2 AND is_deleted = false",
         )
         .bind(merch_id)
         .bind(event_id)
