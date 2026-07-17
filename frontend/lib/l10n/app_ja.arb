@@ -217,6 +217,9 @@
   "editorAssigned": "編集者を追加しました",
   "editorRemoved": "編集者を削除しました",
   "pickTransferCreatorTitle": "イベント作成者を譲渡",
+  "confirmTransferCreatorTitle": "作成者を譲渡しますか？",
+  "confirmTransferCreatorBody": "所有権を {username} に譲渡しますか？作成者権限を失い、元に戻せません。",
+  "confirmTransferCreatorAction": "譲渡する",
   "pickEditorTitle": "イベント編集者を追加",
   "roleCreator": "作成者",
   "roleEditor": "編集者"

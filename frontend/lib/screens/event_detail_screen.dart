@@ -1016,6 +1016,33 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                 excludeUserIds: {?creatorId},
                               );
                               if (selected == null) return;
+                              // Irreversible: confirm before PUT (#442 pr-review).
+                              if (!dialogContext.mounted) return;
+                              final confirmed = await showDialog<bool>(
+                                context: dialogContext,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text(l10n.confirmTransferCreatorTitle),
+                                  content: Text(
+                                    l10n.confirmTransferCreatorBody(
+                                      selected.username,
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, false),
+                                      child: Text(l10n.cancel),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: Text(
+                                        l10n.confirmTransferCreatorAction,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirmed != true) return;
                               await runAction(
                                 () => events.transferEventCreator(
                                   widget.eventId,

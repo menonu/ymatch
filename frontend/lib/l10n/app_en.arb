@@ -946,6 +946,24 @@
   "@pickTransferCreatorTitle": {
     "description": "User picker title when transferring event ownership (#442)"
   },
+  "confirmTransferCreatorTitle": "Transfer event creator?",
+  "@confirmTransferCreatorTitle": {
+    "description": "Confirmation dialog title before irreversible self-service creator transfer (#442)"
+  },
+  "confirmTransferCreatorBody": "Transfer ownership to {username}? You will lose creator privileges. This cannot be undone.",
+  "@confirmTransferCreatorBody": {
+    "description": "Confirmation dialog body for self-service creator transfer (#442)",
+    "placeholders": {
+      "username": {
+        "type": "String",
+        "example": "alice"
+      }
+    }
+  },
+  "confirmTransferCreatorAction": "Transfer",
+  "@confirmTransferCreatorAction": {
+    "description": "Confirm button label on creator transfer dialog (#442)"
+  },
   "pickEditorTitle": "Add event editor",
   "@pickEditorTitle": {
     "description": "User picker title when assigning an event editor (#442)"

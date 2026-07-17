@@ -678,6 +678,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pickTransferCreatorTitle => 'Transfer event creator';
 
   @override
+  String get confirmTransferCreatorTitle => 'Transfer event creator?';
+
+  @override
+  String confirmTransferCreatorBody(String username) {
+    return 'Transfer ownership to $username? You will lose creator privileges. This cannot be undone.';
+  }
+
+  @override
+  String get confirmTransferCreatorAction => 'Transfer';
+
+  @override
   String get pickEditorTitle => 'Add event editor';
 
   @override

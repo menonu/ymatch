@@ -1328,6 +1328,24 @@ abstract class AppLocalizations {
   /// **'Transfer event creator'**
   String get pickTransferCreatorTitle;
 
+  /// Confirmation dialog title before irreversible self-service creator transfer (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer event creator?'**
+  String get confirmTransferCreatorTitle;
+
+  /// Confirmation dialog body for self-service creator transfer (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer ownership to {username}? You will lose creator privileges. This cannot be undone.'**
+  String confirmTransferCreatorBody(String username);
+
+  /// Confirm button label on creator transfer dialog (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get confirmTransferCreatorAction;
+
   /// User picker title when assigning an event editor (#442)
   ///
   /// In en, this message translates to:

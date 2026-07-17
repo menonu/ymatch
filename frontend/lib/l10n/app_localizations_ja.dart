@@ -671,6 +671,17 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pickTransferCreatorTitle => 'イベント作成者を譲渡';
 
   @override
+  String get confirmTransferCreatorTitle => '作成者を譲渡しますか？';
+
+  @override
+  String confirmTransferCreatorBody(String username) {
+    return '所有権を $username に譲渡しますか？作成者権限を失い、元に戻せません。';
+  }
+
+  @override
+  String get confirmTransferCreatorAction => '譲渡する';
+
+  @override
   String get pickEditorTitle => 'イベント編集者を追加';
 
   @override

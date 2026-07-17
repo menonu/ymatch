@@ -367,6 +367,98 @@ void main() {
     expect(find.byKey(const Key('manage_members_button')), findsNothing);
   });
 
+  testWidgets(
+    'Transfer creator requires confirmation before PUT (#442 pr-review)',
+    (tester) async {
+      var putCount = 0;
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final client = ApiClient(
+        config,
+        client: MockClient((request) async {
+          final path = request.url.path;
+          if (request.method == 'GET' && path == '/api/v1/events/5/members') {
+            return http.Response(
+              jsonEncode({
+                'members': [
+                  {'userId': 1, 'role': 'creator', 'username': 'me'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.method == 'GET' && path == '/api/v1/users') {
+            return http.Response(
+              jsonEncode([
+                {'id': 1, 'username': 'me'},
+                {'id': 9, 'username': 'alice'},
+              ]),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.method == 'PUT' && path == '/api/v1/events/5/creator') {
+            putCount++;
+            return http.Response('{}', 200);
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => client),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canCreateMerch = true
+                ..canManageEditors = true
+                ..canTransferCreator = true,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('manage_members_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage members'), findsOneWidget);
+      await tester.tap(find.text('Transfer creator'));
+      await tester.pumpAndSettle();
+
+      // User picker.
+      expect(find.text('Transfer event creator'), findsOneWidget);
+      await tester.tap(find.text('alice'));
+      await tester.pumpAndSettle();
+
+      // Confirmation step — cancel must not PUT.
+      expect(find.text('Transfer event creator?'), findsOneWidget);
+      expect(
+        find.textContaining('Transfer ownership to alice?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(putCount, 0);
+
+      // Confirm path.
+      await tester.tap(find.text('Transfer creator'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('alice'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transfer'));
+      await tester.pumpAndSettle();
+      expect(putCount, 1);
+    },
+  );
+
   // --- Group description UI (#128) ---
 
   testWidgets(
