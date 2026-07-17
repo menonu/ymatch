@@ -1299,6 +1299,20 @@ const MyEventRoleResponse$json = {
     {'1': 'global_override', '3': 2, '4': 1, '5': 8, '10': 'globalOverride'},
     {'1': 'can_create_merch', '3': 3, '4': 1, '5': 8, '10': 'canCreateMerch'},
     {'1': 'can_edit_group', '3': 4, '4': 1, '5': 8, '10': 'canEditGroup'},
+    {
+      '1': 'can_manage_editors',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '10': 'canManageEditors'
+    },
+    {
+      '1': 'can_transfer_creator',
+      '3': 6,
+      '4': 1,
+      '5': 8,
+      '10': 'canTransferCreator'
+    },
   ],
 };
 
@@ -1306,4 +1320,6 @@ const MyEventRoleResponse$json = {
 final $typed_data.Uint8List myEventRoleResponseDescriptor = $convert.base64Decode(
     'ChNNeUV2ZW50Um9sZVJlc3BvbnNlEhIKBHJvbGUYASABKAlSBHJvbGUSJwoPZ2xvYmFsX292ZX'
     'JyaWRlGAIgASgIUg5nbG9iYWxPdmVycmlkZRIoChBjYW5fY3JlYXRlX21lcmNoGAMgASgIUg5j'
-    'YW5DcmVhdGVNZXJjaBIkCg5jYW5fZWRpdF9ncm91cBgEIAEoCFIMY2FuRWRpdEdyb3Vw');
+    'YW5DcmVhdGVNZXJjaBIkCg5jYW5fZWRpdF9ncm91cBgEIAEoCFIMY2FuRWRpdEdyb3VwEiwKEm'
+    'Nhbl9tYW5hZ2VfZWRpdG9ycxgFIAEoCFIQY2FuTWFuYWdlRWRpdG9ycxIwChRjYW5fdHJhbnNm'
+    'ZXJfY3JlYXRvchgGIAEoCFISY2FuVHJhbnNmZXJDcmVhdG9y');

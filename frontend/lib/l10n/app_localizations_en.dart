@@ -643,4 +643,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get matchCancelledSystemMessage =>
       'This match was cancelled because a traded item was deleted.';
+
+  @override
+  String get manageMembers => 'Manage members';
+
+  @override
+  String get transferCreator => 'Transfer creator';
+
+  @override
+  String get addEditor => 'Add editor';
+
+  @override
+  String get removeEditor => 'Remove editor';
+
+  @override
+  String get searchUsersHint => 'Search by username or id';
+
+  @override
+  String get noUsersFound => 'No users found';
+
+  @override
+  String get noMembers => 'No members';
+
+  @override
+  String get creatorTransferred => 'Event creator updated';
+
+  @override
+  String get editorAssigned => 'Editor assigned';
+
+  @override
+  String get editorRemoved => 'Editor removed';
+
+  @override
+  String get pickTransferCreatorTitle => 'Transfer event creator';
+
+  @override
+  String get pickEditorTitle => 'Add event editor';
+
+  @override
+  String get roleCreator => 'creator';
+
+  @override
+  String get roleEditor => 'editor';
 }

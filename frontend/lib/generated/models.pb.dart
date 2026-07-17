@@ -3351,23 +3351,30 @@ class ListEventMembersResponse extends $pb.GeneratedMessage {
 /// Current-user event-role API (#366): the caller's standing on a single
 /// event, used by the frontend to gate the Add Merch button without reading the
 /// denormalized `User.role`. Accessible to any active caller (no 403 for a plain
-/// viewer) — unlike the creator-only `members` list, this is the per-viewer gate.
+/// viewer) — unlike the members list (gated by event.member.manage), this is
+/// the per-viewer gate.
 ///
 /// `can_create_merch` is the exact decision `create_merch` enforces (via
 /// `RbacService::check(MerchCreate)`), so the frontend gate is the same check,
-/// not a re-derivation.
+/// not a re-derivation. `can_manage_editors` / `can_transfer_creator` gate the
+/// self-service member UI (#442).
 class MyEventRoleResponse extends $pb.GeneratedMessage {
   factory MyEventRoleResponse({
     $core.String? role,
     $core.bool? globalOverride,
     $core.bool? canCreateMerch,
     $core.bool? canEditGroup,
+    $core.bool? canManageEditors,
+    $core.bool? canTransferCreator,
   }) {
     final result = create();
     if (role != null) result.role = role;
     if (globalOverride != null) result.globalOverride = globalOverride;
     if (canCreateMerch != null) result.canCreateMerch = canCreateMerch;
     if (canEditGroup != null) result.canEditGroup = canEditGroup;
+    if (canManageEditors != null) result.canManageEditors = canManageEditors;
+    if (canTransferCreator != null)
+      result.canTransferCreator = canTransferCreator;
     return result;
   }
 
@@ -3388,6 +3395,8 @@ class MyEventRoleResponse extends $pb.GeneratedMessage {
     ..aOB(2, _omitFieldNames ? '' : 'globalOverride')
     ..aOB(3, _omitFieldNames ? '' : 'canCreateMerch')
     ..aOB(4, _omitFieldNames ? '' : 'canEditGroup')
+    ..aOB(5, _omitFieldNames ? '' : 'canManageEditors')
+    ..aOB(6, _omitFieldNames ? '' : 'canTransferCreator')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3444,6 +3453,26 @@ class MyEventRoleResponse extends $pb.GeneratedMessage {
   $core.bool hasCanEditGroup() => $_has(3);
   @$pb.TagNumber(4)
   void clearCanEditGroup() => $_clearField(4);
+
+  /// Caller may list/assign/revoke event editors (event.member.manage) (#442).
+  @$pb.TagNumber(5)
+  $core.bool get canManageEditors => $_getBF(4);
+  @$pb.TagNumber(5)
+  set canManageEditors($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCanManageEditors() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCanManageEditors() => $_clearField(5);
+
+  /// Caller is the current event creator and may self-service transfer ownership (#442).
+  @$pb.TagNumber(6)
+  $core.bool get canTransferCreator => $_getBF(5);
+  @$pb.TagNumber(6)
+  set canTransferCreator($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCanTransferCreator() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCanTransferCreator() => $_clearField(6);
 }
 
 const $core.bool _omitFieldNames =

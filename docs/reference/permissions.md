@@ -43,8 +43,8 @@ column is `Permission::as_str`.
 | `global` | `admin` | Full access / all permissions. Superuser bypass. |
 | `global` | `moderator` | Platform management: read user details, ban/unban, create & manage events, edit or remove any event/merch/group, delete matches. |
 | `global` | `user` | Standard trading. No elevated permissions (ordinary trading is ownership-checked). |
-| `event` | `creator` | Owns an event; manages its editors; edits the event, its merch, and its groups. |
-| `event` | `editor` | Edits an event's merch and groups; cannot delete the event or manage editors. |
+| `event` | `creator` | Owns an event; manages its editors; can transfer creator; edits the event, its merch, and its groups. |
+| `event` | `editor` | Edits an event's merch and groups; can assign/remove other editors; cannot delete the event or transfer creator. |
 
 ## Global permissions
 
@@ -68,7 +68,7 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 | `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`) |
 | `event.creator.transfer` | admin, moderator | `event.creator.transfer` | `admin::transfer_event_creator` (`PUT /admin/events/:id/creator`) |
 | `group.creator.transfer` | admin, moderator | `group.creator.transfer` | `admin::transfer_group_creator` (`PUT /admin/events/:id/groups/:name/creator`) |
-| `event.member.manage.any` | admin, moderator | `event.member.manage.any` | Admin members path (`GET/POST/DELETE /admin/events/:id/members…`). **Not** an override of `event.member.manage` — the creator-only members API is unchanged. |
+| `event.member.manage.any` | admin, moderator | `event.member.manage.any` | Admin members path (`GET/POST/DELETE /admin/events/:id/members…`). **Not** an override of `event.member.manage` — the public members API stays creator/editor + admin-bypass only (#432 / #442). |
 | `system.kill_switch` | admin | `system.kill_switch` | — (defined; no consumer wired yet) |
 
 ## Event-scope permissions
@@ -81,7 +81,7 @@ also satisfies each event-scope check.
 |---|---|---|---|
 | `event.edit` | creator, editor | `event.edit.any` | `events::update_event` (`PUT /events/:id`), `events::publish_event` (`POST /events/:id/publish`) |
 | `event.delete` | creator | `event.delete.any` | `admin::delete_event` (`DELETE /admin/events/:id`) — event-scope check (#233) |
-| `event.member.manage` | creator | *(none by design)* | event-member API (`POST/DELETE/GET /events/:id/members`) |
+| `event.member.manage` | creator, editor | *(none by design)* | event-member API (`POST/DELETE/GET /events/:id/members`) (#442 grants editor) |
 | `merch.delete` | creator, editor | `merch.delete.any` | `merch::delete_merch_by_creator` (`DELETE /events/:id/merch/:id`) |
 | `merch.create` | creator, editor | `merch.create.any` | `merch::create_merch` (`POST /events/:id/merch`) |
 | `merch.edit` | creator, editor | `merch.edit.any` | `merch::update_merch` (`PUT /events/:id/merch/:id`), `merch::publish_merch` (`POST /events/:id/merch/:id/publish`) |
@@ -95,11 +95,14 @@ also satisfies each event-scope check.
 ## Granting roles
 
 - **Event `creator`** is auto-assigned at event creation (inside the event-insert
-  transaction). The public members API never removes it; global staff reassign
-  ownership via `PUT /admin/events/:id/creator` (`event.creator.transfer`) (#432).
+  transaction). The public members API never removes it. The current creator may
+  self-service transfer via `PUT /events/:id/creator` (ownership check, #442);
+  global staff reassign via `PUT /admin/events/:id/creator`
+  (`event.creator.transfer`) (#432). Neither path auto-promotes the previous
+  creator to `editor`.
 - **Event `editor`** is assigned/revoked via the event-member API, guarded by
-  `event.member.manage` (the creator), **or** via the admin members path
-  (`event.member.manage.any`) for moderators/admins (#432).
+  `event.member.manage` (event **creator** or **editor**, #442), **or** via the
+  admin members path (`event.member.manage.any`) for moderators/admins (#432).
 - **Group `created_by`** is set at group creation (ownership short-circuit for
   `group.edit`). Global staff reassign it via
   `PUT /admin/events/:id/groups/:name/creator` (`group.creator.transfer`) (#432).

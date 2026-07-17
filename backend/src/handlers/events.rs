@@ -9,7 +9,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::admin::AdminQuery;
+use crate::handlers::admin::{AdminQuery, TransferCreatorRequest};
 use crate::repositories::event::EventRepository;
 use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
@@ -168,9 +168,11 @@ pub async fn publish_event(
 }
 
 /// Resolve the caller from the `?user_id=` query param and require they hold
-/// `event.member.manage` on `event_id` (ADR 0004 §5): the event `creator`, or
-/// the admin superuser bypass. There is deliberately no `*.any` override for
-/// this permission, so a global moderator cannot manage an event's members.
+/// `event.member.manage` on `event_id` (ADR 0004 §5 / #442): the event
+/// `creator` or `editor`, or the admin superuser bypass. There is deliberately
+/// no `*.any` override for this permission, so a global moderator cannot use
+/// the public members API (they use the admin path with
+/// `event.member.manage.any` instead, #432).
 ///
 /// The event's existence is confirmed (404) **before** the RBAC check, so a
 /// missing event is reported as 404 rather than leaked as a 403 to a caller
@@ -201,7 +203,8 @@ async fn require_event_member_manage(
 
 /// Assign the `event/editor` role to `target_id` for `event_id`
 /// (`POST /api/v1/events/:id/members/:target_id`). Guarded by
-/// `event.member.manage` (event creator) + admin bypass. Idempotent.
+/// `event.member.manage` (event creator or editor, #442) + admin bypass.
+/// Idempotent.
 pub async fn assign_event_member(
     State(state): State<AppState>,
     Path((event_id, target_id)): Path<(i32, i32)>,
@@ -221,9 +224,10 @@ pub async fn assign_event_member(
 
 /// Revoke the `event/editor` role from `target_id` for `event_id`
 /// (`DELETE /api/v1/events/:id/members/:target_id`). Guarded by
-/// `event.member.manage` (event creator) + admin bypass. Idempotent: a no-op
-/// if the user holds no editor role. The event `creator` role is never
-/// removed here — the underlying SQL filters `role_id` to `editor`.
+/// `event.member.manage` (event creator or editor, #442) + admin bypass.
+/// Idempotent: a no-op if the user holds no editor role. The event `creator`
+/// role is never removed here — the underlying SQL filters `role_id` to
+/// `editor`.
 pub async fn revoke_event_member(
     State(state): State<AppState>,
     Path((event_id, target_id)): Path<(i32, i32)>,
@@ -236,8 +240,7 @@ pub async fn revoke_event_member(
 
 /// List the event-scoped role assignments for `event_id`
 /// (`GET /api/v1/events/:id/members`). Guarded by `event.member.manage`
-/// (event creator) + admin bypass — only the creator (or an admin) can see
-/// who holds roles on their event.
+/// (event creator or editor, #442) + admin bypass.
 pub async fn list_event_members(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
@@ -248,20 +251,81 @@ pub async fn list_event_members(
     Ok(Json(ListEventMembersResponse { members }))
 }
 
+/// Self-service event creator transfer
+/// (`PUT /api/v1/events/:id/creator`). Callable only by the **current** event
+/// creator (ownership of `events.creator_id`). Editors with
+/// `event.member.manage` cannot transfer. Global staff use the admin path
+/// (`event.creator.transfer`, #432). Does **not** auto-promote the previous
+/// creator to `editor` (same default as #432).
+pub async fn self_transfer_event_creator(
+    State(state): State<AppState>,
+    Path(event_id): Path<i32>,
+    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    Json(payload): Json<TransferCreatorRequest>,
+) -> Result<StatusCode, AppError> {
+    let uid = query
+        .user_id
+        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
+    let user = state.policy.verify_active(uid).await?;
+
+    // 404 before authz so a missing event is not leaked as a 403.
+    let previous = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+
+    if previous != Some(user.id) {
+        return Err(AppError::forbidden(
+            "Only the event creator can transfer ownership",
+        ));
+    }
+
+    if previous == Some(payload.new_creator_id) {
+        return Err(AppError::bad_request("User is already the event creator"));
+    }
+
+    let target = state
+        .users
+        .get_by_id(payload.new_creator_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Target user not found"))?;
+    if target.is_banned.unwrap_or(false) {
+        return Err(AppError::bad_request("Target user is banned"));
+    }
+
+    let mut tx = state.pool.begin().await?;
+    let updated = state
+        .events
+        .set_creator(&mut *tx, event_id, payload.new_creator_id)
+        .await?;
+    if !updated {
+        return Err(AppError::not_found("Event not found"));
+    }
+    state
+        .rbac
+        .transfer_event_creator_role(&mut tx, event_id, previous, payload.new_creator_id)
+        .await?;
+    tx.commit().await?;
+    Ok(StatusCode::OK)
+}
+
 /// Report the caller's effective standing on `event_id`
-/// (`GET /api/v1/events/:id/my-role`). Unlike the creator-only
-/// [`list_event_members`], this is **not** gated by `event.member.manage`: any
-/// active caller may read their own role, so a plain viewer can pre-gate the
-/// Add Merch button (#366) instead of discovering the 403 on click.
+/// (`GET /api/v1/events/:id/my-role`). Unlike [`list_event_members`], this is
+/// **not** gated by `event.member.manage`: any active caller may read their
+/// own role, so a plain viewer can pre-gate the Add Merch button (#366)
+/// instead of discovering the 403 on click.
 ///
 /// The response carries the caller's event-scoped membership (`role`), whether
 /// a global admin/moderator role is in effect (`global_override`), the
 /// **exact** `merch.create` decision the [`create_merch`](crate::handlers::merch)
-/// handler enforces (`can_create_merch`), and the **exact** `group.edit`
+/// handler enforces (`can_create_merch`), the **exact** `group.edit`
 /// decision the [`update_event_group`](crate::handlers::groups) handler enforces
-/// for a non-creator (`can_edit_group`) — each computed via the same
-/// [`RbacService::check`], so the frontend gate is not a re-derivation. The
-/// group creator ownership short-circuit stays a frontend check.
+/// for a non-creator (`can_edit_group`), and self-service member UI gates
+/// (`can_manage_editors`, `can_transfer_creator`, #442) — each computed via
+/// the same [`RbacService::check`] (or ownership) so the frontend gate is not
+/// a re-derivation. The group creator ownership short-circuit stays a frontend
+/// check.
 ///
 /// The event's existence is confirmed (404) before any role query, matching
 /// [`update_event`]'s 404-before-decide convention.
@@ -274,7 +338,7 @@ pub async fn get_my_event_role(
         .user_id
         .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
     let user = state.policy.verify_active(uid).await?;
-    let _ = state
+    let previous_creator = state
         .events
         .get_creator(event_id)
         .await?
@@ -299,11 +363,25 @@ pub async fn get_my_event_role(
         .check(&user, &Scope::Event(event_id), Permission::GroupEdit)
         .await
         .is_ok();
+    let can_manage_editors = state
+        .rbac_service
+        .check(
+            &user,
+            &Scope::Event(event_id),
+            Permission::EventMemberManage,
+        )
+        .await
+        .is_ok();
+    // Self-service transfer is ownership-based, not permission-based: only
+    // the current creator_id may transfer (editors with member.manage cannot).
+    let can_transfer_creator = previous_creator == Some(user.id);
 
     Ok(Json(MyEventRoleResponse {
         role,
         global_override,
         can_create_merch,
         can_edit_group,
+        can_manage_editors,
+        can_transfer_creator,
     }))
 }

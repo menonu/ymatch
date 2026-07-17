@@ -154,6 +154,83 @@ Toggle a merchandise group favorite within an event.
   ```
 - **Response**: `200 OK`
 
+### GET /api/v1/events/:id/my-role
+
+Report the caller's standing on an event (any active user; not gated by
+`event.member.manage`). Used to pre-gate Add Merch and member-management UI.
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+  ```json
+  {
+    "role": "creator",
+    "globalOverride": true,
+    "canCreateMerch": true,
+    "canEditGroup": true,
+    "canManageEditors": true,
+    "canTransferCreator": true
+  }
+  ```
+- **Notes**:
+  - `canManageEditors` is the exact `event.member.manage` RBAC decision (#442).
+  - `canTransferCreator` is true only when the caller is the current
+    `events.creator_id` (ownership; not a permission).
+
+### GET /api/v1/events/:id/members
+
+List event-scoped role assignments (creator + editors).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+  ```json
+  {
+    "members": [
+      { "userId": 1, "role": "creator", "username": "alice" },
+      { "userId": 2, "role": "editor", "username": "bob" }
+    ]
+  }
+  ```
+- **Permissions**: Event creator or editor (`event.member.manage`), or admin
+  superuser bypass. Global moderators use the admin path instead (#432 / #442).
+
+### POST /api/v1/events/:id/members/:target_id
+
+Assign the event-scoped `editor` role (idempotent).
+
+- **Query Parameters**: `user_id` (required) — caller.
+- **Response**: `200 OK`
+- **Permissions**: Same as list members (`event.member.manage`).
+
+### DELETE /api/v1/events/:id/members/:target_id
+
+Revoke the event-scoped `editor` role (idempotent). Never removes the event
+`creator` role.
+
+- **Query Parameters**: `user_id` (required) — caller.
+- **Response**: `200 OK`
+- **Permissions**: Same as list members (`event.member.manage`).
+
+### PUT /api/v1/events/:id/creator
+
+Self-service transfer of event ownership (`events.creator_id` + event-scoped
+`creator` role). Does **not** auto-promote the previous creator to `editor`
+(#442). Staff use `PUT /admin/events/:id/creator` instead (#432).
+
+- **Query Parameters**: `user_id` (required) — must be the **current** creator.
+- **Request Body**:
+  ```json
+  { "newCreatorId": 9 }
+  ```
+- **Response**: `200 OK`
+- **Errors**: `403` if caller is not the current creator; `400` if already the
+  creator or target is banned; `404` if event or target user missing.
+
 ### GET /api/v1/user/:id/favorite_groups
 
 List a user's favorite merchandise groups.
@@ -530,8 +607,9 @@ Transfer item-group ownership (`merchandise_groups.created_by`) (#432).
 ### GET /api/v1/admin/events/:id/members
 
 List event-scoped role assignments (creator + editors) via the admin path (#432).
-Separate from the creator-only `GET /events/:id/members` so global moderators
-can inspect membership without holding `event.member.manage`.
+Separate from the public `GET /events/:id/members` (creator/editor + admin
+bypass) so global moderators can inspect membership without holding
+`event.member.manage`.
 
 - **Query Parameters**:
   | Param     | Type | Description                         |

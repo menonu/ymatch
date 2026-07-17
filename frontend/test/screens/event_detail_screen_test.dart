@@ -292,6 +292,81 @@ void main() {
     },
   );
 
+  // --- Self-service member management (#442) ---
+
+  testWidgets('Manage members button shown when canManageEditors (#442)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          myEventRoleProvider(5).overrideWith(
+            (ref) async => MyEventRoleResponse()
+              ..canCreateMerch = true
+              ..canManageEditors = true
+              ..canTransferCreator = false,
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('manage_members_button')), findsOneWidget);
+    expect(find.byTooltip('Manage members'), findsOneWidget);
+  });
+
+  testWidgets('Manage members button shown when canTransferCreator (#442)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          myEventRoleProvider(5).overrideWith(
+            (ref) async => MyEventRoleResponse()
+              ..canCreateMerch = true
+              ..canManageEditors = false
+              ..canTransferCreator = true,
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('manage_members_button')), findsOneWidget);
+  });
+
+  testWidgets('Manage members button hidden for plain viewer (#442)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          myEventRoleProvider(5).overrideWith(
+            (ref) async => MyEventRoleResponse()
+              ..canCreateMerch = false
+              ..canManageEditors = false
+              ..canTransferCreator = false,
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('manage_members_button')), findsNothing);
+  });
+
   // --- Group description UI (#128) ---
 
   testWidgets(

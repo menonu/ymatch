@@ -86,8 +86,9 @@ pub enum Permission {
     GroupCreatorTransfer,
     /// List/assign/revoke event editors via the **admin** members path.
     /// Admin + moderator. Deliberately separate from [`Permission::EventMemberManage`]
-    /// (no `*.any` override on that permission) so the creator-only
-    /// `/events/:id/members` API stays creator + admin-bypass only (#432).
+    /// (no `*.any` override on that permission) so the public
+    /// `/events/:id/members` API stays event creator/editor + admin-bypass
+    /// only; moderators use this admin path (#432 / #442).
     EventMemberManageAny,
     /// Toggle service kill-switches. Admin.
     SystemKillSwitch,
@@ -96,7 +97,7 @@ pub enum Permission {
     EventEdit,
     /// Delete a specific event. Event creator.
     EventDelete,
-    /// Manage editor roles for a specific event. Event creator.
+    /// Manage editor roles for a specific event. Event creator + editor (#442).
     EventMemberManage,
     /// Delete merch in a specific event. Event creator + editor.
     MerchDelete,
@@ -362,6 +363,7 @@ mod tests {
             EDITOR,
             set(&[
                 "event.edit",
+                "event.member.manage",
                 "merch.delete",
                 "merch.create",
                 "merch.edit",
@@ -572,14 +574,15 @@ mod tests {
     // --- event editor ---
 
     #[test]
-    fn editor_can_edit_but_not_delete_or_manage_members() {
+    fn editor_can_edit_and_manage_members_but_not_delete() {
+        // #442: editors may manage other editors (event.member.manage).
         ok(&[EDITOR], Permission::EventEdit);
         ok(&[EDITOR], Permission::MerchDelete);
         ok(&[EDITOR], Permission::MerchCreate);
         ok(&[EDITOR], Permission::MerchEdit);
         ok(&[EDITOR], Permission::GroupEdit);
+        ok(&[EDITOR], Permission::EventMemberManage);
         denied(&[EDITOR], Permission::EventDelete);
-        denied(&[EDITOR], Permission::EventMemberManage);
         denied(&[EDITOR], Permission::UserBan);
         denied(&[EDITOR], Permission::MatchDelete);
     }
@@ -624,8 +627,10 @@ mod tests {
     fn moderator_plus_editor_combines_permissions() {
         // editor grants event.edit; moderator would also grant it via .any.
         ok(&[MODERATOR, EDITOR], Permission::EventEdit);
-        // neither grants event.member.manage (no *.any, editor lacks it).
-        denied(&[MODERATOR, EDITOR], Permission::EventMemberManage);
+        // #442: editor grants event.member.manage; moderator alone still does not
+        // (no *.any override — staff use EventMemberManageAny on admin path).
+        ok(&[MODERATOR, EDITOR], Permission::EventMemberManage);
+        denied(&[MODERATOR], Permission::EventMemberManage);
     }
 
     // --- integration: RbacService::check against a real seeded DB ---
@@ -1018,6 +1023,7 @@ mod tests {
                 .await
                 .is_err()
         );
+        // #442: event editor holds event.member.manage.
         assert!(
             service
                 .check(
@@ -1026,7 +1032,7 @@ mod tests {
                     Permission::EventMemberManage
                 )
                 .await
-                .is_err()
+                .is_ok()
         );
         assert!(
             service

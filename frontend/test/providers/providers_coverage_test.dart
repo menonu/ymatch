@@ -907,6 +907,75 @@ void main() {
     });
   });
 
+  // ---- EventsController self-service members (#442) ----
+
+  group('EventsController members (#442)', () {
+    test('list / assign / revoke / transfer use public paths', () async {
+      final paths = <String>[];
+      final api = _apiWith(
+        client: MockClient((request) async {
+          paths.add('${request.method} ${request.url.path}');
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/events/8/members') {
+            return _ok({
+              'members': [
+                {'userId': 1, 'role': 'creator', 'username': 'alice'},
+              ],
+            });
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/events/8/members/2') {
+            return _okEmpty();
+          }
+          if (request.method == 'DELETE' &&
+              request.url.path == '/api/v1/events/8/members/2') {
+            return _okEmpty();
+          }
+          if (request.method == 'PUT' &&
+              request.url.path == '/api/v1/events/8/creator') {
+            expect(request.body, contains('newCreatorId'));
+            return _okEmpty();
+          }
+          return http.Response('nope', 404);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final events = container.read(eventsControllerProvider.notifier);
+      final members = await events.listEventMembers(8, 1);
+      expect(members.single.role, 'creator');
+      await events.assignEventEditor(8, 2, 1);
+      await events.revokeEventEditor(8, 2, 1);
+      await events.transferEventCreator(8, 1, 9);
+      expect(container.read(eventsControllerProvider).hasError, isFalse);
+      expect(paths, contains('GET /api/v1/events/8/members'));
+      expect(paths, contains('POST /api/v1/events/8/members/2'));
+      expect(paths, contains('DELETE /api/v1/events/8/members/2'));
+      expect(paths, contains('PUT /api/v1/events/8/creator'));
+    });
+
+    test('transferEventCreator failure rethrows (#442)', () async {
+      final api = _apiWith(
+        client: MockClient((request) async => http.Response('Forbidden', 403)),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(eventsControllerProvider.notifier)
+            .transferEventCreator(3, 1, 9),
+        throwsA(isA<Exception>()),
+      );
+      expect(container.read(eventsControllerProvider).hasError, isTrue);
+    });
+  });
+
   // ---- matchesProvider + notificationCountsProvider (family by userId) ----
 
   group('matchesProvider', () {
