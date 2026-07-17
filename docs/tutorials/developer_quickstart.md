@@ -58,6 +58,40 @@ task test
   task frontend:test
   ```
 
+### Coverage reports
+
+Both stacks write HTML + LCOV under each package’s `coverage/` directory.
+Post-merge CI also runs these on `main` (see `.github/workflows/coverage.yml`
+and `coverage-frontend.yml`); PR CI does not gate on coverage (#279).
+
+```bash
+task backend:coverage    # cargo-llvm-cov; ignores generated/
+task frontend:coverage   # flutter test --coverage + filter script
+```
+
+**Frontend filtering (#453):** `scripts/frontend_coverage_report.sh` drops
+generated sources from the headline number so it reflects hand-written app
+code only:
+
+| Excluded path | Why |
+|---------------|-----|
+| `lib/generated/**` | protobuf bindings (`scripts/proto-gen.sh`) |
+| `lib/l10n/app_localizations*.dart` | `flutter gen-l10n` output |
+
+- Raw Flutter output: `frontend/coverage/lcov.info`
+- Filtered report (what CI gates on): `frontend/coverage/lcov.filtered.info`
+- Optional HTML (needs `genhtml` from the `lcov` package):
+  `frontend/coverage/html/index.html`
+
+CI floor on the **filtered** line % is currently **68%** (baseline on main
+after exclusion was ~71.5%; headroom so only real drops fail). Run the same
+check locally:
+
+```bash
+# after task frontend:coverage, or after flutter test --coverage
+scripts/frontend_coverage_report.sh frontend/coverage/lcov.info --threshold 68
+```
+
 ---
 
 ## Step 3: Start Development Servers

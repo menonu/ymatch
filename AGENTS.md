@@ -92,6 +92,7 @@ task test                    # Run all tests
 task backend:test            # Backend integration tests
 task frontend:test           # Flutter unit/widget tests
 task backend:coverage        # Backend tests + coverage (HTML + lcov.info)
+task frontend:coverage       # Frontend tests + filtered lcov (excludes generated; #453)
 cd backend && cargo fmt -- --check && cargo clippy -- -D warnings
 cd frontend && dart format --output=none --set-exit-if-changed . && flutter analyze
 gh # for github related operation
