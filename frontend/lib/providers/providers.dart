@@ -358,6 +358,75 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// List event members via the public path (#442). Requires event.member.manage.
+  Future<List<EventMemberInfo>> listEventMembers(
+    int eventId,
+    int userId,
+  ) async {
+    final json = await client.get(
+      '/api/v1/events/$eventId/members?user_id=$userId',
+    );
+    final members = (json as Map<String, dynamic>)['members'] as List? ?? [];
+    return members
+        .map((e) => EventMemberInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Assign event editor via the public path (#442).
+  Future<void> assignEventEditor(
+    int eventId,
+    int targetUserId,
+    int userId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.post(
+        '/api/v1/events/$eventId/members/$targetUserId?user_id=$userId',
+        {},
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Revoke event editor via the public path (#442). Never removes creator.
+  Future<void> revokeEventEditor(
+    int eventId,
+    int targetUserId,
+    int userId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.delete(
+        '/api/v1/events/$eventId/members/$targetUserId?user_id=$userId',
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Self-service event creator transfer (`PUT /events/:id/creator`, #442).
+  Future<void> transferEventCreator(
+    int eventId,
+    int userId,
+    int newCreatorId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await client.put('/api/v1/events/$eventId/creator?user_id=$userId', {
+        'newCreatorId': newCreatorId,
+      });
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
   Future<void> generateDebugData(int creatorId) async {
     state = const AsyncValue.loading();
     try {
@@ -435,13 +504,14 @@ final merchProvider = FutureProvider.family<List<Merchandise>, int>((
       .toList();
 });
 
-// --- My event role (#366) ---
+// --- My event role (#366 / #442) ---
 // The caller's effective standing on a single event, used to gate the Add Merch
-// button without reading the denormalized `User.role`. `canCreateMerch` is the
-// exact `merch.create` decision the backend enforces, so the gate is not a
-// client-side re-derivation. Returns `null` when there is no logged-in user or
-// the fetch fails — both leave the button hidden (the safe default; the
-// backend 403 remains the defense-in-depth backstop on tap).
+// button and member-management UI without reading the denormalized `User.role`.
+// `canCreateMerch` / `canManageEditors` are the exact RBAC decisions the
+// backend enforces, so the gate is not a client-side re-derivation. Returns
+// `null` when there is no logged-in user or the fetch fails — both leave gated
+// UI hidden (the safe default; the backend 403 remains the defense-in-depth
+// backstop on tap).
 final myEventRoleProvider = FutureProvider.autoDispose
     .family<MyEventRoleResponse?, int>((ref, eventId) async {
       final user = ref.watch(currentUserProvider);
@@ -457,6 +527,14 @@ final myEventRoleProvider = FutureProvider.autoDispose
         return null;
       }
     });
+
+/// Directory of users for pickers (self-service member UI, #442).
+/// Same public list endpoint as the admin user directory.
+final usersDirectoryProvider = FutureProvider<List<User>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  final json = await client.get('/api/v1/users');
+  return (json as List).map((e) => User()..mergeFromProto3Json(e)).toList();
+});
 
 class MerchController extends StateNotifier<AsyncValue<void>> {
   final ApiClient client;

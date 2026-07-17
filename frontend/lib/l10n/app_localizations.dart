@@ -1261,6 +1261,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This match was cancelled because a traded item was deleted.'**
   String get matchCancelledSystemMessage;
+
+  /// Tooltip / dialog title for event creator/editor self-service member UI (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Manage members'**
+  String get manageMembers;
+
+  /// Action to hand off event ownership to another user (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer creator'**
+  String get transferCreator;
+
+  /// Action to assign an event editor role (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Add editor'**
+  String get addEditor;
+
+  /// Action to revoke an event editor role (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Remove editor'**
+  String get removeEditor;
+
+  /// Hint for the user picker search field in member management (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Search by username or id'**
+  String get searchUsersHint;
+
+  /// Empty state in the user picker (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'No users found'**
+  String get noUsersFound;
+
+  /// Empty state when event has no role members listed (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'No members'**
+  String get noMembers;
+
+  /// SnackBar after successful self-service creator transfer (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Event creator updated'**
+  String get creatorTransferred;
+
+  /// SnackBar after assigning an event editor (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Editor assigned'**
+  String get editorAssigned;
+
+  /// SnackBar after revoking an event editor (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Editor removed'**
+  String get editorRemoved;
+
+  /// User picker title when transferring event ownership (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer event creator'**
+  String get pickTransferCreatorTitle;
+
+  /// Confirmation dialog title before irreversible self-service creator transfer (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer event creator?'**
+  String get confirmTransferCreatorTitle;
+
+  /// Confirmation dialog body for self-service creator transfer (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer ownership to {username}? You will lose creator privileges. This cannot be undone.'**
+  String confirmTransferCreatorBody(String username);
+
+  /// Confirm button label on creator transfer dialog (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get confirmTransferCreatorAction;
+
+  /// User picker title when assigning an event editor (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'Add event editor'**
+  String get pickEditorTitle;
+
+  /// Event-scoped role label for creator in member list (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'creator'**
+  String get roleCreator;
+
+  /// Event-scoped role label for editor in member list (#442)
+  ///
+  /// In en, this message translates to:
+  /// **'editor'**
+  String get roleEditor;
 }
 
 class _AppLocalizationsDelegate

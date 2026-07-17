@@ -636,4 +636,57 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get matchCancelledSystemMessage => '取引アイテムが削除されたため、このマッチはキャンセルされました。';
+
+  @override
+  String get manageMembers => 'メンバー管理';
+
+  @override
+  String get transferCreator => '作成者を譲渡';
+
+  @override
+  String get addEditor => '編集者を追加';
+
+  @override
+  String get removeEditor => '編集者を削除';
+
+  @override
+  String get searchUsersHint => 'ユーザー名または ID で検索';
+
+  @override
+  String get noUsersFound => 'ユーザーが見つかりません';
+
+  @override
+  String get noMembers => 'メンバーがいません';
+
+  @override
+  String get creatorTransferred => 'イベント作成者を更新しました';
+
+  @override
+  String get editorAssigned => '編集者を追加しました';
+
+  @override
+  String get editorRemoved => '編集者を削除しました';
+
+  @override
+  String get pickTransferCreatorTitle => 'イベント作成者を譲渡';
+
+  @override
+  String get confirmTransferCreatorTitle => '作成者を譲渡しますか？';
+
+  @override
+  String confirmTransferCreatorBody(String username) {
+    return '所有権を $username に譲渡しますか？作成者権限を失い、元に戻せません。';
+  }
+
+  @override
+  String get confirmTransferCreatorAction => '譲渡する';
+
+  @override
+  String get pickEditorTitle => 'イベント編集者を追加';
+
+  @override
+  String get roleCreator => '作成者';
+
+  @override
+  String get roleEditor => '編集者';
 }

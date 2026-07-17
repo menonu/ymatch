@@ -304,6 +304,11 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             "/api/v1/events/:id/my-role",
             get(handlers::get_my_event_role),
         )
+        // #442: self-service event creator transfer (current creator only).
+        .route(
+            "/api/v1/events/:id/creator",
+            put(handlers::self_transfer_event_creator),
+        )
         .route(
             "/api/v1/events/:id/members/:target_id",
             post(handlers::assign_event_member).delete(handlers::revoke_event_member),

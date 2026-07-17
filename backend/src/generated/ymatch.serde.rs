@@ -2912,6 +2912,12 @@ impl serde::Serialize for MyEventRoleResponse {
         if self.can_edit_group {
             len += 1;
         }
+        if self.can_manage_editors {
+            len += 1;
+        }
+        if self.can_transfer_creator {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.MyEventRoleResponse", len)?;
         if !self.role.is_empty() {
             struct_ser.serialize_field("role", &self.role)?;
@@ -2924,6 +2930,12 @@ impl serde::Serialize for MyEventRoleResponse {
         }
         if self.can_edit_group {
             struct_ser.serialize_field("canEditGroup", &self.can_edit_group)?;
+        }
+        if self.can_manage_editors {
+            struct_ser.serialize_field("canManageEditors", &self.can_manage_editors)?;
+        }
+        if self.can_transfer_creator {
+            struct_ser.serialize_field("canTransferCreator", &self.can_transfer_creator)?;
         }
         struct_ser.end()
     }
@@ -2942,6 +2954,10 @@ impl<'de> serde::Deserialize<'de> for MyEventRoleResponse {
             "canCreateMerch",
             "can_edit_group",
             "canEditGroup",
+            "can_manage_editors",
+            "canManageEditors",
+            "can_transfer_creator",
+            "canTransferCreator",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -2950,6 +2966,8 @@ impl<'de> serde::Deserialize<'de> for MyEventRoleResponse {
             GlobalOverride,
             CanCreateMerch,
             CanEditGroup,
+            CanManageEditors,
+            CanTransferCreator,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2975,6 +2993,8 @@ impl<'de> serde::Deserialize<'de> for MyEventRoleResponse {
                             "globalOverride" | "global_override" => Ok(GeneratedField::GlobalOverride),
                             "canCreateMerch" | "can_create_merch" => Ok(GeneratedField::CanCreateMerch),
                             "canEditGroup" | "can_edit_group" => Ok(GeneratedField::CanEditGroup),
+                            "canManageEditors" | "can_manage_editors" => Ok(GeneratedField::CanManageEditors),
+                            "canTransferCreator" | "can_transfer_creator" => Ok(GeneratedField::CanTransferCreator),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2998,6 +3018,8 @@ impl<'de> serde::Deserialize<'de> for MyEventRoleResponse {
                 let mut global_override__ = None;
                 let mut can_create_merch__ = None;
                 let mut can_edit_group__ = None;
+                let mut can_manage_editors__ = None;
+                let mut can_transfer_creator__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Role => {
@@ -3024,6 +3046,18 @@ impl<'de> serde::Deserialize<'de> for MyEventRoleResponse {
                             }
                             can_edit_group__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::CanManageEditors => {
+                            if can_manage_editors__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("canManageEditors"));
+                            }
+                            can_manage_editors__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::CanTransferCreator => {
+                            if can_transfer_creator__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("canTransferCreator"));
+                            }
+                            can_transfer_creator__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(MyEventRoleResponse {
@@ -3031,6 +3065,8 @@ impl<'de> serde::Deserialize<'de> for MyEventRoleResponse {
                     global_override: global_override__.unwrap_or_default(),
                     can_create_merch: can_create_merch__.unwrap_or_default(),
                     can_edit_group: can_edit_group__.unwrap_or_default(),
+                    can_manage_editors: can_manage_editors__.unwrap_or_default(),
+                    can_transfer_creator: can_transfer_creator__.unwrap_or_default(),
                 })
             }
         }

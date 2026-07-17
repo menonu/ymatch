@@ -499,11 +499,13 @@ pub struct ListEventMembersResponse {
 /// Current-user event-role API (#366): the caller's standing on a single
 /// event, used by the frontend to gate the Add Merch button without reading the
 /// denormalized `User.role`. Accessible to any active caller (no 403 for a plain
-/// viewer) — unlike the creator-only `members` list, this is the per-viewer gate.
+/// viewer) — unlike the members list (gated by event.member.manage), this is
+/// the per-viewer gate.
 ///
 /// `can_create_merch` is the exact decision `create_merch` enforces (via
 /// `RbacService::check(MerchCreate)`), so the frontend gate is the same check,
-/// not a re-derivation.
+/// not a re-derivation. `can_manage_editors` / `can_transfer_creator` gate the
+/// self-service member UI (#442).
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MyEventRoleResponse {
@@ -519,4 +521,10 @@ pub struct MyEventRoleResponse {
     /// the caller may edit any group's info on this event (group.edit)
     #[prost(bool, tag = "4")]
     pub can_edit_group: bool,
+    /// Caller may list/assign/revoke event editors (event.member.manage) (#442).
+    #[prost(bool, tag = "5")]
+    pub can_manage_editors: bool,
+    /// Caller is the current event creator and may self-service transfer ownership (#442).
+    #[prost(bool, tag = "6")]
+    pub can_transfer_creator: bool,
 }

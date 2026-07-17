@@ -67,7 +67,7 @@ async fn test_event_member_assign_permission_boundary(pool: PgPool) {
 
     grant_global_role(&pool, moderator, "moderator").await;
     grant_global_role(&pool, admin, "admin").await;
-    // `editor` is a real event editor (can edit, but not manage members).
+    // `editor` is a real event editor (#442: can manage members).
     assign_event_role(&pool, editor, event_id, "editor").await;
 
     let assign = |caller: i64| {
@@ -85,16 +85,16 @@ async fn test_event_member_assign_permission_boundary(pool: PgPool) {
         }
     };
 
-    // Plain user, event editor, and global moderator are all denied — there is
-    // no `*.any` override for event.member.manage.
+    // Plain user and global moderator are denied — there is no `*.any`
+    // override for event.member.manage on the public path (#432).
     assert_eq!(assign(plain).await.status(), StatusCode::FORBIDDEN);
-    assert_eq!(assign(editor).await.status(), StatusCode::FORBIDDEN);
     assert_eq!(assign(moderator).await.status(), StatusCode::FORBIDDEN);
-    // Admin superuser bypass and the event creator both pass.
+    // #442: event editor may assign editors; creator and admin bypass too.
+    assert_eq!(assign(editor).await.status(), StatusCode::OK);
     assert_eq!(assign(admin).await.status(), StatusCode::OK);
     assert_eq!(assign(creator).await.status(), StatusCode::OK);
 
-    // No duplicate editor row despite two successful assigns.
+    // No duplicate editor row despite three successful assigns.
     assert_eq!(event_role_count(&pool, target, event_id).await, 1);
 }
 
@@ -205,12 +205,14 @@ async fn test_event_member_revoke_preserves_creator(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_event_member_list_requires_creator(pool: PgPool) {
+async fn test_event_member_list_requires_member_manage(pool: PgPool) {
     let creator = login_guest(&pool, "mem-list-creator", "tok").await;
     let event_id = create_event(&pool, "Member List Event", creator).await;
     let plain = login_guest(&pool, "mem-list-plain", "tok").await;
+    let editor = login_guest(&pool, "mem-list-editor", "tok").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
 
-    // A non-creator (no event.member.manage) is denied the member list.
+    // A plain viewer (no event.member.manage) is denied the member list.
     let resp = get_request(
         &pool,
         &format!("/api/v1/events/{}/members?user_id={}", event_id, plain),
@@ -218,7 +220,19 @@ async fn test_event_member_list_requires_creator(pool: PgPool) {
     .await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 
-    // The creator sees the list (just themselves at this point).
+    // #442: event editor may list members.
+    let resp = get_request(
+        &pool,
+        &format!("/api/v1/events/{}/members?user_id={}", event_id, editor),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let members = body["members"].as_array().unwrap();
+    assert_eq!(members.len(), 2, "creator + editor");
+
+    // The creator sees the list.
     let resp = get_request(
         &pool,
         &format!("/api/v1/events/{}/members?user_id={}", event_id, creator),
@@ -228,8 +242,30 @@ async fn test_event_member_list_requires_creator(pool: PgPool) {
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let members = body["members"].as_array().unwrap();
-    assert_eq!(members.len(), 1);
-    assert_eq!(members[0]["role"], "creator");
+    assert_eq!(members.len(), 2);
+}
+
+#[sqlx::test]
+async fn test_event_member_editor_can_revoke_editor(pool: PgPool) {
+    // #442: editors may revoke other editors (never creator).
+    let creator = login_guest(&pool, "mem-ed-rev-creator", "tok").await;
+    let event_id = create_event(&pool, "Editor Revoke Event", creator).await;
+    let editor = login_guest(&pool, "mem-ed-rev-editor", "tok").await;
+    let target = login_guest(&pool, "mem-ed-rev-target", "tok").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+    assign_event_role(&pool, target, event_id, "editor").await;
+
+    let resp = delete_request(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/members/{}?user_id={}",
+            event_id, target, editor
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(!has_event_role(&pool, target, event_id, "editor").await);
+    assert!(has_event_role(&pool, creator, event_id, "creator").await);
 }
 
 #[sqlx::test]
@@ -266,14 +302,15 @@ async fn test_event_member_assign_404_missing_target(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
-// --- GET /api/v1/events/:id/my-role (#366) --------------------------------
+// --- GET /api/v1/events/:id/my-role (#366 / #442) -------------------------
 //
-// Unlike the creator-only `members` list, `my-role` is readable by any active
-// caller — it is the per-viewer gate the frontend uses to show/hide the Add
-// Merch button. `can_create_merch` is the exact `merch.create` decision the
-// `create_merch` handler enforces; `role` is the caller's event-scoped
-// membership; `global_override` is true when a global admin/moderator role is
-// in effect.
+// Unlike the members list (gated by event.member.manage), `my-role` is
+// readable by any active caller — it is the per-viewer gate the frontend uses
+// to show/hide Add Merch and member-management UI. `can_create_merch` is the
+// exact `merch.create` decision the `create_merch` handler enforces; `role` is
+// the caller's event-scoped membership; `global_override` is true when a
+// global admin/moderator role is in effect. #442 adds `can_manage_editors`
+// and `can_transfer_creator`.
 //
 // NOTE: `create_event` grants the creator the global `moderator` role (event
 // creation requires `event.create`), so the creator legitimately reports
@@ -308,6 +345,8 @@ async fn test_my_role_creator(pool: PgPool) {
     assert_eq!(body["role"], "creator");
     assert!(bool_field(&body, "globalOverride"));
     assert!(bool_field(&body, "canCreateMerch"));
+    assert!(bool_field(&body, "canManageEditors"));
+    assert!(bool_field(&body, "canTransferCreator"));
 }
 
 #[sqlx::test]
@@ -322,6 +361,9 @@ async fn test_my_role_editor(pool: PgPool) {
     assert_eq!(body["role"], "editor");
     assert!(!bool_field(&body, "globalOverride"));
     assert!(bool_field(&body, "canCreateMerch"));
+    // #442: editors manage editors but cannot transfer creator.
+    assert!(bool_field(&body, "canManageEditors"));
+    assert!(!bool_field(&body, "canTransferCreator"));
 }
 
 #[sqlx::test]
@@ -335,6 +377,8 @@ async fn test_my_role_plain_viewer(pool: PgPool) {
     assert_eq!(body["role"], "none");
     assert!(!bool_field(&body, "globalOverride"));
     assert!(!bool_field(&body, "canCreateMerch"));
+    assert!(!bool_field(&body, "canManageEditors"));
+    assert!(!bool_field(&body, "canTransferCreator"));
 }
 
 #[sqlx::test]
@@ -343,6 +387,7 @@ async fn test_my_role_moderator_global_override(pool: PgPool) {
     let event_id = create_event(&pool, "My Role Mod Event", creator).await;
     // A global moderator who is NOT a member of the event: power comes from
     // `merch.create.any`, so role is "none" but can_create_merch is true.
+    // Moderators do NOT get event.member.manage on the public path.
     let moderator = login_guest(&pool, "myrole-mod", "tok").await;
     grant_global_role(&pool, moderator, "moderator").await;
 
@@ -350,6 +395,8 @@ async fn test_my_role_moderator_global_override(pool: PgPool) {
     assert_eq!(body["role"], "none");
     assert!(bool_field(&body, "globalOverride"));
     assert!(bool_field(&body, "canCreateMerch"));
+    assert!(!bool_field(&body, "canManageEditors"));
+    assert!(!bool_field(&body, "canTransferCreator"));
 }
 
 #[sqlx::test]
@@ -357,7 +404,8 @@ async fn test_my_role_admin_bypass(pool: PgPool) {
     let creator = login_guest(&pool, "myrole-adm-creator", "tok").await;
     let event_id = create_event(&pool, "My Role Admin Event", creator).await;
     // A global admin who is NOT a member: the superuser bypass grants every
-    // permission, including merch.create.
+    // permission, including merch.create and event.member.manage. Transfer is
+    // still ownership-only on the self-service path.
     let admin = login_guest(&pool, "myrole-admin", "tok").await;
     grant_global_role(&pool, admin, "admin").await;
 
@@ -365,6 +413,115 @@ async fn test_my_role_admin_bypass(pool: PgPool) {
     assert_eq!(body["role"], "none");
     assert!(bool_field(&body, "globalOverride"));
     assert!(bool_field(&body, "canCreateMerch"));
+    assert!(bool_field(&body, "canManageEditors"));
+    assert!(!bool_field(&body, "canTransferCreator"));
+}
+
+// --- PUT /api/v1/events/:id/creator (#442 self-service) -------------------
+
+#[sqlx::test]
+async fn test_self_transfer_event_creator_success(pool: PgPool) {
+    let old_creator = login_guest(&pool, "self-xfer-old", "tok").await;
+    let event_id = create_event(&pool, "Self Xfer Event", old_creator).await;
+    let new_creator = login_guest(&pool, "self-xfer-new", "tok").await;
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/creator?user_id={}",
+            event_id, old_creator
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, new_creator),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "self transfer should succeed"
+    );
+
+    let creator_id: Option<i32> = sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(creator_id, Some(new_creator as i32));
+    assert!(has_event_role(&pool, new_creator, event_id, "creator").await);
+    assert!(!has_event_role(&pool, old_creator, event_id, "creator").await);
+    assert!(
+        !has_event_role(&pool, old_creator, event_id, "editor").await,
+        "previous creator is not auto-promoted to editor"
+    );
+}
+
+#[sqlx::test]
+async fn test_self_transfer_event_creator_rbac_and_validation(pool: PgPool) {
+    let creator = login_guest(&pool, "self-xfer-val-c", "tok").await;
+    let event_id = create_event(&pool, "Self Xfer Val", creator).await;
+    let editor = login_guest(&pool, "self-xfer-val-ed", "tok").await;
+    let plain = login_guest(&pool, "self-xfer-val-plain", "tok").await;
+    let target = login_guest(&pool, "self-xfer-val-tgt", "tok").await;
+    assign_event_role(&pool, editor, event_id, "editor").await;
+
+    // Editor cannot transfer (has member.manage but not ownership).
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/creator?user_id={}", event_id, editor),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Plain user → 403.
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/creator?user_id={}", event_id, plain),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Missing event → 404.
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/999999/creator?user_id={}", creator),
+        &format!(r#"{{"newCreatorId": {}}}"#, target),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // Missing target → 404.
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/creator?user_id={}", event_id, creator),
+        r#"{"newCreatorId": 999999}"#,
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // Already creator → 400.
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/creator?user_id={}", event_id, creator),
+        &format!(r#"{{"newCreatorId": {}}}"#, creator),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Banned target → 400.
+    let banned = login_guest(&pool, "self-xfer-val-banned", "tok").await;
+    sqlx::query("UPDATE users SET is_banned = true WHERE id = $1")
+        .bind(banned as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/events/{}/creator?user_id={}", event_id, creator),
+        &format!(r#"{{"newCreatorId": {}}}"#, banned),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
 #[sqlx::test]
