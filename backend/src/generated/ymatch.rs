@@ -129,6 +129,10 @@ pub struct InventoryItem {
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "8")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// ADR 0008: true when the linked merchandise row is soft-deleted.
+    /// Present on holder inventory lists so the UI can badge deleted items.
+    #[prost(bool, optional, tag = "9")]
+    pub is_deleted: ::core::option::Option<bool>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -139,7 +143,7 @@ pub struct TradeMatch {
     pub user1_id: i32,
     #[prost(int32, tag = "3")]
     pub user2_id: i32,
-    /// "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED"
+    /// "PENDING", "OFFERED", "ACCEPTED", "COMPLETED", "REJECTED", "CANCELLED"
     #[prost(string, tag = "4")]
     pub status: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]

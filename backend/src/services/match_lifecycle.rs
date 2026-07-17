@@ -4,7 +4,7 @@
 //! the match state machine. Repositories are single-statement; this
 //! service is the only place we open `pool.begin()`.
 //!
-//! State machine (#297 negotiation):
+//! State machine (#297 negotiation + ADR 0008 cancel):
 //!
 //! ```text
 //!     PENDING ──propose──> OFFERED ──counter──> OFFERED ── …
@@ -13,6 +13,10 @@
 //!        │                   └─reject──────────────────────────> REJECTED
 //!        └──reject──> REJECTED
 //!     ACCEPTED ──complete──> COMPLETED
+//!
+//!     PENDING  ──cancel (system, item deleted)──► CANCELLED
+//!     OFFERED  ──cancel (system, item deleted)──► CANCELLED
+//!     ACCEPTED ──cancel (system, item deleted)──► CANCELLED
 //! ```
 //!
 //! `OFFERED` is the "proposal on the table" state; `offered_by` is the last
@@ -20,6 +24,10 @@
 //! may counter-offer from OFFERED. Legs accumulate by partial upsert
 //! (unspecified legs persist). Accept is the non-proposer's and requires a
 //! balanced proposal (Σ qty each side gives equal and > 0).
+//!
+//! `CANCELLED` is system-driven only (merchandise soft-delete invalidates
+//! active matches that reference the item — ADR 0008). It is **not**
+//! reachable via [`MatchLifecycleService::change_status`].
 //!
 //! The apply-inventory step runs *after* COMPLETED and updates the
 //! `inventory` table based on the offer's `match_items` legs. Each side
@@ -38,6 +46,8 @@ const STATUS_OFFERED: &str = "OFFERED";
 const STATUS_ACCEPTED: &str = "ACCEPTED";
 const STATUS_COMPLETED: &str = "COMPLETED";
 const STATUS_REJECTED: &str = "REJECTED";
+/// System-only terminal status (item deleted). Not user-reachable.
+pub const STATUS_CANCELLED: &str = "CANCELLED";
 
 /// Service for the match state machine.
 ///
@@ -465,13 +475,16 @@ fn validate_participation(user_id: i32, user1_id: i32, user2_id: i32) -> Result<
     Ok(())
 }
 
-/// Reject transition targets that are not part of the state machine.
+/// Reject transition targets that are not part of the *user* state machine.
 ///
 /// Factored out of [`MatchLifecycleService::change_status`] so it can be
 /// unit-tested. Called *before* opening the transaction so an invalid
 /// target short-circuits before any DB work — and before the not-found
 /// check (an invalid status on a missing match id must still be a 400, not
 /// a 404; see `test_update_match_status_validation`).
+///
+/// `CANCELLED` is intentionally absent: it is system-driven only (see
+/// [`validate_cancel_transition`]).
 fn validate_transition_target(new_status: &str) -> Result<(), AppError> {
     if !matches!(new_status, "ACCEPTED" | "REJECTED" | "COMPLETED") {
         return Err(AppError::bad_request("Invalid status"));
@@ -496,6 +509,20 @@ fn validate_status_transition(new_status: &str, current_status: &str) -> Result<
             AppError::bad_request("Can only reject PENDING or OFFERED matches"),
         ),
         _ => Ok(()),
+    }
+}
+
+/// Validate a system-driven cancel (ADR 0008 / merch soft-delete).
+///
+/// Allows `PENDING` / `OFFERED` / `ACCEPTED` → `CANCELLED`. Not reachable via
+/// [`MatchLifecycleService::change_status`] (see
+/// [`validate_transition_target`]). Used by the merch delete path.
+pub fn validate_cancel_transition(current_status: &str) -> Result<(), AppError> {
+    match current_status {
+        STATUS_PENDING | STATUS_OFFERED | STATUS_ACCEPTED => Ok(()),
+        _ => Err(AppError::bad_request(
+            "Can only cancel PENDING, OFFERED, or ACCEPTED matches",
+        )),
     }
 }
 
@@ -845,6 +872,15 @@ mod tests {
         assert_eq!(validate_transition_target("COMPLETED"), Ok(()));
     }
 
+    #[test]
+    fn transition_target_cancelled_rejected() {
+        // CANCELLED is system-only; users must not set it via change_status.
+        assert_eq!(
+            validate_transition_target(STATUS_CANCELLED),
+            Err(AppError::bad_request("Invalid status"))
+        );
+    }
+
     // --- validate_status_transition (the four-arm guard) ---
 
     #[test]
@@ -918,6 +954,53 @@ mod tests {
             validate_status_transition("REJECTED", "COMPLETED"),
             Err(AppError::bad_request(
                 "Can only reject PENDING or OFFERED matches"
+            ))
+        );
+    }
+
+    // --- validate_cancel_transition (ADR 0008 system cancel) ---
+
+    #[test]
+    fn cancel_from_pending_ok() {
+        assert_eq!(validate_cancel_transition(STATUS_PENDING), Ok(()));
+    }
+
+    #[test]
+    fn cancel_from_offered_ok() {
+        assert_eq!(validate_cancel_transition(STATUS_OFFERED), Ok(()));
+    }
+
+    #[test]
+    fn cancel_from_accepted_ok() {
+        assert_eq!(validate_cancel_transition(STATUS_ACCEPTED), Ok(()));
+    }
+
+    #[test]
+    fn cancel_from_completed_rejected() {
+        assert_eq!(
+            validate_cancel_transition(STATUS_COMPLETED),
+            Err(AppError::bad_request(
+                "Can only cancel PENDING, OFFERED, or ACCEPTED matches"
+            ))
+        );
+    }
+
+    #[test]
+    fn cancel_from_rejected_rejected() {
+        assert_eq!(
+            validate_cancel_transition(STATUS_REJECTED),
+            Err(AppError::bad_request(
+                "Can only cancel PENDING, OFFERED, or ACCEPTED matches"
+            ))
+        );
+    }
+
+    #[test]
+    fn cancel_from_cancelled_rejected() {
+        assert_eq!(
+            validate_cancel_transition(STATUS_CANCELLED),
+            Err(AppError::bad_request(
+                "Can only cancel PENDING, OFFERED, or ACCEPTED matches"
             ))
         );
     }

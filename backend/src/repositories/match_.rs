@@ -101,7 +101,8 @@ impl MatchRepository {
                JOIN users u
                  ON u.id = (CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END)
                JOIN events e ON e.id = m.event_id
-               WHERE (m.user1_id = $1 OR m.user2_id = $1) AND m.status != 'REJECTED'
+               WHERE (m.user1_id = $1 OR m.user2_id = $1)
+                 AND m.status NOT IN ('REJECTED', 'CANCELLED')
                ORDER BY m.created_at DESC"#;
         let match_rows = sqlx::query(match_sql)
             .bind(user_id)
@@ -219,6 +220,7 @@ impl MatchRepository {
                     photo_url: r.get::<Option<String>, _>("photo_url"),
                     // #348: populated from the merch row (was hardcoded None).
                     group_name,
+                    is_deleted: None,
                 });
         }
         let mut wants_by_peer: HashMap<
@@ -243,6 +245,7 @@ impl MatchRepository {
                     photo_url: r.get::<Option<String>, _>("photo_url"),
                     // #348: populated from the merch row (was hardcoded None).
                     group_name,
+                    is_deleted: None,
                 });
         }
         let mut items_by_match: HashMap<i32, Vec<MatchItem>> = HashMap::new();

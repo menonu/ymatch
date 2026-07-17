@@ -1464,6 +1464,9 @@ impl serde::Serialize for InventoryItem {
         if self.group_name.is_some() {
             len += 1;
         }
+        if self.is_deleted.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.InventoryItem", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -1489,6 +1492,9 @@ impl serde::Serialize for InventoryItem {
         if let Some(v) = self.group_name.as_ref() {
             struct_ser.serialize_field("groupName", v)?;
         }
+        if let Some(v) = self.is_deleted.as_ref() {
+            struct_ser.serialize_field("isDeleted", v)?;
+        }
         struct_ser.end()
     }
 }
@@ -1512,6 +1518,8 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
             "photoUrl",
             "group_name",
             "groupName",
+            "is_deleted",
+            "isDeleted",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1524,6 +1532,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
             MerchName,
             PhotoUrl,
             GroupName,
+            IsDeleted,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1553,6 +1562,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                             "merchName" | "merch_name" => Ok(GeneratedField::MerchName),
                             "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
+                            "isDeleted" | "is_deleted" => Ok(GeneratedField::IsDeleted),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1580,6 +1590,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                 let mut merch_name__ = None;
                 let mut photo_url__ = None;
                 let mut group_name__ = None;
+                let mut is_deleted__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -1638,6 +1649,12 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                             }
                             group_name__ = map_.next_value()?;
                         }
+                        GeneratedField::IsDeleted => {
+                            if is_deleted__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("isDeleted"));
+                            }
+                            is_deleted__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(InventoryItem {
@@ -1649,6 +1666,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                     merch_name: merch_name__,
                     photo_url: photo_url__,
                     group_name: group_name__,
+                    is_deleted: is_deleted__,
                 })
             }
         }

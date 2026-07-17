@@ -728,6 +728,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     $core.String? merchName,
     $core.String? photoUrl,
     $core.String? groupName,
+    $core.bool? isDeleted,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -738,6 +739,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     if (merchName != null) result.merchName = merchName;
     if (photoUrl != null) result.photoUrl = photoUrl;
     if (groupName != null) result.groupName = groupName;
+    if (isDeleted != null) result.isDeleted = isDeleted;
     return result;
   }
 
@@ -762,6 +764,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'merchName')
     ..aOS(7, _omitFieldNames ? '' : 'photoUrl')
     ..aOS(8, _omitFieldNames ? '' : 'groupName')
+    ..aOB(9, _omitFieldNames ? '' : 'isDeleted')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -854,6 +857,17 @@ class InventoryItem extends $pb.GeneratedMessage {
   $core.bool hasGroupName() => $_has(7);
   @$pb.TagNumber(8)
   void clearGroupName() => $_clearField(8);
+
+  /// ADR 0008: true when the linked merchandise row is soft-deleted.
+  /// Present on holder inventory lists so the UI can badge deleted items.
+  @$pb.TagNumber(9)
+  $core.bool get isDeleted => $_getBF(8);
+  @$pb.TagNumber(9)
+  set isDeleted($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasIsDeleted() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearIsDeleted() => $_clearField(9);
 }
 
 class TradeMatch extends $pb.GeneratedMessage {

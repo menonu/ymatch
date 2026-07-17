@@ -42,24 +42,29 @@ fn map_name_conflict(e: sqlx::Error, name: &str, group: &str) -> AppError {
     }
 }
 
-/// Outcome of [`MerchandiseRepository::delete_merch`].
+/// Outcome of [`MerchandiseRepository::delete_merch`] / [`delete_by_id`].
+///
+/// ADR 0008: deletion is always soft-delete; the hard-delete branch is gone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeleteOutcome {
-    /// The merch row was soft-deleted (`is_deleted = true`, `trade_enabled = false`)
-    /// because inventory rows still reference it.
+    /// The merch row was soft-deleted (`is_deleted = true`, `trade_enabled = false`).
+    /// Active matches referencing the item were moved to `CANCELLED` in the
+    /// same transaction.
     SoftDeleted,
-    /// The merch row was hard-deleted because no inventory references it.
-    HardDeleted,
 }
 
 impl DeleteOutcome {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::SoftDeleted => "soft_deleted",
-            Self::HardDeleted => "hard_deleted",
         }
     }
 }
+
+/// System message posted into a match thread when the match is force-cancelled
+/// because a referenced merch item was deleted (ADR 0008).
+const CANCEL_SYSTEM_MESSAGE: &str = "This match was cancelled because a traded item was deleted.";
+const MESSAGE_TYPE_SYSTEM: &str = "SYSTEM";
 
 /// Concrete PostgreSQL-backed repository for the `merchandise` table.
 ///
@@ -89,6 +94,11 @@ impl MerchandiseRepository {
 
     /// List merchandise for one event, with creator-visible drafts included
     /// when `viewer_id` matches the merch creator.
+    ///
+    /// ADR 0008: soft-deleted rows are visible only to *holders* — the merch
+    /// `creator_id` or any user with a `HAVE` inventory row for the item —
+    /// and are still marked `is_deleted = true`. Non-holders never see them.
+    /// Search remains live-items-only (see handlers/search.rs).
     pub async fn list_for_event(
         &self,
         event_id: i32,
@@ -97,8 +107,24 @@ impl MerchandiseRepository {
         let sql = format!(
             r#"SELECT {} FROM merchandise m
             LEFT JOIN merchandise_groups g ON g.event_id = m.event_id AND g.group_name = m.group_name
-            WHERE m.event_id = $1 AND m.is_deleted = false
+            WHERE m.event_id = $1
             AND (m.status = 'published' OR m.creator_id = $2)
+            AND (
+              m.is_deleted = false
+              OR (
+                m.is_deleted = true
+                AND $2 IS NOT NULL
+                AND (
+                  m.creator_id = $2
+                  OR EXISTS (
+                    SELECT 1 FROM inventory i
+                    WHERE i.merch_id = m.id
+                      AND i.user_id = $2
+                      AND i.status = 'HAVE'
+                  )
+                )
+              )
+            )
             ORDER BY m.id ASC"#,
             MERCH_SELECT
         );
@@ -356,49 +382,81 @@ impl MerchandiseRepository {
         }
     }
 
-    /// Soft- or hard-delete by merch primary key, based on whether any
-    /// inventory row references this merch. Used by the admin path
-    /// (`DELETE /admin/merch/:id`) which only has a merch id, and by
-    /// [`Self::delete_merch`] for the event-scoped creator path.
+    /// Soft-delete merchandise and cancel active matches that reference it
+    /// (ADR 0008 / #423).
+    ///
+    /// Always sets `is_deleted = true, trade_enabled = false` — never issues
+    /// `DELETE FROM merchandise`. In the same transaction, every
+    /// `PENDING`/`OFFERED`/`ACCEPTED` match that has a `match_items` row for
+    /// this merch (give or receive side) is set to `CANCELLED`, and a system
+    /// `messages` row is posted into each cancelled match thread.
+    ///
+    /// `COMPLETED` matches are left as history. Used by the admin path
+    /// (`DELETE /admin/merch/:id`) and by [`Self::delete_merch`] for the
+    /// event-scoped creator path.
     ///
     /// Returns `None` if no merchandise row exists for `merch_id`.
     pub async fn delete_by_id(&self, merch_id: i32) -> Result<Option<DeleteOutcome>, AppError> {
-        let has_inventory: bool = sqlx::query(
-            "SELECT EXISTS(SELECT 1 FROM inventory WHERE merch_id = $1 AND quantity > 0) as has_inv",
+        let mut tx = self.pool.begin().await?;
+
+        let exists: Option<i32> =
+            sqlx::query_scalar("SELECT id FROM merchandise WHERE id = $1 FOR UPDATE")
+                .bind(merch_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        if exists.is_none() {
+            return Ok(None);
+        }
+
+        sqlx::query(
+            "UPDATE merchandise SET is_deleted = true, trade_enabled = false WHERE id = $1",
         )
         .bind(merch_id)
-        .fetch_one(&self.pool)
-        .await?
-        .get("has_inv");
+        .execute(&mut *tx)
+        .await?;
 
-        if has_inventory {
-            let affected = sqlx::query(
-                "UPDATE merchandise SET is_deleted = true, trade_enabled = false WHERE id = $1",
+        // Cancel active matches that reference this merch via match_items
+        // (give or receive side), then post a system message into each
+        // cancelled match thread so participants know why it vanished.
+        let cancelled: Vec<(i32, i32)> = sqlx::query_as(
+            r#"
+            UPDATE matches m
+            SET status = 'CANCELLED'
+            WHERE m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+              AND EXISTS (
+                SELECT 1 FROM match_items mi
+                WHERE mi.match_id = m.id AND mi.merch_id = $1
+              )
+            RETURNING m.id, m.user1_id
+            "#,
+        )
+        .bind(merch_id)
+        .fetch_all(&mut *tx)
+        .await?;
+
+        if !cancelled.is_empty() {
+            let match_ids: Vec<i32> = cancelled.iter().map(|(id, _)| *id).collect();
+            let senders: Vec<i32> = cancelled.iter().map(|(_, uid)| *uid).collect();
+            sqlx::query(
+                r#"
+                INSERT INTO messages (match_id, sender_id, content, message_type)
+                SELECT match_id, sender_id, $3, $4
+                FROM UNNEST($1::int[], $2::int[]) AS t(match_id, sender_id)
+                "#,
             )
-            .bind(merch_id)
-            .execute(&self.pool)
-            .await?
-            .rows_affected();
-            Ok(if affected == 0 {
-                None
-            } else {
-                Some(DeleteOutcome::SoftDeleted)
-            })
-        } else {
-            let affected = sqlx::query("DELETE FROM merchandise WHERE id = $1")
-                .bind(merch_id)
-                .execute(&self.pool)
-                .await?
-                .rows_affected();
-            Ok(if affected == 0 {
-                None
-            } else {
-                Some(DeleteOutcome::HardDeleted)
-            })
+            .bind(&match_ids)
+            .bind(&senders)
+            .bind(CANCEL_SYSTEM_MESSAGE)
+            .bind(MESSAGE_TYPE_SYSTEM)
+            .execute(&mut *tx)
+            .await?;
         }
+
+        tx.commit().await?;
+        Ok(Some(DeleteOutcome::SoftDeleted))
     }
 
-    /// Soft- or hard-delete merch scoped to an event. Delegates to
+    /// Soft-delete merch scoped to an event. Delegates to
     /// [`Self::delete_by_id`]; `event_id` is retained for the event-scoped
     /// route signature used by `merch::delete_merch_by_creator`.
     pub async fn delete_merch(

@@ -93,6 +93,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
+                    // ADR 0008: SYSTEM rows (forced cancel on merch delete) are
+                    // centered notices, not chat bubbles.
+                    if (msg.hasMessageType() && msg.messageType == 'SYSTEM') {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          msg.content.isNotEmpty
+                              ? msg.content
+                              : l10n.matchCancelledSystemMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      );
+                    }
                     final isMe = msg.senderId == user.id;
 
                     return Align(

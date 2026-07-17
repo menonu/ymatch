@@ -669,13 +669,15 @@ class UserInventoryNotifier
         if (item.merchId == merchId && item.status == status) {
           found = true;
           // clone is deprecated, instantiate a new one and copy props
-          return InventoryItem()
+          final updated = InventoryItem()
             ..id = item.id
             ..userId = item.userId
             ..merchId = item.merchId
             ..status = item.status
             ..quantity = quantity
             ..merchName = item.merchName;
+          if (item.hasIsDeleted()) updated.isDeleted = item.isDeleted;
+          return updated;
         }
         return item;
       }).toList();

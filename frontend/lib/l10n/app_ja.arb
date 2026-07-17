@@ -202,5 +202,7 @@
   "exportFormatMarkdown": "Markdown",
   "exportCopy": "コピー",
   "exportCopied": "クリップボードにコピーしました",
-  "exportEmpty": "エクスポート対象がありません"
+  "exportEmpty": "エクスポート対象がありません",
+  "itemDeleted": "削除済み",
+  "matchCancelledSystemMessage": "取引アイテムが削除されたため、このマッチはキャンセルされました。"
 }
