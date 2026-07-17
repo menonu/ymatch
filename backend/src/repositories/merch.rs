@@ -20,6 +20,8 @@
 use crate::error::AppError;
 use crate::generated::ymatch::{CreateMerchRequest, Merchandise, UpdateMerchRequest};
 use crate::handlers::mappers::merch_from_row;
+use crate::repositories::match_::MatchRepository;
+use crate::services::match_lifecycle::CANCEL_MSG_MERCH_DELETED;
 use sqlx::{PgPool, Row};
 
 /// Whether a `sqlx::Error` is a Postgres unique-violation (SQLSTATE 23505).
@@ -60,11 +62,6 @@ impl DeleteOutcome {
         }
     }
 }
-
-/// System message posted into a match thread when the match is force-cancelled
-/// because a referenced merch item was deleted (ADR 0008).
-const CANCEL_SYSTEM_MESSAGE: &str = "This match was cancelled because a traded item was deleted.";
-const MESSAGE_TYPE_SYSTEM: &str = "SYSTEM";
 
 /// Concrete PostgreSQL-backed repository for the `merchandise` table.
 ///
@@ -403,14 +400,17 @@ impl MerchandiseRepository {
     pub async fn delete_by_id(&self, merch_id: i32) -> Result<Option<DeleteOutcome>, AppError> {
         let mut tx = self.pool.begin().await?;
 
-        let exists: Option<i32> =
-            sqlx::query_scalar("SELECT id FROM merchandise WHERE id = $1 FOR UPDATE")
-                .bind(merch_id)
-                .fetch_optional(&mut *tx)
-                .await?;
-        if exists.is_none() {
+        let row = sqlx::query(
+            "SELECT id, event_id, group_name FROM merchandise WHERE id = $1 FOR UPDATE",
+        )
+        .bind(merch_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(row) = row else {
             return Ok(None);
-        }
+        };
+        let event_id: i32 = row.get("event_id");
+        let group_name: Option<String> = row.get("group_name");
 
         sqlx::query(
             "UPDATE merchandise SET is_deleted = true, trade_enabled = false WHERE id = $1",
@@ -419,42 +419,19 @@ impl MerchandiseRepository {
         .execute(&mut *tx)
         .await?;
 
-        // Cancel active matches that reference this merch via match_items
-        // (give or receive side), then post a system message into each
-        // cancelled match thread so participants know why it vanished.
-        let cancelled: Vec<(i32, i32)> = sqlx::query_as(
-            r#"
-            UPDATE matches m
-            SET status = 'CANCELLED'
-            WHERE m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
-              AND EXISTS (
-                SELECT 1 FROM match_items mi
-                WHERE mi.match_id = m.id AND mi.merch_id = $1
-              )
-            RETURNING m.id, m.user1_id
-            "#,
-        )
-        .bind(merch_id)
-        .fetch_all(&mut *tx)
-        .await?;
-
-        if !cancelled.is_empty() {
-            let match_ids: Vec<i32> = cancelled.iter().map(|(id, _)| *id).collect();
-            let senders: Vec<i32> = cancelled.iter().map(|(_, uid)| *uid).collect();
-            sqlx::query(
-                r#"
-                INSERT INTO messages (match_id, sender_id, content, message_type)
-                SELECT match_id, sender_id, $3, $4
-                FROM UNNEST($1::int[], $2::int[]) AS t(match_id, sender_id)
-                "#,
+        // ADR 0008 + ADR 0010: cancel matches that reference this merch via
+        // match_items, and active matches in the same group whose mutual
+        // capacity is now zero (covers legs-less PENDING).
+        let matches = MatchRepository::new(self.pool.clone());
+        matches
+            .cancel_after_merch_delete(
+                &mut tx,
+                merch_id,
+                event_id,
+                group_name.as_deref(),
+                CANCEL_MSG_MERCH_DELETED,
             )
-            .bind(&match_ids)
-            .bind(&senders)
-            .bind(CANCEL_SYSTEM_MESSAGE)
-            .bind(MESSAGE_TYPE_SYSTEM)
-            .execute(&mut *tx)
             .await?;
-        }
 
         tx.commit().await?;
         Ok(Some(DeleteOutcome::SoftDeleted))

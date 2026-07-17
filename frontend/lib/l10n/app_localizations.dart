@@ -992,6 +992,12 @@ abstract class AppLocalizations {
   /// **'COMPLETED'**
   String get statusCompleted;
 
+  /// Match status chip: system-cancelled (inventory/merch invalidation)
+  ///
+  /// In en, this message translates to:
+  /// **'CANCELLED'**
+  String get statusCancelled;
+
   /// Label above items the user would give (potential match)
   ///
   /// In en, this message translates to:

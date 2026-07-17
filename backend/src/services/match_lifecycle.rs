@@ -35,7 +35,7 @@
 //! prevents double-application.
 
 use crate::error::AppError;
-use crate::generated::ymatch::{OfferItem, OfferTradeRequest};
+use crate::generated::ymatch::{InventoryItem, OfferItem, OfferTradeRequest};
 use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::MatchRepository;
 use sqlx::PgPool;
@@ -46,8 +46,16 @@ const STATUS_OFFERED: &str = "OFFERED";
 const STATUS_ACCEPTED: &str = "ACCEPTED";
 const STATUS_COMPLETED: &str = "COMPLETED";
 const STATUS_REJECTED: &str = "REJECTED";
-/// System-only terminal status (item deleted). Not user-reachable.
+/// System-only terminal status (item deleted / capacity zero). Not user-reachable.
 pub const STATUS_CANCELLED: &str = "CANCELLED";
+
+/// SYSTEM message when mutual inventory capacity hits zero (ADR 0010).
+pub const CANCEL_MSG_INVENTORY_CAPACITY: &str =
+    "This match was cancelled because inventory no longer supports a mutual trade.";
+
+/// SYSTEM message when a referenced merch item is soft-deleted (ADR 0008).
+pub const CANCEL_MSG_MERCH_DELETED: &str =
+    "This match was cancelled because a traded item was deleted.";
 
 /// Service for the match state machine.
 ///
@@ -351,6 +359,59 @@ impl MatchLifecycleService {
         tx.commit().await?;
         Ok(())
     }
+
+    /// Upsert inventory and, for WANT/TRADE writes, re-evaluate mutual
+    /// capacity of the acting user's active matches (ADR 0010).
+    ///
+    /// Inventory write + any resulting `CANCELLED` transitions + SYSTEM
+    /// messages run in a single transaction. `HAVE`-only upserts skip
+    /// re-evaluation (HAVE is not part of the cap).
+    pub async fn update_inventory(
+        &self,
+        user_id: i32,
+        merch_id: i32,
+        status: &str,
+        quantity: i32,
+    ) -> Result<InventoryItem, AppError> {
+        let mut tx = self.pool.begin().await?;
+
+        let item = self
+            .inventory
+            .upsert_in_tx(&mut *tx, user_id, merch_id, status, quantity)
+            .await?;
+
+        if status == "WANT" || status == "TRADE" {
+            self.cancel_zero_capacity_for_user(&mut tx, user_id).await?;
+        }
+
+        tx.commit().await?;
+        Ok(item)
+    }
+
+    /// Cancel the user's active matches whose mutual cap is zero on either
+    /// side (ADR 0010). Caller holds the transaction.
+    async fn cancel_zero_capacity_for_user(
+        &self,
+        tx: &mut sqlx::PgConnection,
+        user_id: i32,
+    ) -> Result<(), AppError> {
+        let scopes = self
+            .matches
+            .list_active_scopes_for_user(&mut *tx, user_id)
+            .await?;
+        let mut to_cancel: Vec<i32> = Vec::new();
+        for scope in &scopes {
+            if self.matches.scope_requires_cancel(&mut *tx, scope).await? {
+                to_cancel.push(scope.id);
+            }
+        }
+        if !to_cancel.is_empty() {
+            self.matches
+                .system_cancel_matches(&mut *tx, &to_cancel, CANCEL_MSG_INVENTORY_CAPACITY)
+                .await?;
+        }
+        Ok(())
+    }
 }
 
 // Note: the lifecycle service requires a real database (transactions are
@@ -361,6 +422,7 @@ impl MatchLifecycleService {
 // `validate_participation`, `validate_legs`, `is_balanced`,
 // `validate_transition_target`, `validate_status_transition`,
 // `apply_inventory_delta`) so they can be unit-tested without a database.
+// ADR 0010 capacity predicate lives in `match_::capacity_requires_cancel`.
 
 /// Validate that the proposed legs are well-formed and within the receiver's
 /// WANT quantity (#294/#297).

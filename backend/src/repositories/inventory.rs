@@ -38,6 +38,23 @@ impl InventoryRepository {
         status: &str,
         quantity: i32,
     ) -> Result<InventoryItem, AppError> {
+        self.upsert_in_tx(&self.pool, user_id, merch_id, status, quantity)
+            .await
+    }
+
+    /// Transaction-aware upsert (ADR 0010: share the inventory write with
+    /// match capacity re-evaluation in one transaction).
+    pub async fn upsert_in_tx<'c, E>(
+        &self,
+        exec: E,
+        user_id: i32,
+        merch_id: i32,
+        status: &str,
+        quantity: i32,
+    ) -> Result<InventoryItem, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let row = sqlx::query(
             r#"INSERT INTO inventory (user_id, merch_id, status, quantity)
                VALUES ($1, $2, $3, $4)
@@ -49,7 +66,7 @@ impl InventoryRepository {
         .bind(merch_id)
         .bind(status)
         .bind(quantity)
-        .fetch_one(&self.pool)
+        .fetch_one(exec)
         .await?;
         Ok(InventoryItem {
             id: row.get("id"),

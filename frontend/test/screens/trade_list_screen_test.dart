@@ -403,37 +403,46 @@ void main() {
     },
   );
 
-  testWidgets('CANCELLED matches are hidden from all tabs (ADR 0008 / #423)', (
-    WidgetTester tester,
-  ) async {
-    final cancelled = TradeMatch()
-      ..id = 999
-      ..user1Id = 1
-      ..user2Id = 2
-      ..status = 'CANCELLED'
-      ..userHaves.add(_item(10, 'Gone Pen', 1, 1));
-    final pending = _pendingMatch();
+  testWidgets(
+    'CANCELLED matches appear only on Done tab (ADR 0010 / #452)',
+    (WidgetTester tester) async {
+      final cancelled = TradeMatch()
+        ..id = 999
+        ..user1Id = 1
+        ..user2Id = 2
+        ..status = 'CANCELLED'
+        ..userHaves.add(_item(10, 'Gone Pen', 1, 1));
+      final pending = _pendingMatch();
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authProvider.overrideWith((ref) => MockAuthController(_user())),
-          matchesProvider(1).overrideWith((ref) async => [pending, cancelled]),
-          notificationCountsProvider(
-            1,
-          ).overrideWith((ref) async => NotificationCounts()),
-        ],
-        child: _localized(const TradeListScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(
+              1,
+            ).overrideWith((ref) async => [pending, cancelled]),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // Match tab: only the PENDING card is shown; cancelled is excluded.
-    expect(find.text('Make Offer'), findsOneWidget);
-    expect(find.text('Gone Pen'), findsNothing);
-    // The pending match still appears once.
-    expect(find.textContaining('Give Pen'), findsWidgets);
-  });
+      // Match tab: only the PENDING card; CANCELLED excluded from actionable tabs.
+      expect(find.text('Make Offer'), findsOneWidget);
+      expect(find.text('Gone Pen'), findsNothing);
+      expect(find.textContaining('Give Pen'), findsWidgets);
+
+      // Done tab surfaces CANCELLED for history (ADR 0010).
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(find.text('CANCELLED'), findsOneWidget);
+      expect(find.textContaining('Gone Pen'), findsOneWidget);
+      expect(find.text('Make Offer'), findsNothing);
+    },
+  );
 }
 
 User _user() => User()

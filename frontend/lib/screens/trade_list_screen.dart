@@ -37,24 +37,25 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     TradeTab tab,
     int userId,
   ) {
-    // ADR 0008: CANCELLED is system-only and never surfaces in the UI.
-    // Backend list already excludes it; filter defensively on the client too.
-    final active = matches.where((m) => m.status != 'CANCELLED');
+    // ADR 0010: CANCELLED is system-only (not user-actionable) but surfaces
+    // under Done alongside COMPLETED. Actionable tabs exclude it.
     switch (tab) {
       case TradeTab.match_:
-        return active.where((m) => m.status == 'PENDING').toList();
+        return matches.where((m) => m.status == 'PENDING').toList();
       case TradeTab.offerOut:
-        return active
+        return matches
             .where((m) => m.status == 'OFFERED' && m.offeredBy == userId)
             .toList();
       case TradeTab.offerIn:
-        return active
+        return matches
             .where((m) => m.status == 'OFFERED' && m.offeredBy != userId)
             .toList();
       case TradeTab.active:
-        return active.where((m) => m.status == 'ACCEPTED').toList();
+        return matches.where((m) => m.status == 'ACCEPTED').toList();
       case TradeTab.completed:
-        return active.where((m) => m.status == 'COMPLETED').toList();
+        return matches
+            .where((m) => m.status == 'COMPLETED' || m.status == 'CANCELLED')
+            .toList();
     }
   }
 
@@ -281,103 +282,108 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
         ? match.otherUser.username
         : l10n.unknownUser;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        // #314: completed matches stay conversable — the card opens the chat
-        // thread on every tab, same as while trading.
-        onTap: () => context.go('/matches/chat/${match.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header: user + status
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppTheme.secondaryColor.withValues(
-                      alpha: 0.1,
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: AppTheme.secondaryColor,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          otherName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        _statusChip(context, match.status),
-                        // #322 / ADR 0001: a match is scoped to one item group,
-                        // so show `event:group` once on the card instead of per
-                        // item. Both fields are NOT NULL on a real match; guard
-                        // so synthetic/test matches without them render nothing.
-                        if (match.hasGroupName() && match.hasEventName()) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            l10n.matchGroupLabel(
-                              match.eventName,
-                              match.groupName,
-                            ),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  // #314: the Message affordance is shown on every tab,
-                  // including completed matches (chat remains open after a
-                  // trade is done, same as while trading).
-                  FilledButton.tonal(
-                    onPressed: () => context.go('/matches/chat/${match.id}'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+    final cancelled = match.status == 'CANCELLED';
+    return Opacity(
+      opacity: cancelled ? 0.72 : 1,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          // #314: completed matches stay conversable — the card opens the chat
+          // thread on every tab, same as while trading. CANCELLED (ADR 0010)
+          // also keeps chat for history/SYSTEM cancel reason.
+          onTap: () => context.go('/matches/chat/${match.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: user + status
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppTheme.secondaryColor.withValues(
+                        alpha: 0.1,
                       ),
-                      minimumSize: const Size(0, 36),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      child: const Icon(
+                        Icons.person,
+                        color: AppTheme.secondaryColor,
+                        size: 20,
+                      ),
                     ),
-                    child: Text(l10n.messageAction),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            otherName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          _statusChip(context, match.status),
+                          // #322 / ADR 0001: a match is scoped to one item group,
+                          // so show `event:group` once on the card instead of per
+                          // item. Both fields are NOT NULL on a real match; guard
+                          // so synthetic/test matches without them render nothing.
+                          if (match.hasGroupName() && match.hasEventName()) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              l10n.matchGroupLabel(
+                                match.eventName,
+                                match.groupName,
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // #314: the Message affordance is shown on every tab,
+                    // including completed matches (chat remains open after a
+                    // trade is done, same as while trading).
+                    FilledButton.tonal(
+                      onPressed: () => context.go('/matches/chat/${match.id}'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(l10n.messageAction),
+                    ),
+                  ],
+                ),
+
+                // Items section
+                if (match.selectedItems.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildSelectedItems(context, user.id, match),
+                ] else if (match.userHaves.isNotEmpty ||
+                    match.userWants.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildPotentialItems(context, match),
                 ],
-              ),
 
-              // Items section
-              if (match.selectedItems.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                _buildSelectedItems(context, user.id, match),
-              ] else if (match.userHaves.isNotEmpty ||
-                  match.userWants.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                _buildPotentialItems(context, match),
+                // Balance indicator on an open proposal (#297)
+                if (match.status == 'OFFERED') ...[
+                  const SizedBox(height: 8),
+                  _buildBalanceIndicator(context, user.id, match),
+                ],
+
+                // Action buttons (none for CANCELLED — Done tab history only)
+                if (!cancelled) ..._buildActions(context, user, match, tab),
               ],
-
-              // Balance indicator on an open proposal (#297)
-              if (match.status == 'OFFERED') ...[
-                const SizedBox(height: 8),
-                _buildBalanceIndicator(context, user.id, match),
-              ],
-
-              // Action buttons
-              ..._buildActions(context, user, match, tab),
-            ],
+            ),
           ),
         ),
       ),
@@ -404,6 +410,10 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
       case 'COMPLETED':
         color = Colors.grey;
         label = l10n.statusCompleted;
+        break;
+      case 'CANCELLED':
+        color = Colors.brown;
+        label = l10n.statusCancelled;
         break;
       default:
         color = Colors.grey;

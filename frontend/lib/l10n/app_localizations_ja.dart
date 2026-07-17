@@ -494,6 +494,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get statusCompleted => '完了';
 
   @override
+  String get statusCancelled => '無効';
+
+  @override
   String get youGive => 'あなたが渡すもの:';
 
   @override

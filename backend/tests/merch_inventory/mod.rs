@@ -1065,7 +1065,7 @@ async fn test_delete_merch_cancels_active_matches_leaves_completed(pool: PgPool)
     .unwrap();
     assert_eq!(completed_msgs, 0, "COMPLETED must not get a cancel message");
 
-    // Cancelled matches excluded from the user's active list.
+    // ADR 0010: CANCELLED is returned so the Done tab can show it; REJECTED stays hidden.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1084,12 +1084,16 @@ async fn test_delete_merch_cancels_active_matches_leaves_completed(pool: PgPool)
         .map(|m| m["status"].as_str().unwrap_or(""))
         .collect();
     assert!(
-        !statuses.iter().any(|s| *s == "CANCELLED"),
-        "CANCELLED must be hidden from active list, got {statuses:?}"
+        statuses.iter().any(|s| *s == "CANCELLED"),
+        "CANCELLED must surface in list for Done tab, got {statuses:?}"
     );
     assert!(
         statuses.iter().any(|s| *s == "COMPLETED"),
         "COMPLETED history should still list"
+    );
+    assert!(
+        !statuses.iter().any(|s| *s == "REJECTED"),
+        "REJECTED stays hidden, got {statuses:?}"
     );
 }
 
@@ -1224,15 +1228,23 @@ async fn test_deleted_merch_holder_visibility(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_offer_rejects_soft_deleted_merch(pool: PgPool) {
-    // ADR 0008 / review: PENDING matches may survive without match_items, but
-    // proposing a soft-deleted merch id must fail.
+    // ADR 0008: proposing a soft-deleted merch id must fail.
+    // ADR 0010: legs-less PENDING whose only capacity was the deleted item
+    // is cancelled on delete; keep a second live merch so mutual capacity
+    // remains and the match stays PENDING for the offer-rejection check.
     let (creator, event_id) =
         create_test_user_and_event(pool.clone(), "offer-del-creator", "Offer Del Event").await;
     let peer = login_guest(&pool, "offer-del-peer", "t").await;
 
     let merch_id = create_merch(&pool, event_id, "OfferDel Item", "G").await;
+    let merch_live = create_merch(&pool, event_id, "OfferDel Live", "G").await;
+    // Mutual capacity via live item (both directions) + the soon-deleted item.
     set_inventory(&pool, creator, merch_id, "TRADE", 2).await;
     set_inventory(&pool, peer, merch_id, "WANT", 2).await;
+    set_inventory(&pool, creator, merch_live, "TRADE", 1).await;
+    set_inventory(&pool, peer, merch_live, "WANT", 1).await;
+    set_inventory(&pool, peer, merch_live, "TRADE", 1).await;
+    set_inventory(&pool, creator, merch_live, "WANT", 1).await;
 
     let match_id: i32 = sqlx::query_scalar(
         "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
@@ -1245,7 +1257,7 @@ async fn test_offer_rejects_soft_deleted_merch(pool: PgPool) {
     .await
     .unwrap();
 
-    // Soft-delete (no match_items → match stays PENDING).
+    // Soft-delete one merch; capacity via live item remains → match stays PENDING.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1269,7 +1281,7 @@ async fn test_offer_rejects_soft_deleted_merch(pool: PgPool) {
         .unwrap();
     assert_eq!(
         status, "PENDING",
-        "PENDING without legs is not auto-cancelled"
+        "PENDING with remaining mutual capacity stays active"
     );
 
     // Offer of the deleted merch must be rejected.
@@ -1282,5 +1294,169 @@ async fn test_offer_rejects_soft_deleted_merch(pool: PgPool) {
         resp.status(),
         StatusCode::BAD_REQUEST,
         "offer of soft-deleted merch must fail"
+    );
+}
+
+// --- ADR 0010 / #452: inventory mutual-capacity invalidation ---
+
+/// Two users + two merch in group G with mutual TRADE/WANT of `qty` each way.
+/// Inserts a match at `status` (no match_items). Returns (u1, u2, event, m_a, m_b, match_id).
+async fn seed_mutual_capacity_match(
+    pool: &PgPool,
+    label: &str,
+    status: &str,
+    qty: i32,
+) -> (i64, i64, i64, i64, i64, i32) {
+    let (u1, event_id) =
+        create_test_user_and_event(pool.clone(), &format!("{label}-u1"), &format!("{label} Ev"))
+            .await;
+    let u2 = login_guest(pool, &format!("{label}-u2"), "t").await;
+    let m_a = create_merch(pool, event_id, &format!("{label} A"), "G").await;
+    let m_b = create_merch(pool, event_id, &format!("{label} B"), "G").await;
+    // u1 TRADEST A, WANTS B; u2 TRADEST B, WANTS A
+    set_inventory(pool, u1, m_a, "TRADE", qty).await;
+    set_inventory(pool, u1, m_b, "WANT", qty).await;
+    set_inventory(pool, u2, m_b, "TRADE", qty).await;
+    set_inventory(pool, u2, m_a, "WANT", qty).await;
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, 'G', $4) RETURNING id",
+    )
+    .bind(u1 as i32)
+    .bind(u2 as i32)
+    .bind(event_id as i32)
+    .bind(status)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    (u1, u2, event_id, m_a, m_b, match_id)
+}
+
+async fn match_status(pool: &PgPool, match_id: i32) -> String {
+    sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test]
+async fn test_inventory_cap_partial_reduction_keeps_pending(pool: PgPool) {
+    // 2:2 → 2:1 still both sides positive → keep
+    let (u1, _u2, _e, m_a, _m_b, match_id) =
+        seed_mutual_capacity_match(&pool, "cap-keep", "PENDING", 2).await;
+
+    set_inventory(&pool, u1, m_a, "TRADE", 1).await; // cap(u1→u2) becomes 1; other side still 2
+
+    assert_eq!(
+        match_status(&pool, match_id).await,
+        "PENDING",
+        "2:2 → 2:1 must keep the match"
+    );
+}
+
+#[sqlx::test]
+async fn test_inventory_cap_zero_cancels_pending_offered_accepted(pool: PgPool) {
+    for status in ["PENDING", "OFFERED", "ACCEPTED"] {
+        let label = format!("cap-z-{status}");
+        let (u1, _u2, _e, m_a, _m_b, match_id) =
+            seed_mutual_capacity_match(&pool, &label, status, 2).await;
+
+        // Zero u1's TRADE of A → cap(u1→u2)=0 → cancel
+        set_inventory(&pool, u1, m_a, "TRADE", 0).await;
+
+        assert_eq!(
+            match_status(&pool, match_id).await,
+            "CANCELLED",
+            "{status} must cancel when either cap hits 0"
+        );
+
+        let msg: String = sqlx::query_scalar(
+            "SELECT content FROM messages WHERE match_id = $1 AND message_type = 'SYSTEM'",
+        )
+        .bind(match_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            msg.contains("inventory"),
+            "SYSTEM message should mention inventory, got {msg}"
+        );
+    }
+}
+
+#[sqlx::test]
+async fn test_inventory_cap_zero_leaves_completed(pool: PgPool) {
+    let (u1, _u2, _e, m_a, _m_b, match_id) =
+        seed_mutual_capacity_match(&pool, "cap-done", "COMPLETED", 2).await;
+
+    set_inventory(&pool, u1, m_a, "TRADE", 0).await;
+
+    assert_eq!(
+        match_status(&pool, match_id).await,
+        "COMPLETED",
+        "COMPLETED is historical and must not be cancelled"
+    );
+}
+
+#[sqlx::test]
+async fn test_list_includes_cancelled_after_inventory_cap_zero(pool: PgPool) {
+    let (u1, _u2, _e, m_a, _m_b, match_id) =
+        seed_mutual_capacity_match(&pool, "cap-list", "PENDING", 1).await;
+
+    set_inventory(&pool, u1, m_a, "TRADE", 0).await;
+    assert_eq!(match_status(&pool, match_id).await, "CANCELLED");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/matches/user/{}", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        matches
+            .iter()
+            .any(|m| m["id"].as_i64() == Some(match_id as i64) && m["status"] == "CANCELLED"),
+        "list_for_user must return CANCELLED match, got {matches:?}"
+    );
+}
+
+#[sqlx::test]
+async fn test_delete_merch_cancels_legsless_pending_when_cap_zero(pool: PgPool) {
+    // ADR 0010 closes ADR 0008 gap: PENDING without match_items is cancelled
+    // when soft-delete removes a direction of mutual capacity.
+    // Setup: cap(u1→u2) only via m_a; cap(u2→u1) only via m_b.
+    // Deleting m_a zeros cap(u1→u2) → CANCELLED even with no match_items.
+    let (u1, _u2, event_id, m_a, _m_b, match_id) =
+        seed_mutual_capacity_match(&pool, "cap-del-pending", "PENDING", 1).await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, m_a, u1
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    assert_eq!(
+        match_status(&pool, match_id).await,
+        "CANCELLED",
+        "legs-less PENDING must cancel when capacity is gone after delete"
     );
 }
