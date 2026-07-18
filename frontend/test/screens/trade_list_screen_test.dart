@@ -342,6 +342,28 @@ void main() {
     },
   );
 
+  testWidgets('match card prefers groupDisplayName over groupName (#466)', (
+    WidgetTester tester,
+  ) async {
+    final match = _groupMatch()..groupDisplayName = 'Booster Boxes';
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [match]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: _localized(const TradeListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('TokyoFest: Booster Boxes'), findsOneWidget);
+    expect(find.text('TokyoFest: BoosterBox'), findsNothing);
+  });
+
   testWidgets('match card shows localized event：group under ja (#322)', (
     WidgetTester tester,
   ) async {

@@ -5,6 +5,7 @@ import '../providers/providers.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
+import '../utils/group_display.dart';
 import '../utils/image_helper.dart';
 import '../widgets/export_inventory_dialog.dart';
 import '../widgets/how_to_trade.dart';
@@ -54,22 +55,6 @@ int resolveInitialGroupTabIndex(
   final i = groupKeys.indexOf(initialGroupName);
   return i >= 0 ? i : 0;
 }
-
-/// The user-visible label for a group: its cosmetic `display_name` when set,
-/// otherwise the internal `group_name` key (#425). The key is unchanged by an
-/// "edit name" — only the rendered text swaps to `display_name`.
-String groupDisplayNameFor(String groupKey, MerchandiseGroup? meta) {
-  if (meta != null && meta.hasDisplayName() && meta.displayName.isNotEmpty) {
-    return meta.displayName;
-  }
-  return groupKey;
-}
-
-/// [groupDisplayName] resolved against a name → metadata map.
-String groupDisplayName(
-  String groupKey,
-  Map<String, MerchandiseGroup> groupByName,
-) => groupDisplayNameFor(groupKey, groupByName[groupKey]);
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   /// Whether the bottom-left group description panel is open (#128).
@@ -405,9 +390,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           final rawGroup = groupName == otherItems
                               ? ''
                               : groupName;
+                          // #466: dialog title uses cosmetic display_name;
+                          // export still filters inventory by the key.
                           await _showExportInventoryDialog(
                             context,
-                            displayGroupName: groupName,
+                            displayGroupName: groupDisplayName(
+                              groupName,
+                              groupByName,
+                            ),
                             rawGroup: rawGroup,
                             user: user,
                           );

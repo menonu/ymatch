@@ -58,6 +58,9 @@ pub struct FavoriteGroup {
     /// Helpful for rendering the shortcut
     #[prost(string, optional, tag = "4")]
     pub event_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// Cosmetic label from merchandise_groups; UI falls back to group_name (#466).
+    #[prost(string, optional, tag = "5")]
+    pub display_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -170,6 +173,9 @@ pub struct TradeMatch {
     /// parent event name of the match's group (#322)
     #[prost(string, optional, tag = "13")]
     pub event_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// Cosmetic group label from merchandise_groups; UI falls back to group_name (#466).
+    #[prost(string, optional, tag = "14")]
+    pub group_display_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

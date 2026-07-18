@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
+import '../models/models.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
+import '../utils/group_display.dart';
 import '../utils/image_helper.dart';
 
 class AddMerchScreen extends ConsumerStatefulWidget {
@@ -131,6 +133,9 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
   @override
   Widget build(BuildContext context) {
     final merchAsync = ref.watch(merchProvider(widget.eventId));
+    // #466: load formal group rows so chips can show display_name while
+    // selection / create-merch still use the immutable group_name key.
+    final groupsAsync = ref.watch(eventGroupsProvider(widget.eventId));
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
@@ -142,12 +147,21 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
       ),
       body: merchAsync.when(
         data: (merchList) {
-          // Extract unique groups
+          final groupsMeta =
+              groupsAsync.valueOrNull ?? const <MerchandiseGroup>[];
+          final groupByName = <String, MerchandiseGroup>{
+            for (final g in groupsMeta) g.groupName: g,
+          };
+
+          // Keys for chips: merch groups + formal groups + session custom names.
           final Set<String> uniqueGroups = {};
           for (final item in merchList) {
             if (item.hasGroupName() && item.groupName.isNotEmpty) {
               uniqueGroups.add(item.groupName);
             }
+          }
+          for (final g in groupsMeta) {
+            if (g.groupName.isNotEmpty) uniqueGroups.add(g.groupName);
           }
           uniqueGroups.addAll(_customGroups);
           final groups = uniqueGroups.toList()..sort(_naturalCompare);
@@ -164,6 +178,10 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                 : null;
             return gName == _selectedGroup;
           }).toList()..sort((a, b) => _naturalCompare(a.name, b.name));
+
+          final selectedLabel = _selectedGroup == null
+              ? l10n.uncategorized
+              : groupDisplayName(_selectedGroup!, groupByName);
 
           return Column(
             children: [
@@ -190,7 +208,8 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                             (g) => Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: FilterChip(
-                                label: Text(g),
+                                // #466: cosmetic label; selection value stays the key.
+                                label: Text(groupDisplayName(g, groupByName)),
                                 selected: _selectedGroup == g,
                                 selectedColor: AppTheme.primaryColor.withValues(
                                   alpha: 0.1,
@@ -341,9 +360,7 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
                 ),
                 color: Colors.grey[100],
                 child: Text(
-                  l10n.existingItemsInGroup(
-                    _selectedGroup ?? l10n.uncategorized,
-                  ),
+                  l10n.existingItemsInGroup(selectedLabel),
                   style: Theme.of(
                     context,
                   ).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),

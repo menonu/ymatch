@@ -333,9 +333,13 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                           if (match.hasGroupName() && match.hasEventName()) ...[
                             const SizedBox(height: 2),
                             Text(
+                              // #466: cosmetic group_display_name when set.
                               l10n.matchGroupLabel(
                                 match.eventName,
-                                match.groupName,
+                                match.hasGroupDisplayName() &&
+                                        match.groupDisplayName.isNotEmpty
+                                    ? match.groupDisplayName
+                                    : match.groupName,
                               ),
                               style: TextStyle(
                                 fontSize: 12,

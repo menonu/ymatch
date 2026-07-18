@@ -53,12 +53,16 @@ impl GroupFavoritesRepository {
         Ok(true)
     }
 
-    /// List a user's favorite groups joined to the event name.
+    /// List a user's favorite groups joined to the event name and optional
+    /// cosmetic `display_name` (#466).
     pub async fn list_for_user(&self, user_id: i32) -> Result<Vec<FavoriteGroup>, AppError> {
         let rows = sqlx::query(
-            r#"SELECT gf.user_id, gf.event_id, gf.group_name, e.name as event_name
+            r#"SELECT gf.user_id, gf.event_id, gf.group_name, e.name as event_name,
+                      mg.display_name AS display_name
                FROM group_favorites gf
                JOIN events e ON gf.event_id = e.id
+               LEFT JOIN merchandise_groups mg
+                 ON mg.event_id = gf.event_id AND mg.group_name = gf.group_name
                WHERE gf.user_id = $1
                ORDER BY gf.created_at DESC"#,
         )
@@ -72,6 +76,10 @@ impl GroupFavoritesRepository {
                 event_id: row.get("event_id"),
                 group_name: row.get("group_name"),
                 event_name: Some(row.get("event_name")),
+                // NULL / empty → omit so the UI falls back to group_name (#466).
+                display_name: row
+                    .get::<Option<String>, _>("display_name")
+                    .filter(|s| !s.is_empty()),
             })
             .collect())
     }

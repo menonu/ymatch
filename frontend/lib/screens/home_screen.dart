@@ -174,6 +174,13 @@ class HomeScreen extends ConsumerWidget {
                         }),
                         ...favGroups.map((group) {
                           final l10n = AppLocalizations.of(context)!;
+                          // #466: chip label uses display_name when the API
+                          // returns it; navigation still uses group_name key.
+                          final label =
+                              group.hasDisplayName() &&
+                                  group.displayName.isNotEmpty
+                              ? group.displayName
+                              : group.groupName;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: _buildShortcutChip(
@@ -183,7 +190,7 @@ class HomeScreen extends ConsumerWidget {
                                 group.hasEventName()
                                     ? group.eventName
                                     : l10n.groupFallback,
-                                group.groupName,
+                                label,
                               ),
                               group.eventId,
                               groupName: group.groupName,

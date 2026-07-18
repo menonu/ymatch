@@ -92,15 +92,20 @@ impl MatchRepository {
         // #322: also read the parent event's name so the match card can show
         // `event:group` once. `matches.event_id` is NOT NULL FK → the JOIN
         // always hits a row, and `events.name` is NOT NULL → always Some.
+        // #466: LEFT JOIN merchandise_groups for the cosmetic display_name so
+        // the card can show a renamed label without mutating group_name.
         let match_sql = r#"SELECT m.id, m.user1_id, m.user2_id, m.status, m.offered_by,
                       m.user1_inventory_applied_at, m.user2_inventory_applied_at,
                       m.created_at, m.event_id, m.group_name, e.name AS event_name,
+                      mg.display_name AS group_display_name,
                       CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END AS other_id,
                       u.username AS other_username
                FROM matches m
                JOIN users u
                  ON u.id = (CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END)
                JOIN events e ON e.id = m.event_id
+               LEFT JOIN merchandise_groups mg
+                 ON mg.event_id = m.event_id AND mg.group_name = m.group_name
                WHERE (m.user1_id = $1 OR m.user2_id = $1)
                  -- ADR 0010: surface CANCELLED under Done; keep REJECTED hidden.
                  AND m.status <> 'REJECTED'
@@ -279,8 +284,12 @@ impl MatchRepository {
             let group_name: String = row.get("group_name");
             // #322: surface the match's `event:group` on the TradeMatch so the
             // card can show it once (both NOT NULL on matches/events).
+            // #466: optional cosmetic label; UI falls back to group_name.
             m.group_name = Some(group_name.clone());
             m.event_name = Some(row.get("event_name"));
+            m.group_display_name = row
+                .get::<Option<String>, _>("group_display_name")
+                .filter(|s| !s.is_empty());
             m.other_user = Some(User {
                 id: other_id,
                 username: other_username,
@@ -996,7 +1005,9 @@ fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
         selected_items: vec![],
         // #322: populated by `list_for_user` (which joins events); None on the
         // admin `list_all` path (MATCH_COLUMNS does not select event/group).
+        // #466: group_display_name also only filled on the list_for_user path.
         group_name: None,
         event_name: None,
+        group_display_name: None,
     }
 }
