@@ -248,7 +248,7 @@ List a user's favorite merchandise groups.
 
 ### GET /api/v1/events/:id/merch
 
-List merchandise for an event. Returns published items plus the requesting user's own drafts. Excludes soft-deleted items.
+List merchandise for an event. Returns published items plus the requesting user's own drafts. Excludes soft-deleted items for every viewer (including creator/moderator and HAVE holders) — ADR 0011 / #468. Soft-deleted rows remain visible only via holder inventory (`GET /api/v1/user/:id/inventory`) and historical match detail.
 
 - **Query Parameters**:
   | Param     | Type | Description                                 |
@@ -304,7 +304,7 @@ Publish a draft merchandise item.
 
 ### DELETE /api/v1/events/:id/merch/:merch_id
 
-Delete a merchandise item. Uses soft-delete (`is_deleted = TRUE`) if the item has existing inventory references; otherwise performs a hard delete.
+Delete a merchandise item. Always soft-deletes (`is_deleted = TRUE`, `trade_enabled = FALSE`) and cancels active matches that reference the item (ADR 0008). Soft-deleted rows are omitted from catalog lists (ADR 0011).
 
 - **Query Parameters**:
   | Param     | Type | Description                         |
@@ -462,7 +462,7 @@ All admin endpoints require the `user_id` query parameter, and the requesting us
 
 ### GET /api/v1/admin/merch
 
-List all merchandise (including drafts and soft-deleted).
+List all merchandise (published + drafts). Soft-deleted rows are excluded (same live-only catalog rule as event list; ADR 0011).
 
 - **Response**: `200 OK` — Array of merchandise objects.
 
@@ -485,7 +485,7 @@ Delete an event.
 
 ### DELETE /api/v1/admin/merch/:id
 
-Delete merchandise (soft-delete if inventory exists).
+Delete merchandise. Always soft-deletes (`is_deleted = TRUE`, `trade_enabled = FALSE`) and cancels active matches that reference the item (ADR 0008). Soft-deleted rows are omitted from catalog lists (ADR 0011).
 
 - **Query Parameters**:
   | Param     | Type | Description                         |

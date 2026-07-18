@@ -1,6 +1,6 @@
 # ADR 0008: Merchandise Deletion Semantics and the `CANCELLED` Match Status
 
-- **Status**: Accepted (UI visibility of `CANCELLED` revised in part by [ADR 0010](0010-inventory-mutual-capacity-invalidation.md); Decision 3 body retained as historical record)
+- **Status**: Accepted (UI visibility of `CANCELLED` revised in part by [ADR 0010](0010-inventory-mutual-capacity-invalidation.md); catalog visibility of soft-deleted merch revised in part by [ADR 0011](0011-hide-deleted-merch-from-catalog.md); Decision 3 and Decision 4 bodies retained as historical record)
 - **Date**: 2026-07-14
 - **Supersedes**: —
 

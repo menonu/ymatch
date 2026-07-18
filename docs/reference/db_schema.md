@@ -214,10 +214,10 @@ The `users.role` field controls access levels across the platform:
 
 ### Soft-Delete Behavior
 
-Merchandise uses a soft-delete pattern via the `is_deleted` column:
-- When merchandise has existing inventory references, a `DELETE` request sets `is_deleted = TRUE` rather than removing the row, preserving referential integrity.
-- Soft-deleted merchandise is excluded from listing queries but remains accessible for existing inventory and match records.
-- Merchandise with no inventory references may be hard-deleted.
+Merchandise uses a soft-delete pattern via the `is_deleted` column (ADR 0008 / ADR 0011):
+- A merch `DELETE` always sets `is_deleted = TRUE` and `trade_enabled = FALSE` (no hard-delete branch), preserving inventory and match history.
+- Soft-deleted merchandise is excluded from catalog listing queries (event merch list, admin list, search) for every viewer, including creator/moderator.
+- Soft-deleted rows remain accessible on holder inventory and historical match detail.
 
 ### Draft / Published Status
 

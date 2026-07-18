@@ -918,7 +918,7 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
     );
 }
 
-// --- ADR 0008 / #423: soft-delete cancels active matches + holder visibility ---
+// --- ADR 0008 / #423 / ADR 0011 / #468: soft-delete cancels matches; catalog hides deleted ---
 
 /// Seed a match between two users with a match_items leg on `merch_id`.
 async fn seed_match_with_item(
@@ -1098,13 +1098,16 @@ async fn test_delete_merch_cancels_active_matches_leaves_completed(pool: PgPool)
 }
 
 #[sqlx::test]
-async fn test_deleted_merch_holder_visibility(pool: PgPool) {
-    // ADR 0008: creator + HAVE-holder see deleted merch (marked); others do not.
-    // Search excludes deleted even for the holder.
+async fn test_deleted_merch_catalog_hidden_inventory_marked(pool: PgPool) {
+    // ADR 0011 / #468: catalog (event merch list) is live-only for everyone —
+    // creator, HAVE-holder, stranger, and moderator. Soft-delete still keeps
+    // the row; inventory still marks isDeleted for holders. Search live-only.
     let (creator, event_id) =
         create_test_user_and_event(pool.clone(), "holder-vis-creator", "Holder Vis Event").await;
     let holder = login_guest(&pool, "holder-vis-holder", "t").await;
     let stranger = login_guest(&pool, "holder-vis-stranger", "t").await;
+    let moderator = login_guest(&pool, "holder-vis-mod", "t").await;
+    grant_global_role(&pool, moderator, "moderator").await;
 
     let merch_id = create_merch(&pool, event_id, "HolderVis Item", "G").await;
     set_inventory(&pool, holder, merch_id, "HAVE", 2).await;
@@ -1126,7 +1129,7 @@ async fn test_deleted_merch_holder_visibility(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Creator sees it, marked deleted.
+    // Catalog: creator does not see soft-deleted merch.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1142,11 +1145,12 @@ async fn test_deleted_merch_holder_visibility(pool: PgPool) {
         .unwrap();
     let items: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    let found = items.iter().find(|m| m["id"].as_i64() == Some(merch_id));
-    assert!(found.is_some(), "creator must see deleted merch");
-    assert_eq!(found.unwrap()["isDeleted"], true);
+    assert!(
+        items.iter().all(|m| m["id"].as_i64() != Some(merch_id)),
+        "creator must not see deleted merch on catalog list"
+    );
 
-    // HAVE-holder sees it marked deleted.
+    // Catalog: HAVE-holder does not see soft-deleted merch either.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -1162,11 +1166,33 @@ async fn test_deleted_merch_holder_visibility(pool: PgPool) {
         .unwrap();
     let items: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
-    let found = items.iter().find(|m| m["id"].as_i64() == Some(merch_id));
-    assert!(found.is_some(), "HAVE-holder must see deleted merch");
-    assert_eq!(found.unwrap()["isDeleted"], true);
+    assert!(
+        items.iter().all(|m| m["id"].as_i64() != Some(merch_id)),
+        "HAVE-holder must not see deleted merch on catalog list"
+    );
 
-    // Holder inventory marks isDeleted.
+    // Catalog: global moderator does not see soft-deleted merch.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/events/{}/merch?user_id={}",
+                    event_id, moderator
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let items: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(
+        items.iter().all(|m| m["id"].as_i64() != Some(merch_id)),
+        "moderator must not see deleted merch on catalog list"
+    );
+
+    // Holder inventory still lists the row and marks isDeleted.
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(

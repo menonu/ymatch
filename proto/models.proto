@@ -72,8 +72,9 @@ message InventoryItem {
   optional string merch_name = 6;
   optional string photo_url = 7;
   optional string group_name = 8;
-  // ADR 0008: true when the linked merchandise row is soft-deleted.
-  // Present on holder inventory lists so the UI can badge deleted items.
+  // ADR 0008 / ADR 0011: true when the linked merchandise row is soft-deleted.
+  // Present on holder inventory lists so the UI can badge deleted items
+  // (catalog lists are live-only and omit soft-deleted rows).
   optional bool is_deleted = 9;
 }
 
