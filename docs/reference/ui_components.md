@@ -124,7 +124,7 @@ used throughout this document.
 | `MerchDetailedCard` | `EventDetailScreen` | Reorderable card with image, name, stepper counters |
 | `MerchGridCard` | `EventDetailScreen` | 3-column grid cell with image, name, compact counters |
 | `MerchCompactRow` | `EventDetailScreen` | Inline row with thumbnail, name, counters |
-| `MatchCard` | `TradeListScreen` | User avatar, status chip, item chips, action buttons |
+| `MatchCard` | `TradeListScreen` | User avatar, status chip, local match datetime (#476), item chips, action buttons |
 | `ProfileCard` | `ProfileScreen` | Avatar, editable username, UUID section |
 | `InstructionsCard` | `ProfileScreen` | 3-step "How to Trade" guide |
 | `SystemStatusCard` | `AdminDashboardScreen` | Memory, CPU, uptime, OS info |
