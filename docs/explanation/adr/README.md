@@ -75,3 +75,4 @@ Record every ADR in the index below, newest last.
 | [0009](0009-apply-inventory-decrements-giver-have.md) | Apply Inventory Decrements Giver HAVE by Default | Accepted | 2026-07-15 |
 | [0010](0010-inventory-mutual-capacity-invalidation.md) | Inventory Mutual-Capacity Invalidation and Visible `CANCELLED` | Accepted | 2026-07-17 |
 | [0011](0011-hide-deleted-merch-from-catalog.md) | Hide Soft-Deleted Merchandise from Catalog Surfaces by Default | Accepted | 2026-07-18 |
+| [0012](0012-rematch-after-reject-or-cancel.md) | Rematch After Reject or Cancel (Reopen PENDING with Prior-History Annotation) | Accepted | 2026-07-18 |
