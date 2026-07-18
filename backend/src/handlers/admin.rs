@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::common::{TransferCreatorRequest, UserIdQuery};
 use crate::repositories::user::VerifiedUser;
 use crate::routes::AppState;
 use crate::services::rbac::{Permission, Scope};
@@ -8,18 +9,6 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-
-#[derive(serde::Deserialize)]
-pub struct AdminQuery {
-    pub user_id: Option<i32>,
-}
-
-/// Body for admin creator-transfer endpoints (#432).
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransferCreatorRequest {
-    pub new_creator_id: i32,
-}
 
 /// Resolve the caller from the `user_id` query param and require they hold
 /// `permission` in the global scope (ADR 0004 §3). This is the RBAC entry
@@ -46,7 +35,7 @@ async fn require_global(
 pub async fn delete_event(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     // #233: creators hold `event.delete` via the event-scoped `creator`
     // role; moderators/admins hold `event.delete.any`. Both satisfy
@@ -75,7 +64,7 @@ pub async fn delete_event(
 pub async fn delete_merch(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::MerchDeleteAny).await?;
     // Idempotent: missing merch is still 200 (admin cleanup of stale ids).
@@ -86,7 +75,7 @@ pub async fn delete_merch(
 pub async fn delete_match(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     // #370: match deletion is now modeled as the global `match.delete`
     // permission (granted to moderator + admin, plus the admin superuser
@@ -106,7 +95,7 @@ pub async fn list_groups(
 pub async fn delete_group(
     State(state): State<AppState>,
     Path((event_id, group_name)): Path<(i32, String)>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::GroupDelete).await?;
     if state.groups.remove_for_admin(event_id, &group_name).await? {
@@ -119,7 +108,7 @@ pub async fn delete_group(
 pub async fn ban_user(
     State(state): State<AppState>,
     Path(target_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
     Json(payload): Json<BanUserRequest>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::UserBan).await?;
@@ -146,7 +135,7 @@ pub async fn ban_user(
 pub async fn unban_user(
     State(state): State<AppState>,
     Path(target_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::UserUnban).await?;
 
@@ -162,7 +151,7 @@ pub async fn unban_user(
 pub async fn update_user_role(
     State(state): State<AppState>,
     Path(target_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
     Json(payload): Json<UpdateUserRoleRequest>,
 ) -> Result<StatusCode, AppError> {
     // Only admin can change roles (ADR 0004: `user.role.manage` -> admin).
@@ -188,7 +177,7 @@ pub async fn update_user_role(
 pub async fn get_user_details(
     State(state): State<AppState>,
     Path(target_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<User>, AppError> {
     // #376: the full User proto includes sensitive fields (device_token,
     // ban state, role). Gate on the global `user.read` permission so a
@@ -223,7 +212,7 @@ async fn require_active_target_user(state: &AppState, new_creator_id: i32) -> Re
 pub async fn transfer_event_creator(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
     Json(payload): Json<TransferCreatorRequest>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::EventCreatorTransfer).await?;
@@ -264,7 +253,7 @@ pub async fn transfer_event_creator(
 pub async fn transfer_group_creator(
     State(state): State<AppState>,
     Path((event_id, group_name)): Path<(i32, String)>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
     Json(payload): Json<TransferCreatorRequest>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::GroupCreatorTransfer).await?;
@@ -294,11 +283,12 @@ pub async fn transfer_group_creator(
 /// List event members via the admin path
 /// (`GET /api/v1/admin/events/:id/members`). Gated by
 /// `event.member.manage.any` so global moderators can inspect membership
-/// without holding the creator-only `event.member.manage` permission (#432).
+/// without holding `event.member.manage` (creator + editor; no `*.any`
+/// override — moderators use this admin path, #432 / #442).
 pub async fn admin_list_event_members(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<ListEventMembersResponse>, AppError> {
     require_global(&state, query.user_id, Permission::EventMemberManageAny).await?;
     let _ = state
@@ -315,7 +305,7 @@ pub async fn admin_list_event_members(
 pub async fn admin_assign_event_member(
     State(state): State<AppState>,
     Path((event_id, target_id)): Path<(i32, i32)>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::EventMemberManageAny).await?;
     let _ = state
@@ -338,7 +328,7 @@ pub async fn admin_assign_event_member(
 pub async fn admin_revoke_event_member(
     State(state): State<AppState>,
     Path((event_id, target_id)): Path<(i32, i32)>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_global(&state, query.user_id, Permission::EventMemberManageAny).await?;
     let _ = state

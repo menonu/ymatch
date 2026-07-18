@@ -9,7 +9,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::admin::{AdminQuery, TransferCreatorRequest};
+use crate::handlers::common::{TransferCreatorRequest, UserIdQuery};
 use crate::repositories::event::EventRepository;
 use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
@@ -208,7 +208,7 @@ async fn require_event_member_manage(
 pub async fn assign_event_member(
     State(state): State<AppState>,
     Path((event_id, target_id)): Path<(i32, i32)>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_event_member_manage(&state, query.user_id, event_id).await?;
     // Target must exist (404) — checked after the RBAC guard so an
@@ -231,7 +231,7 @@ pub async fn assign_event_member(
 pub async fn revoke_event_member(
     State(state): State<AppState>,
     Path((event_id, target_id)): Path<(i32, i32)>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<StatusCode, AppError> {
     require_event_member_manage(&state, query.user_id, event_id).await?;
     state.rbac.revoke_event_editor(target_id, event_id).await?;
@@ -244,7 +244,7 @@ pub async fn revoke_event_member(
 pub async fn list_event_members(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<ListEventMembersResponse>, AppError> {
     require_event_member_manage(&state, query.user_id, event_id).await?;
     let members = state.rbac.list_event_members(event_id).await?;
@@ -260,7 +260,7 @@ pub async fn list_event_members(
 pub async fn self_transfer_event_creator(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
     Json(payload): Json<TransferCreatorRequest>,
 ) -> Result<StatusCode, AppError> {
     let uid = query
@@ -332,7 +332,7 @@ pub async fn self_transfer_event_creator(
 pub async fn get_my_event_role(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-    axum::extract::Query(query): axum::extract::Query<AdminQuery>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<MyEventRoleResponse>, AppError> {
     let uid = query
         .user_id
