@@ -206,6 +206,7 @@
   "exportEmpty": "エクスポート対象がありません",
   "itemDeleted": "削除済み",
   "matchCancelledSystemMessage": "取引アイテムが削除されたため、このマッチはキャンセルされました。",
+  "matchCancelledInventoryCapacity": "在庫が相互取引を支えられなくなったため、このマッチはキャンセルされました。",
 
   "manageMembers": "メンバー管理",
   "transferCreator": "作成者を譲渡",

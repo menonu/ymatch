@@ -1262,11 +1262,17 @@ abstract class AppLocalizations {
   /// **'Deleted'**
   String get itemDeleted;
 
-  /// Fallback label for SYSTEM message_type rows posted when merch deletion cancels a match
+  /// Chat SYSTEM notice when a match is cancelled because a traded item was deleted (MERCH_DELETED reason code, ADR 0008 / #462)
   ///
   /// In en, this message translates to:
   /// **'This match was cancelled because a traded item was deleted.'**
   String get matchCancelledSystemMessage;
+
+  /// Chat SYSTEM notice when a match is cancelled because mutual inventory capacity hit zero (INVENTORY_CAPACITY reason code, ADR 0010 / #462)
+  ///
+  /// In en, this message translates to:
+  /// **'This match was cancelled because inventory no longer supports a mutual trade.'**
+  String get matchCancelledInventoryCapacity;
 
   /// Tooltip / dialog title for event creator/editor self-service member UI (#442)
   ///

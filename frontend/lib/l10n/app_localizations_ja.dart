@@ -641,6 +641,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get matchCancelledSystemMessage => '取引アイテムが削除されたため、このマッチはキャンセルされました。';
 
   @override
+  String get matchCancelledInventoryCapacity =>
+      '在庫が相互取引を支えられなくなったため、このマッチはキャンセルされました。';
+
+  @override
   String get manageMembers => 'メンバー管理';
 
   @override

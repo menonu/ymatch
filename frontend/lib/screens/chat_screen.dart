@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../utils/system_message.dart';
 import 'map_picker_screen.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -93,8 +94,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
-                    // ADR 0008: SYSTEM rows (forced cancel on merch delete) are
-                    // centered notices, not chat bubbles.
+                    // ADR 0008 / 0010: SYSTEM cancel rows are centered notices
+                    // (not chat bubbles). Content is a stable reason code;
+                    // display copy is localized (#462).
                     if (msg.hasMessageType() && msg.messageType == 'SYSTEM') {
                       return Padding(
                         padding: const EdgeInsets.symmetric(
@@ -102,9 +104,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           vertical: 8,
                         ),
                         child: Text(
-                          msg.content.isNotEmpty
-                              ? msg.content
-                              : l10n.matchCancelledSystemMessage,
+                          localizeSystemMessage(l10n, msg.content),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.grey[600],

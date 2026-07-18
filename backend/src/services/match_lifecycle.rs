@@ -38,7 +38,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::{InventoryItem, OfferItem, OfferTradeRequest};
 use crate::repositories::inventory::InventoryRepository;
-use crate::repositories::match_::{CANCEL_MSG_INVENTORY_CAPACITY, MatchRepository};
+use crate::repositories::match_::{CANCEL_REASON_INVENTORY_CAPACITY, MatchRepository};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -410,7 +410,7 @@ impl MatchLifecycleService {
         }
         if !to_cancel.is_empty() {
             self.matches
-                .system_cancel_matches(&mut *tx, &to_cancel, CANCEL_MSG_INVENTORY_CAPACITY)
+                .system_cancel_matches(&mut *tx, &to_cancel, CANCEL_REASON_INVENTORY_CAPACITY)
                 .await?;
         }
         Ok(())

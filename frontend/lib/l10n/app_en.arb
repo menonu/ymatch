@@ -903,7 +903,11 @@
   },
   "matchCancelledSystemMessage": "This match was cancelled because a traded item was deleted.",
   "@matchCancelledSystemMessage": {
-    "description": "Fallback label for SYSTEM message_type rows posted when merch deletion cancels a match"
+    "description": "Chat SYSTEM notice when a match is cancelled because a traded item was deleted (MERCH_DELETED reason code, ADR 0008 / #462)"
+  },
+  "matchCancelledInventoryCapacity": "This match was cancelled because inventory no longer supports a mutual trade.",
+  "@matchCancelledInventoryCapacity": {
+    "description": "Chat SYSTEM notice when a match is cancelled because mutual inventory capacity hit zero (INVENTORY_CAPACITY reason code, ADR 0010 / #462)"
   },
 
   "manageMembers": "Manage members",
