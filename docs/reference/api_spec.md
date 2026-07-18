@@ -304,7 +304,7 @@ Publish a draft merchandise item.
 
 ### DELETE /api/v1/events/:id/merch/:merch_id
 
-Delete a merchandise item. Uses soft-delete (`is_deleted = TRUE`) if the item has existing inventory references; otherwise performs a hard delete.
+Delete a merchandise item. Always soft-deletes (`is_deleted = TRUE`, `trade_enabled = FALSE`) and cancels active matches that reference the item (ADR 0008). Soft-deleted rows are omitted from catalog lists (ADR 0011).
 
 - **Query Parameters**:
   | Param     | Type | Description                         |
@@ -485,7 +485,7 @@ Delete an event.
 
 ### DELETE /api/v1/admin/merch/:id
 
-Delete merchandise (soft-delete if inventory exists).
+Delete merchandise. Always soft-deletes (`is_deleted = TRUE`, `trade_enabled = FALSE`) and cancels active matches that reference the item (ADR 0008). Soft-deleted rows are omitted from catalog lists (ADR 0011).
 
 - **Query Parameters**:
   | Param     | Type | Description                         |

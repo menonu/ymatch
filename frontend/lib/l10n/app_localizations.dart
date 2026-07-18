@@ -1256,7 +1256,7 @@ abstract class AppLocalizations {
   /// **'Nothing selected to export'**
   String get exportEmpty;
 
-  /// Badge on soft-deleted merchandise visible only to holders (ADR 0008)
+  /// Badge on soft-deleted merchandise (inventory / defensive catalog UI; ADR 0008 / ADR 0011)
   ///
   /// In en, this message translates to:
   /// **'Deleted'**
