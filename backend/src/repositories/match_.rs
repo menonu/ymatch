@@ -960,6 +960,11 @@ pub const CANCEL_REASON_INVENTORY_CAPACITY: &str = "INVENTORY_CAPACITY";
 /// Display copy is localized on the client — do not store English prose.
 pub const CANCEL_REASON_MERCH_DELETED: &str = "MERCH_DELETED";
 
+/// Stable rematch reason codes for SYSTEM message `content` (ADR 0012 / #477).
+/// Display copy is localized on the client — do not store English prose.
+pub const REMATCH_REASON_AFTER_REJECTED: &str = "REMATCH_AFTER_REJECTED";
+pub const REMATCH_REASON_AFTER_CANCELLED: &str = "REMATCH_AFTER_CANCELLED";
+
 #[cfg(test)]
 mod capacity_tests {
     use super::capacity_requires_cancel;

@@ -87,6 +87,9 @@ stateDiagram-v2
   OFFERED --> REJECTED: either rejects
   ACCEPTED --> COMPLETED: complete
   COMPLETED --> [*]
+  PENDING --> CANCELLED: system cancel (merch delete / cap=0)
+  OFFERED --> CANCELLED: system cancel
+  ACCEPTED --> CANCELLED: system cancel
   REJECTED --> PENDING: rematch when mutual caps hold
   CANCELLED --> PENDING: rematch when mutual caps hold
 ```

@@ -1,9 +1,5 @@
+use crate::repositories::match_::{REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON_AFTER_REJECTED};
 use sqlx::{PgPool, Row};
-
-/// Stable SYSTEM message codes for rematch (ADR 0012 / #477).
-/// Display copy is localized on the client — do not store English prose.
-pub const REMATCH_REASON_AFTER_REJECTED: &str = "REMATCH_AFTER_REJECTED";
-pub const REMATCH_REASON_AFTER_CANCELLED: &str = "REMATCH_AFTER_CANCELLED";
 
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     // 1. Fetch all 'WANT' items, joining with merchandise to get group_name
@@ -17,6 +13,8 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         JOIN merchandise m ON i.merch_id = m.id
         JOIN users u ON i.user_id = u.id
         WHERE i.status = 'WANT'
+          -- ADR 0012 / ADR 0010: zero-qty rows do not contribute to mutual cap.
+          AND i.quantity > 0
           AND m.is_deleted = false AND m.trade_enabled = true
           AND m.group_name IS NOT NULL
           AND u.is_banned = false
@@ -49,6 +47,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
             r#"SELECT i.user_id, i.merch_id FROM inventory i
             JOIN users u ON i.user_id = u.id
             WHERE i.merch_id = $1 AND i.status = 'TRADE' AND i.user_id != $2
+              AND i.quantity > 0
               AND u.is_banned = false
               AND NOT EXISTS (
                 SELECT 1 FROM match_items mi
@@ -74,7 +73,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                 SELECT i.merch_id
                 FROM inventory i
                 JOIN merchandise m ON i.merch_id = m.id
-                WHERE i.user_id = $1 AND i.status = 'TRADE'
+                WHERE i.user_id = $1 AND i.status = 'TRADE' AND i.quantity > 0
                   AND m.event_id = $2 AND m.group_name = $3
                 "#,
             )
@@ -88,9 +87,10 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
             for a_trade_row in user_a_trades {
                 let a_trade_merch_id: i32 = a_trade_row.get("merch_id");
 
-                // Check if Partner WANTS this item
+                // Check if Partner WANTS this item (positive quantity).
                 let partner_want = sqlx::query(
-                    "SELECT id FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+                    "SELECT id FROM inventory WHERE user_id = $1 AND merch_id = $2
+                       AND status = 'WANT' AND quantity > 0",
                 )
                 .bind(partner_id)
                 .bind(a_trade_merch_id)
