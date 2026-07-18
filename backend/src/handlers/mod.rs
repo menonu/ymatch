@@ -1,5 +1,6 @@
 mod admin;
 mod auth;
+pub mod common;
 mod events;
 mod groups;
 mod images;
@@ -13,6 +14,7 @@ mod system;
 
 pub use admin::*;
 pub use auth::*;
+pub use common::*;
 pub use events::*;
 pub use groups::*;
 pub use images::*;

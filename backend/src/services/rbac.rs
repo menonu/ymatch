@@ -151,7 +151,9 @@ impl Permission {
     /// event-scoped role.
     ///
     /// `EventMemberManage` has no `*.any` override by design: only the event
-    /// creator (and the admin superuser bypass) can manage an event's editors.
+    /// creator + editor (and the admin superuser bypass) can manage an event's
+    /// editors on the public path. Moderators use
+    /// [`Permission::EventMemberManageAny`] on the admin path (#432 / #442).
     pub fn satisfying_names(&self) -> &'static [&'static str] {
         match self {
             Permission::EventEdit => &["event.edit", "event.edit.any"],
@@ -432,8 +434,9 @@ mod tests {
 
     #[test]
     fn satisfying_names_has_no_any_override_for_member_manage() {
-        // event.member.manage deliberately has no *.any override: only the
-        // event creator (or the admin bypass) can manage an event's editors.
+        // event.member.manage deliberately has no *.any override: creator +
+        // editor (or the admin bypass) on the public path; moderators use
+        // EventMemberManageAny on the admin path (#432 / #442).
         assert_eq!(
             Permission::EventMemberManage.satisfying_names(),
             &["event.member.manage"]
@@ -719,9 +722,10 @@ mod tests {
             .await
             .unwrap();
         // A second event owned by user_id, which admin is NOT a member of.
-        // This isolates the admin superuser bypass: EventMemberManage is a
-        // creator-only permission, and user_id (not admin) is the creator, so
-        // admin can only pass via the bypass -- not via an event role.
+        // This isolates the admin superuser bypass: EventMemberManage is
+        // granted via event creator/editor roles (not *.any), and user_id
+        // (not admin) is the creator, so admin can only pass via the bypass
+        // -- not via an event role.
         sqlx::query("INSERT INTO events (name, creator_id) VALUES ('Other Event', $1)")
             .bind(user_id)
             .execute(&pool)
@@ -742,8 +746,9 @@ mod tests {
         // editor is scoped to event_id only.
         assign(&pool, editor_id, "event", Some(event_id), "editor").await;
 
-        // Admin superuser bypass: passes a global permission and a creator-only
-        // event permission on an event admin does NOT own (user_id does).
+        // Admin superuser bypass: passes a global permission and an
+        // event-scoped permission (EventMemberManage) on an event admin does
+        // NOT own (user_id does).
         assert!(
             service
                 .check(&verified(admin_id), &Scope::Global, Permission::UserBan)
@@ -831,7 +836,7 @@ mod tests {
                 .await
                 .is_err()
         );
-        // user_id is the creator of Other Event -> creator-only permission passes.
+        // user_id is the creator of Other Event -> EventMemberManage passes.
         assert!(
             service
                 .check(
@@ -843,8 +848,8 @@ mod tests {
                 .is_ok()
         );
 
-        // Editor: can edit and delete merch on their event, cannot delete the
-        // event or manage members, and has no power on the other event.
+        // Editor: can edit and delete merch on their event, can manage members
+        // (#442), cannot delete the event, and has no power on the other event.
         assert!(
             service
                 .check(
