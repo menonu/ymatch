@@ -648,6 +648,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This match was cancelled because a traded item was deleted.';
 
   @override
+  String get matchCancelledInventoryCapacity =>
+      'This match was cancelled because inventory no longer supports a mutual trade.';
+
+  @override
   String get manageMembers => 'Manage members';
 
   @override

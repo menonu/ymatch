@@ -817,13 +817,14 @@ impl MatchRepository {
     /// System-cancel active matches and post one SYSTEM message each.
     ///
     /// Only rows still in `PENDING`/`OFFERED`/`ACCEPTED` are updated (idempotent
-    /// if an id was already terminal). `message` distinguishes inventory-capacity
-    /// cancel (ADR 0010) from merch-delete cancel (ADR 0008).
+    /// if an id was already terminal). `reason` is a stable code
+    /// ([`CANCEL_REASON_INVENTORY_CAPACITY`] / [`CANCEL_REASON_MERCH_DELETED`])
+    /// stored in `messages.content` for client-side i18n — not display prose.
     pub async fn system_cancel_matches<'c, E>(
         &self,
         exec: E,
         match_ids: &[i32],
-        message: &str,
+        reason: &str,
     ) -> Result<i64, AppError>
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
@@ -850,7 +851,7 @@ impl MatchRepository {
             "#,
         )
         .bind(match_ids)
-        .bind(message)
+        .bind(reason)
         .fetch_one(exec)
         .await?;
         Ok(row.0)
@@ -892,7 +893,7 @@ impl MatchRepository {
         merch_id: i32,
         event_id: i32,
         group_name: Option<&str>,
-        message: &str,
+        reason: &str,
     ) -> Result<(), AppError> {
         use std::collections::HashSet;
 
@@ -918,7 +919,7 @@ impl MatchRepository {
 
         if !ids.is_empty() {
             let list: Vec<i32> = ids.into_iter().collect();
-            self.system_cancel_matches(&mut *conn, &list, message)
+            self.system_cancel_matches(&mut *conn, &list, reason)
                 .await?;
         }
         Ok(())
@@ -941,13 +942,13 @@ pub fn capacity_requires_cancel(cap1: i32, cap2: i32) -> bool {
     cap1 <= 0 || cap2 <= 0
 }
 
-/// SYSTEM message when mutual inventory capacity hits zero (ADR 0010).
-pub const CANCEL_MSG_INVENTORY_CAPACITY: &str =
-    "This match was cancelled because inventory no longer supports a mutual trade.";
+/// Stable cancel reason code for SYSTEM message `content` (ADR 0010).
+/// Display copy is localized on the client — do not store English prose.
+pub const CANCEL_REASON_INVENTORY_CAPACITY: &str = "INVENTORY_CAPACITY";
 
-/// SYSTEM message when a referenced merch item is soft-deleted (ADR 0008).
-pub const CANCEL_MSG_MERCH_DELETED: &str =
-    "This match was cancelled because a traded item was deleted.";
+/// Stable cancel reason code for SYSTEM message `content` (ADR 0008).
+/// Display copy is localized on the client — do not store English prose.
+pub const CANCEL_REASON_MERCH_DELETED: &str = "MERCH_DELETED";
 
 #[cfg(test)]
 mod capacity_tests {

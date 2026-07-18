@@ -20,7 +20,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::{CreateMerchRequest, Merchandise, UpdateMerchRequest};
 use crate::handlers::mappers::merch_from_row;
-use crate::repositories::match_::{CANCEL_MSG_MERCH_DELETED, MatchRepository};
+use crate::repositories::match_::{CANCEL_REASON_MERCH_DELETED, MatchRepository};
 use sqlx::{PgPool, Row};
 
 /// Whether a `sqlx::Error` is a Postgres unique-violation (SQLSTATE 23505).
@@ -429,7 +429,7 @@ impl MerchandiseRepository {
                 merch_id,
                 event_id,
                 group_name.as_deref(),
-                CANCEL_MSG_MERCH_DELETED,
+                CANCEL_REASON_MERCH_DELETED,
             )
             .await?;
 

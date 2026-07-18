@@ -1042,8 +1042,8 @@ async fn test_delete_merch_cancels_active_matches_leaves_completed(pool: PgPool)
     }
 
     for id in [pending, offered, accepted] {
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM messages
+        let content: String = sqlx::query_scalar(
+            "SELECT content FROM messages
              WHERE match_id = $1 AND message_type = 'SYSTEM'",
         )
         .bind(id as i32)
@@ -1051,8 +1051,8 @@ async fn test_delete_merch_cancels_active_matches_leaves_completed(pool: PgPool)
         .await
         .unwrap();
         assert_eq!(
-            count, 1,
-            "cancelled match {id} should have one SYSTEM message"
+            content, "MERCH_DELETED",
+            "cancelled match {id} should post the merch-delete reason code"
         );
     }
     let completed_msgs: i64 = sqlx::query_scalar(
@@ -1379,9 +1379,9 @@ async fn test_inventory_cap_zero_cancels_pending_offered_accepted(pool: PgPool) 
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert!(
-            msg.contains("inventory"),
-            "SYSTEM message should mention inventory, got {msg}"
+        assert_eq!(
+            msg, "INVENTORY_CAPACITY",
+            "SYSTEM message should be the stable inventory cancel reason code, got {msg}"
         );
     }
 }
