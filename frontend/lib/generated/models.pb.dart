@@ -322,12 +322,14 @@ class FavoriteGroup extends $pb.GeneratedMessage {
     $core.int? eventId,
     $core.String? groupName,
     $core.String? eventName,
+    $core.String? displayName,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
     if (eventId != null) result.eventId = eventId;
     if (groupName != null) result.groupName = groupName;
     if (eventName != null) result.eventName = eventName;
+    if (displayName != null) result.displayName = displayName;
     return result;
   }
 
@@ -348,6 +350,7 @@ class FavoriteGroup extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'eventId')
     ..aOS(3, _omitFieldNames ? '' : 'groupName')
     ..aOS(4, _omitFieldNames ? '' : 'eventName')
+    ..aOS(5, _omitFieldNames ? '' : 'displayName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -404,6 +407,16 @@ class FavoriteGroup extends $pb.GeneratedMessage {
   $core.bool hasEventName() => $_has(3);
   @$pb.TagNumber(4)
   void clearEventName() => $_clearField(4);
+
+  /// Cosmetic label from merchandise_groups; UI falls back to group_name (#466).
+  @$pb.TagNumber(5)
+  $core.String get displayName => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set displayName($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDisplayName() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDisplayName() => $_clearField(5);
 }
 
 class Merchandise extends $pb.GeneratedMessage {
@@ -885,6 +898,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     $core.bool? inventoryApplied,
     $core.String? groupName,
     $core.String? eventName,
+    $core.String? groupDisplayName,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -900,6 +914,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (inventoryApplied != null) result.inventoryApplied = inventoryApplied;
     if (groupName != null) result.groupName = groupName;
     if (eventName != null) result.eventName = eventName;
+    if (groupDisplayName != null) result.groupDisplayName = groupDisplayName;
     return result;
   }
 
@@ -932,6 +947,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     ..aOB(11, _omitFieldNames ? '' : 'inventoryApplied')
     ..aOS(12, _omitFieldNames ? '' : 'groupName')
     ..aOS(13, _omitFieldNames ? '' : 'eventName')
+    ..aOS(14, _omitFieldNames ? '' : 'groupDisplayName')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1052,6 +1068,16 @@ class TradeMatch extends $pb.GeneratedMessage {
   $core.bool hasEventName() => $_has(12);
   @$pb.TagNumber(13)
   void clearEventName() => $_clearField(13);
+
+  /// Cosmetic group label from merchandise_groups; UI falls back to group_name (#466).
+  @$pb.TagNumber(14)
+  $core.String get groupDisplayName => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set groupDisplayName($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasGroupDisplayName() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearGroupDisplayName() => $_clearField(14);
 }
 
 class MatchItem extends $pb.GeneratedMessage {

@@ -1218,6 +1218,59 @@ async fn test_match_carries_event_group_context(pool: PgPool) {
         matches[0]["eventName"].as_str().unwrap(),
         "Qty Cap Trade Event",
     );
+    // No display_name set on the group → groupDisplayName absent/null (#466).
+    assert!(
+        matches[0].get("groupDisplayName").is_none() || matches[0]["groupDisplayName"].is_null(),
+        "unset groupDisplayName must be absent/null, got {:?}",
+        matches[0].get("groupDisplayName")
+    );
+}
+
+/// #466: match list joins merchandise_groups.display_name so the trade card
+/// can show the cosmetic label while keeping group_name as the key.
+#[sqlx::test]
+async fn test_match_carries_group_display_name(pool: PgPool) {
+    let (_match_id, user1_id, _user2_id, _merch_a_id, _merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    // Resolve the match's event_id so we can set display_name on its group.
+    let (event_id,): (i32,) =
+        sqlx::query_as("SELECT event_id FROM matches WHERE user1_id = $1 OR user2_id = $1 LIMIT 1")
+            .bind(user1_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    sqlx::query(
+        "INSERT INTO merchandise_groups (event_id, group_name, display_name)
+         VALUES ($1, 'Cards', 'Trading Cards')
+         ON CONFLICT (event_id, group_name)
+         DO UPDATE SET display_name = EXCLUDED.display_name",
+    )
+    .bind(event_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user1_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let matches: Vec<serde_json::Value> =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert!(!matches.is_empty());
+    assert_eq!(matches[0]["groupName"].as_str().unwrap(), "Cards");
+    assert_eq!(
+        matches[0]["groupDisplayName"].as_str().unwrap(),
+        "Trading Cards"
+    );
 }
 
 /// #346: defense-in-depth DB constraint. ADR 0001 scopes a match to one

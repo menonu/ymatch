@@ -34,6 +34,8 @@ message FavoriteGroup {
   int32 event_id = 2;
   string group_name = 3;
   optional string event_name = 4; // Helpful for rendering the shortcut
+  // Cosmetic label from merchandise_groups; UI falls back to group_name (#466).
+  optional string display_name = 5;
 }
 
 message Merchandise {
@@ -90,6 +92,8 @@ message TradeMatch {
   bool inventory_applied = 11; // true if inventory update already executed
   optional string group_name = 12; // the match's single item group (ADR 0001, #322)
   optional string event_name = 13; // parent event name of the match's group (#322)
+  // Cosmetic group label from merchandise_groups; UI falls back to group_name (#466).
+  optional string group_display_name = 14;
 }
 
 message MatchItem {

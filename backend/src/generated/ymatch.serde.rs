@@ -1193,6 +1193,9 @@ impl serde::Serialize for FavoriteGroup {
         if self.event_name.is_some() {
             len += 1;
         }
+        if self.display_name.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.FavoriteGroup", len)?;
         if self.user_id != 0 {
             struct_ser.serialize_field("userId", &self.user_id)?;
@@ -1205,6 +1208,9 @@ impl serde::Serialize for FavoriteGroup {
         }
         if let Some(v) = self.event_name.as_ref() {
             struct_ser.serialize_field("eventName", v)?;
+        }
+        if let Some(v) = self.display_name.as_ref() {
+            struct_ser.serialize_field("displayName", v)?;
         }
         struct_ser.end()
     }
@@ -1224,6 +1230,8 @@ impl<'de> serde::Deserialize<'de> for FavoriteGroup {
             "groupName",
             "event_name",
             "eventName",
+            "display_name",
+            "displayName",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1232,6 +1240,7 @@ impl<'de> serde::Deserialize<'de> for FavoriteGroup {
             EventId,
             GroupName,
             EventName,
+            DisplayName,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1257,6 +1266,7 @@ impl<'de> serde::Deserialize<'de> for FavoriteGroup {
                             "eventId" | "event_id" => Ok(GeneratedField::EventId),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
                             "eventName" | "event_name" => Ok(GeneratedField::EventName),
+                            "displayName" | "display_name" => Ok(GeneratedField::DisplayName),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1280,6 +1290,7 @@ impl<'de> serde::Deserialize<'de> for FavoriteGroup {
                 let mut event_id__ = None;
                 let mut group_name__ = None;
                 let mut event_name__ = None;
+                let mut display_name__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::UserId => {
@@ -1310,6 +1321,12 @@ impl<'de> serde::Deserialize<'de> for FavoriteGroup {
                             }
                             event_name__ = map_.next_value()?;
                         }
+                        GeneratedField::DisplayName => {
+                            if display_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("displayName"));
+                            }
+                            display_name__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(FavoriteGroup {
@@ -1317,6 +1334,7 @@ impl<'de> serde::Deserialize<'de> for FavoriteGroup {
                     event_id: event_id__.unwrap_or_default(),
                     group_name: group_name__.unwrap_or_default(),
                     event_name: event_name__,
+                    display_name: display_name__,
                 })
             }
         }
@@ -4147,6 +4165,9 @@ impl serde::Serialize for TradeMatch {
         if self.event_name.is_some() {
             len += 1;
         }
+        if self.group_display_name.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.TradeMatch", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -4187,6 +4208,9 @@ impl serde::Serialize for TradeMatch {
         if let Some(v) = self.event_name.as_ref() {
             struct_ser.serialize_field("eventName", v)?;
         }
+        if let Some(v) = self.group_display_name.as_ref() {
+            struct_ser.serialize_field("groupDisplayName", v)?;
+        }
         struct_ser.end()
     }
 }
@@ -4221,6 +4245,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             "groupName",
             "event_name",
             "eventName",
+            "group_display_name",
+            "groupDisplayName",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4238,6 +4264,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             InventoryApplied,
             GroupName,
             EventName,
+            GroupDisplayName,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4272,6 +4299,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             "inventoryApplied" | "inventory_applied" => Ok(GeneratedField::InventoryApplied),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
                             "eventName" | "event_name" => Ok(GeneratedField::EventName),
+                            "groupDisplayName" | "group_display_name" => Ok(GeneratedField::GroupDisplayName),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4304,6 +4332,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                 let mut inventory_applied__ = None;
                 let mut group_name__ = None;
                 let mut event_name__ = None;
+                let mut group_display_name__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -4392,6 +4421,12 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             }
                             event_name__ = map_.next_value()?;
                         }
+                        GeneratedField::GroupDisplayName => {
+                            if group_display_name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("groupDisplayName"));
+                            }
+                            group_display_name__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(TradeMatch {
@@ -4408,6 +4443,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                     inventory_applied: inventory_applied__.unwrap_or_default(),
                     group_name: group_name__,
                     event_name: event_name__,
+                    group_display_name: group_display_name__,
                 })
             }
         }

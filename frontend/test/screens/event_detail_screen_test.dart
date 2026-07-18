@@ -16,6 +16,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/event_detail_screen.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
+import 'package:frontend/utils/group_display.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -190,9 +190,19 @@ const FavoriteGroup$json = {
       '10': 'eventName',
       '17': true
     },
+    {
+      '1': 'display_name',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'displayName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_event_name'},
+    {'1': '_display_name'},
   ],
 };
 
@@ -200,7 +210,8 @@ const FavoriteGroup$json = {
 final $typed_data.Uint8List favoriteGroupDescriptor = $convert.base64Decode(
     'Cg1GYXZvcml0ZUdyb3VwEhcKB3VzZXJfaWQYASABKAVSBnVzZXJJZBIZCghldmVudF9pZBgCIA'
     'EoBVIHZXZlbnRJZBIdCgpncm91cF9uYW1lGAMgASgJUglncm91cE5hbWUSIgoKZXZlbnRfbmFt'
-    'ZRgEIAEoCUgAUglldmVudE5hbWWIAQFCDQoLX2V2ZW50X25hbWU=');
+    'ZRgEIAEoCUgAUglldmVudE5hbWWIAQESJgoMZGlzcGxheV9uYW1lGAUgASgJSAFSC2Rpc3BsYX'
+    'lOYW1liAEBQg0KC19ldmVudF9uYW1lQg8KDV9kaXNwbGF5X25hbWU=');
 
 @$core.Deprecated('Use merchandiseDescriptor instead')
 const Merchandise$json = {
@@ -520,6 +531,15 @@ const TradeMatch$json = {
       '10': 'eventName',
       '17': true
     },
+    {
+      '1': 'group_display_name',
+      '3': 14,
+      '4': 1,
+      '5': 9,
+      '9': 5,
+      '10': 'groupDisplayName',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_created_at'},
@@ -527,6 +547,7 @@ const TradeMatch$json = {
     {'1': '_offered_by'},
     {'1': '_group_name'},
     {'1': '_event_name'},
+    {'1': '_group_display_name'},
   ],
 };
 
@@ -541,8 +562,9 @@ final $typed_data.Uint8List tradeMatchDescriptor = $convert.base64Decode(
     'iAEBEjgKDnNlbGVjdGVkX2l0ZW1zGAogAygLMhEueW1hdGNoLk1hdGNoSXRlbVINc2VsZWN0ZW'
     'RJdGVtcxIrChFpbnZlbnRvcnlfYXBwbGllZBgLIAEoCFIQaW52ZW50b3J5QXBwbGllZBIiCgpn'
     'cm91cF9uYW1lGAwgASgJSANSCWdyb3VwTmFtZYgBARIiCgpldmVudF9uYW1lGA0gASgJSARSCW'
-    'V2ZW50TmFtZYgBAUINCgtfY3JlYXRlZF9hdEINCgtfb3RoZXJfdXNlckINCgtfb2ZmZXJlZF9i'
-    'eUINCgtfZ3JvdXBfbmFtZUINCgtfZXZlbnRfbmFtZQ==');
+    'V2ZW50TmFtZYgBARIxChJncm91cF9kaXNwbGF5X25hbWUYDiABKAlIBVIQZ3JvdXBEaXNwbGF5'
+    'TmFtZYgBAUINCgtfY3JlYXRlZF9hdEINCgtfb3RoZXJfdXNlckINCgtfb2ZmZXJlZF9ieUINCg'
+    'tfZ3JvdXBfbmFtZUINCgtfZXZlbnRfbmFtZUIVChNfZ3JvdXBfZGlzcGxheV9uYW1l');
 
 @$core.Deprecated('Use matchItemDescriptor instead')
 const MatchItem$json = {

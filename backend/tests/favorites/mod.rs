@@ -188,6 +188,67 @@ async fn test_group_favorite_toggle_and_list(pool: PgPool) {
     assert_eq!(groups[0]["groupName"], "Books");
     assert_eq!(groups[0]["eventId"], event_id);
     assert_eq!(groups[0]["eventName"], "Group Fav Event");
+    // No merchandise_groups row yet → display_name absent/null (#466).
+    assert!(
+        groups[0].get("displayName").is_none() || groups[0]["displayName"].is_null(),
+        "unset display_name must be absent/null, got {:?}",
+        groups[0].get("displayName")
+    );
+}
+
+/// #466: favorite-group list joins merchandise_groups.display_name so home
+/// chips can show the cosmetic label without a second request.
+#[sqlx::test]
+async fn test_group_favorite_list_includes_display_name(pool: PgPool) {
+    let (user_id, event_id) =
+        create_test_user_and_event(pool.clone(), "gfav-display-user", "Group Fav Display Event")
+            .await;
+
+    // Create a formal group row with a cosmetic display_name.
+    sqlx::query(
+        "INSERT INTO merchandise_groups (event_id, group_name, display_name, created_by)
+         VALUES ($1, 'Pins', 'Enamel Pins!', $2)",
+    )
+    .bind(event_id as i32)
+    .bind(user_id as i32)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/favorite_group", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "groupName": "Pins", "isFavorite": true}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/user/{}/favorite_groups", user_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_to_string(resp.into_body()).await;
+    let groups: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0]["groupName"], "Pins");
+    assert_eq!(groups[0]["displayName"].as_str().unwrap(), "Enamel Pins!");
 }
 
 #[sqlx::test]
