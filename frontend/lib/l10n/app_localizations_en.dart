@@ -655,6 +655,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'This match was cancelled because inventory no longer supports a mutual trade.';
 
   @override
+  String get matchRematchAfterRejected =>
+      'This match was reopened after a previous rejection.';
+
+  @override
+  String get matchRematchAfterCancelled =>
+      'This match was reopened after a previous cancellation.';
+
+  @override
+  String get matchRejectedBefore => 'Rejected before';
+
+  @override
+  String get matchCancelledBefore => 'Cancelled before';
+
+  @override
+  String matchRematchCount(int count) {
+    return '$count×';
+  }
+
+  @override
   String get manageMembers => 'Manage members';
 
   @override

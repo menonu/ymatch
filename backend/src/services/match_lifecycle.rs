@@ -17,6 +17,9 @@
 //!     PENDING  ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
 //!     OFFERED  ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
 //!     ACCEPTED ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
+//!
+//!     REJECTED  ──rematch (matcher, mutual caps > 0)──► PENDING   (ADR 0012)
+//!     CANCELLED ──rematch (matcher, mutual caps > 0)──► PENDING   (ADR 0012)
 //! ```
 //!
 //! `OFFERED` is the "proposal on the table" state; `offered_by` is the last
@@ -28,6 +31,10 @@
 //! `CANCELLED` is system-driven only: merchandise soft-delete (ADR 0008) or
 //! mutual inventory capacity collapsing to zero (ADR 0010). It is **not**
 //! reachable via [`MatchLifecycleService::change_status`].
+//!
+//! Rematch (ADR 0012) is system-driven in the periodic matcher: a
+//! `REJECTED` or `CANCELLED` pair+group row is reopened to `PENDING` when
+//! mutual capacity holds again (or still). `COMPLETED` is not rematchable.
 //!
 //! The apply-inventory step runs *after* COMPLETED and updates the
 //! `inventory` table based on the offer's `match_items` legs. Each side

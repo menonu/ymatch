@@ -208,6 +208,11 @@
   "itemDeleted": "削除済み",
   "matchCancelledSystemMessage": "取引アイテムが削除されたため、このマッチはキャンセルされました。",
   "matchCancelledInventoryCapacity": "在庫が相互取引を支えられなくなったため、このマッチはキャンセルされました。",
+  "matchRematchAfterRejected": "以前の拒否のあと、このマッチが再開されました。",
+  "matchRematchAfterCancelled": "以前のキャンセルのあと、このマッチが再開されました。",
+  "matchRejectedBefore": "以前に拒否済み",
+  "matchCancelledBefore": "以前にキャンセル済み",
+  "matchRematchCount": "{count}回",
 
   "manageMembers": "メンバー管理",
   "transferCreator": "作成者を譲渡",

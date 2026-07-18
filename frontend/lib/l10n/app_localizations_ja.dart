@@ -648,6 +648,23 @@ class AppLocalizationsJa extends AppLocalizations {
       '在庫が相互取引を支えられなくなったため、このマッチはキャンセルされました。';
 
   @override
+  String get matchRematchAfterRejected => '以前の拒否のあと、このマッチが再開されました。';
+
+  @override
+  String get matchRematchAfterCancelled => '以前のキャンセルのあと、このマッチが再開されました。';
+
+  @override
+  String get matchRejectedBefore => '以前に拒否済み';
+
+  @override
+  String get matchCancelledBefore => '以前にキャンセル済み';
+
+  @override
+  String matchRematchCount(int count) {
+    return '$count回';
+  }
+
+  @override
   String get manageMembers => 'メンバー管理';
 
   @override

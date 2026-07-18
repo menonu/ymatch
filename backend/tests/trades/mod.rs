@@ -1702,3 +1702,421 @@ async fn test_list_for_user_scopes_haves_wants_to_match_group(pool: PgPool) {
     assert_eq!(f1_wants[0]["merchId"].as_i64().unwrap(), f2);
     assert_eq!(f1_wants[0]["groupName"].as_str().unwrap(), "F1");
 }
+
+// --- ADR 0012 / #477: rematch after REJECTED / CANCELLED ---
+
+async fn list_user_matches(pool: &PgPool, user_id: i64) -> Vec<serde_json::Value> {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/v1/matches/user/{}", user_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap()
+}
+
+async fn reject_match(pool: &PgPool, match_id: i64, user_id: i64) {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/status", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "status": "REJECTED"}}"#,
+                    user_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "reject should succeed");
+}
+
+#[sqlx::test]
+async fn test_rematch_after_reject_reopens_same_row(pool: PgPool) {
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    // Put legs on the table so rematch must clear them (reject also deletes
+    // items; rematch must leave legs empty either way).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/offer", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "items": [
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+                        {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
+                    ]}}"#,
+                    user1_id, merch_a_id, user1_id, merch_b_id, user2_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    reject_match(&pool, match_id, user1_id).await;
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "REJECTED");
+    // REJECTED is hidden from list.
+    let listed = list_user_matches(&pool, user1_id).await;
+    assert!(
+        !listed.iter().any(|m| m["id"].as_i64() == Some(match_id)),
+        "REJECTED must stay hidden before rematch"
+    );
+
+    let rematched = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher after reject");
+    assert!(rematched >= 1, "matcher should reopen rejected match");
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "PENDING", "same row reopened to PENDING");
+
+    let rematch_count: i32 = sqlx::query_scalar("SELECT rematch_count FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rematch_count, 1);
+
+    let last_terminal: String =
+        sqlx::query_scalar("SELECT last_terminal_status FROM matches WHERE id = $1")
+            .bind(match_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(last_terminal, "REJECTED");
+
+    let last_terminal_at: Option<chrono::DateTime<chrono::Utc>> =
+        sqlx::query_scalar("SELECT last_terminal_at FROM matches WHERE id = $1")
+            .bind(match_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        last_terminal_at.is_some(),
+        "last_terminal_at set on rematch"
+    );
+
+    let legs: i64 =
+        sqlx::query_scalar("SELECT COUNT(*)::bigint FROM match_items WHERE match_id = $1")
+            .bind(match_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(legs, 0, "rematch clears match_items");
+
+    let offered_by: Option<i32> =
+        sqlx::query_scalar("SELECT offered_by FROM matches WHERE id = $1")
+            .bind(match_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(offered_by.is_none(), "rematch clears offered_by");
+
+    let msg: String = sqlx::query_scalar(
+        "SELECT content FROM messages WHERE match_id = $1 AND message_type = 'SYSTEM'
+         ORDER BY id DESC LIMIT 1",
+    )
+    .bind(match_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(msg, "REMATCH_AFTER_REJECTED");
+
+    // Only one row for the pair+group.
+    let row_count: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row_count, 1);
+
+    let listed = list_user_matches(&pool, user1_id).await;
+    let m = listed
+        .iter()
+        .find(|m| m["id"].as_i64() == Some(match_id))
+        .expect("rematched PENDING must surface in list");
+    assert_eq!(m["status"], "PENDING");
+    assert_eq!(m["rematchCount"].as_i64(), Some(1));
+    assert_eq!(m["lastTerminalStatus"].as_str(), Some("REJECTED"));
+    assert!(m["lastTerminalAt"].as_str().is_some());
+}
+
+#[sqlx::test]
+async fn test_rematch_after_cancel_when_capacity_restored(pool: PgPool) {
+    let (match_id, user1_id, _user2_id, merch_a_id, _merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    // Zero TRADE → ADR 0010 CANCELLED.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/user/inventory")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "merchId": {}, "status": "TRADE", "quantity": 0}}"#,
+                    user1_id, merch_a_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    // Restore mutual capacity.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/user/inventory")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "merchId": {}, "status": "TRADE", "quantity": 1}}"#,
+                    user1_id, merch_a_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let rematched = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher after cancel restore");
+    assert!(rematched >= 1, "matcher should reopen cancelled match");
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "PENDING");
+
+    let last_terminal: String =
+        sqlx::query_scalar("SELECT last_terminal_status FROM matches WHERE id = $1")
+            .bind(match_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(last_terminal, "CANCELLED");
+
+    let msg: String = sqlx::query_scalar(
+        "SELECT content FROM messages WHERE match_id = $1 AND message_type = 'SYSTEM'
+         AND content = 'REMATCH_AFTER_CANCELLED' LIMIT 1",
+    )
+    .bind(match_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(msg, "REMATCH_AFTER_CANCELLED");
+
+    let listed = list_user_matches(&pool, user1_id).await;
+    let m = listed
+        .iter()
+        .find(|m| m["id"].as_i64() == Some(match_id))
+        .expect("rematched after cancel must list as PENDING");
+    assert_eq!(m["status"], "PENDING");
+    assert_eq!(m["lastTerminalStatus"].as_str(), Some("CANCELLED"));
+    assert_eq!(m["rematchCount"].as_i64(), Some(1));
+}
+
+#[sqlx::test]
+async fn test_rematch_skips_completed(pool: PgPool) {
+    let (match_id, _user1_id, _user2_id, _a, _b) = setup_pending_trade_match(pool.clone()).await;
+
+    sqlx::query("UPDATE matches SET status = 'COMPLETED' WHERE id = $1")
+        .bind(match_id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher");
+    assert_eq!(created, 0, "COMPLETED must not rematch or insert");
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "COMPLETED");
+
+    let rematch_count: i32 = sqlx::query_scalar("SELECT rematch_count FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rematch_count, 0);
+}
+
+#[sqlx::test]
+async fn test_matcher_does_not_duplicate_active_pending(pool: PgPool) {
+    let (match_id, _user1_id, _user2_id, _a, _b) = setup_pending_trade_match(pool.clone()).await;
+
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("second matcher pass");
+    assert_eq!(created, 0, "active PENDING must not rematch or insert");
+
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM matches")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(total, 1);
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "PENDING");
+}
+
+#[sqlx::test]
+async fn test_rematch_skips_cancelled_while_capacity_zero(pool: PgPool) {
+    // ADR 0012 / #477 review: zero-qty TRADE must not rematch (hollow PENDING).
+    let (match_id, user1_id, _user2_id, merch_a_id, _merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/user/inventory")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "merchId": {}, "status": "TRADE", "quantity": 0}}"#,
+                    user1_id, merch_a_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    // Do not restore capacity — matcher must leave CANCELLED alone.
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher while capacity zero");
+    assert_eq!(created, 0, "zero mutual capacity must not rematch");
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    let rematch_count: i32 = sqlx::query_scalar("SELECT rematch_count FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rematch_count, 0);
+}
+
+#[sqlx::test]
+async fn test_rematch_skips_cancelled_after_merch_soft_delete(pool: PgPool) {
+    // ADR 0012 / #479 review: soft-deleted merch must not count as mutual
+    // capacity on the matcher back-edge (ADR 0008 cancel must stick).
+    let (match_id, user1_id, _user2_id, merch_a_id, _merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    let event_id: i32 = sqlx::query_scalar("SELECT event_id FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    // Soft-delete Card A → capacity collapses → CANCELLED.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_a_id, user1_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "soft-delete merch should succeed"
+    );
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    // Without a second live mutual edge, rematch must not reopen.
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher after merch soft-delete");
+    assert_eq!(
+        created, 0,
+        "soft-deleted merch must not rematch via stale inventory rows"
+    );
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    let rematch_count: i32 = sqlx::query_scalar("SELECT rematch_count FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rematch_count, 0);
+}

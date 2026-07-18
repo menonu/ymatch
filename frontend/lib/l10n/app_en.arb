@@ -913,6 +913,31 @@
   "@matchCancelledInventoryCapacity": {
     "description": "Chat SYSTEM notice when a match is cancelled because mutual inventory capacity hit zero (INVENTORY_CAPACITY reason code, ADR 0010 / #462)"
   },
+  "matchRematchAfterRejected": "This match was reopened after a previous rejection.",
+  "@matchRematchAfterRejected": {
+    "description": "Chat SYSTEM notice when a match is rematched after REJECTED (REMATCH_AFTER_REJECTED, ADR 0012 / #477)"
+  },
+  "matchRematchAfterCancelled": "This match was reopened after a previous cancellation.",
+  "@matchRematchAfterCancelled": {
+    "description": "Chat SYSTEM notice when a match is rematched after CANCELLED (REMATCH_AFTER_CANCELLED, ADR 0012 / #477)"
+  },
+  "matchRejectedBefore": "Rejected before",
+  "@matchRejectedBefore": {
+    "description": "Match card annotation when last_terminal_status is REJECTED (ADR 0012 / #477)"
+  },
+  "matchCancelledBefore": "Cancelled before",
+  "@matchCancelledBefore": {
+    "description": "Match card annotation when last_terminal_status is CANCELLED (ADR 0012 / #477)"
+  },
+  "matchRematchCount": "{count}×",
+  "@matchRematchCount": {
+    "description": "Optional rematch count suffix when rematch_count > 1 (ADR 0012 / #477)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
 
   "manageMembers": "Manage members",
   "@manageMembers": {

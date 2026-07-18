@@ -6,6 +6,10 @@ import '../l10n/app_localizations.dart';
 const String cancelReasonMerchDeleted = 'MERCH_DELETED';
 const String cancelReasonInventoryCapacity = 'INVENTORY_CAPACITY';
 
+/// ADR 0012 / #477: rematch reopened a terminal match.
+const String rematchReasonAfterRejected = 'REMATCH_AFTER_REJECTED';
+const String rematchReasonAfterCancelled = 'REMATCH_AFTER_CANCELLED';
+
 /// Legacy English bodies written before reason codes (#462). Mapped so
 /// existing rows still localize.
 const String _legacyMerchDeleted =
@@ -16,7 +20,7 @@ const String _legacyInventoryCapacity =
 /// Localize a SYSTEM message `content` value for the chat notice.
 ///
 /// Handles:
-/// - stable reason codes (`MERCH_DELETED`, `INVENTORY_CAPACITY`)
+/// - stable reason codes (`MERCH_DELETED`, `INVENTORY_CAPACITY`, rematch codes)
 /// - pre-#462 English prose still in the DB
 /// - empty content → merch-delete wording (historical fallback)
 /// - unknown values → returned as-is so custom/future copy is not swallowed
@@ -29,6 +33,10 @@ String localizeSystemMessage(AppLocalizations l10n, String content) {
     case cancelReasonInventoryCapacity:
     case _legacyInventoryCapacity:
       return l10n.matchCancelledInventoryCapacity;
+    case rematchReasonAfterRejected:
+      return l10n.matchRematchAfterRejected;
+    case rematchReasonAfterCancelled:
+      return l10n.matchRematchAfterCancelled;
     default:
       return content;
   }

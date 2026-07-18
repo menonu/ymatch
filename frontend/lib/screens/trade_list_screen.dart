@@ -327,6 +327,11 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                           ),
                           const SizedBox(height: 2),
                           _statusChip(context, match.status),
+                          // ADR 0012 / #477: prior-history annotation after rematch.
+                          if (match.hasLastTerminalStatus()) ...[
+                            const SizedBox(height: 2),
+                            _priorHistoryAnnotation(context, match),
+                          ],
                           // #322 / ADR 0001: a match is scoped to one item group,
                           // so show `event:group` once on the card instead of per
                           // item. Both fields are NOT NULL on a real match; guard
@@ -393,6 +398,27 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// ADR 0012: chip under the status when this pair+group was rematched.
+  Widget _priorHistoryAnnotation(BuildContext context, TradeMatch match) {
+    final l10n = AppLocalizations.of(context)!;
+    final base = switch (match.lastTerminalStatus) {
+      'REJECTED' => l10n.matchRejectedBefore,
+      'CANCELLED' => l10n.matchCancelledBefore,
+      _ => match.lastTerminalStatus,
+    };
+    final label = match.rematchCount > 1
+        ? '$base · ${l10n.matchRematchCount(match.rematchCount)}'
+        : base;
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: Colors.deepOrange[700],
       ),
     );
   }

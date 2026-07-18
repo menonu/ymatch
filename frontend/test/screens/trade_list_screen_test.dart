@@ -30,6 +30,22 @@ TradeMatch _pendingMatch() => TradeMatch()
   ..userHaves.add(_item(10, 'Give Pen', 3, 1))
   ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
+TradeMatch _rematchedPending({
+  required String lastTerminal,
+  int rematchCount = 1,
+}) => TradeMatch()
+  ..id = 101
+  ..user1Id = 1
+  ..user2Id = 2
+  ..status = 'PENDING'
+  ..lastTerminalStatus = lastTerminal
+  ..rematchCount = rematchCount
+  ..otherUser = (User()
+    ..id = 2
+    ..username = 'partner')
+  ..userHaves.add(_item(10, 'Give Pen', 3, 1))
+  ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
+
 void main() {
   testWidgets('offer dialog shows no mode switcher and both sections (#303)', (
     WidgetTester tester,
@@ -68,6 +84,55 @@ void main() {
     expect(find.text('Items you give:'), findsOneWidget);
     expect(find.text('Items you receive:'), findsOneWidget);
   });
+
+  testWidgets(
+    'rematched PENDING shows Rejected before annotation (ADR 0012 / #477)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith(
+              (ref) async => [_rematchedPending(lastTerminal: 'REJECTED')],
+            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rejected before'), findsOneWidget);
+      expect(find.textContaining('Make Offer'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'rematched PENDING shows Cancelled before and rematch count (ADR 0012 / #477)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith(
+              (ref) async => [
+                _rematchedPending(lastTerminal: 'CANCELLED', rematchCount: 2),
+              ],
+            ),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancelled before · 2×'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'offer dialog shows the Japanese balance explanation under ja locale (#303)',

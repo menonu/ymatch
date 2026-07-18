@@ -900,6 +900,9 @@ class TradeMatch extends $pb.GeneratedMessage {
     $core.String? groupName,
     $core.String? eventName,
     $core.String? groupDisplayName,
+    $core.int? rematchCount,
+    $core.String? lastTerminalStatus,
+    $core.String? lastTerminalAt,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -916,6 +919,10 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (groupName != null) result.groupName = groupName;
     if (eventName != null) result.eventName = eventName;
     if (groupDisplayName != null) result.groupDisplayName = groupDisplayName;
+    if (rematchCount != null) result.rematchCount = rematchCount;
+    if (lastTerminalStatus != null)
+      result.lastTerminalStatus = lastTerminalStatus;
+    if (lastTerminalAt != null) result.lastTerminalAt = lastTerminalAt;
     return result;
   }
 
@@ -949,6 +956,9 @@ class TradeMatch extends $pb.GeneratedMessage {
     ..aOS(12, _omitFieldNames ? '' : 'groupName')
     ..aOS(13, _omitFieldNames ? '' : 'eventName')
     ..aOS(14, _omitFieldNames ? '' : 'groupDisplayName')
+    ..aI(15, _omitFieldNames ? '' : 'rematchCount')
+    ..aOS(16, _omitFieldNames ? '' : 'lastTerminalStatus')
+    ..aOS(17, _omitFieldNames ? '' : 'lastTerminalAt')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1079,6 +1089,36 @@ class TradeMatch extends $pb.GeneratedMessage {
   $core.bool hasGroupDisplayName() => $_has(13);
   @$pb.TagNumber(14)
   void clearGroupDisplayName() => $_clearField(14);
+
+  /// ADR 0012 / #477: times this pair+group match was reopened after REJECTED/CANCELLED.
+  @$pb.TagNumber(15)
+  $core.int get rematchCount => $_getIZ(14);
+  @$pb.TagNumber(15)
+  set rematchCount($core.int value) => $_setSignedInt32(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasRematchCount() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearRematchCount() => $_clearField(15);
+
+  /// ADR 0012: status immediately before the latest rematch ("REJECTED" | "CANCELLED").
+  @$pb.TagNumber(16)
+  $core.String get lastTerminalStatus => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set lastTerminalStatus($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasLastTerminalStatus() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearLastTerminalStatus() => $_clearField(16);
+
+  /// ADR 0012: when the latest rematch left the terminal status (RFC3339).
+  @$pb.TagNumber(17)
+  $core.String get lastTerminalAt => $_getSZ(16);
+  @$pb.TagNumber(17)
+  set lastTerminalAt($core.String value) => $_setString(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasLastTerminalAt() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearLastTerminalAt() => $_clearField(17);
 }
 
 class MatchItem extends $pb.GeneratedMessage {

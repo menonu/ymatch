@@ -58,18 +58,24 @@ flowchart TD
   A[Tick] --> B[Load WANT inventory rows<br/>active merch, non-null group, not banned]
   B --> C[For each WANT: find other users TRADING that merch]
   C --> D{Partner has WANT for something<br/>I TRADE in same event+group?}
-  D -->|yes| E[Insert PENDING match for pair+group<br/>if not already present]
+  D -->|yes| E{Row for pair+group?}
   D -->|no| F[Next candidate]
-  E --> F
-  F --> G[Sleep until next interval]
+  E -->|none| G[Insert PENDING]
+  E -->|REJECTED or CANCELLED| H[Reopen same row to PENDING<br/>+ rematch annotation ADR 0012]
+  E -->|active or COMPLETED| F
+  G --> F
+  H --> F
+  F --> I[Sleep until next interval]
 ```
 
-Matching only creates **PENDING** opportunities. It does not move inventory.
-Scope rules: [ADR 0001](../adr/0001-match-scoped-to-item-group.md).
+Matching creates or reopens **PENDING** opportunities. It does not move inventory.
+Scope rules: [ADR 0001](../adr/0001-match-scoped-to-item-group.md). Rematch after
+reject/cancel: [ADR 0012](../adr/0012-rematch-after-reject-or-cancel.md).
 
 ## Trade negotiation and completion
 
-State machine (simplified from [ADR 0002](../adr/0002-negotiation-state-machine.md)):
+State machine (simplified from [ADR 0002](../adr/0002-negotiation-state-machine.md)
+and [ADR 0012](../adr/0012-rematch-after-reject-or-cancel.md)):
 
 ```mermaid
 stateDiagram-v2
@@ -81,7 +87,11 @@ stateDiagram-v2
   OFFERED --> REJECTED: either rejects
   ACCEPTED --> COMPLETED: complete
   COMPLETED --> [*]
-  REJECTED --> [*]
+  PENDING --> CANCELLED: system cancel (merch delete / cap=0)
+  OFFERED --> CANCELLED: system cancel
+  ACCEPTED --> CANCELLED: system cancel
+  REJECTED --> PENDING: rematch when mutual caps hold
+  CANCELLED --> PENDING: rematch when mutual caps hold
 ```
 
 After `COMPLETED`, each party may **apply inventory** as a separate, idempotent

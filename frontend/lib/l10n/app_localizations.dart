@@ -1280,6 +1280,36 @@ abstract class AppLocalizations {
   /// **'This match was cancelled because inventory no longer supports a mutual trade.'**
   String get matchCancelledInventoryCapacity;
 
+  /// Chat SYSTEM notice when a match is rematched after REJECTED (REMATCH_AFTER_REJECTED, ADR 0012 / #477)
+  ///
+  /// In en, this message translates to:
+  /// **'This match was reopened after a previous rejection.'**
+  String get matchRematchAfterRejected;
+
+  /// Chat SYSTEM notice when a match is rematched after CANCELLED (REMATCH_AFTER_CANCELLED, ADR 0012 / #477)
+  ///
+  /// In en, this message translates to:
+  /// **'This match was reopened after a previous cancellation.'**
+  String get matchRematchAfterCancelled;
+
+  /// Match card annotation when last_terminal_status is REJECTED (ADR 0012 / #477)
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected before'**
+  String get matchRejectedBefore;
+
+  /// Match card annotation when last_terminal_status is CANCELLED (ADR 0012 / #477)
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled before'**
+  String get matchCancelledBefore;
+
+  /// Optional rematch count suffix when rematch_count > 1 (ADR 0012 / #477)
+  ///
+  /// In en, this message translates to:
+  /// **'{count}×'**
+  String matchRematchCount(int count);
+
   /// Tooltip / dialog title for event creator/editor self-service member UI (#442)
   ///
   /// In en, this message translates to:
