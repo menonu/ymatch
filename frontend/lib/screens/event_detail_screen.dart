@@ -113,9 +113,22 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return merchAsync.when(
       data: (merch) {
         if (merch.isEmpty) {
+          // #464: Manage Members lives bottom-left (not AppBar), same as the
+          // populated layout. Empty catalog still needs creator/editor access.
           return Scaffold(
-            appBar: AppBar(actions: _buildMemberManageActions(context, role)),
-            body: _buildEmptyState(context, ref),
+            appBar: AppBar(),
+            body: Stack(
+              children: [
+                _buildEmptyState(context, ref),
+                if (_buildManageMembersButton(context, role)
+                    case final manageBtn?)
+                  Positioned(
+                    left: 16,
+                    bottom: 16 + MediaQuery.paddingOf(context).bottom,
+                    child: manageBtn,
+                  ),
+              ],
+            ),
             floatingActionButton: _buildAddMerchFab(context),
           );
         }
@@ -236,8 +249,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       ref.invalidate(inventoryProvider(user.id));
                   },
                 ),
-                // #442: self-service event creator/editor management.
-                ..._buildMemberManageActions(context, role),
                 // Show controls (display mode) moved to AppBar
                 PopupMenuButton<InventoryDisplayMode>(
                   icon: Stack(
@@ -731,17 +742,21 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     ),
                   ],
                 ),
-                // Bottom-left controls (#128): Group info (everyone) + Edit
-                // group (creator of the active tab, or anyone the backend
-                // authorizes via `group.edit` — editors / moderator / admin,
-                // per `my-role` canEditGroup, #425). Tabs stay clean — no
-                // shield/edit icons there.
+                // Bottom-left controls (#128 / #464): Group info (everyone) +
+                // Edit group (creator / canEditGroup, #425) + Manage members
+                // (canManageEditors / canTransferCreator, #442). Tabs stay
+                // clean — no shield/edit icons there. Admin manage moved off
+                // the AppBar so it co-locates with other primary group tooling.
                 Positioned(
                   left: 16,
                   bottom: 16 + MediaQuery.paddingOf(context).bottom,
                   child: Builder(
                     builder: (context) {
                       final tabCtrl = DefaultTabController.of(context);
+                      final manageBtn = _buildManageMembersButton(
+                        context,
+                        role,
+                      );
                       return AnimatedBuilder(
                         animation: tabCtrl,
                         builder: (context, _) {
@@ -795,6 +810,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                   icon: const Icon(Icons.edit),
                                 ),
                               ],
+                              // Event-scoped (#442); independent of active tab.
+                              ?manageBtn,
                             ],
                           );
                         },
@@ -844,24 +861,24 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  /// AppBar actions for self-service member management (#442).
+  /// Bottom-left control for self-service member management (#442, #464).
   /// Visible when the caller can manage editors and/or transfer creator.
-  List<Widget> _buildMemberManageActions(
+  /// Returns null when the control should be hidden.
+  Widget? _buildManageMembersButton(
     BuildContext context,
     MyEventRoleResponse? role,
   ) {
-    if (role == null) return const [];
+    if (role == null) return null;
     final canManage = role.canManageEditors || role.canTransferCreator;
-    if (!canManage) return const [];
+    if (!canManage) return null;
     final l10n = AppLocalizations.of(context)!;
-    return [
-      IconButton(
-        key: const Key('manage_members_button'),
-        icon: const Icon(Icons.manage_accounts),
-        tooltip: l10n.manageMembers,
-        onPressed: () => _showManageMembersDialog(context, role),
-      ),
-    ];
+    return IconButton(
+      key: const Key('manage_members_button'),
+      icon: const Icon(Icons.manage_accounts),
+      tooltip: l10n.manageMembers,
+      iconSize: 24,
+      onPressed: () => _showManageMembersDialog(context, role),
+    );
   }
 
   Future<void> _showManageMembersDialog(
