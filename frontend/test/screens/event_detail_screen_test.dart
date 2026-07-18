@@ -1121,6 +1121,129 @@ void main() {
     expect(groupDisplayName('Bad', empty), 'Bad');
   });
 
+  // --- TRADE-only filter + display mode (#472) ---
+
+  testWidgets('TRADE filter shows only items with TRADE > 0 (#472)', (
+    tester,
+  ) async {
+    final haveOnly = Merchandise()
+      ..id = 11
+      ..eventId = 5
+      ..name = 'HaveOnlyCard'
+      ..groupName = 'Pens'
+      ..creatorId = 1;
+    final wantOnly = Merchandise()
+      ..id = 12
+      ..eventId = 5
+      ..name = 'WantOnlyCard'
+      ..groupName = 'Pens'
+      ..creatorId = 1;
+    final tradeOnly = Merchandise()
+      ..id = 13
+      ..eventId = 5
+      ..name = 'TradeOnlyCard'
+      ..groupName = 'Pens'
+      ..creatorId = 1;
+
+    final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+    final client = ApiClient(
+      config,
+      client: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.path == '/api/v1/user/1/inventory') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 1,
+                'userId': 1,
+                'merchId': 11,
+                'status': 'HAVE',
+                'quantity': 2,
+                'merchName': 'HaveOnlyCard',
+              },
+              {
+                'id': 2,
+                'userId': 1,
+                'merchId': 12,
+                'status': 'WANT',
+                'quantity': 1,
+                'merchName': 'WantOnlyCard',
+              },
+              {
+                'id': 3,
+                'userId': 1,
+                'merchId': 13,
+                'status': 'TRADE',
+                'quantity': 1,
+                'merchName': 'TradeOnlyCard',
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => client),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(
+            5,
+          ).overrideWith((ref) async => [haveOnly, wantOnly, tradeOnly]),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('HaveOnlyCard'), findsOneWidget);
+    expect(find.text('WantOnlyCard'), findsOneWidget);
+    expect(find.text('TradeOnlyCard'), findsOneWidget);
+
+    // Segment label is the localized "For Trade" (status `trade`).
+    // Prefer the filter bar over the detailed TRADE stepper label.
+    final tradeSegment = find.descendant(
+      of: find.byType(SegmentedButton<MerchFilter>),
+      matching: find.text('For Trade'),
+    );
+    await tester.ensureVisible(tradeSegment);
+    await tester.tap(tradeSegment);
+    await tester.pumpAndSettle();
+
+    expect(find.text('TradeOnlyCard'), findsOneWidget);
+    expect(find.text('HaveOnlyCard'), findsNothing);
+    expect(find.text('WantOnlyCard'), findsNothing);
+  });
+
+  testWidgets('Just For Trade display mode shows only TRADE stepper (#472)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          inventoryDisplayModeProvider.overrideWith(
+            (ref) => InventoryDisplayMode.trade,
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Detailed view: only the TRADE stepper is mounted (keys from _buildStepper).
+    expect(find.byKey(const Key('stepper_inc_TRADE')), findsOneWidget);
+    expect(find.byKey(const Key('stepper_inc_HAVE')), findsNothing);
+    expect(find.byKey(const Key('stepper_inc_WANT')), findsNothing);
+    expect(find.text('+'), findsOneWidget);
+    expect(find.text('−'), findsOneWidget);
+  });
+
   // Regression for the 0.3.13 export-from-3-dots-menu wiring: the menu's
   // onSelected called DefaultTabController.of on the State's build context,
   // which is the controller's *parent* — the lookup threw at runtime and the

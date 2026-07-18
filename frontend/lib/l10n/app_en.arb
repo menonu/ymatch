@@ -561,6 +561,10 @@
   "@invModeWantTrade": {
     "description": "Inventory display-mode option: show wished and for-trade items"
   },
+  "invModeJustTrade": "Just For Trade",
+  "@invModeJustTrade": {
+    "description": "Inventory display-mode option: show only for-trade (TRADE) steppers"
+  },
   "invModeAll": "All",
   "@invModeAll": {
     "description": "Inventory display-mode option: show all inventory items"

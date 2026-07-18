@@ -390,6 +390,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invModeWantTrade => 'Wish & For Trade';
 
   @override
+  String get invModeJustTrade => 'Just For Trade';
+
+  @override
   String get invModeAll => 'All';
 
   @override
