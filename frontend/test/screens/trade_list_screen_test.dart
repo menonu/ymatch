@@ -33,19 +33,18 @@ TradeMatch _pendingMatch() => TradeMatch()
 TradeMatch _rematchedPending({
   required String lastTerminal,
   int rematchCount = 1,
-}) =>
-    TradeMatch()
-      ..id = 101
-      ..user1Id = 1
-      ..user2Id = 2
-      ..status = 'PENDING'
-      ..lastTerminalStatus = lastTerminal
-      ..rematchCount = rematchCount
-      ..otherUser = (User()
-        ..id = 2
-        ..username = 'partner')
-      ..userHaves.add(_item(10, 'Give Pen', 3, 1))
-      ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
+}) => TradeMatch()
+  ..id = 101
+  ..user1Id = 1
+  ..user2Id = 2
+  ..status = 'PENDING'
+  ..lastTerminalStatus = lastTerminal
+  ..rematchCount = rematchCount
+  ..otherUser = (User()
+    ..id = 2
+    ..username = 'partner')
+  ..userHaves.add(_item(10, 'Give Pen', 3, 1))
+  ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
 void main() {
   testWidgets('offer dialog shows no mode switcher and both sections (#303)', (
