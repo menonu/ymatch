@@ -2055,3 +2055,68 @@ async fn test_rematch_skips_cancelled_while_capacity_zero(pool: PgPool) {
         .unwrap();
     assert_eq!(rematch_count, 0);
 }
+
+#[sqlx::test]
+async fn test_rematch_skips_cancelled_after_merch_soft_delete(pool: PgPool) {
+    // ADR 0012 / #479 review: soft-deleted merch must not count as mutual
+    // capacity on the matcher back-edge (ADR 0008 cancel must stick).
+    let (match_id, user1_id, _user2_id, merch_a_id, _merch_b_id) =
+        setup_pending_trade_match(pool.clone()).await;
+
+    let event_id: i32 = sqlx::query_scalar("SELECT event_id FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    // Soft-delete Card A → capacity collapses → CANCELLED.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/events/{}/merch/{}?user_id={}",
+                    event_id, merch_a_id, user1_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "soft-delete merch should succeed"
+    );
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    // Without a second live mutual edge, rematch must not reopen.
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher after merch soft-delete");
+    assert_eq!(
+        created, 0,
+        "soft-deleted merch must not rematch via stale inventory rows"
+    );
+
+    let status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CANCELLED");
+
+    let rematch_count: i32 = sqlx::query_scalar("SELECT rematch_count FROM matches WHERE id = $1")
+        .bind(match_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rematch_count, 0);
+}

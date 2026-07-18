@@ -42,12 +42,16 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
         let want_group_name: String = want_row.get("group_name");
         let want_event_id: i32 = want_row.get("event_id");
 
-        // Potential partners who are TRADING what User A wants (exclude banned users)
+        // Potential partners who are TRADING what User A wants (exclude banned users).
+        // Merch liveness is implied by want_merch_id (outer query already filtered
+        // live/trade-enabled), but re-check for defense in depth.
         let potential_partners = sqlx::query(
             r#"SELECT i.user_id, i.merch_id FROM inventory i
             JOIN users u ON i.user_id = u.id
+            JOIN merchandise m ON m.id = i.merch_id
             WHERE i.merch_id = $1 AND i.status = 'TRADE' AND i.user_id != $2
               AND i.quantity > 0
+              AND m.is_deleted = false AND m.trade_enabled = true
               AND u.is_banned = false
               AND NOT EXISTS (
                 SELECT 1 FROM match_items mi
@@ -68,6 +72,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
             // Does Partner (User B) WANT anything that User A is TRADING, AND
             // is it in the same group (same (event_id, group_name))? ADR 0001.
+            // ADR 0010 / 0012: only live, trade-enabled merch contribute to cap.
             let user_a_trades = sqlx::query(
                 r#"
                 SELECT i.merch_id
@@ -75,6 +80,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                 JOIN merchandise m ON i.merch_id = m.id
                 WHERE i.user_id = $1 AND i.status = 'TRADE' AND i.quantity > 0
                   AND m.event_id = $2 AND m.group_name = $3
+                  AND m.is_deleted = false AND m.trade_enabled = true
                 "#,
             )
             .bind(want_user_id)
@@ -87,10 +93,15 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
             for a_trade_row in user_a_trades {
                 let a_trade_merch_id: i32 = a_trade_row.get("merch_id");
 
-                // Check if Partner WANTS this item (positive quantity).
+                // Partner WANT must be on live, trade-enabled merch too.
                 let partner_want = sqlx::query(
-                    "SELECT id FROM inventory WHERE user_id = $1 AND merch_id = $2
-                       AND status = 'WANT' AND quantity > 0",
+                    r#"
+                    SELECT i.id FROM inventory i
+                    JOIN merchandise m ON m.id = i.merch_id
+                    WHERE i.user_id = $1 AND i.merch_id = $2
+                      AND i.status = 'WANT' AND i.quantity > 0
+                      AND m.is_deleted = false AND m.trade_enabled = true
+                    "#,
                 )
                 .bind(partner_id)
                 .bind(a_trade_merch_id)
