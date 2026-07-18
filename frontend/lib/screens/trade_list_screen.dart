@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../utils/format_local_datetime.dart';
 import '../utils/group_display.dart';
 import '../utils/image_helper.dart';
 
@@ -40,24 +41,36 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
   ) {
     // ADR 0010: CANCELLED is system-only (not user-actionable) but surfaces
     // under Done alongside COMPLETED. Actionable tabs exclude it.
+    final Iterable<TradeMatch> filtered;
     switch (tab) {
       case TradeTab.match_:
-        return matches.where((m) => m.status == 'PENDING').toList();
+        filtered = matches.where((m) => m.status == 'PENDING');
       case TradeTab.offerOut:
-        return matches
-            .where((m) => m.status == 'OFFERED' && m.offeredBy == userId)
-            .toList();
+        filtered = matches.where(
+          (m) => m.status == 'OFFERED' && m.offeredBy == userId,
+        );
       case TradeTab.offerIn:
-        return matches
-            .where((m) => m.status == 'OFFERED' && m.offeredBy != userId)
-            .toList();
+        filtered = matches.where(
+          (m) => m.status == 'OFFERED' && m.offeredBy != userId,
+        );
       case TradeTab.active:
-        return matches.where((m) => m.status == 'ACCEPTED').toList();
+        filtered = matches.where((m) => m.status == 'ACCEPTED');
       case TradeTab.completed:
-        return matches
-            .where((m) => m.status == 'COMPLETED' || m.status == 'CANCELLED')
-            .toList();
+        filtered = matches.where(
+          (m) => m.status == 'COMPLETED' || m.status == 'CANCELLED',
+        );
     }
+    // #476: latest-first by created_at (defensive — do not rely on server
+    // order alone after client-side tab filtering).
+    final list = filtered.toList();
+    list.sort(
+      (a, b) => compareIsoDateTimeDesc(
+        a.hasCreatedAt() ? a.createdAt : null,
+        b.hasCreatedAt() ? b.createdAt : null,
+        fallback: () => b.id.compareTo(a.id),
+      ),
+    );
+    return list;
   }
 
   int _tabCount(List<TradeMatch> matches, TradeTab tab, int userId) {
@@ -282,6 +295,10 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     final otherName = match.hasOtherUser()
         ? match.otherUser.username
         : l10n.unknownUser;
+    // #476: UTC API timestamp → device-local wall clock for display.
+    final createdAtLabel = match.hasCreatedAt()
+        ? formatLocalDateTime(match.createdAt)
+        : null;
 
     final cancelled = match.status == 'CANCELLED';
     return Opacity(
@@ -349,6 +366,17 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                                       : null,
                                 ),
                               ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                          // #476: match created_at in device local time.
+                          if (createdAtLabel != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              createdAtLabel,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],

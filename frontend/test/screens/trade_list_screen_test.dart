@@ -5,6 +5,7 @@ import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/trade_list_screen.dart';
+import 'package:frontend/utils/format_local_datetime.dart';
 
 /// Wraps [child] with the localization delegates so screens that call
 /// `AppLocalizations.of(context)` resolve strings in widget tests.
@@ -527,6 +528,131 @@ void main() {
     expect(find.textContaining('Gone Pen'), findsOneWidget);
     expect(find.text('Make Offer'), findsNothing);
   });
+
+  // #476: match card shows created_at as local datetime; list is latest-first.
+  TradeMatch _matchWithUser({
+    required int id,
+    required String username,
+    required String status,
+    String? createdAt,
+  }) {
+    final m = TradeMatch()
+      ..id = id
+      ..user1Id = 1
+      ..user2Id = 2
+      ..status = status
+      ..otherUser = (User()
+        ..id = 2
+        ..username = username)
+      ..userHaves.add(_item(10, 'Give Pen', 1, 1));
+    if (createdAt != null) m.createdAt = createdAt;
+    return m;
+  }
+
+  testWidgets(
+    'match card shows created_at as local datetime when present (#476)',
+    (WidgetTester tester) async {
+      const iso = '2026-07-01T15:30:00Z';
+      final match = _matchWithUser(
+        id: 301,
+        username: 'Alice',
+        status: 'PENDING',
+        createdAt: iso,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [match]),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final expected = formatLocalDateTime(iso)!;
+      expect(find.text(expected), findsOneWidget);
+      expect(find.text('Alice'), findsOneWidget);
+    },
+  );
+
+  testWidgets('match card omits datetime when created_at is missing (#476)', (
+    WidgetTester tester,
+  ) async {
+    final match = _matchWithUser(id: 302, username: 'Bob', status: 'PENDING');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [match]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: _localized(const TradeListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bob'), findsOneWidget);
+    // No yyyy/MM/dd HH:mm line on the card.
+    expect(
+      find.textContaining(RegExp(r'\d{4}/\d{2}/\d{2} \d{2}:\d{2}')),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'match list within a tab is ordered latest created_at first (#476)',
+    (WidgetTester tester) async {
+      // Deliberately reverse chronological input order.
+      final older = _matchWithUser(
+        id: 10,
+        username: 'OlderUser',
+        status: 'PENDING',
+        createdAt: '2026-07-01T10:00:00Z',
+      );
+      final newer = _matchWithUser(
+        id: 20,
+        username: 'NewerUser',
+        status: 'PENDING',
+        createdAt: '2026-07-03T10:00:00Z',
+      );
+      final middle = _matchWithUser(
+        id: 15,
+        username: 'MiddleUser',
+        status: 'PENDING',
+        createdAt: '2026-07-02T10:00:00Z',
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(
+              1,
+            ).overrideWith((ref) async => [older, newer, middle]),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: _localized(const TradeListScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final newerY = tester.getTopLeft(find.text('NewerUser')).dy;
+      final middleY = tester.getTopLeft(find.text('MiddleUser')).dy;
+      final olderY = tester.getTopLeft(find.text('OlderUser')).dy;
+      expect(newerY, lessThan(middleY));
+      expect(middleY, lessThan(olderY));
+    },
+  );
 }
 
 User _user() => User()
