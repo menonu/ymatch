@@ -7,7 +7,7 @@
 | **Single shared PostgreSQL** per environment | All durable domain state lives in one DB; matching and lifecycle use SQL transactions. |
 | **JSON REST + protobuf models** | Wire bodies are proto3 JSON; Rust/Dart types are generated from `proto/models.proto` via `scripts/proto-gen.sh`. |
 | **Flutter client** | UI and client state are Riverpod + GoRouter; browser and mobile share one codebase. |
-| **Image storage pluggable** | `IMAGE_STORAGE=local` (dev/OCI volume) or Firebase/GCS-compatible backend; clients may load image URLs directly when public. |
+| **Image storage via `ImageStorage` trait** | Current backend is local files (`UPLOAD_DIR`, served as `/uploads/*`); the trait remains for a future object-store backend. |
 | **Always Free–friendly hosting** | Production/staging target OCI Ampere A1 VMs with Docker Compose — not a multi-region k8s mesh. |
 | **Public GitHub repository** | Secrets, host paths, and PII must never be committed ([security.md](../security.md)). |
 

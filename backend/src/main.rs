@@ -35,9 +35,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    let image_storage = storage::create_storage().await;
-    let storage_type = std::env::var("IMAGE_STORAGE").unwrap_or_else(|_| "local".to_string());
-    tracing::info!("Image storage backend: {}", storage_type);
+    let image_storage = storage::create_storage();
+    let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    tracing::info!("Image storage backend: local (UPLOAD_DIR={})", upload_dir);
 
     let app = routes::create_router(pool.clone(), image_storage);
 

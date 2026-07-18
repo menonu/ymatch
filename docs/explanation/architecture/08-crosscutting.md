@@ -48,7 +48,7 @@
 |---------------------|---------|
 | `DATABASE_URL` | Postgres connection |
 | `PORT` | API listen port (default 3000) |
-| `IMAGE_STORAGE` / `UPLOAD_DIR` | Image backend |
+| `UPLOAD_DIR` (optional `IMAGE_STORAGE=local`) | Local image files root |
 | `MATCHING_INTERVAL_SECONDS` | Matcher cadence |
 | `RATE_LIMIT_*` (if set) | Governor rate-limit tuning (see `routes.rs` defaults) |
 
