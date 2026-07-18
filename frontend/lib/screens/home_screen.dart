@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
+import '../utils/group_display.dart';
 import '../widgets/how_to_trade.dart';
 
 enum EventSort { recent, popular, alphabetical }
@@ -176,11 +177,10 @@ class HomeScreen extends ConsumerWidget {
                           final l10n = AppLocalizations.of(context)!;
                           // #466: chip label uses display_name when the API
                           // returns it; navigation still uses group_name key.
-                          final label =
-                              group.hasDisplayName() &&
-                                  group.displayName.isNotEmpty
-                              ? group.displayName
-                              : group.groupName;
+                          final label = groupLabel(
+                            group.groupName,
+                            group.hasDisplayName() ? group.displayName : null,
+                          );
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: _buildShortcutChip(

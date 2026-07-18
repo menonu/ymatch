@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../utils/group_display.dart';
 import '../utils/image_helper.dart';
 
 enum TradeTab { match_, offerOut, offerIn, active, completed }
@@ -336,10 +337,12 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
                               // #466: cosmetic group_display_name when set.
                               l10n.matchGroupLabel(
                                 match.eventName,
-                                match.hasGroupDisplayName() &&
-                                        match.groupDisplayName.isNotEmpty
-                                    ? match.groupDisplayName
-                                    : match.groupName,
+                                groupLabel(
+                                  match.groupName,
+                                  match.hasGroupDisplayName()
+                                      ? match.groupDisplayName
+                                      : null,
+                                ),
                               ),
                               style: TextStyle(
                                 fontSize: 12,
