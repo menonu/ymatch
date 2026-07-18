@@ -132,8 +132,9 @@ pub struct InventoryItem {
     pub photo_url: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "8")]
     pub group_name: ::core::option::Option<::prost::alloc::string::String>,
-    /// ADR 0008: true when the linked merchandise row is soft-deleted.
-    /// Present on holder inventory lists so the UI can badge deleted items.
+    /// ADR 0008 / ADR 0011: true when the linked merchandise row is soft-deleted.
+    /// Present on holder inventory lists so the UI can badge deleted items
+    /// (catalog lists are live-only and omit soft-deleted rows).
     #[prost(bool, optional, tag = "9")]
     pub is_deleted: ::core::option::Option<bool>,
 }

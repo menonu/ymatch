@@ -899,7 +899,7 @@
 
   "itemDeleted": "Deleted",
   "@itemDeleted": {
-    "description": "Badge on soft-deleted merchandise visible only to holders (ADR 0008)"
+    "description": "Badge on soft-deleted merchandise (inventory / defensive catalog UI; ADR 0008 / ADR 0011)"
   },
   "matchCancelledSystemMessage": "This match was cancelled because a traded item was deleted.",
   "@matchCancelledSystemMessage": {

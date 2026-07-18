@@ -91,10 +91,11 @@ impl MerchandiseRepository {
     /// List merchandise for one event, with creator-visible drafts included
     /// when `viewer_id` matches the merch creator.
     ///
-    /// ADR 0008: soft-deleted rows are visible only to *holders* — the merch
-    /// `creator_id` or any user with a `HAVE` inventory row for the item —
-    /// and are still marked `is_deleted = true`. Non-holders never see them.
-    /// Search remains live-items-only (see handlers/search.rs).
+    /// ADR 0011: catalog lists are live-only (`is_deleted = false`) for every
+    /// viewer — including the merch creator, moderators, and HAVE holders.
+    /// Soft-deleted rows remain in the DB (ADR 0008) and still surface on
+    /// holder inventory via `InventoryRepository::list_for_user`. Search is
+    /// also live-only (handlers/search.rs).
     pub async fn list_for_event(
         &self,
         event_id: i32,
@@ -104,23 +105,8 @@ impl MerchandiseRepository {
             r#"SELECT {} FROM merchandise m
             LEFT JOIN merchandise_groups g ON g.event_id = m.event_id AND g.group_name = m.group_name
             WHERE m.event_id = $1
+            AND m.is_deleted = false
             AND (m.status = 'published' OR m.creator_id = $2)
-            AND (
-              m.is_deleted = false
-              OR (
-                m.is_deleted = true
-                AND $2 IS NOT NULL
-                AND (
-                  m.creator_id = $2
-                  OR EXISTS (
-                    SELECT 1 FROM inventory i
-                    WHERE i.merch_id = m.id
-                      AND i.user_id = $2
-                      AND i.status = 'HAVE'
-                  )
-                )
-              )
-            )
             ORDER BY m.id ASC"#,
             MERCH_SELECT
         );

@@ -91,9 +91,10 @@ impl InventoryRepository {
     /// List all inventory rows for a user, joined to `merchandise` for
     /// `merch_name` / `photo_url` / `group_name` / `is_deleted`.
     ///
-    /// ADR 0008: holders keep seeing soft-deleted merch in their inventory
-    /// (marked via `is_deleted`). WANT rows for deleted merch remain too
-    /// (inert; matching already excludes them). Search is live-only.
+    /// ADR 0008 / ADR 0011: holders keep seeing soft-deleted merch in their
+    /// inventory (marked via `is_deleted`). Catalog lists are live-only;
+    /// inventory is the surface that still exposes deletion. WANT rows for
+    /// deleted merch remain too (inert; matching already excludes them).
     pub async fn list_for_user(&self, user_id: i32) -> Result<Vec<InventoryItem>, AppError> {
         let rows = sqlx::query(
             r#"SELECT

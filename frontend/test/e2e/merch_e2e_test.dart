@@ -147,9 +147,10 @@ void main() {
   );
 
   test(
-    // ADR 0008: delete is soft-delete only. The creator is a holder, so
-    // the row remains on GET /events/{id}/merch marked isDeleted=true.
-    'deleteMerchByCreator DELETEs /events/{id}/merch/{id} and soft-deletes it',
+    // ADR 0008: delete is soft-delete only (row remains, trade disabled).
+    // ADR 0011 / #468: catalog is live-only — creator no longer sees the
+    // row on GET /events/{id}/merch after delete.
+    'deleteMerchByCreator DELETEs /events/{id}/merch/{id} and hides it from catalog',
     () async {
       final container = makeContainer();
       addTearDown(container.dispose);
@@ -168,19 +169,14 @@ void main() {
       final deleted = merch.where((m) => m['id'] == merchId).toList();
       expect(
         deleted,
-        hasLength(1),
-        reason: 'creator (holder) still sees soft-deleted merch (ADR 0008)',
+        isEmpty,
+        reason: 'creator must not see soft-deleted merch on catalog (ADR 0011)',
       );
-      expect(
-        deleted.single['isDeleted'],
-        isTrue,
-        reason: 'soft-deleted merch is marked isDeleted for holders',
-      );
-      expect(
-        deleted.single['tradeEnabled'],
-        isFalse,
-        reason: 'soft-delete always disables trade',
-      );
+
+      // Soft-delete still leaves the row; recreate same name must succeed
+      // (partial unique index) and produce a new id.
+      final recreatedId = await addMerch(container, name);
+      expect(recreatedId, isNot(merchId));
     },
   );
 }

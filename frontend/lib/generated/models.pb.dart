@@ -871,8 +871,9 @@ class InventoryItem extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearGroupName() => $_clearField(8);
 
-  /// ADR 0008: true when the linked merchandise row is soft-deleted.
-  /// Present on holder inventory lists so the UI can badge deleted items.
+  /// ADR 0008 / ADR 0011: true when the linked merchandise row is soft-deleted.
+  /// Present on holder inventory lists so the UI can badge deleted items
+  /// (catalog lists are live-only and omit soft-deleted rows).
   @$pb.TagNumber(9)
   $core.bool get isDeleted => $_getBF(8);
   @$pb.TagNumber(9)

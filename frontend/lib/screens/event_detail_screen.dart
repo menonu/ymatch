@@ -2294,7 +2294,10 @@ int _naturalCompare(String a, String b) {
   return a.length.compareTo(b.length);
 }
 
-/// Small badge marking soft-deleted merch (ADR 0008 / holder-only).
+/// Small badge marking soft-deleted merch.
+///
+/// ADR 0011: event catalog lists are live-only, so this is primarily defensive
+/// for stale client state. Inventory rows still carry `is_deleted` (ADR 0008).
 class _DeletedBadge extends StatelessWidget {
   final String label;
 

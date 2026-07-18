@@ -248,7 +248,7 @@ List a user's favorite merchandise groups.
 
 ### GET /api/v1/events/:id/merch
 
-List merchandise for an event. Returns published items plus the requesting user's own drafts. Excludes soft-deleted items.
+List merchandise for an event. Returns published items plus the requesting user's own drafts. Excludes soft-deleted items for every viewer (including creator/moderator and HAVE holders) — ADR 0011 / #468. Soft-deleted rows remain visible only via holder inventory (`GET /api/v1/user/:id/inventory`) and historical match detail.
 
 - **Query Parameters**:
   | Param     | Type | Description                                 |
@@ -462,7 +462,7 @@ All admin endpoints require the `user_id` query parameter, and the requesting us
 
 ### GET /api/v1/admin/merch
 
-List all merchandise (including drafts and soft-deleted).
+List all merchandise (published + drafts). Soft-deleted rows are excluded (same live-only catalog rule as event list; ADR 0011).
 
 - **Response**: `200 OK` — Array of merchandise objects.
 
