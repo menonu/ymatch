@@ -293,56 +293,76 @@ void main() {
     },
   );
 
-  // --- Self-service member management (#442) ---
+  // --- Self-service member management (#442, placement #464) ---
 
-  testWidgets('Manage members button shown when canManageEditors (#442)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-          authProvider.overrideWith((ref) => _MockAuthController(_user())),
-          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
-          myEventRoleProvider(5).overrideWith(
-            (ref) async => MyEventRoleResponse()
-              ..canCreateMerch = true
-              ..canManageEditors = true
-              ..canTransferCreator = false,
-          ),
-        ],
-        child: _localized(const EventDetailScreen(eventId: 5)),
-      ),
-    );
-    await tester.pumpAndSettle();
-
+  /// Asserts Manage Members is present and not hosted by the AppBar (#464).
+  void expectManageMembersBottomLeft() {
     expect(find.byKey(const Key('manage_members_button')), findsOneWidget);
     expect(find.byTooltip('Manage members'), findsOneWidget);
-  });
-
-  testWidgets('Manage members button shown when canTransferCreator (#442)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-          authProvider.overrideWith((ref) => _MockAuthController(_user())),
-          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
-          myEventRoleProvider(5).overrideWith(
-            (ref) async => MyEventRoleResponse()
-              ..canCreateMerch = true
-              ..canManageEditors = false
-              ..canTransferCreator = true,
-          ),
-        ],
-        child: _localized(const EventDetailScreen(eventId: 5)),
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byKey(const Key('manage_members_button')),
       ),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
+  }
 
-    expect(find.byKey(const Key('manage_members_button')), findsOneWidget);
-  });
+  testWidgets(
+    'Manage members button shown bottom-left when canManageEditors (#442/#464)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canCreateMerch = true
+                ..canManageEditors = true
+                ..canTransferCreator = false,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expectManageMembersBottomLeft();
+      // Co-located with existing bottom-left group controls (#128).
+      expect(find.byTooltip('Group info'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Manage members button shown bottom-left when canTransferCreator (#442/#464)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canCreateMerch = true
+                ..canManageEditors = false
+                ..canTransferCreator = true,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expectManageMembersBottomLeft();
+    },
+  );
 
   testWidgets('Manage members button hidden for plain viewer (#442)', (
     tester,
@@ -367,6 +387,31 @@ void main() {
 
     expect(find.byKey(const Key('manage_members_button')), findsNothing);
   });
+
+  testWidgets(
+    'empty merch: Manage members still bottom-left (not AppBar) (#464)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(5).overrideWith((ref) async => <Merchandise>[]),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canCreateMerch = true
+                ..canManageEditors = true
+                ..canTransferCreator = true,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expectManageMembersBottomLeft();
+    },
+  );
 
   testWidgets(
     'Transfer creator requires confirmation before PUT (#442 pr-review)',

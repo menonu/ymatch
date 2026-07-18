@@ -74,13 +74,17 @@ BottomNavBar
 - **AppBar**: Search bar (items), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
   - Inventory display: Just HAVE / WANT & TRADE / All
   - View mode: Detailed / Grid / Compact List
-  - Overflow: Want All Missing
+  - Overflow: Want All Missing / Export inventory
 - **TabBar**: Dynamic scrollable tabs per merchandise group, each with favorite star
 - **Filter Bar**: `SegmentedButton` — All, HAVE, WANT, Missing (with count badge)
 - **Content**: `TabBarView` with per-group content in selected view mode:
   - **Detailed View**: `ReorderableListView` with image, name, owner icon, stepper counters
   - **Grid View**: 3-column `GridView` with image, name, compact +/- counters
   - **Compact List**: `ListView` with thumbnail, name, inline counters
+- **Bottom-left controls** (icon-only, safe-area aware):
+  - Group info (everyone) — toggles description panel (#128)
+  - Edit Group — group creator or `canEditGroup` (#425)
+  - Manage Members — `canManageEditors` / `canTransferCreator` (#442); moved off AppBar (#464)
 - **FAB**: "Add Merch" — opens `AddMerchScreen`
 - **Long-press (owner only)**: Bottom sheet with "Edit Name" / "Delete"
 
