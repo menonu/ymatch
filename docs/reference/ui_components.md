@@ -82,7 +82,7 @@ used throughout this document.
 | Identifier | Parent Screen | Segments |
 |-----------|---------------|----------|
 | `EventFilterBar` | `HomeScreen` | All Events, Favorites, My Items |
-| `MerchFilterBar` | `EventDetailScreen` | All, HAVE, WANT, Missing |
+| `MerchFilterBar` | `EventDetailScreen` | All, Own, Wish, For Trade, Missing (#472) |
 
 ### Floating Action Buttons
 

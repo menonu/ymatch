@@ -788,6 +788,12 @@ abstract class AppLocalizations {
   /// **'Wish & For Trade'**
   String get invModeWantTrade;
 
+  /// Inventory display-mode option: show only for-trade (TRADE) steppers
+  ///
+  /// In en, this message translates to:
+  /// **'Just For Trade'**
+  String get invModeJustTrade;
+
   /// Inventory display-mode option: show all inventory items
   ///
   /// In en, this message translates to:

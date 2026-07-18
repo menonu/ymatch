@@ -72,11 +72,11 @@ BottomNavBar
 ### EventDetailScreen
 
 - **AppBar**: Search bar (items), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
-  - Inventory display: Just HAVE / WANT & TRADE / All
+  - Inventory display: Just Own / Wish & For Trade / Just For Trade / All (#472)
   - View mode: Detailed / Grid / Compact List
   - Overflow: Want All Missing / Export inventory
 - **TabBar**: Dynamic scrollable tabs per merchandise group, each with favorite star
-- **Filter Bar**: `SegmentedButton` — All, HAVE, WANT, Missing (with count badge)
+- **Filter Bar**: `SegmentedButton` — All, Own, Wish, For Trade, Missing (#472)
 - **Content**: `TabBarView` with per-group content in selected view mode:
   - **Detailed View**: `ReorderableListView` with image, name, owner icon, stepper counters
   - **Grid View**: 3-column `GridView` with image, name, compact +/- counters

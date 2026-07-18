@@ -15,17 +15,57 @@ enum ViewMode { detailed, grid, list }
 
 final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
 
-enum MerchFilter { all, have, want, missing }
+enum MerchFilter { all, have, want, trade, missing }
 
 final merchFilterProvider = StateProvider<MerchFilter>(
   (ref) => MerchFilter.all,
 );
 
-enum InventoryDisplayMode { have, wantTrade, all }
+enum InventoryDisplayMode { have, wantTrade, trade, all }
 
 final inventoryDisplayModeProvider = StateProvider<InventoryDisplayMode>(
   (ref) => InventoryDisplayMode.all,
 );
+
+/// Whether [item] inventory quantities pass [filter] (#472).
+///
+/// [missing] keeps pre-existing semantics: HAVE == 0 && WANT == 0 (TRADE is
+/// ignored). TRADE-only stock therefore still matches Missing.
+bool matchesMerchFilter(
+  MerchFilter filter, {
+  required int have,
+  required int want,
+  required int trade,
+}) {
+  switch (filter) {
+    case MerchFilter.all:
+      return true;
+    case MerchFilter.have:
+      return have > 0;
+    case MerchFilter.want:
+      return want > 0;
+    case MerchFilter.trade:
+      return trade > 0;
+    case MerchFilter.missing:
+      return have == 0 && want == 0;
+  }
+}
+
+/// Which inventory steppers to show for [mode] (#472).
+({bool showHave, bool showWant, bool showTrade}) inventoryDisplayFlags(
+  InventoryDisplayMode mode,
+) {
+  switch (mode) {
+    case InventoryDisplayMode.have:
+      return (showHave: true, showWant: false, showTrade: false);
+    case InventoryDisplayMode.wantTrade:
+      return (showHave: false, showWant: true, showTrade: true);
+    case InventoryDisplayMode.trade:
+      return (showHave: false, showWant: false, showTrade: true);
+    case InventoryDisplayMode.all:
+      return (showHave: true, showWant: true, showTrade: true);
+  }
+}
 
 final itemSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 
@@ -133,15 +173,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             return false;
           }
 
-          if (filterMode == MerchFilter.all) return true;
           final inv = inventoryLookup[item.id] ?? {};
-          final have = inv['HAVE'] ?? 0;
-          final want = inv['WANT'] ?? 0;
-
-          if (filterMode == MerchFilter.have) return have > 0;
-          if (filterMode == MerchFilter.want) return want > 0;
-          if (filterMode == MerchFilter.missing) return have == 0 && want == 0;
-          return true;
+          return matchesMerchFilter(
+            filterMode,
+            have: inv['HAVE'] ?? 0,
+            want: inv['WANT'] ?? 0,
+            trade: inv['TRADE'] ?? 0,
+          );
         }).toList();
 
         final hiddenCount = merch.length - filteredMerch.length;
@@ -271,6 +309,12 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       value: InventoryDisplayMode.wantTrade,
                       child: Text(
                         AppLocalizations.of(context)!.invModeWantTrade,
+                      ),
+                    ),
+                    PopupMenuItem<InventoryDisplayMode>(
+                      value: InventoryDisplayMode.trade,
+                      child: Text(
+                        AppLocalizations.of(context)!.invModeJustTrade,
                       ),
                     ),
                     PopupMenuItem<InventoryDisplayMode>(
@@ -567,6 +611,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                     ),
                                     icon: const Icon(
                                       Icons.favorite_border,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  ButtonSegment(
+                                    value: MerchFilter.trade,
+                                    label: Text(
+                                      AppLocalizations.of(context)!.trade,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.swap_horiz,
                                       size: 16,
                                     ),
                                   ),
@@ -1255,12 +1309,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final wantQty = merchInv['WANT'] ?? 0;
     final tradeQty = merchInv['TRADE'] ?? 0;
 
-    final showHave =
-        displayMode == InventoryDisplayMode.have ||
-        displayMode == InventoryDisplayMode.all;
-    final showWantTrade =
-        displayMode == InventoryDisplayMode.wantTrade ||
-        displayMode == InventoryDisplayMode.all;
+    final flags = inventoryDisplayFlags(displayMode);
+    final showHave = flags.showHave;
+    final showWant = flags.showWant;
+    final showTrade = flags.showTrade;
 
     final isOwner =
         user != null && item.hasCreatorId() && item.creatorId == user.id;
@@ -1339,7 +1391,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
                       ),
                     ),
-                  if (showWantTrade) ...[
+                  if (showWant)
                     Expanded(
                       child: _buildGridCounter(
                         context,
@@ -1351,6 +1403,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             : (q) => _updateInv(ref, user, item.id, 'WANT', q),
                       ),
                     ),
+                  if (showTrade)
                     Expanded(
                       child: _buildGridCounter(
                         context,
@@ -1362,7 +1415,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
                       ),
                     ),
-                  ],
                 ],
               ),
             ],
@@ -1461,12 +1513,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final wantQty = merchInv['WANT'] ?? 0;
     final tradeQty = merchInv['TRADE'] ?? 0;
 
-    final showHave =
-        displayMode == InventoryDisplayMode.have ||
-        displayMode == InventoryDisplayMode.all;
-    final showWantTrade =
-        displayMode == InventoryDisplayMode.wantTrade ||
-        displayMode == InventoryDisplayMode.all;
+    final flags = inventoryDisplayFlags(displayMode);
+    final showHave = flags.showHave;
+    final showWant = flags.showWant;
+    final showTrade = flags.showTrade;
 
     final isOwner =
         user != null && item.hasCreatorId() && item.creatorId == user.id;
@@ -1536,8 +1586,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       ? null
                       : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
                 ),
-              if (showHave && showWantTrade) const SizedBox(width: 4),
-              if (showWantTrade) ...[
+              if (showHave && (showWant || showTrade)) const SizedBox(width: 4),
+              if (showWant)
                 _buildCompactCounter(
                   context,
                   l10n.wantShort,
@@ -1547,7 +1597,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       ? null
                       : (q) => _updateInv(ref, user, item.id, 'WANT', q),
                 ),
-                const SizedBox(width: 4),
+              if (showWant && showTrade) const SizedBox(width: 4),
+              if (showTrade)
                 _buildCompactCounter(
                   context,
                   l10n.tradeShort,
@@ -1557,7 +1608,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       ? null
                       : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
                 ),
-              ],
             ],
           ),
         ),
@@ -1632,12 +1682,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final wantQty = merchInv['WANT'] ?? 0;
     final tradeQty = merchInv['TRADE'] ?? 0;
 
-    final showHave =
-        displayMode == InventoryDisplayMode.have ||
-        displayMode == InventoryDisplayMode.all;
-    final showWantTrade =
-        displayMode == InventoryDisplayMode.wantTrade ||
-        displayMode == InventoryDisplayMode.all;
+    final flags = inventoryDisplayFlags(displayMode);
+    final showHave = flags.showHave;
+    final showWant = flags.showWant;
+    final showTrade = flags.showTrade;
 
     final isOwner =
         user != null && item.hasCreatorId() && item.creatorId == user.id;
@@ -1727,8 +1775,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                       ),
                               ),
                             ),
-                          if (showHave && showWantTrade) const Spacer(flex: 1),
-                          if (showWantTrade) ...[
+                          if (showHave && (showWant || showTrade))
+                            const Spacer(flex: 1),
+                          if (showWant)
                             Expanded(
                               flex: 5,
                               child: _buildStepper(
@@ -1747,7 +1796,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                       ),
                               ),
                             ),
-                            const Spacer(flex: 1),
+                          if (showWant && showTrade) const Spacer(flex: 1),
+                          if (showTrade)
                             Expanded(
                               flex: 5,
                               child: _buildStepper(
@@ -1766,7 +1816,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                       ),
                               ),
                             ),
-                          ],
                         ],
                       ),
                     ],

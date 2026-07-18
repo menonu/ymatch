@@ -124,6 +124,7 @@
   "merchFilterMissing": "未所持",
   "invModeJustHave": "所持のみ",
   "invModeWantTrade": "求・譲",
+  "invModeJustTrade": "譲のみ",
   "invModeAll": "すべて",
 
   "addMerch": "グッズを追加",

@@ -388,6 +388,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get invModeWantTrade => '求・譲';
 
   @override
+  String get invModeJustTrade => '譲のみ';
+
+  @override
   String get invModeAll => 'すべて';
 
   @override
