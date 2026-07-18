@@ -177,6 +177,15 @@ pub struct TradeMatch {
     /// Cosmetic group label from merchandise_groups; UI falls back to group_name (#466).
     #[prost(string, optional, tag = "14")]
     pub group_display_name: ::core::option::Option<::prost::alloc::string::String>,
+    /// ADR 0012 / #477: times this pair+group match was reopened after REJECTED/CANCELLED.
+    #[prost(int32, tag = "15")]
+    pub rematch_count: i32,
+    /// ADR 0012: status immediately before the latest rematch ("REJECTED" | "CANCELLED").
+    #[prost(string, optional, tag = "16")]
+    pub last_terminal_status: ::core::option::Option<::prost::alloc::string::String>,
+    /// ADR 0012: when the latest rematch left the terminal status (RFC3339).
+    #[prost(string, optional, tag = "17")]
+    pub last_terminal_at: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

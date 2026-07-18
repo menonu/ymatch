@@ -95,6 +95,12 @@ message TradeMatch {
   optional string event_name = 13; // parent event name of the match's group (#322)
   // Cosmetic group label from merchandise_groups; UI falls back to group_name (#466).
   optional string group_display_name = 14;
+  // ADR 0012 / #477: times this pair+group match was reopened after REJECTED/CANCELLED.
+  int32 rematch_count = 15;
+  // ADR 0012: status immediately before the latest rematch ("REJECTED" | "CANCELLED").
+  optional string last_terminal_status = 16;
+  // ADR 0012: when the latest rematch left the terminal status (RFC3339).
+  optional string last_terminal_at = 17;
 }
 
 message MatchItem {

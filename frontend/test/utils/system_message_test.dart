@@ -74,5 +74,29 @@ void main() {
       final l10n = await _l10n(const Locale('ja'));
       expect(localizeSystemMessage(l10n, 'custom note'), 'custom note');
     });
+
+    test('maps rematch reason codes under en (ADR 0012 / #477)', () async {
+      final l10n = await _l10n(const Locale('en'));
+      expect(
+        localizeSystemMessage(l10n, rematchReasonAfterRejected),
+        'This match was reopened after a previous rejection.',
+      );
+      expect(
+        localizeSystemMessage(l10n, rematchReasonAfterCancelled),
+        'This match was reopened after a previous cancellation.',
+      );
+    });
+
+    test('maps rematch reason codes under ja (ADR 0012 / #477)', () async {
+      final l10n = await _l10n(const Locale('ja'));
+      expect(
+        localizeSystemMessage(l10n, rematchReasonAfterRejected),
+        '以前の拒否のあと、このマッチが再開されました。',
+      );
+      expect(
+        localizeSystemMessage(l10n, rematchReasonAfterCancelled),
+        '以前のキャンセルのあと、このマッチが再開されました。',
+      );
+    });
   });
 }

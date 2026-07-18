@@ -1,5 +1,10 @@
 use sqlx::{PgPool, Row};
 
+/// Stable SYSTEM message codes for rematch (ADR 0012 / #477).
+/// Display copy is localized on the client — do not store English prose.
+pub const REMATCH_REASON_AFTER_REJECTED: &str = "REMATCH_AFTER_REJECTED";
+pub const REMATCH_REASON_AFTER_CANCELLED: &str = "REMATCH_AFTER_CANCELLED";
+
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     // 1. Fetch all 'WANT' items, joining with merchandise to get group_name
     // Skip items from deleted/trade-disabled merchandise and banned users.
@@ -84,33 +89,43 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                 let a_trade_merch_id: i32 = a_trade_row.get("merch_id");
 
                 // Check if Partner WANTS this item
-                let partner_want = sqlx::query("SELECT id FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'")
-                    .bind(partner_id)
-                    .bind(a_trade_merch_id)
-                    .fetch_optional(pool)
-                    .await
-                    .map_err(|e| e.to_string())?;
+                let partner_want = sqlx::query(
+                    "SELECT id FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+                )
+                .bind(partner_id)
+                .bind(a_trade_merch_id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| e.to_string())?;
 
-                if partner_want.is_some() {
-                    // MATCH FOUND!
-                    // Check if a match already exists for this (pair, group) to
-                    // avoid duplicates. ADR 0001: one match per (user1, user2,
-                    // group), so the same pair may have a separate match in a
-                    // different group — dedup only within the same group.
-                    let existing_match = sqlx::query(
-                        "SELECT id FROM matches
-                         WHERE event_id = $3 AND group_name = $4
-                           AND ((user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1))",
-                    )
-                    .bind(want_user_id)
-                    .bind(partner_id)
-                    .bind(want_event_id)
-                    .bind(&want_group_name)
-                    .fetch_optional(pool)
-                    .await
-                    .map_err(|e| e.to_string())?;
+                if partner_want.is_none() {
+                    continue;
+                }
 
-                    if existing_match.is_none() {
+                // MATCH FOUND!
+                // Check if a match already exists for this (pair, group) to
+                // avoid duplicates. ADR 0001: one match per (user1, user2,
+                // group), so the same pair may have a separate match in a
+                // different group — dedup only within the same group.
+                //
+                // ADR 0012: if the row is REJECTED or CANCELLED, reopen it
+                // to PENDING (same id) instead of inserting a second row.
+                // COMPLETED and active statuses are left alone.
+                let existing_match = sqlx::query(
+                    "SELECT id, status FROM matches
+                     WHERE event_id = $3 AND group_name = $4
+                       AND ((user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1))",
+                )
+                .bind(want_user_id)
+                .bind(partner_id)
+                .bind(want_event_id)
+                .bind(&want_group_name)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| e.to_string())?;
+
+                match existing_match {
+                    None => {
                         sqlx::query(
                             "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name, created_at)
                              VALUES ($1, $2, 'PENDING', $3, $4, NOW())",
@@ -124,53 +139,129 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                         .map_err(|e| e.to_string())?;
 
                         matches_created += 1;
-
-                        // Notify both users. Treat RowNotFound as "user
-                        // vanished"; log any other DB error so infra failures
-                        // are observable (#266).
-                        let load_notify_user = |user_id: i32| async move {
-                            match sqlx::query(
-                                "SELECT username, device_token FROM users WHERE id = $1",
-                            )
-                            .bind(user_id)
-                            .fetch_one(pool)
-                            .await
-                            {
-                                Ok(row) => Some(row),
-                                Err(sqlx::Error::RowNotFound) => None,
-                                Err(e) => {
-                                    tracing::warn!(
-                                        error = %e,
-                                        user_id,
-                                        "match notification: failed to load user"
-                                    );
-                                    None
-                                }
-                            }
-                        };
-                        let user1_row = load_notify_user(want_user_id).await;
-                        let user2_row = load_notify_user(partner_id).await;
-
-                        if let (Some(u1), Some(u2)) = (user1_row, user2_row) {
-                            let u1_token: Option<String> = u1.get("device_token");
-                            let u2_token: Option<String> = u2.get("device_token");
-                            let u1_name: String = u1.get("username");
-                            let u2_name: String = u2.get("username");
-
-                            if let Some(token) = u1_token {
-                                crate::notifications::send_match_notification(&token, &u2_name)
-                                    .await;
-                            }
-                            if let Some(token) = u2_token {
-                                crate::notifications::send_match_notification(&token, &u1_name)
-                                    .await;
-                            }
+                        notify_pair(pool, want_user_id, partner_id).await;
+                    }
+                    Some(row) => {
+                        let match_id: i32 = row.get("id");
+                        let status: String = row.get("status");
+                        // Active or COMPLETED: skip (no second match).
+                        if (status == "REJECTED" || status == "CANCELLED")
+                            && reopen_terminal_match(pool, match_id, &status).await?
+                        {
+                            matches_created += 1;
+                            notify_pair(pool, want_user_id, partner_id).await;
                         }
                     }
                 }
+                // One mutual edge is enough for this partner+group.
+                break;
             }
         }
     }
 
     Ok(matches_created)
+}
+
+/// ADR 0012: reopen a REJECTED/CANCELLED match to PENDING with annotation + SYSTEM message.
+///
+/// Returns `true` if the row was reopened (still terminal at update time).
+async fn reopen_terminal_match(
+    pool: &PgPool,
+    match_id: i32,
+    prior_status: &str,
+) -> Result<bool, String> {
+    let reason = match prior_status {
+        "REJECTED" => REMATCH_REASON_AFTER_REJECTED,
+        "CANCELLED" => REMATCH_REASON_AFTER_CANCELLED,
+        _ => return Ok(false),
+    };
+
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+
+    let updated = sqlx::query(
+        r#"
+        UPDATE matches
+        SET status = 'PENDING',
+            offered_by = NULL,
+            rematch_count = rematch_count + 1,
+            last_terminal_status = $2,
+            last_terminal_at = NOW()
+        WHERE id = $1
+          AND status IN ('REJECTED', 'CANCELLED')
+        RETURNING id, user1_id
+        "#,
+    )
+    .bind(match_id)
+    .bind(prior_status)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(row) = updated else {
+        tx.rollback().await.map_err(|e| e.to_string())?;
+        return Ok(false);
+    };
+
+    let user1_id: i32 = row.get("user1_id");
+
+    sqlx::query("DELETE FROM match_items WHERE match_id = $1")
+        .bind(match_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO messages (match_id, sender_id, content, message_type)
+        VALUES ($1, $2, $3, 'SYSTEM')
+        "#,
+    )
+    .bind(match_id)
+    .bind(user1_id)
+    .bind(reason)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+async fn notify_pair(pool: &PgPool, user_a: i32, user_b: i32) {
+    // Notify both users. Treat RowNotFound as "user vanished"; log any other
+    // DB error so infra failures are observable (#266).
+    let load_notify_user = |user_id: i32| async move {
+        match sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(pool)
+            .await
+        {
+            Ok(row) => Some(row),
+            Err(sqlx::Error::RowNotFound) => None,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    user_id,
+                    "match notification: failed to load user"
+                );
+                None
+            }
+        }
+    };
+    let user1_row = load_notify_user(user_a).await;
+    let user2_row = load_notify_user(user_b).await;
+
+    if let (Some(u1), Some(u2)) = (user1_row, user2_row) {
+        let u1_token: Option<String> = u1.get("device_token");
+        let u2_token: Option<String> = u2.get("device_token");
+        let u1_name: String = u1.get("username");
+        let u2_name: String = u2.get("username");
+
+        if let Some(token) = u1_token {
+            crate::notifications::send_match_notification(&token, &u2_name).await;
+        }
+        if let Some(token) = u2_token {
+            crate::notifications::send_match_notification(&token, &u1_name).await;
+        }
+    }
 }

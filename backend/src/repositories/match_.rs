@@ -98,6 +98,7 @@ impl MatchRepository {
                       m.user1_inventory_applied_at, m.user2_inventory_applied_at,
                       m.created_at, m.event_id, m.group_name, e.name AS event_name,
                       mg.display_name AS group_display_name,
+                      m.rematch_count, m.last_terminal_status, m.last_terminal_at,
                       CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END AS other_id,
                       u.username AS other_username
                FROM matches m
@@ -987,7 +988,7 @@ mod capacity_tests {
     }
 }
 
-const MATCH_COLUMNS: &str = "id, user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at, created_at";
+const MATCH_COLUMNS: &str = "id, user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at, created_at, rematch_count, last_terminal_status, last_terminal_at";
 
 /// Helper: parse a `matches` row into a partial `TradeMatch` (no related data).
 fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
@@ -1009,5 +1010,9 @@ fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
         group_name: None,
         event_name: None,
         group_display_name: None,
+        // ADR 0012 / #477: rematch annotation (defaults 0 / None on first match).
+        rematch_count: row.get("rematch_count"),
+        last_terminal_status: row.get("last_terminal_status"),
+        last_terminal_at: to_rfc3339(row.get("last_terminal_at")),
     }
 }

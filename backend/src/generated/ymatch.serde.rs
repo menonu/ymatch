@@ -4168,6 +4168,15 @@ impl serde::Serialize for TradeMatch {
         if self.group_display_name.is_some() {
             len += 1;
         }
+        if self.rematch_count != 0 {
+            len += 1;
+        }
+        if self.last_terminal_status.is_some() {
+            len += 1;
+        }
+        if self.last_terminal_at.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.TradeMatch", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -4211,6 +4220,15 @@ impl serde::Serialize for TradeMatch {
         if let Some(v) = self.group_display_name.as_ref() {
             struct_ser.serialize_field("groupDisplayName", v)?;
         }
+        if self.rematch_count != 0 {
+            struct_ser.serialize_field("rematchCount", &self.rematch_count)?;
+        }
+        if let Some(v) = self.last_terminal_status.as_ref() {
+            struct_ser.serialize_field("lastTerminalStatus", v)?;
+        }
+        if let Some(v) = self.last_terminal_at.as_ref() {
+            struct_ser.serialize_field("lastTerminalAt", v)?;
+        }
         struct_ser.end()
     }
 }
@@ -4247,6 +4265,12 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             "eventName",
             "group_display_name",
             "groupDisplayName",
+            "rematch_count",
+            "rematchCount",
+            "last_terminal_status",
+            "lastTerminalStatus",
+            "last_terminal_at",
+            "lastTerminalAt",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4265,6 +4289,9 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             GroupName,
             EventName,
             GroupDisplayName,
+            RematchCount,
+            LastTerminalStatus,
+            LastTerminalAt,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4300,6 +4327,9 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
                             "eventName" | "event_name" => Ok(GeneratedField::EventName),
                             "groupDisplayName" | "group_display_name" => Ok(GeneratedField::GroupDisplayName),
+                            "rematchCount" | "rematch_count" => Ok(GeneratedField::RematchCount),
+                            "lastTerminalStatus" | "last_terminal_status" => Ok(GeneratedField::LastTerminalStatus),
+                            "lastTerminalAt" | "last_terminal_at" => Ok(GeneratedField::LastTerminalAt),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4333,6 +4363,9 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                 let mut group_name__ = None;
                 let mut event_name__ = None;
                 let mut group_display_name__ = None;
+                let mut rematch_count__ = None;
+                let mut last_terminal_status__ = None;
+                let mut last_terminal_at__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -4427,6 +4460,26 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             }
                             group_display_name__ = map_.next_value()?;
                         }
+                        GeneratedField::RematchCount => {
+                            if rematch_count__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("rematchCount"));
+                            }
+                            rematch_count__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::LastTerminalStatus => {
+                            if last_terminal_status__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lastTerminalStatus"));
+                            }
+                            last_terminal_status__ = map_.next_value()?;
+                        }
+                        GeneratedField::LastTerminalAt => {
+                            if last_terminal_at__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lastTerminalAt"));
+                            }
+                            last_terminal_at__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(TradeMatch {
@@ -4444,6 +4497,9 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                     group_name: group_name__,
                     event_name: event_name__,
                     group_display_name: group_display_name__,
+                    rematch_count: rematch_count__.unwrap_or_default(),
+                    last_terminal_status: last_terminal_status__,
+                    last_terminal_at: last_terminal_at__,
                 })
             }
         }
