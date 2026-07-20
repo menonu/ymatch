@@ -863,6 +863,69 @@ async fn test_admin_transfer_event_creator_rbac_and_validation(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
+/// #445: admin transfer after a concurrent/prior self-service transfer must
+/// revoke whoever currently holds `event/creator` (not a stale snapshot) and
+/// leave exactly one creator role row.
+#[sqlx::test]
+async fn test_admin_transfer_event_creator_after_self_transfer(pool: PgPool) {
+    let old_creator = login_guest(&pool, "xfer-evt-after-old", "t").await;
+    let event_id = create_event(&pool, "Xfer Event After Self", old_creator).await;
+    let mid = login_guest(&pool, "xfer-evt-after-mid", "t").await;
+    let final_creator = login_guest(&pool, "xfer-evt-after-final", "t").await;
+    let staff = login_guest(&pool, "xfer-evt-after-staff", "t").await;
+    grant_global_role(&pool, staff, "moderator").await;
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/creator?user_id={}",
+            event_id, old_creator
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, mid),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/admin/events/{}/creator?user_id={}",
+            event_id, staff
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, final_creator),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let creator_id: Option<i32> = sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(creator_id, Some(final_creator as i32));
+
+    let creator_roles: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint
+         FROM user_roles ur
+         JOIN roles r ON r.id = ur.role_id
+         WHERE ur.scope_type = 'event'
+           AND ur.scope_id = $1
+           AND r.scope_type = 'event'
+           AND r.name = 'creator'",
+    )
+    .bind(event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        creator_roles, 1,
+        "must leave exactly one event/creator role"
+    );
+    assert!(has_event_role(&pool, final_creator, event_id, "creator").await);
+    assert!(!has_event_role(&pool, mid, event_id, "creator").await);
+    assert!(!has_event_role(&pool, old_creator, event_id, "creator").await);
+}
+
 #[sqlx::test]
 async fn test_admin_transfer_group_creator_success(pool: PgPool) {
     let creator = login_guest(&pool, "xfer-grp-old", "t").await;

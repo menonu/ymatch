@@ -209,6 +209,10 @@ async fn require_active_target_user(state: &AppState, new_creator_id: i32) -> Re
 /// Atomically updates `events.creator_id` and swaps the event-scoped
 /// `creator` role. Does **not** auto-promote the previous creator to
 /// `editor` (#432).
+///
+/// The prior creator is re-read under `SELECT … FOR UPDATE` so the role
+/// swap always revokes whoever currently holds ownership, even when a
+/// concurrent self-service or admin transfer races this request (#445).
 pub async fn transfer_event_creator(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
@@ -232,6 +236,18 @@ pub async fn transfer_event_creator(
     require_active_target_user(&state, payload.new_creator_id).await?;
 
     let mut tx = state.pool.begin().await?;
+    // Use the locked creator as the role-swap source so a concurrent
+    // transfer cannot leave two live `event/creator` assignments.
+    let locked_previous = state
+        .events
+        .lock_creator_for_update(&mut *tx, event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+
+    if locked_previous == Some(payload.new_creator_id) {
+        return Err(AppError::bad_request("User is already the event creator"));
+    }
+
     let updated = state
         .events
         .set_creator(&mut *tx, event_id, payload.new_creator_id)
@@ -241,7 +257,7 @@ pub async fn transfer_event_creator(
     }
     state
         .rbac
-        .transfer_event_creator_role(&mut tx, event_id, previous, payload.new_creator_id)
+        .transfer_event_creator_role(&mut tx, event_id, locked_previous, payload.new_creator_id)
         .await?;
     tx.commit().await?;
     Ok(StatusCode::OK)

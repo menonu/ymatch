@@ -524,6 +524,135 @@ async fn test_self_transfer_event_creator_rbac_and_validation(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
+/// #445: after ownership has already moved, a second self-transfer by the
+/// former creator must fail (403) and must not leave a second `event/creator`
+/// role row.
+#[sqlx::test]
+async fn test_self_transfer_event_creator_stale_ownership(pool: PgPool) {
+    let old_creator = login_guest(&pool, "self-xfer-stale-old", "tok").await;
+    let event_id = create_event(&pool, "Self Xfer Stale", old_creator).await;
+    let mid = login_guest(&pool, "self-xfer-stale-mid", "tok").await;
+    let third = login_guest(&pool, "self-xfer-stale-third", "tok").await;
+
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/creator?user_id={}",
+            event_id, old_creator
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, mid),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Former creator tries again after ownership moved (stale client / race).
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/creator?user_id={}",
+            event_id, old_creator
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, third),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "stale self-transfer must not succeed"
+    );
+
+    let creator_id: Option<i32> = sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(creator_id, Some(mid as i32));
+    assert_eq!(
+        count_event_creator_roles(&pool, event_id).await,
+        1,
+        "must keep exactly one event/creator role"
+    );
+    assert!(has_event_role(&pool, mid, event_id, "creator").await);
+    assert!(!has_event_role(&pool, old_creator, event_id, "creator").await);
+    assert!(!has_event_role(&pool, third, event_id, "creator").await);
+}
+
+/// #445: two concurrent self-transfers by the same creator must leave exactly
+/// one live `event/creator` assignment (one OK, one 403 under the row lock).
+#[sqlx::test]
+async fn test_self_transfer_event_creator_concurrent_single_winner(pool: PgPool) {
+    let old_creator = login_guest(&pool, "self-xfer-race-old", "tok").await;
+    let event_id = create_event(&pool, "Self Xfer Race", old_creator).await;
+    let target_b = login_guest(&pool, "self-xfer-race-b", "tok").await;
+    let target_c = login_guest(&pool, "self-xfer-race-c", "tok").await;
+
+    let pool_b = pool.clone();
+    let pool_c = pool.clone();
+    let uri_b = format!(
+        "/api/v1/events/{}/creator?user_id={}",
+        event_id, old_creator
+    );
+    let uri_c = uri_b.clone();
+    let body_b = format!(r#"{{"newCreatorId": {}}}"#, target_b);
+    let body_c = format!(r#"{{"newCreatorId": {}}}"#, target_c);
+
+    let (resp_b, resp_c) = tokio::join!(
+        put_json(&pool_b, &uri_b, &body_b),
+        put_json(&pool_c, &uri_c, &body_c),
+    );
+    let status_b = resp_b.status();
+    let status_c = resp_c.status();
+
+    assert!(
+        (status_b == StatusCode::OK && status_c == StatusCode::FORBIDDEN)
+            || (status_b == StatusCode::FORBIDDEN && status_c == StatusCode::OK),
+        "expected one OK and one FORBIDDEN, got {status_b:?} and {status_c:?}"
+    );
+
+    let winner = if status_b == StatusCode::OK {
+        target_b
+    } else {
+        target_c
+    };
+    let loser = if status_b == StatusCode::OK {
+        target_c
+    } else {
+        target_b
+    };
+
+    let creator_id: Option<i32> = sqlx::query_scalar("SELECT creator_id FROM events WHERE id = $1")
+        .bind(event_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(creator_id, Some(winner as i32));
+    assert_eq!(
+        count_event_creator_roles(&pool, event_id).await,
+        1,
+        "concurrent transfers must not leave two event/creator roles"
+    );
+    assert!(has_event_role(&pool, winner, event_id, "creator").await);
+    assert!(!has_event_role(&pool, loser, event_id, "creator").await);
+    assert!(!has_event_role(&pool, old_creator, event_id, "creator").await);
+}
+
+/// Count live `event/creator` role rows for `event_id` (#445 race invariants).
+async fn count_event_creator_roles(pool: &PgPool, event_id: i64) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint
+         FROM user_roles ur
+         JOIN roles r ON r.id = ur.role_id
+         WHERE ur.scope_type = 'event'
+           AND ur.scope_id = $1
+           AND r.scope_type = 'event'
+           AND r.name = 'creator'",
+    )
+    .bind(event_id as i32)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
 #[sqlx::test]
 async fn test_my_role_404_missing_event(pool: PgPool) {
     let viewer = login_guest(&pool, "myrole-404-viewer", "tok").await;

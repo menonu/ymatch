@@ -257,6 +257,10 @@ pub async fn list_event_members(
 /// `event.member.manage` cannot transfer. Global staff use the admin path
 /// (`event.creator.transfer`, #432). Does **not** auto-promote the previous
 /// creator to `editor` (same default as #432).
+///
+/// Ownership is re-checked under `SELECT … FOR UPDATE` inside the write
+/// transaction so concurrent transfers cannot leave multiple live
+/// `event/creator` role rows (#445).
 pub async fn self_transfer_event_creator(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
@@ -268,7 +272,8 @@ pub async fn self_transfer_event_creator(
         .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
     let user = state.policy.verify_active(uid).await?;
 
-    // 404 before authz so a missing event is not leaked as a 403.
+    // Fast-path 404/authz before opening a transaction so a missing event is
+    // not leaked as a 403 and banned/missing targets fail without a lock.
     let previous = state
         .events
         .get_creator(event_id)
@@ -295,6 +300,23 @@ pub async fn self_transfer_event_creator(
     }
 
     let mut tx = state.pool.begin().await?;
+    // Re-assert ownership under the row lock: a concurrent transfer may have
+    // moved `creator_id` since the pre-check above.
+    let locked_previous = state
+        .events
+        .lock_creator_for_update(&mut *tx, event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+
+    if locked_previous != Some(user.id) {
+        return Err(AppError::forbidden(
+            "Only the event creator can transfer ownership",
+        ));
+    }
+    if locked_previous == Some(payload.new_creator_id) {
+        return Err(AppError::bad_request("User is already the event creator"));
+    }
+
     let updated = state
         .events
         .set_creator(&mut *tx, event_id, payload.new_creator_id)
@@ -304,7 +326,7 @@ pub async fn self_transfer_event_creator(
     }
     state
         .rbac
-        .transfer_event_creator_role(&mut tx, event_id, previous, payload.new_creator_id)
+        .transfer_event_creator_role(&mut tx, event_id, locked_previous, payload.new_creator_id)
         .await?;
     tx.commit().await?;
     Ok(StatusCode::OK)
