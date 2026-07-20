@@ -65,9 +65,9 @@ BRANCH="$(git branch --show-current)"   # must be pushed to origin
 
 gh workflow run ci-e2e.yml --ref "$BRANCH"
 
-# Inspect / share the run
-gh run list --workflow=ci-e2e.yml --branch "$BRANCH" --limit 1
-gh run view --web
+# Inspect / share the run (pin id so concurrent coverage runs do not mix)
+RUN_ID="$(gh run list --workflow=ci-e2e.yml --branch "$BRANCH" --limit 1 --json databaseId -q '.[0].databaseId')"
+gh run view "$RUN_ID" --web
 ```
 
 Paste the run URL into the PR (description or comment) so reviewers can open the log without hunting Actions. Same pattern for coverage:
