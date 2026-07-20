@@ -62,7 +62,10 @@ task test
 
 Both stacks write HTML + LCOV under each package’s `coverage/` directory.
 Post-merge CI also runs these on `main` (see `.github/workflows/coverage.yml`
-and `coverage-frontend.yml`); PR CI does not gate on coverage (#279).
+and `coverage-frontend.yml`); PR CI does not gate on coverage (#279). For
+**risky** PRs you can still run the same workflows on a branch before merge
+via `workflow_dispatch` — see
+[Development Workflow Step 7a](../how_to/development_workflow.md#step-7a-optional-pre-merge-e2e-and-coverage-risky-prs).
 
 ```bash
 task backend:coverage    # cargo-llvm-cov; ignores generated/

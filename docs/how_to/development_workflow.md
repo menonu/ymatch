@@ -110,6 +110,82 @@ gh pr create --title "feat: implement notifications for matched trades" --body "
 ```
 This triggers the CI pipeline (`.github/workflows/ci.yml`) to build and test your changes automatically.
 
+PR CI intentionally stays light: **backend coverage**, **frontend coverage**, and **frontend wire e2e** run **post-merge on `main`** only (plus manual `workflow_dispatch`). That is the #279 cycle-time trade-off — a regression can surface after merge and need a follow-up fix. For high-risk PRs, run those checks **before** merge using the steps below.
+
+---
+
+## Step 7a: Optional pre-merge E2E and coverage (risky PRs)
+
+Use this path when a failure on `main` would be expensive to unwind. These workflows are **not** required on every PR.
+
+### When to run
+
+Trigger the relevant workflow(s) if the PR touches any of:
+
+| Category | Examples | Prefer |
+|----------|----------|--------|
+| **Proto / wire contract** | `proto/**`, generated Rust/Dart bindings, `toProto3Json` / offer-trade request bodies | Frontend E2E (`ci-e2e.yml`) |
+| **Match / trade lifecycle** | match state machine, offer/accept/apply, matcher job | Frontend E2E; backend coverage if guards change |
+| **Migrations / schema** | `backend/migrations/**`, SQL that integration tests exercise | Backend coverage (runs tests against Postgres) |
+| **AuthZ / RBAC matrix** | permissions, role checks, admin/moderator paths | Backend coverage; frontend coverage if UI gates change |
+| **Coverage-sensitive refactors** | large deletes, test moves, filtering scripts | Matching coverage workflow(s) |
+
+Skip for docs-only, pure CSS/layout, or small non-contract changes — post-merge runs on `main` are enough.
+
+### Exact commands
+
+Push the PR branch first, then dispatch against that ref (workflow file name or display name both work with `gh`):
+
+```bash
+# From the repo root; BRANCH is the PR head branch (not main)
+BRANCH="$(git branch --show-current)"
+
+# Frontend wire E2E (docker-compose.e2e + Flutter e2e suite)
+gh workflow run ci-e2e.yml --ref "$BRANCH"
+
+# Backend line coverage (cargo-llvm-cov, 70% gate)
+gh workflow run coverage.yml --ref "$BRANCH"
+
+# Frontend line coverage (filtered LCOV, 68% gate)
+gh workflow run coverage-frontend.yml --ref "$BRANCH"
+```
+
+Watch the run and open its URL:
+
+```bash
+# Latest run for this branch of a given workflow
+gh run list --workflow=ci-e2e.yml --branch "$BRANCH" --limit 1
+gh run watch   # optional: follow the most recent run interactively
+gh run view --web   # open in browser
+```
+
+You can also start runs from the GitHub UI: **Actions** → workflow name → **Run workflow** → choose the PR branch.
+
+Local alternatives (no GitHub minutes): [e2e_tests.md](./e2e_tests.md) (`task e2e:up` / `e2e:test` / `e2e:down`) and [Developer Quickstart — Coverage](../tutorials/developer_quickstart.md#coverage-reports) (`task backend:coverage` / `task frontend:coverage`). CI dispatch still matches production gates and is preferred when validating the same environment as `main`.
+
+### Attach results on the PR
+
+After the run finishes, paste a short note (and the run link) into the PR description or a comment:
+
+```bash
+# Example: print a markdown line for the latest E2E run on this branch
+gh run list --workflow=ci-e2e.yml --branch "$BRANCH" --limit 1 \
+  --json databaseId,conclusion,url,displayTitle \
+  --jq '.[0] | "- Pre-merge E2E: \(.conclusion) — \(.url)"'
+```
+
+Suggested PR comment body:
+
+```markdown
+### Pre-merge heavy checks (#279 / #456)
+
+- Frontend E2E: <url> — success
+- Backend coverage: <url> — success
+- Frontend coverage: <url> — n/a (not needed for this PR)
+```
+
+Reviewers can treat green pre-merge runs as extra confidence; they still do **not** replace required `ci.yml` checks. Discord alerts for E2E/coverage failures apply only to `main` (see [monitoring setup §4b](./monitoring_setup.md#4b-post-merge-e2e--coverage-failure-alerts-281)).
+
 ---
 
 ## Step 7b: Review the Pull Request
@@ -118,6 +194,7 @@ After the PR exists (and preferably after CI is green), run a structured review:
 
 - Prefer `/pr-review <PR>` (project skill under [`.claude/skills/pr-review/`](../../.claude/skills/pr-review/)).
 - Otherwise follow the [PR Review Guide](./pr_review.md): gather PR + issue + diff, evaluate correctness / security / design, and post a comment in the standard format with severities `[critical]` / `[major]` / `[minor]` / `[nit]`.
+- For **risky** categories (proto, lifecycle, migrations, authz — Step 7a), confirm the author either ran pre-merge E2E/coverage or explained why post-merge on `main` is enough.
 
 Address critical and major findings (or explain them), then re-run the review. Do not merge from the agent — see the next step.
 

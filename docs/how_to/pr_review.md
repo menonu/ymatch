@@ -13,6 +13,20 @@ Run a PR review after the PR exists and CI is green (or at least after the diff 
 
 Do **not** merge after review. Report the PR URL and wait for a human merge or explicit authorization.
 
+### Risky-change checklist (optional heavy CI)
+
+Backend coverage, frontend coverage, and frontend wire E2E are **post-merge on `main`** by default (#279). For PRs in the categories below, check whether the author ran (or should run) a pre-merge `workflow_dispatch` and linked the run on the PR — see [Development Workflow Step 7a](./development_workflow.md#step-7a-optional-pre-merge-e2e-and-coverage-risky-prs):
+
+| Risky category | Examples |
+|----------------|----------|
+| Proto / wire contract | `proto/**`, generated bindings, offer-trade JSON |
+| Match / trade lifecycle | offer, accept, apply, matcher |
+| Migrations / schema | `backend/migrations/**` |
+| AuthZ / RBAC matrix | permissions, role-gated handlers/UI |
+| Coverage-sensitive refactors | large test or source moves that could drop gates |
+
+This is a **review prompt**, not a required status check. Missing pre-merge runs is usually `[minor]` / discussion unless the risk is clearly high and unmitigated (`[major]`).
+
 ---
 
 ## Why an independent reviewer
