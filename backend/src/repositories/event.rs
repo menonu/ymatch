@@ -198,6 +198,25 @@ impl EventRepository {
         Ok(row.map(|r| r.get::<Option<i32>, _>("creator_id")))
     }
 
+    /// `SELECT creator_id … FOR UPDATE` on the event row. Returns `None` if
+    /// the event is missing; otherwise `Some(creator_id)` (which may itself
+    /// be `None`). The row lock is held until the surrounding transaction
+    /// ends so concurrent creator transfers serialize on this row (#445).
+    pub async fn lock_creator_for_update<'c, E>(
+        &self,
+        exec: E,
+        event_id: i32,
+    ) -> Result<Option<Option<i32>>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let row = sqlx::query("SELECT creator_id FROM events WHERE id = $1 FOR UPDATE")
+            .bind(event_id)
+            .fetch_optional(exec)
+            .await?;
+        Ok(row.map(|r| r.get::<Option<i32>, _>("creator_id")))
+    }
+
     /// Set `events.creator_id` for admin ownership transfer (#432).
     /// Runs on the caller's open transaction so it commits with the
     /// matching `user_roles` swap. Returns `false` if the event is missing.
