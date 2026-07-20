@@ -126,7 +126,7 @@ Trigger the relevant workflow(s) if the PR touches any of:
 |----------|----------|--------|
 | **Proto / wire contract** | `proto/**`, generated Rust/Dart bindings, `toProto3Json` / offer-trade request bodies | Frontend E2E (`ci-e2e.yml`) |
 | **Match / trade lifecycle** | match state machine, offer/accept/apply, matcher job | Frontend E2E; backend coverage if guards change |
-| **Migrations / schema** | `backend/migrations/**`, SQL that integration tests exercise | Backend coverage (runs tests against Postgres) |
+| **Migrations / schema** | `backend/migrations/**`, SQL that integration tests exercise | Backend coverage (**70% floor / report**; PR `ci.yml` already runs DB tests) |
 | **AuthZ / RBAC matrix** | permissions, role checks, admin/moderator paths | Backend coverage; frontend coverage if UI gates change |
 | **Coverage-sensitive refactors** | large deletes, test moves, filtering scripts | Matching coverage workflow(s) |
 
@@ -150,13 +150,13 @@ gh workflow run coverage.yml --ref "$BRANCH"
 gh workflow run coverage-frontend.yml --ref "$BRANCH"
 ```
 
-Watch the run and open its URL:
+Watch a **specific** workflow run and open its URL (pin the id so concurrent E2E/coverage dispatches do not mix):
 
 ```bash
 # Latest run for this branch of a given workflow
-gh run list --workflow=ci-e2e.yml --branch "$BRANCH" --limit 1
-gh run watch   # optional: follow the most recent run interactively
-gh run view --web   # open in browser
+RUN_ID="$(gh run list --workflow=ci-e2e.yml --branch "$BRANCH" --limit 1 --json databaseId -q '.[0].databaseId')"
+gh run watch "$RUN_ID"    # optional: follow that run interactively
+gh run view "$RUN_ID" --web   # open in browser
 ```
 
 You can also start runs from the GitHub UI: **Actions** → workflow name → **Run workflow** → choose the PR branch.
