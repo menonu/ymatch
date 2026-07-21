@@ -322,29 +322,21 @@ class HomeScreen extends ConsumerWidget {
                       user != null &&
                       event.hasCreatorId() &&
                       event.creatorId == user.id;
-                  // #483: event member management from home long-press when
-                  // my-role allows manage/transfer (not only event creator).
-                  final role = user != null
-                      ? ref.watch(myEventRoleProvider(event.id)).valueOrNull
-                      : null;
-                  final canManageMembers =
-                      role != null &&
-                      (role.canManageEditors || role.canTransferCreator);
-                  final showEventActions = isOwner || canManageMembers;
+                  // #483: long-press resolves my-role lazily (no N× watch per
+                  // card). Owner always gets rename/delete; manage tiles only
+                  // when role allows. Viewers no-op after the await.
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       key: Key('event_card_${event.id}'),
                       onTap: () => context.go('/event/${event.id}'),
-                      onLongPress: showEventActions
+                      onLongPress: user != null
                           ? () => _showEventActions(
                               context,
                               ref,
                               event,
                               isOwner: isOwner,
-                              role: role,
-                              canManageMembers: canManageMembers,
                             )
                           : null,
                       child: Padding(
@@ -569,16 +561,21 @@ class HomeScreen extends ConsumerWidget {
     }
   }
 
-  void _showEventActions(
+  Future<void> _showEventActions(
     BuildContext context,
     WidgetRef ref,
     Event event, {
     required bool isOwner,
-    required MyEventRoleResponse? role,
-    required bool canManageMembers,
-  }) {
+  }) async {
     final l10n = AppLocalizations.of(context)!;
-    showModalBottomSheet(
+    // Resolve role on demand so Home does not N× subscribe to my-role (#483).
+    final role = await ref.read(myEventRoleProvider(event.id).future);
+    final canManageMembers =
+        role != null && (role.canManageEditors || role.canTransferCreator);
+    if (!isOwner && !canManageMembers) return;
+    if (!context.mounted) return;
+
+    await showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(

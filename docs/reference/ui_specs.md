@@ -66,10 +66,11 @@ BottomNavBar
   - Participant count, view count, created date
   - Favorite star toggle
 - **FAB**: "New Event" — opens name dialog
-- **Long-press** (gated; no dead control for plain viewers):
+- **Long-press** (signed-in users; `my-role` fetched on press, not for every card):
   - **Owner** (`creator_id == user`): "Edit Name" / "Delete"
-  - **Event members** when `canManageEditors` / `canTransferCreator` from `my-role` (#442, #483): "Manage members" → same dialog as before (list / add / remove editor / transfer creator)
+  - **Event members** when `canManageEditors` / `canTransferCreator` (#442, #483): "Manage members" → same dialog as before (list / add / remove editor / transfer creator)
   - Non-owner editors with manage flags get Manage members only (no rename/delete)
+  - Plain viewers: long-press no-ops (no sheet, no 403 path)
 - **Empty state**: Centered icon + "Create Event" button
 
 ### EventDetailScreen

@@ -546,13 +546,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // No long-press handler — avoids a dead control that would 403 (#483).
-    final inkWell = tester.widget<InkWell>(
-      find.byKey(const Key('event_card_7')),
-    );
-    expect(inkWell.onLongPress, isNull);
+    // Long-press is attached for signed-in users but resolves role lazily and
+    // no-ops for viewers (no sheet / manage tile that would 403) (#483).
+    await tester.longPress(find.text('Other Fest'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('manage_members_action')), findsNothing);
     expect(find.text('Manage members'), findsNothing);
+    expect(find.text('Edit Name'), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
   });
 
   testWidgets(
