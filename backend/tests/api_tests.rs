@@ -9,6 +9,7 @@ mod event_members;
 mod event_views;
 mod events;
 mod favorites;
+mod group_members;
 mod groups;
 mod images;
 mod match_lifecycle;

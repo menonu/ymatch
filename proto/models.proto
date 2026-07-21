@@ -312,3 +312,29 @@ message MyEventRoleResponse {
   // Caller is the current event creator and may self-service transfer ownership (#442).
   bool can_transfer_creator = 6;
 }
+
+// Group-member API (#443): group-scoped role assignments for a merchandise
+// group. `role` is "creator" or "editor". Used by
+// GET /api/v1/events/:id/groups/:group_name/members.
+message GroupMember {
+  int32 user_id = 1;
+  string role = 2; // "creator" or "editor"
+  optional string username = 3;
+}
+
+message ListGroupMembersResponse {
+  repeated GroupMember members = 1;
+}
+
+// Current-user group-role API (#443): the caller's standing on a single item
+// group. Accessible to any active caller (no 403 for a plain viewer) so the
+// frontend can gate the Manage Group Members control without a 403 on open.
+// `can_manage_editors` / `can_transfer_creator` / `can_edit_group` mirror the
+// exact backend decisions (RBAC or ownership).
+message MyGroupRoleResponse {
+  string role = 1;              // group-scoped membership: "creator", "editor", or "none"
+  bool global_override = 2;     // a global admin/moderator role is in effect
+  bool can_edit_group = 3;      // caller may edit this group's metadata
+  bool can_manage_editors = 4;  // caller may list/assign/revoke group editors
+  bool can_transfer_creator = 5; // caller is the current group creator (ownership)
+}

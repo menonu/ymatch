@@ -12,9 +12,10 @@ current permission set; the *why* behind the model lives in
 - **Source of truth:** `user_roles` (one row per `(user_id, role_id, scope_type,
   scope_id)`). `users.role` is a denormalized mirror kept only for the proto
   `User.role` field / frontend admin gate; RBAC checks never read it.
-- **Scopes:** `global` (`scope_id NULL`) and `event` (`scope_id = events.id`).
-  A check in the `event` scope consults the user's global roles *plus* their
-  roles on that event.
+- **Scopes:** `global` (`scope_id NULL`), `event` (`scope_id = events.id`), and
+  `group` (`scope_id = merchandise_groups.id`, #443 / [ADR 0013](../explanation/adr/0013-group-scope-rbac.md)).
+  A check in the `event` or `group` scope consults the user's global roles
+  *plus* their roles in that scope.
 - **Decision rule** (`RbacService::check`, ADR 0004 §3): a check passes if
   **any** of:
   1. **Admin superuser bypass** — the user holds the `global/admin` role.
@@ -45,6 +46,8 @@ column is `Permission::as_str`.
 | `global` | `user` | Standard trading. No elevated permissions (ordinary trading is ownership-checked). |
 | `event` | `creator` | Owns an event; manages its editors; can transfer creator; edits the event, its merch, and its groups. |
 | `event` | `editor` | Edits an event's merch and groups; can assign/remove other editors; cannot delete the event or transfer creator. |
+| `group` | `creator` | Owns a specific item group; manages group editors; can transfer group creator; edits group metadata (#443). |
+| `group` | `editor` | Co-manages a specific item group (edit metadata, assign/remove group editors); cannot transfer group creator (#443). |
 
 ## Global permissions
 
@@ -85,12 +88,28 @@ also satisfies each event-scope check.
 | `merch.delete` | creator, editor | `merch.delete.any` | `merch::delete_merch_by_creator` (`DELETE /events/:id/merch/:id`) |
 | `merch.create` | creator, editor | `merch.create.any` | `merch::create_merch` (`POST /events/:id/merch`) |
 | `merch.edit` | creator, editor | `merch.edit.any` | `merch::update_merch` (`PUT /events/:id/merch/:id`), `merch::publish_merch` (`POST /events/:id/merch/:id/publish`) |
-| `group.edit` | creator, editor | `group.edit.any` | `groups::update_event_group` (`PUT /events/:id/groups/:name`) |
+| `group.edit` | creator, editor | `group.edit.any` | `groups::update_event_group` (`PUT /events/:id/groups/:name`) — also satisfied by group-scoped `group.edit` (#443) |
 
-> The **merch creator** and **group creator** pass `merch.edit` / `group.edit`
-> checks via an ownership short-circuit at the handler (the `created_by` /
-> `creator_id` column equals the caller), so they do not need the event role.
-> The RBAC permission is consulted only for non-owners.
+## Group-scope permissions
+
+Granted in the `group` scope (to `group/creator` and/or `group/editor`); checked
+with `Scope::Group(merchandise_groups.id)` (#443 / ADR 0013). Global
+`group.edit.any` still satisfies `group.edit` when global roles are loaded.
+`group.member.manage` has **no** `*.any` form.
+
+| Permission | Granted to (group roles) | `*.any` override | Enforced by |
+|---|---|---|---|
+| `group.edit` | creator, editor | `group.edit.any` | `groups::update_event_group` (after ownership + event-scope checks fail) |
+| `group.member.manage` | creator, editor | *(none by design)* | group-member API (`GET/POST/DELETE /events/:id/groups/:name/members…`) |
+
+> **Event editor ≠ group editor.** Event-scoped roles grant event-wide
+> `group.edit` for any group in the event. Group-scoped roles grant powers only
+> for that item group.
+>
+> The **merch creator** and **group owner** (`created_by`) pass `merch.edit` /
+> `group.edit` checks via an ownership short-circuit at the handler when the
+> column equals the caller. Group owner also holds `group/creator` after
+> backfill/create (#443).
 
 ## Granting roles
 
@@ -104,8 +123,14 @@ also satisfies each event-scope check.
   `event.member.manage` (event **creator** or **editor**, #442), **or** via the
   admin members path (`event.member.manage.any`) for moderators/admins (#432).
 - **Group `created_by`** is set at group creation (ownership short-circuit for
-  `group.edit`). Global staff reassign it via
-  `PUT /admin/events/:id/groups/:name/creator` (`group.creator.transfer`) (#432).
+  `group.edit`) and a matching `group/creator` role is assigned in the same
+  transaction (#443). Self-service transfer:
+  `PUT /events/:id/groups/:name/creator` (current owner only). Global staff
+  reassign via `PUT /admin/events/:id/groups/:name/creator`
+  (`group.creator.transfer`) (#432) — both paths keep `created_by` and
+  `user_roles` in sync.
+- **Group `editor`** is assigned/revoked via the group-member API, guarded by
+  `group.member.manage` (group **creator** or **editor**, #443).
 - **Global `user`/`moderator`/`admin`** are granted per-environment with
   [`scripts/grant_role.sh <username> <role>`](../how_to/grant_roles.md), which
   writes `users.role` and the `user_roles` global row in one transaction so the
@@ -130,5 +155,6 @@ also satisfies each event-scope check.
 
 - [ADR 0004 — RBAC Permission Model](../explanation/adr/0004-rbac-permission-model.md)
 - [ADR 0005 — Gate Merch Creation Behind `merch.create`](../explanation/adr/0005-merch-create-permission.md)
+- [ADR 0013 — Group-Scoped RBAC](../explanation/adr/0013-group-scope-rbac.md)
 - [Granting Global Roles](../how_to/grant_roles.md)
 - [API Specification](api_spec.md) · [Database Schema](db_schema.md)

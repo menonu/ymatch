@@ -107,10 +107,16 @@ pub enum Permission {
     /// editor. The merch *creator* passes via an ownership short-circuit in
     /// the handler, not via this permission.
     MerchEdit,
-    /// Edit a group in a specific event. Event creator + editor. The group
-    /// *creator* passes via an ownership short-circuit in the handler, not via
-    /// this permission.
+    /// Edit a group in a specific event (event-scope) **or** a specific item
+    /// group (group-scope, #443). Event creator + editor hold the event-scoped
+    /// grant; group creator + editor hold the group-scoped grant. The group
+    /// *owner* (`created_by`) also passes via an ownership short-circuit in
+    /// the handler.
     GroupEdit,
+    /// Manage editor roles for a specific item group. Group creator + editor
+    /// (#443). No `*.any` override — public path only; staff use admin
+    /// group-creator transfer (#432), not this permission.
+    GroupMemberManage,
 }
 
 impl Permission {
@@ -141,6 +147,7 @@ impl Permission {
             Permission::MerchCreate => "merch.create",
             Permission::MerchEdit => "merch.edit",
             Permission::GroupEdit => "group.edit",
+            Permission::GroupMemberManage => "group.member.manage",
         }
     }
 
@@ -150,10 +157,12 @@ impl Permission {
     /// satisfies an `EventEdit` check without the moderator holding an
     /// event-scoped role.
     ///
-    /// `EventMemberManage` has no `*.any` override by design: only the event
-    /// creator + editor (and the admin superuser bypass) can manage an event's
-    /// editors on the public path. Moderators use
-    /// [`Permission::EventMemberManageAny`] on the admin path (#432 / #442).
+    /// `EventMemberManage` and `GroupMemberManage` have no `*.any` override by
+    /// design: only the scoped creator/editor (and the admin superuser bypass)
+    /// can manage editors on the public path. Moderators use
+    /// [`Permission::EventMemberManageAny`] on the admin event-members path
+    /// (#432 / #442); group member management has no separate admin path yet
+    /// (#443).
     pub fn satisfying_names(&self) -> &'static [&'static str] {
         match self {
             Permission::EventEdit => &["event.edit", "event.edit.any"],
@@ -161,6 +170,9 @@ impl Permission {
             Permission::MerchDelete => &["merch.delete", "merch.delete.any"],
             Permission::MerchCreate => &["merch.create", "merch.create.any"],
             Permission::MerchEdit => &["merch.edit", "merch.edit.any"],
+            // Name collision across scopes is intentional: both event-scoped
+            // and group-scoped `group.edit` rows share this string; the scope
+            // of the check selects which role rows are loaded (#443).
             Permission::GroupEdit => &["group.edit", "group.edit.any"],
             Permission::UserRead => &["user.read"],
             Permission::UserBan => &["user.ban"],
@@ -181,6 +193,7 @@ impl Permission {
             Permission::EventMemberManageAny => &["event.member.manage.any"],
             Permission::SystemKillSwitch => &["system.kill_switch"],
             Permission::EventMemberManage => &["event.member.manage"],
+            Permission::GroupMemberManage => &["group.member.manage"],
         }
     }
 }
@@ -189,14 +202,17 @@ impl Permission {
 ///
 /// `Global` covers platform-wide permissions (`user.ban`, `event.create`,
 /// etc.). `Event(event_id)` covers permissions scoped to a single event
-/// (`event.edit`, `merch.delete`, ...); a `Global` check still consults the
-/// user's global roles, and an `Event` check consults the user's global
-/// roles *plus* their roles scoped to that event (so a global moderator's
-/// `*.any` permission can satisfy an event-scope check).
+/// (`event.edit`, `merch.delete`, ...). `Group(group_id)` covers permissions
+/// scoped to a single item group (`merchandise_groups.id`, #443). A `Global`
+/// check consults global roles only; `Event` / `Group` checks consult the
+/// user's global roles *plus* their roles in that scope (so a global
+/// moderator's `*.any` permission can satisfy an event-scope check).
 #[derive(Debug, Clone, Copy)]
 pub enum Scope {
     Global,
     Event(i32),
+    /// `merchandise_groups.id` — group-scoped creator/editor (#443).
+    Group(i32),
 }
 
 /// Authorization service. Construct once at startup with the shared
@@ -271,11 +287,7 @@ impl RbacService {
         scope: &Scope,
         permission: Permission,
     ) -> Result<(), AppError> {
-        let event_id = match scope {
-            Scope::Global => None,
-            Scope::Event(eid) => Some(*eid),
-        };
-        let role_ids = self.rbac.role_ids_for_user(user.id, event_id).await?;
+        let role_ids = self.rbac.role_ids_for_user(user.id, scope).await?;
         let catalog = self.catalog().await?;
         Self::evaluate(&role_ids, catalog, permission)
     }
@@ -297,6 +309,8 @@ mod tests {
     const USER: i32 = 3;
     const CREATOR: i32 = 4;
     const EDITOR: i32 = 5;
+    const GROUP_CREATOR: i32 = 6;
+    const GROUP_EDITOR: i32 = 7;
 
     fn set(names: &[&str]) -> HashSet<String> {
         names.iter().map(|s| s.to_string()).collect()
@@ -372,6 +386,8 @@ mod tests {
                 "group.edit",
             ]),
         );
+        perms_by_role.insert(GROUP_CREATOR, set(&["group.edit", "group.member.manage"]));
+        perms_by_role.insert(GROUP_EDITOR, set(&["group.edit", "group.member.manage"]));
         PermissionCatalog::new(ADMIN, perms_by_role)
     }
 
@@ -441,6 +457,11 @@ mod tests {
             Permission::EventMemberManage.satisfying_names(),
             &["event.member.manage"]
         );
+        // group.member.manage likewise has no *.any (#443).
+        assert_eq!(
+            Permission::GroupMemberManage.satisfying_names(),
+            &["group.member.manage"]
+        );
     }
 
     #[test]
@@ -474,6 +495,7 @@ mod tests {
         ok(&[ADMIN], Permission::MerchCreate);
         ok(&[ADMIN], Permission::MerchEdit);
         ok(&[ADMIN], Permission::GroupEdit);
+        ok(&[ADMIN], Permission::GroupMemberManage);
         ok(&[ADMIN], Permission::MatchDelete);
     }
 
@@ -575,6 +597,22 @@ mod tests {
     }
 
     // --- event editor ---
+
+    // --- group creator / editor (#443) ---
+
+    #[test]
+    fn group_creator_and_editor_can_edit_group_and_manage_members() {
+        ok(&[GROUP_CREATOR], Permission::GroupEdit);
+        ok(&[GROUP_CREATOR], Permission::GroupMemberManage);
+        ok(&[GROUP_EDITOR], Permission::GroupEdit);
+        ok(&[GROUP_EDITOR], Permission::GroupMemberManage);
+        // Group roles do not grant event-scoped powers.
+        denied(&[GROUP_CREATOR], Permission::EventEdit);
+        denied(&[GROUP_EDITOR], Permission::EventMemberManage);
+        denied(&[GROUP_CREATOR], Permission::MerchCreate);
+        denied(&[USER], Permission::GroupMemberManage);
+        denied(&[MODERATOR], Permission::GroupMemberManage);
+    }
 
     #[test]
     fn editor_can_edit_and_manage_members_but_not_delete() {

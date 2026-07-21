@@ -727,6 +727,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleEditor => 'editor';
 
   @override
+  String get manageGroupMembers => 'Manage group members';
+
+  @override
+  String get groupCreatorTransferred => 'Group creator updated';
+
+  @override
+  String get pickTransferGroupCreatorTitle => 'Transfer group creator';
+
+  @override
+  String get confirmTransferGroupCreatorTitle => 'Transfer group creator?';
+
+  @override
+  String confirmTransferGroupCreatorBody(String username) {
+    return 'Transfer group ownership to $username? You will lose creator privileges on this group. This cannot be undone.';
+  }
+
+  @override
+  String get pickGroupEditorTitle => 'Add group editor';
+
+  @override
   String get mapPickerTitle => 'Pick location';
 
   @override

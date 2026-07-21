@@ -157,6 +157,8 @@ impl MerchandiseRepository {
         // (event_id, group_name), create it with empty description and
         // created_by = creator_id. If it exists, do nothing (the
         // description set via NewGroupDialog is preserved).
+        // #443: also ensure a group/creator user_roles row exists for the
+        // group's actual created_by (idempotent; no-op when already present).
         if let Some(creator_id) = req.creator_id {
             sqlx::query(
                 r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by)
@@ -166,6 +168,19 @@ impl MerchandiseRepository {
             .bind(event_id)
             .bind(group_name)
             .bind(creator_id)
+            .execute(&self.pool)
+            .await?;
+            sqlx::query(
+                r#"INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+                   SELECT mg.created_by, r.id, 'group', mg.id
+                   FROM merchandise_groups mg
+                   JOIN roles r ON r.scope_type = 'group' AND r.name = 'creator'
+                   WHERE mg.event_id = $1 AND mg.group_name = $2
+                     AND mg.created_by IS NOT NULL
+                   ON CONFLICT (user_id, role_id, scope_id) DO NOTHING"#,
+            )
+            .bind(event_id)
+            .bind(group_name)
             .execute(&self.pool)
             .await?;
         }

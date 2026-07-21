@@ -325,6 +325,23 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             "/api/v1/events/:id/groups/:group_name",
             put(handlers::update_event_group),
         )
+        // #443: group-scoped self-service members + my-role + creator transfer.
+        .route(
+            "/api/v1/events/:id/groups/:group_name/members",
+            get(handlers::list_group_members),
+        )
+        .route(
+            "/api/v1/events/:id/groups/:group_name/my-role",
+            get(handlers::get_my_group_role),
+        )
+        .route(
+            "/api/v1/events/:id/groups/:group_name/creator",
+            put(handlers::self_transfer_group_creator),
+        )
+        .route(
+            "/api/v1/events/:id/groups/:group_name/members/:target_id",
+            post(handlers::assign_group_member).delete(handlers::revoke_group_member),
+        )
         .route(
             "/api/v1/events/:id/merch/:merch_id/publish",
             post(handlers::publish_merch),

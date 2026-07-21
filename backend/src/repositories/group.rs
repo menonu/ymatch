@@ -91,14 +91,19 @@ impl MerchandiseGroupRepository {
             .collect())
     }
 
-    /// Set `created_by` for admin group-ownership transfer (#432).
-    /// Returns `false` if the group row does not exist.
-    pub async fn set_creator(
+    /// Set `created_by` for group-ownership transfer (#432 / #443).
+    /// Runs on the caller's open transaction so it commits with the matching
+    /// `user_roles` swap. Returns `false` if the group row does not exist.
+    pub async fn set_creator<'c, E>(
         &self,
+        exec: E,
         event_id: i32,
         group_name: &str,
         new_creator_id: i32,
-    ) -> Result<bool, AppError> {
+    ) -> Result<bool, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
         let affected = sqlx::query(
             "UPDATE merchandise_groups
              SET created_by = $1, updated_at = NOW()
@@ -107,31 +112,56 @@ impl MerchandiseGroupRepository {
         .bind(new_creator_id)
         .bind(event_id)
         .bind(group_name)
-        .execute(&self.pool)
+        .execute(exec)
         .await?
         .rows_affected();
         Ok(affected > 0)
     }
 
+    /// `SELECT id, created_by … FOR UPDATE` on the group row keyed by
+    /// `(event_id, group_name)`. Returns `None` if missing; otherwise
+    /// `(group_id, created_by)`. The row lock is held until the surrounding
+    /// transaction ends so concurrent creator transfers serialize (#443 / #445).
+    pub async fn lock_for_update<'c, E>(
+        &self,
+        exec: E,
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<Option<(i32, Option<i32>)>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let row = sqlx::query(
+            "SELECT id, created_by FROM merchandise_groups
+             WHERE event_id = $1 AND group_name = $2 FOR UPDATE",
+        )
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_optional(exec)
+        .await?;
+        Ok(row.map(|r| (r.get::<i32, _>("id"), r.get::<Option<i32>, _>("created_by"))))
+    }
+
     /// Remove a group's user-visible state as one transaction. Merchandise is
     /// soft-deleted so inventory history remains valid; matches and favorites
-    /// are deleted because they are scoped to the group itself.
+    /// are deleted because they are scoped to the group itself. Group-scoped
+    /// `user_roles` are also cleared (`scope_id` has no FK, #443).
     pub async fn remove_for_admin(
         &self,
         event_id: i32,
         group_name: &str,
     ) -> Result<bool, AppError> {
         let mut tx = self.pool.begin().await?;
-        let exists: Option<i32> = sqlx::query_scalar(
+        let group_id: Option<i32> = sqlx::query_scalar(
             "SELECT id FROM merchandise_groups WHERE event_id = $1 AND group_name = $2 FOR UPDATE",
         )
         .bind(event_id)
         .bind(group_name)
         .fetch_optional(&mut *tx)
         .await?;
-        if exists.is_none() {
+        let Some(group_id) = group_id else {
             return Ok(false);
-        }
+        };
 
         sqlx::query(
             r#"DELETE FROM messages
@@ -161,6 +191,11 @@ impl MerchandiseGroupRepository {
         .bind(group_name)
         .execute(&mut *tx)
         .await?;
+        // Orphan cleanup for group-scoped RBAC (#443); no FK on scope_id.
+        sqlx::query("DELETE FROM user_roles WHERE scope_type = 'group' AND scope_id = $1")
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query("DELETE FROM merchandise_groups WHERE event_id = $1 AND group_name = $2")
             .bind(event_id)
             .bind(group_name)
@@ -170,13 +205,21 @@ impl MerchandiseGroupRepository {
         Ok(true)
     }
 
-    /// Upsert a group row. The first time a group name is seen for an
-    /// event, the row is created with `created_by = user_id` (and optional
-    /// `photo_url` on insert only). On a subsequent call for the same
-    /// `(event_id, group_name)`, only `description` is updated and
-    /// `created_by` / `photo_url` are preserved — photo changes must go
-    /// through the RBAC-gated update path (#404).
-    pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
+    /// Upsert a group row on the caller's open transaction (#443). The first
+    /// time a group name is seen for an event, the row is created with
+    /// `created_by = user_id` (and optional `photo_url` on insert only). On a
+    /// subsequent call for the same `(event_id, group_name)`, only
+    /// `description` is updated and `created_by` / `photo_url` are preserved
+    /// — photo changes must go through the RBAC-gated update path (#404).
+    ///
+    /// The caller is responsible for assigning `group/creator` when this is a
+    /// new group (or ensuring the role exists for `created_by`). Event
+    /// existence is checked here to prevent orphaned group rows.
+    pub async fn create_in_tx(
+        &self,
+        exec: &mut sqlx::PgConnection,
+        req: &CreateGroupRequest,
+    ) -> Result<MerchandiseGroup, AppError> {
         let group_name = req.group_name.trim().to_string();
         if group_name.is_empty() {
             return Err(AppError::bad_request("group_name is required"));
@@ -193,7 +236,7 @@ impl MerchandiseGroupRepository {
         // group rows if a client mistypes the event_id.
         let event_exists: Option<i32> = sqlx::query_scalar("SELECT id FROM events WHERE id = $1")
             .bind(req.event_id)
-            .fetch_optional(&self.pool)
+            .fetch_optional(&mut *exec)
             .await?;
         if event_exists.is_none() {
             return Err(AppError::not_found("Event not found"));
@@ -217,9 +260,19 @@ impl MerchandiseGroupRepository {
             .bind(&description)
             .bind(req.user_id)
             .bind(photo_url)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *exec)
             .await?;
         Ok(group_from_row(&row))
+    }
+
+    /// Upsert a group row (pool-based convenience for callers that do not need
+    /// a surrounding transaction). Prefer the handler path that uses
+    /// [`Self::create_in_tx`] + `group/creator` assignment (#443).
+    pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
+        let mut tx = self.pool.begin().await?;
+        let group = self.create_in_tx(&mut tx, &req).await?;
+        tx.commit().await?;
+        Ok(group)
     }
 
     /// Update description (and optionally photo_url / display_name) of an

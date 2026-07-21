@@ -3542,6 +3542,245 @@ class MyEventRoleResponse extends $pb.GeneratedMessage {
   void clearCanTransferCreator() => $_clearField(6);
 }
 
+/// Group-member API (#443): group-scoped role assignments for a merchandise
+/// group. `role` is "creator" or "editor". Used by
+/// GET /api/v1/events/:id/groups/:group_name/members.
+class GroupMember extends $pb.GeneratedMessage {
+  factory GroupMember({
+    $core.int? userId,
+    $core.String? role,
+    $core.String? username,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (role != null) result.role = role;
+    if (username != null) result.username = username;
+    return result;
+  }
+
+  GroupMember._();
+
+  factory GroupMember.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GroupMember.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GroupMember',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'userId')
+    ..aOS(2, _omitFieldNames ? '' : 'role')
+    ..aOS(3, _omitFieldNames ? '' : 'username')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GroupMember clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GroupMember copyWith(void Function(GroupMember) updates) =>
+      super.copyWith((message) => updates(message as GroupMember))
+          as GroupMember;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GroupMember create() => GroupMember._();
+  @$core.override
+  GroupMember createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GroupMember getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GroupMember>(create);
+  static GroupMember? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get userId => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set userId($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get role => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set role($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRole() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRole() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get username => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set username($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUsername() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUsername() => $_clearField(3);
+}
+
+class ListGroupMembersResponse extends $pb.GeneratedMessage {
+  factory ListGroupMembersResponse({
+    $core.Iterable<GroupMember>? members,
+  }) {
+    final result = create();
+    if (members != null) result.members.addAll(members);
+    return result;
+  }
+
+  ListGroupMembersResponse._();
+
+  factory ListGroupMembersResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ListGroupMembersResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListGroupMembersResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..pPM<GroupMember>(1, _omitFieldNames ? '' : 'members',
+        subBuilder: GroupMember.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListGroupMembersResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListGroupMembersResponse copyWith(
+          void Function(ListGroupMembersResponse) updates) =>
+      super.copyWith((message) => updates(message as ListGroupMembersResponse))
+          as ListGroupMembersResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ListGroupMembersResponse create() => ListGroupMembersResponse._();
+  @$core.override
+  ListGroupMembersResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ListGroupMembersResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListGroupMembersResponse>(create);
+  static ListGroupMembersResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<GroupMember> get members => $_getList(0);
+}
+
+/// Current-user group-role API (#443): the caller's standing on a single item
+/// group. Accessible to any active caller (no 403 for a plain viewer) so the
+/// frontend can gate the Manage Group Members control without a 403 on open.
+/// `can_manage_editors` / `can_transfer_creator` / `can_edit_group` mirror the
+/// exact backend decisions (RBAC or ownership).
+class MyGroupRoleResponse extends $pb.GeneratedMessage {
+  factory MyGroupRoleResponse({
+    $core.String? role,
+    $core.bool? globalOverride,
+    $core.bool? canEditGroup,
+    $core.bool? canManageEditors,
+    $core.bool? canTransferCreator,
+  }) {
+    final result = create();
+    if (role != null) result.role = role;
+    if (globalOverride != null) result.globalOverride = globalOverride;
+    if (canEditGroup != null) result.canEditGroup = canEditGroup;
+    if (canManageEditors != null) result.canManageEditors = canManageEditors;
+    if (canTransferCreator != null)
+      result.canTransferCreator = canTransferCreator;
+    return result;
+  }
+
+  MyGroupRoleResponse._();
+
+  factory MyGroupRoleResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MyGroupRoleResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MyGroupRoleResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'ymatch'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'role')
+    ..aOB(2, _omitFieldNames ? '' : 'globalOverride')
+    ..aOB(3, _omitFieldNames ? '' : 'canEditGroup')
+    ..aOB(4, _omitFieldNames ? '' : 'canManageEditors')
+    ..aOB(5, _omitFieldNames ? '' : 'canTransferCreator')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MyGroupRoleResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MyGroupRoleResponse copyWith(void Function(MyGroupRoleResponse) updates) =>
+      super.copyWith((message) => updates(message as MyGroupRoleResponse))
+          as MyGroupRoleResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MyGroupRoleResponse create() => MyGroupRoleResponse._();
+  @$core.override
+  MyGroupRoleResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MyGroupRoleResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MyGroupRoleResponse>(create);
+  static MyGroupRoleResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get role => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set role($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRole() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRole() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get globalOverride => $_getBF(1);
+  @$pb.TagNumber(2)
+  set globalOverride($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGlobalOverride() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGlobalOverride() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get canEditGroup => $_getBF(2);
+  @$pb.TagNumber(3)
+  set canEditGroup($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCanEditGroup() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCanEditGroup() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get canManageEditors => $_getBF(3);
+  @$pb.TagNumber(4)
+  set canManageEditors($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCanManageEditors() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCanManageEditors() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get canTransferCreator => $_getBF(4);
+  @$pb.TagNumber(5)
+  set canTransferCreator($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCanTransferCreator() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCanTransferCreator() => $_clearField(5);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

@@ -17,7 +17,8 @@
 //! `list_event_members`.
 
 use crate::error::AppError;
-use crate::generated::ymatch::EventMember;
+use crate::generated::ymatch::{EventMember, GroupMember};
+use crate::services::rbac::Scope;
 use sqlx::{PgConnection, PgPool, Row};
 
 pub struct RbacRepository {
@@ -29,23 +30,26 @@ impl RbacRepository {
         Self { pool }
     }
 
-    /// Return the role ids a user currently holds in the global scope, plus
-    /// — when `event_id` is `Some` — the roles they hold scoped to that
-    /// specific event. A `None` `event_id` is a pure global-scope check.
+    /// Return the role ids a user currently holds for the given [`Scope`].
+    ///
+    /// - [`Scope::Global`]: global roles only.
+    /// - [`Scope::Event`]: global + event-scoped roles for that event id.
+    /// - [`Scope::Group`]: global + group-scoped roles for that
+    ///   `merchandise_groups.id` (#443).
     ///
     /// The result feeds [`crate::services::rbac::RbacService::evaluate`],
     /// which maps role ids to permissions via the cached catalog and applies
     /// the admin superuser bypass + `*.any` overlap rule. The global scope
-    /// is always included so that a global moderator's `event.edit.any`
-    /// permission can satisfy an event-scope `event.edit` check without a
-    /// separate query.
+    /// is always included for event/group checks so a global moderator's
+    /// `event.edit.any` (or `group.edit.any`) can satisfy a scoped check
+    /// without a separate query.
     pub async fn role_ids_for_user(
         &self,
         user_id: i32,
-        event_id: Option<i32>,
+        scope: &Scope,
     ) -> Result<Vec<i32>, AppError> {
-        let rows = match event_id {
-            None => {
+        let rows = match scope {
+            Scope::Global => {
                 sqlx::query_scalar::<_, i32>(
                     "SELECT role_id FROM user_roles
                      WHERE user_id = $1 AND scope_type = 'global' AND scope_id IS NULL",
@@ -54,7 +58,7 @@ impl RbacRepository {
                 .fetch_all(&self.pool)
                 .await?
             }
-            Some(eid) => {
+            Scope::Event(eid) => {
                 sqlx::query_scalar::<_, i32>(
                     "SELECT role_id FROM user_roles
                      WHERE user_id = $1
@@ -63,6 +67,18 @@ impl RbacRepository {
                 )
                 .bind(user_id)
                 .bind(eid)
+                .fetch_all(&self.pool)
+                .await?
+            }
+            Scope::Group(gid) => {
+                sqlx::query_scalar::<_, i32>(
+                    "SELECT role_id FROM user_roles
+                     WHERE user_id = $1
+                       AND ((scope_type = 'global' AND scope_id IS NULL)
+                            OR (scope_type = 'group' AND scope_id = $2))",
+                )
+                .bind(user_id)
+                .bind(gid)
                 .fetch_all(&self.pool)
                 .await?
             }
@@ -291,6 +307,191 @@ impl RbacRepository {
         .await?;
         Ok(row.map(|(name,)| name))
     }
+
+    // --- group scope (#443) -------------------------------------------------
+
+    /// Look up the `group/creator` role id on the caller's transaction
+    /// connection (so unseeded catalog fails inside the same txn).
+    async fn group_creator_role_id(exec: &mut PgConnection) -> Result<i32, AppError> {
+        let role_id: i32 = sqlx::query_scalar(
+            "SELECT id FROM roles WHERE scope_type = 'group' AND name = 'creator'",
+        )
+        .fetch_one(&mut *exec)
+        .await?;
+        Ok(role_id)
+    }
+
+    /// Look up the `group/<role_name>` role id on the shared pool.
+    async fn group_role_id(&self, role_name: &str) -> Result<i32, AppError> {
+        let role_id: i32 =
+            sqlx::query_scalar("SELECT id FROM roles WHERE scope_type = 'group' AND name = $1")
+                .bind(role_name)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(role_id)
+    }
+
+    /// Assign the `group/creator` role to `user_id` scoped to
+    /// `merchandise_groups.id` (#443). Called at group creation and during
+    /// creator transfer. Idempotent via `ON CONFLICT DO NOTHING`.
+    pub async fn assign_group_creator(
+        &self,
+        exec: &mut PgConnection,
+        user_id: i32,
+        group_id: i32,
+    ) -> Result<(), AppError> {
+        let role_id = Self::group_creator_role_id(exec).await?;
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+             VALUES ($1, $2, 'group', $3)
+             ON CONFLICT (user_id, role_id, scope_id) DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(group_id)
+        .execute(&mut *exec)
+        .await?;
+        Ok(())
+    }
+
+    /// Revoke the `group/creator` role from `user_id` for `group_id` (#443).
+    /// Used only by creator-transfer paths — the public members API never
+    /// removes the creator role. Idempotent.
+    pub async fn revoke_group_creator(
+        &self,
+        exec: &mut PgConnection,
+        user_id: i32,
+        group_id: i32,
+    ) -> Result<(), AppError> {
+        let role_id = Self::group_creator_role_id(exec).await?;
+        sqlx::query(
+            "DELETE FROM user_roles
+             WHERE user_id = $1 AND role_id = $2 AND scope_type = 'group' AND scope_id = $3",
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(group_id)
+        .execute(&mut *exec)
+        .await?;
+        Ok(())
+    }
+
+    /// Atomically transfer the group-scoped `creator` role from
+    /// `previous_creator_id` (if any) to `new_creator_id` (#443). Does not
+    /// touch `merchandise_groups.created_by` — the caller updates that column
+    /// in the same transaction. Does not auto-grant `editor` to the previous
+    /// creator.
+    pub async fn transfer_group_creator_role(
+        &self,
+        exec: &mut PgConnection,
+        group_id: i32,
+        previous_creator_id: Option<i32>,
+        new_creator_id: i32,
+    ) -> Result<(), AppError> {
+        if let Some(prev) = previous_creator_id
+            && prev != new_creator_id
+        {
+            self.revoke_group_creator(exec, prev, group_id).await?;
+        }
+        self.assign_group_creator(exec, new_creator_id, group_id)
+            .await?;
+        Ok(())
+    }
+
+    /// Assign the `group/editor` role to `user_id` scoped to `group_id` (#443).
+    /// Idempotent. The `creator` role is never assigned here.
+    pub async fn assign_group_editor(&self, user_id: i32, group_id: i32) -> Result<(), AppError> {
+        let role_id = self.group_role_id("editor").await?;
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+             VALUES ($1, $2, 'group', $3)
+             ON CONFLICT (user_id, role_id, scope_id) DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(group_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Revoke the `group/editor` role from `user_id` for `group_id` (#443).
+    /// Idempotent. Never removes the `creator` role (SQL filters to editor).
+    pub async fn revoke_group_editor(&self, user_id: i32, group_id: i32) -> Result<(), AppError> {
+        let role_id = self.group_role_id("editor").await?;
+        sqlx::query(
+            "DELETE FROM user_roles
+             WHERE user_id = $1 AND role_id = $2 AND scope_type = 'group' AND scope_id = $3",
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(group_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// List every group-scoped role assignment for `group_id` (#443).
+    /// Creators sort before editors, then by user id.
+    pub async fn list_group_members(&self, group_id: i32) -> Result<Vec<GroupMember>, AppError> {
+        let rows = sqlx::query(
+            "SELECT u.id AS user_id, u.username, r.name AS role_name
+             FROM user_roles ur
+             JOIN users u  ON u.id = ur.user_id
+             JOIN roles r  ON r.id = ur.role_id
+             WHERE ur.scope_type = 'group' AND ur.scope_id = $1
+             ORDER BY r.name, u.id",
+        )
+        .bind(group_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| GroupMember {
+                user_id: r.get("user_id"),
+                role: r.get("role_name"),
+                username: r.get("username"),
+            })
+            .collect())
+    }
+
+    /// The caller's single group-scoped role on `group_id` (#443), or `None`.
+    /// `creator` wins over `editor` when both rows exist.
+    pub async fn group_role_name(
+        &self,
+        user_id: i32,
+        group_id: i32,
+    ) -> Result<Option<String>, AppError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT r.name
+             FROM user_roles ur
+             JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = $1
+               AND ur.scope_type = 'group'
+               AND ur.scope_id = $2
+             ORDER BY CASE r.name WHEN 'creator' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END
+             LIMIT 1",
+        )
+        .bind(user_id)
+        .bind(group_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(name,)| name))
+    }
+
+    /// Drop all group-scoped `user_roles` for `group_id` (used when a group is
+    /// hard-deleted so orphaned assignments do not linger — `scope_id` has no FK).
+    pub async fn revoke_all_group_roles(
+        &self,
+        exec: &mut PgConnection,
+        group_id: i32,
+    ) -> Result<(), AppError> {
+        sqlx::query("DELETE FROM user_roles WHERE scope_type = 'group' AND scope_id = $1")
+            .bind(group_id)
+            .execute(&mut *exec)
+            .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -391,5 +592,90 @@ mod tests {
         assert_eq!(members.len(), 1);
         assert_eq!(members[0].user_id, creator_id);
         assert_eq!(members[0].role, "creator");
+    }
+
+    /// Group-scoped member write path (#443): assign/list/revoke editor;
+    /// creator is never removed by editor revoke.
+    #[sqlx::test]
+    async fn group_member_write_path(pool: PgPool) {
+        let rbac = RbacRepository::new(pool.clone());
+
+        for name in ["gmem-creator", "gmem-editor"] {
+            sqlx::query("INSERT INTO users (username) VALUES ($1)")
+                .bind(name)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        let creator_id: i32 =
+            sqlx::query_scalar("SELECT id FROM users WHERE username = 'gmem-creator'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let editor_id: i32 =
+            sqlx::query_scalar("SELECT id FROM users WHERE username = 'gmem-editor'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+
+        sqlx::query("INSERT INTO events (name, creator_id) VALUES ('GMember Event', $1)")
+            .bind(creator_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let event_id: i32 =
+            sqlx::query_scalar("SELECT id FROM events WHERE name = 'GMember Event'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+
+        sqlx::query(
+            "INSERT INTO merchandise_groups (event_id, group_name, description, created_by)
+             VALUES ($1, 'G1', '', $2)",
+        )
+        .bind(event_id)
+        .bind(creator_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let group_id: i32 = sqlx::query_scalar(
+            "SELECT id FROM merchandise_groups WHERE event_id = $1 AND group_name = 'G1'",
+        )
+        .bind(event_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        rbac.assign_group_creator(&mut tx, creator_id, group_id)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let members = rbac.list_group_members(group_id).await.unwrap();
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].user_id, creator_id);
+        assert_eq!(members[0].role, "creator");
+
+        rbac.assign_group_editor(editor_id, group_id).await.unwrap();
+        let members = rbac.list_group_members(group_id).await.unwrap();
+        assert_eq!(members.len(), 2);
+        assert_eq!(members[0].role, "creator");
+        assert_eq!(members[1].role, "editor");
+        assert_eq!(members[1].user_id, editor_id);
+
+        rbac.assign_group_editor(editor_id, group_id).await.unwrap();
+        assert_eq!(rbac.list_group_members(group_id).await.unwrap().len(), 2);
+
+        rbac.revoke_group_editor(editor_id, group_id).await.unwrap();
+        assert_eq!(rbac.list_group_members(group_id).await.unwrap().len(), 1);
+
+        rbac.revoke_group_editor(creator_id, group_id)
+            .await
+            .unwrap();
+        let members = rbac.list_group_members(group_id).await.unwrap();
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].role, "creator");
+        assert_eq!(members[0].user_id, creator_id);
     }
 }

@@ -1412,6 +1412,42 @@ abstract class AppLocalizations {
   /// **'editor'**
   String get roleEditor;
 
+  /// Tooltip / dialog title for item-group creator/editor self-service member UI (#443)
+  ///
+  /// In en, this message translates to:
+  /// **'Manage group members'**
+  String get manageGroupMembers;
+
+  /// SnackBar after successful self-service group creator transfer (#443)
+  ///
+  /// In en, this message translates to:
+  /// **'Group creator updated'**
+  String get groupCreatorTransferred;
+
+  /// User picker title when transferring group ownership (#443)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer group creator'**
+  String get pickTransferGroupCreatorTitle;
+
+  /// Confirmation dialog title before irreversible group creator transfer (#443)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer group creator?'**
+  String get confirmTransferGroupCreatorTitle;
+
+  /// Confirmation dialog body for self-service group creator transfer (#443)
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer group ownership to {username}? You will lose creator privileges on this group. This cannot be undone.'**
+  String confirmTransferGroupCreatorBody(String username);
+
+  /// User picker title when assigning a group editor (#443)
+  ///
+  /// In en, this message translates to:
+  /// **'Add group editor'**
+  String get pickGroupEditorTitle;
+
   /// App bar title on the chat map location picker (#448)
   ///
   /// In en, this message translates to:
