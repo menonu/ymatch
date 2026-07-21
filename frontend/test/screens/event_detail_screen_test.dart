@@ -293,78 +293,9 @@ void main() {
     },
   );
 
-  // --- Self-service member management (#442, placement #464) ---
+  // --- Event-scope member management entry moved to Home (#483) ---
 
-  /// Asserts Manage Members is present and not hosted by the AppBar (#464).
-  void expectManageMembersBottomLeft() {
-    expect(find.byKey(const Key('manage_members_button')), findsOneWidget);
-    expect(find.byTooltip('Manage members'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byKey(const Key('manage_members_button')),
-      ),
-      findsNothing,
-    );
-  }
-
-  testWidgets(
-    'Manage members button shown bottom-left when canManageEditors (#442/#464)',
-    (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(
-              5,
-            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            myEventRoleProvider(5).overrideWith(
-              (ref) async => MyEventRoleResponse()
-                ..canCreateMerch = true
-                ..canManageEditors = true
-                ..canTransferCreator = false,
-            ),
-          ],
-          child: _localized(const EventDetailScreen(eventId: 5)),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expectManageMembersBottomLeft();
-      // Co-located with existing bottom-left group controls (#128).
-      expect(find.byTooltip('Group info'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'Manage members button shown bottom-left when canTransferCreator (#442/#464)',
-    (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(
-              5,
-            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            myEventRoleProvider(5).overrideWith(
-              (ref) async => MyEventRoleResponse()
-                ..canCreateMerch = true
-                ..canManageEditors = false
-                ..canTransferCreator = true,
-            ),
-          ],
-          child: _localized(const EventDetailScreen(eventId: 5)),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expectManageMembersBottomLeft();
-    },
-  );
-
-  testWidgets('Manage members button hidden for plain viewer (#442)', (
+  testWidgets('Event manage members is not on EventDetailScreen (#483)', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -375,9 +306,36 @@ void main() {
           merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
           myEventRoleProvider(5).overrideWith(
             (ref) async => MyEventRoleResponse()
-              ..canCreateMerch = false
-              ..canManageEditors = false
-              ..canTransferCreator = false,
+              ..canCreateMerch = true
+              ..canManageEditors = true
+              ..canTransferCreator = true,
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('manage_members_button')), findsNothing);
+    expect(find.byTooltip('Manage members'), findsNothing);
+    // Group tools remain bottom-left.
+    expect(find.byTooltip('Group info'), findsOneWidget);
+  });
+
+  testWidgets('empty merch: no event manage members control on detail (#483)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => <Merchandise>[]),
+          myEventRoleProvider(5).overrideWith(
+            (ref) async => MyEventRoleResponse()
+              ..canCreateMerch = true
+              ..canManageEditors = true
+              ..canTransferCreator = true,
           ),
         ],
         child: _localized(const EventDetailScreen(eventId: 5)),
@@ -387,123 +345,6 @@ void main() {
 
     expect(find.byKey(const Key('manage_members_button')), findsNothing);
   });
-
-  testWidgets(
-    'empty merch: Manage members still bottom-left (not AppBar) (#464)',
-    (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(5).overrideWith((ref) async => <Merchandise>[]),
-            myEventRoleProvider(5).overrideWith(
-              (ref) async => MyEventRoleResponse()
-                ..canCreateMerch = true
-                ..canManageEditors = true
-                ..canTransferCreator = true,
-            ),
-          ],
-          child: _localized(const EventDetailScreen(eventId: 5)),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expectManageMembersBottomLeft();
-    },
-  );
-
-  testWidgets(
-    'Transfer creator requires confirmation before PUT (#442 pr-review)',
-    (tester) async {
-      var putCount = 0;
-      final config = ConfigService()
-        ..setBaseUrlForTest('http://localhost:3000');
-      final client = ApiClient(
-        config,
-        client: MockClient((request) async {
-          final path = request.url.path;
-          if (request.method == 'GET' && path == '/api/v1/events/5/members') {
-            return http.Response(
-              jsonEncode({
-                'members': [
-                  {'userId': 1, 'role': 'creator', 'username': 'me'},
-                ],
-              }),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }
-          if (request.method == 'GET' && path == '/api/v1/users') {
-            return http.Response(
-              jsonEncode([
-                {'id': 1, 'username': 'me'},
-                {'id': 9, 'username': 'alice'},
-              ]),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }
-          if (request.method == 'PUT' && path == '/api/v1/events/5/creator') {
-            putCount++;
-            return http.Response('{}', 200);
-          }
-          return http.Response('[]', 200);
-        }),
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            apiClientProvider.overrideWith((ref) => client),
-            authProvider.overrideWith((ref) => _MockAuthController(_user())),
-            merchProvider(
-              5,
-            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
-            myEventRoleProvider(5).overrideWith(
-              (ref) async => MyEventRoleResponse()
-                ..canCreateMerch = true
-                ..canManageEditors = true
-                ..canTransferCreator = true,
-            ),
-          ],
-          child: _localized(const EventDetailScreen(eventId: 5)),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('manage_members_button')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Manage members'), findsOneWidget);
-      await tester.tap(find.text('Transfer creator'));
-      await tester.pumpAndSettle();
-
-      // User picker.
-      expect(find.text('Transfer event creator'), findsOneWidget);
-      await tester.tap(find.text('alice'));
-      await tester.pumpAndSettle();
-
-      // Confirmation step — cancel must not PUT.
-      expect(find.text('Transfer event creator?'), findsOneWidget);
-      expect(
-        find.textContaining('Transfer ownership to alice?'),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Cancel').last);
-      await tester.pumpAndSettle();
-      expect(putCount, 0);
-
-      // Confirm path.
-      await tester.tap(find.text('Transfer creator'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('alice'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Transfer'));
-      await tester.pumpAndSettle();
-      expect(putCount, 1);
-    },
-  );
 
   // --- Group-scoped member management (#443) ---
 

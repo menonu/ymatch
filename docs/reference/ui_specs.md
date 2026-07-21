@@ -66,7 +66,11 @@ BottomNavBar
   - Participant count, view count, created date
   - Favorite star toggle
 - **FAB**: "New Event" — opens name dialog
-- **Long-press (owner only)**: Bottom sheet with "Edit Name" / "Delete"
+- **Long-press** (signed-in users; `my-role` fetched on press, not for every card):
+  - **Owner** (`creator_id == user`): "Edit Name" / "Delete"
+  - **Event members** when `canManageEditors` / `canTransferCreator` (#442, #483): "Manage members" → same dialog as before (list / add / remove editor / transfer creator)
+  - Non-owner editors with manage flags get Manage members only (no rename/delete)
+  - Plain viewers: long-press no-ops (no sheet, no 403 path)
 - **Empty state**: Centered icon + "Create Event" button
 
 ### EventDetailScreen
@@ -81,12 +85,13 @@ BottomNavBar
   - **Detailed View**: `ReorderableListView` with image, name, owner icon, stepper counters
   - **Grid View**: 3-column `GridView` with image, name, compact +/- counters
   - **Compact List**: `ListView` with thumbnail, name, inline counters
-- **Bottom-left controls** (icon-only, safe-area aware):
+- **Bottom-left controls** (icon-only, safe-area aware; **group-scope only**):
   - Group info (everyone) — toggles description panel (#128)
   - Edit Group — group creator or `canEditGroup` (#425)
-  - Manage Members — `canManageEditors` / `canTransferCreator` (#442); moved off AppBar (#464)
+  - Manage group members — group `canManageEditors` / `canTransferCreator` on active tab (#443); stays bottom-left
+  - Event member management is **not** here — use Home event-card long-press (#483; formerly bottom-left #464)
 - **FAB**: "Add Merch" — opens `AddMerchScreen`
-- **Long-press (owner only)**: Bottom sheet with "Edit Name" / "Delete"
+- **Long-press merch (owner only)**: Bottom sheet with "Edit Name" / "Delete"
 
 ### AddMerchScreen
 

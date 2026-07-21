@@ -6,6 +6,7 @@ import '../providers/providers.dart';
 import '../models/models.dart';
 import '../utils/group_display.dart';
 import '../widgets/how_to_trade.dart';
+import '../widgets/manage_event_members_dialog.dart';
 
 enum EventSort { recent, popular, alphabetical }
 
@@ -321,13 +322,22 @@ class HomeScreen extends ConsumerWidget {
                       user != null &&
                       event.hasCreatorId() &&
                       event.creatorId == user.id;
+                  // #483: long-press resolves my-role lazily (no N× watch per
+                  // card). Owner always gets rename/delete; manage tiles only
+                  // when role allows. Viewers no-op after the await.
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
+                      key: Key('event_card_${event.id}'),
                       onTap: () => context.go('/event/${event.id}'),
-                      onLongPress: isOwner
-                          ? () => _showEventActions(context, ref, event)
+                      onLongPress: user != null
+                          ? () => _showEventActions(
+                              context,
+                              ref,
+                              event,
+                              isOwner: isOwner,
+                            )
                           : null,
                       child: Padding(
                         padding: const EdgeInsets.all(20),
@@ -551,33 +561,63 @@ class HomeScreen extends ConsumerWidget {
     }
   }
 
-  void _showEventActions(BuildContext context, WidgetRef ref, Event event) {
+  Future<void> _showEventActions(
+    BuildContext context,
+    WidgetRef ref,
+    Event event, {
+    required bool isOwner,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
-    showModalBottomSheet(
+    // Resolve role on demand so Home does not N× subscribe to my-role (#483).
+    final role = await ref.read(myEventRoleProvider(event.id).future);
+    final canManageMembers =
+        role != null && (role.canManageEditors || role.canTransferCreator);
+    if (!isOwner && !canManageMembers) return;
+    if (!context.mounted) return;
+
+    await showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: Text(l10n.editName),
-              onTap: () {
-                Navigator.pop(ctx);
-                _editEventName(context, ref, event);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: Text(
-                l10n.delete,
-                style: const TextStyle(color: Colors.red),
+            if (isOwner) ...[
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: Text(l10n.editName),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _editEventName(context, ref, event);
+                },
               ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmDeleteEvent(context, ref, event);
-              },
-            ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: Text(
+                  l10n.delete,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteEvent(context, ref, event);
+                },
+              ),
+            ],
+            // #483: event-scope member management (same dialog as #442).
+            if (canManageMembers && role != null)
+              ListTile(
+                key: const Key('manage_members_action'),
+                leading: const Icon(Icons.manage_accounts),
+                title: Text(l10n.manageMembers),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showManageEventMembersDialog(
+                    context,
+                    ref,
+                    eventId: event.id,
+                    role: role,
+                  );
+                },
+              ),
           ],
         ),
       ),

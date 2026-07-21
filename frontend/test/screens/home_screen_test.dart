@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -94,6 +95,11 @@ Event _ownedEvent() => Event()
   ..id = 42
   ..name = 'Owned Fest'
   ..creatorId = 1;
+
+Event _otherEvent() => Event()
+  ..id = 7
+  ..name = 'Other Fest'
+  ..creatorId = 99;
 
 void main() {
   // The AppBar help icon watches howToHintSeenProvider, which reads
@@ -428,6 +434,210 @@ void main() {
       expect(find.byType(SnackBar), findsOneWidget);
       expect(find.textContaining('Error:'), findsOneWidget);
       expect(find.byType(AlertDialog), findsOneWidget);
+    },
+  );
+
+  // --- Event member management via home long-press (#483) ---
+
+  testWidgets(
+    'owner long-press sheet includes Manage members when role allows (#483)',
+    (tester) async {
+      final user = User()
+        ..id = 1
+        ..username = 'creator';
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => [_ownedEvent()]),
+            myEventRoleProvider(42).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canManageEditors = true
+                ..canTransferCreator = true,
+            ),
+            apiClientProvider.overrideWithValue(
+              ApiClient(
+                ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+                client: MockClient((_) async => http.Response('[]', 200)),
+              ),
+            ),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Owned Fest'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Name'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+      expect(find.byKey(const Key('manage_members_action')), findsOneWidget);
+      expect(find.text('Manage members'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'editor (non-owner) long-press shows Manage members only (#483)',
+    (tester) async {
+      final user = User()
+        ..id = 1
+        ..username = 'editor';
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => [_otherEvent()]),
+            myEventRoleProvider(7).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canManageEditors = true
+                ..canTransferCreator = false,
+            ),
+            apiClientProvider.overrideWithValue(
+              ApiClient(
+                ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+                client: MockClient((_) async => http.Response('[]', 200)),
+              ),
+            ),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Other Fest'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('manage_members_action')), findsOneWidget);
+      expect(find.text('Manage members'), findsOneWidget);
+      expect(find.text('Edit Name'), findsNothing);
+      expect(find.text('Delete'), findsNothing);
+    },
+  );
+
+  testWidgets('plain viewer has no long-press manage entry (#483)', (
+    tester,
+  ) async {
+    final user = User()
+      ..id = 1
+      ..username = 'viewer';
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(user)),
+          eventsProvider.overrideWith((ref) async => [_otherEvent()]),
+          myEventRoleProvider(7).overrideWith(
+            (ref) async => MyEventRoleResponse()
+              ..canManageEditors = false
+              ..canTransferCreator = false,
+          ),
+          apiClientProvider.overrideWithValue(
+            ApiClient(
+              ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+              client: MockClient((_) async => http.Response('[]', 200)),
+            ),
+          ),
+        ],
+        child: _localized(const HomeScreen(), locale: const Locale('en')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Long-press is attached for signed-in users but resolves role lazily and
+    // no-ops for viewers (no sheet / manage tile that would 403) (#483).
+    await tester.longPress(find.text('Other Fest'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('manage_members_action')), findsNothing);
+    expect(find.text('Manage members'), findsNothing);
+    expect(find.text('Edit Name'), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+  });
+
+  testWidgets(
+    'Transfer creator requires confirmation before PUT from home (#442/#483)',
+    (tester) async {
+      var putCount = 0;
+      final user = User()
+        ..id = 1
+        ..username = 'creator';
+      final client = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: MockClient((request) async {
+          final path = request.url.path;
+          if (request.method == 'GET' && path == '/api/v1/events/42/members') {
+            return http.Response(
+              jsonEncode({
+                'members': [
+                  {'userId': 1, 'role': 'creator', 'username': 'me'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.method == 'GET' && path == '/api/v1/users') {
+            return http.Response(
+              jsonEncode([
+                {'id': 1, 'username': 'me'},
+                {'id': 9, 'username': 'alice'},
+              ]),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.method == 'PUT' && path == '/api/v1/events/42/creator') {
+            putCount++;
+            return http.Response('{}', 200);
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => [_ownedEvent()]),
+            myEventRoleProvider(42).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canManageEditors = true
+                ..canTransferCreator = true,
+            ),
+            apiClientProvider.overrideWithValue(client),
+          ],
+          child: _localized(const HomeScreen(), locale: const Locale('en')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Owned Fest'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('manage_members_action')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage members'), findsOneWidget);
+      await tester.tap(find.text('Transfer creator'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Transfer event creator'), findsOneWidget);
+      await tester.tap(find.text('alice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Transfer event creator?'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(putCount, 0);
+
+      await tester.tap(find.text('Transfer creator'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('alice'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transfer'));
+      await tester.pumpAndSettle();
+      expect(putCount, 1);
     },
   );
 }

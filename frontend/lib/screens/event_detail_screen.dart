@@ -9,6 +9,7 @@ import '../utils/group_display.dart';
 import '../utils/image_helper.dart';
 import '../widgets/export_inventory_dialog.dart';
 import '../widgets/how_to_trade.dart';
+import '../widgets/manage_event_members_dialog.dart';
 import 'add_merch_screen.dart';
 
 enum ViewMode { detailed, grid, list }
@@ -138,22 +139,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return merchAsync.when(
       data: (merch) {
         if (merch.isEmpty) {
-          // #464: Manage Members lives bottom-left (not AppBar), same as the
-          // populated layout. Empty catalog still needs creator/editor access.
+          // #483: event member management lives on Home long-press, not here.
           return Scaffold(
             appBar: AppBar(),
-            body: Stack(
-              children: [
-                _buildEmptyState(context, ref),
-                if (_buildManageMembersButton(context, role)
-                    case final manageBtn?)
-                  Positioned(
-                    left: 16,
-                    bottom: 16 + MediaQuery.paddingOf(context).bottom,
-                    child: manageBtn,
-                  ),
-              ],
-            ),
+            body: _buildEmptyState(context, ref),
             floatingActionButton: _buildAddMerchFab(context),
           );
         }
@@ -786,20 +775,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     ),
                   ],
                 ),
-                // Bottom-left controls (#128 / #464): Group info (everyone) +
+                // Bottom-left controls (#128 / #443): Group info (everyone) +
                 // Edit group (creator / event or group canEditGroup, #425/#443)
-                // + Manage group members (group-scoped, #443) + Manage event
-                // members (canManageEditors / canTransferCreator, #442).
+                // + Manage group members (group-scoped, #443). Event-scoped
+                // member management is Home event-card long-press (#483).
                 Positioned(
                   left: 16,
                   bottom: 16 + MediaQuery.paddingOf(context).bottom,
                   child: Builder(
                     builder: (context) {
                       final tabCtrl = DefaultTabController.of(context);
-                      final manageBtn = _buildManageMembersButton(
-                        context,
-                        role,
-                      );
                       return AnimatedBuilder(
                         animation: tabCtrl,
                         builder: (context, _) {
@@ -875,8 +860,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                               ],
                               // Group-scoped (#443); depends on active tab.
                               ?manageGroupBtn,
-                              // Event-scoped (#442); independent of active tab.
-                              ?manageBtn,
                             ],
                           );
                         },
@@ -926,26 +909,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  /// Bottom-left control for self-service **event** member management
-  /// (#442, #464). Visible when the caller can manage editors and/or
-  /// transfer event creator. Returns null when the control should be hidden.
-  Widget? _buildManageMembersButton(
-    BuildContext context,
-    MyEventRoleResponse? role,
-  ) {
-    if (role == null) return null;
-    final canManage = role.canManageEditors || role.canTransferCreator;
-    if (!canManage) return null;
-    final l10n = AppLocalizations.of(context)!;
-    return IconButton(
-      key: const Key('manage_members_button'),
-      icon: const Icon(Icons.manage_accounts),
-      tooltip: l10n.manageMembers,
-      iconSize: 24,
-      onPressed: () => _showManageMembersDialog(context, role),
-    );
-  }
-
   /// Bottom-left control for self-service **group** member management (#443).
   /// Visible when the caller can manage group editors and/or transfer group
   /// creator on the active tab. Hidden for the synthetic "Other items" bucket.
@@ -965,214 +928,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       tooltip: l10n.manageGroupMembers,
       iconSize: 24,
       onPressed: () => _showManageGroupMembersDialog(context, groupName, role),
-    );
-  }
-
-  Future<void> _showManageMembersDialog(
-    BuildContext context,
-    MyEventRoleResponse role,
-  ) async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-    final l10n = AppLocalizations.of(context)!;
-    final events = ref.read(eventsControllerProvider.notifier);
-
-    Future<List<EventMemberInfo>> loadMembers() =>
-        events.listEventMembers(widget.eventId, user.id);
-
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: Text(l10n.manageMembers),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 400,
-                child: FutureBuilder<List<EventMemberInfo>>(
-                  future: loadMembers(),
-                  builder: (context, snap) {
-                    if (snap.connectionState != ConnectionState.done) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snap.hasError) {
-                      return Text(l10n.errorPrefix(snap.error.toString()));
-                    }
-                    final members = snap.data ?? [];
-                    final creatorId = members
-                        .where((m) => m.role == 'creator')
-                        .map((m) => m.userId)
-                        .firstOrNull;
-
-                    Future<void> runAction(
-                      Future<void> Function() action,
-                      String successLabel, {
-                      bool closeOnSuccess = false,
-                    }) async {
-                      try {
-                        await action();
-                        ref.invalidate(myEventRoleProvider(widget.eventId));
-                        if (closeOnSuccess && dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        } else {
-                          setDialogState(() {});
-                        }
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(successLabel)));
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(l10n.errorPrefix(e.toString())),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                          );
-                        }
-                      }
-                    }
-
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: members.isEmpty
-                              ? Center(child: Text(l10n.noMembers))
-                              : ListView.builder(
-                                  itemCount: members.length,
-                                  itemBuilder: (context, index) {
-                                    final m = members[index];
-                                    final label =
-                                        m.username != null &&
-                                            m.username!.isNotEmpty
-                                        ? '${m.username} (${m.userId})'
-                                        : 'ID ${m.userId}';
-                                    final roleLabel = m.role == 'creator'
-                                        ? l10n.roleCreator
-                                        : m.role == 'editor'
-                                        ? l10n.roleEditor
-                                        : m.role;
-                                    return ListTile(
-                                      title: Text(label),
-                                      subtitle: Text(roleLabel),
-                                      trailing:
-                                          role.canManageEditors &&
-                                              m.role == 'editor'
-                                          ? IconButton(
-                                              icon: const Icon(
-                                                Icons.remove_circle_outline,
-                                                color: Colors.red,
-                                              ),
-                                              tooltip: l10n.removeEditor,
-                                              onPressed: () => runAction(
-                                                () => events.revokeEventEditor(
-                                                  widget.eventId,
-                                                  m.userId,
-                                                  user.id,
-                                                ),
-                                                l10n.editorRemoved,
-                                              ),
-                                            )
-                                          : null,
-                                    );
-                                  },
-                                ),
-                        ),
-                        const Divider(),
-                        if (role.canManageEditors)
-                          ListTile(
-                            leading: const Icon(Icons.person_add_alt_1),
-                            title: Text(l10n.addEditor),
-                            onTap: () async {
-                              final selected = await _pickUser(
-                                dialogContext,
-                                ref,
-                                title: l10n.pickEditorTitle,
-                                excludeUserIds: members
-                                    .map((m) => m.userId)
-                                    .toSet(),
-                              );
-                              if (selected == null) return;
-                              await runAction(
-                                () => events.assignEventEditor(
-                                  widget.eventId,
-                                  selected.id,
-                                  user.id,
-                                ),
-                                l10n.editorAssigned,
-                              );
-                            },
-                          ),
-                        if (role.canTransferCreator)
-                          ListTile(
-                            leading: const Icon(Icons.swap_horiz),
-                            title: Text(l10n.transferCreator),
-                            onTap: () async {
-                              final selected = await _pickUser(
-                                dialogContext,
-                                ref,
-                                title: l10n.pickTransferCreatorTitle,
-                                excludeUserIds: {?creatorId},
-                              );
-                              if (selected == null) return;
-                              // Irreversible: confirm before PUT (#442 pr-review).
-                              if (!dialogContext.mounted) return;
-                              final confirmed = await showDialog<bool>(
-                                context: dialogContext,
-                                builder: (ctx) => AlertDialog(
-                                  title: Text(l10n.confirmTransferCreatorTitle),
-                                  content: Text(
-                                    l10n.confirmTransferCreatorBody(
-                                      selected.username,
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(ctx, false),
-                                      child: Text(l10n.cancel),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: Text(
-                                        l10n.confirmTransferCreatorAction,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirmed != true) return;
-                              await runAction(
-                                () => events.transferEventCreator(
-                                  widget.eventId,
-                                  user.id,
-                                  selected.id,
-                                ),
-                                l10n.creatorTransferred,
-                                closeOnSuccess: true,
-                              );
-                            },
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(l10n.cancel),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 
@@ -1305,7 +1060,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             leading: const Icon(Icons.person_add_alt_1),
                             title: Text(l10n.addEditor),
                             onTap: () async {
-                              final selected = await _pickUser(
+                              final selected = await pickUserFromDirectory(
                                 dialogContext,
                                 ref,
                                 title: l10n.pickGroupEditorTitle,
@@ -1330,7 +1085,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                             leading: const Icon(Icons.swap_horiz),
                             title: Text(l10n.transferCreator),
                             onTap: () async {
-                              final selected = await _pickUser(
+                              final selected = await pickUserFromDirectory(
                                 dialogContext,
                                 ref,
                                 title: l10n.pickTransferGroupCreatorTitle,
@@ -2787,84 +2542,4 @@ class _EditMerchDialogState extends ConsumerState<_EditMerchDialog> {
       ],
     );
   }
-}
-
-/// Shared user picker for self-service event member management (#442).
-Future<User?> _pickUser(
-  BuildContext context,
-  WidgetRef ref, {
-  required String title,
-  Set<int> excludeUserIds = const {},
-}) async {
-  final l10n = AppLocalizations.of(context)!;
-  final users = await ref.read(usersDirectoryProvider.future);
-  final candidates =
-      users
-          .where((u) => !excludeUserIds.contains(u.id))
-          .where((u) => !(u.hasIsBanned() && u.isBanned))
-          .toList()
-        ..sort((a, b) => a.username.compareTo(b.username));
-
-  if (!context.mounted) return null;
-  return showDialog<User>(
-    context: context,
-    builder: (context) {
-      var filter = '';
-      return StatefulBuilder(
-        builder: (context, setState) {
-          final filtered = filter.isEmpty
-              ? candidates
-              : candidates
-                    .where(
-                      (u) =>
-                          u.username.toLowerCase().contains(
-                            filter.toLowerCase(),
-                          ) ||
-                          '${u.id}'.contains(filter),
-                    )
-                    .toList();
-          return AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 360,
-              child: Column(
-                children: [
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: l10n.searchUsersHint,
-                      prefixIcon: const Icon(Icons.search),
-                    ),
-                    onChanged: (v) => setState(() => filter = v),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: filtered.isEmpty
-                        ? Center(child: Text(l10n.noUsersFound))
-                        : ListView.builder(
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final u = filtered[index];
-                              return ListTile(
-                                title: Text(u.username),
-                                subtitle: Text('ID: ${u.id}'),
-                                onTap: () => Navigator.pop(context, u),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(l10n.cancel),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
 }
