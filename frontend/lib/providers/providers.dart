@@ -428,7 +428,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// List group members via the public path (#443). Requires group.member.manage.
-  Future<List<EventMemberInfo>> listGroupMembers(
+  Future<List<GroupMemberInfo>> listGroupMembers(
     int eventId,
     String groupName,
     int userId,
@@ -439,7 +439,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     );
     final members = (json as Map<String, dynamic>)['members'] as List? ?? [];
     return members
-        .map((e) => EventMemberInfo.fromJson(e as Map<String, dynamic>))
+        .map((e) => GroupMemberInfo.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -967,7 +967,8 @@ class AdminGroup {
   );
 }
 
-/// Event-scoped member row from list members APIs (#432).
+/// Scoped member row from event (#432) or group (#443) list-members APIs.
+/// Shape is identical across scopes (`userId`, `role`, optional `username`).
 class EventMemberInfo {
   const EventMemberInfo({
     required this.userId,
@@ -986,6 +987,9 @@ class EventMemberInfo {
         username: json['username'] as String?,
       );
 }
+
+/// Alias for group member rows (#443); same wire shape as [EventMemberInfo].
+typedef GroupMemberInfo = EventMemberInfo;
 
 final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
   final client = ref.watch(apiClientProvider);

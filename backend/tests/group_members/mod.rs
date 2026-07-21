@@ -160,6 +160,20 @@ async fn test_group_member_assign_permission_boundary(pool: PgPool) {
         }
     };
 
+    // Event-scoped editor is not a group editor (#443 product rule).
+    let event_editor = login_guest(&pool, "gmem-bound-ev-ed", "tok").await;
+    assign_event_role(&pool, event_editor, event_id, "editor").await;
+    assert_eq!(assign(event_editor).await.status(), StatusCode::FORBIDDEN);
+    let list_as_event_editor = get_request(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/groups/Cards/members?user_id={}",
+            event_id, event_editor
+        ),
+    )
+    .await;
+    assert_eq!(list_as_event_editor.status(), StatusCode::FORBIDDEN);
+
     // Plain user and global moderator are denied (no *.any for group.member.manage).
     assert_eq!(assign(plain).await.status(), StatusCode::FORBIDDEN);
     assert_eq!(assign(moderator).await.status(), StatusCode::FORBIDDEN);

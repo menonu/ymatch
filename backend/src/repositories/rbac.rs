@@ -478,20 +478,6 @@ impl RbacRepository {
         .await?;
         Ok(row.map(|(name,)| name))
     }
-
-    /// Drop all group-scoped `user_roles` for `group_id` (used when a group is
-    /// hard-deleted so orphaned assignments do not linger — `scope_id` has no FK).
-    pub async fn revoke_all_group_roles(
-        &self,
-        exec: &mut PgConnection,
-        group_id: i32,
-    ) -> Result<(), AppError> {
-        sqlx::query("DELETE FROM user_roles WHERE scope_type = 'group' AND scope_id = $1")
-            .bind(group_id)
-            .execute(&mut *exec)
-            .await?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]

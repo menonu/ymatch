@@ -1186,7 +1186,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final l10n = AppLocalizations.of(context)!;
     final events = ref.read(eventsControllerProvider.notifier);
 
-    Future<List<EventMemberInfo>> loadMembers() =>
+    Future<List<GroupMemberInfo>> loadMembers() =>
         events.listGroupMembers(widget.eventId, groupName, user.id);
 
     if (!context.mounted) return;
@@ -1200,7 +1200,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               content: SizedBox(
                 width: double.maxFinite,
                 height: 400,
-                child: FutureBuilder<List<EventMemberInfo>>(
+                child: FutureBuilder<List<GroupMemberInfo>>(
                   future: loadMembers(),
                   builder: (context, snap) {
                     if (snap.connectionState != ConnectionState.done) {

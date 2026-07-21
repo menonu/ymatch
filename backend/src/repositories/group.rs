@@ -192,6 +192,8 @@ impl MerchandiseGroupRepository {
         .execute(&mut *tx)
         .await?;
         // Orphan cleanup for group-scoped RBAC (#443); no FK on scope_id.
+        // Kept inline (same SQL as RbacRepository::revoke_all_group_roles) so
+        // group delete does not need an RbacRepository dependency.
         sqlx::query("DELETE FROM user_roles WHERE scope_type = 'group' AND scope_id = $1")
             .bind(group_id)
             .execute(&mut *tx)
@@ -265,12 +267,26 @@ impl MerchandiseGroupRepository {
         Ok(group_from_row(&row))
     }
 
-    /// Upsert a group row (pool-based convenience for callers that do not need
-    /// a surrounding transaction). Prefer the handler path that uses
-    /// [`Self::create_in_tx`] + `group/creator` assignment (#443).
+    /// Upsert a group row and ensure `group/creator` for the row's
+    /// `created_by` (#443). Prefer the handler path that uses
+    /// [`Self::create_in_tx`] + `RbacRepository::assign_group_creator` when
+    /// the role assignment must share an existing transaction.
     pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
         let mut tx = self.pool.begin().await?;
         let group = self.create_in_tx(&mut tx, &req).await?;
+        if let Some(creator_id) = group.created_by {
+            sqlx::query(
+                r#"INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+                   SELECT $1, r.id, 'group', $2
+                   FROM roles r
+                   WHERE r.scope_type = 'group' AND r.name = 'creator'
+                   ON CONFLICT (user_id, role_id, scope_id) DO NOTHING"#,
+            )
+            .bind(creator_id)
+            .bind(group.id)
+            .execute(&mut *tx)
+            .await?;
+        }
         tx.commit().await?;
         Ok(group)
     }
