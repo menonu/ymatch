@@ -41,8 +41,9 @@ used throughout this document.
 | Identifier | File | Description |
 |-----------|------|-------------|
 | `LoginScreen` | `screens/login_screen.dart` | Guest registration, account restore, backend error display |
-| `HomeScreen` | `screens/home_screen.dart` | Event list with search, filters, favorites, sort |
-| `EventDetailScreen` | `screens/event_detail_screen.dart` | Merchandise list per event with inventory management; AppBar event-name long-press for event members (#442, #483); bottom-left group info / edit group / manage group members (#128, #425, #443) |
+| `HomeScreen` | `screens/home_screen.dart` | Event list with search, filters, favorites, sort; long-press for rename/delete (owner) and Manage members (#483) |
+| `EventDetailScreen` | `screens/event_detail_screen.dart` | Merchandise list per event with inventory management; bottom-left group info / edit group / manage group members (#128, #425, #443). Event members: Home long-press (#483) |
+| `ManageEventMembersDialog` | `widgets/manage_event_members_dialog.dart` | Self-service event members dialog (list / add / remove editor / transfer); opened from Home event-card long-press (#442, #483) |
 | `AddMerchScreen` | `screens/add_merch_screen.dart` | New merchandise form with group selection, image picker |
 | `TradeListScreen` | `screens/trade_list_screen.dart` | Trade matches across 5 status tabs |
 | `ChatScreen` | `screens/chat_screen.dart` | Messaging within a trade match |

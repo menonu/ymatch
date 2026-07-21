@@ -66,17 +66,18 @@ BottomNavBar
   - Participant count, view count, created date
   - Favorite star toggle
 - **FAB**: "New Event" — opens name dialog
-- **Long-press (owner only)**: Bottom sheet with "Edit Name" / "Delete"
+- **Long-press** (gated; no dead control for plain viewers):
+  - **Owner** (`creator_id == user`): "Edit Name" / "Delete"
+  - **Event members** when `canManageEditors` / `canTransferCreator` from `my-role` (#442, #483): "Manage members" → same dialog as before (list / add / remove editor / transfer creator)
+  - Non-owner editors with manage flags get Manage members only (no rename/delete)
 - **Empty state**: Centered icon + "Create Event" button
 
 ### EventDetailScreen
 
-- **AppBar**: Event name (title), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
+- **AppBar**: Search bar (items), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
   - Inventory display: Just Own / Wish & For Trade / Just For Trade / All (#472)
   - View mode: Detailed / Grid / Compact List
   - Overflow: Want All Missing / Export inventory
-  - **Long-press event name** — opens event Manage Members when `canManageEditors` / `canTransferCreator` (#442, #483); viewers see the name only (no dead control)
-- **Search bar**: Item search below AppBar (moved out of title so the event name can own long-press, #483)
 - **TabBar**: Dynamic scrollable tabs per merchandise group, each with favorite star
 - **Filter Bar**: `SegmentedButton` — All, Own, Wish, For Trade, Missing (#472)
 - **Content**: `TabBarView` with per-group content in selected view mode:
@@ -87,7 +88,7 @@ BottomNavBar
   - Group info (everyone) — toggles description panel (#128)
   - Edit Group — group creator or `canEditGroup` (#425)
   - Manage group members — group `canManageEditors` / `canTransferCreator` on active tab (#443); stays bottom-left
-  - Event member management is **not** here — use AppBar event-name long-press (#483; formerly bottom-left #464)
+  - Event member management is **not** here — use Home event-card long-press (#483; formerly bottom-left #464)
 - **FAB**: "Add Merch" — opens `AddMerchScreen`
 - **Long-press merch (owner only)**: Bottom sheet with "Edit Name" / "Delete"
 
