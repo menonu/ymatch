@@ -544,3 +544,47 @@ pub struct MyEventRoleResponse {
     #[prost(bool, tag = "6")]
     pub can_transfer_creator: bool,
 }
+/// Group-member API (#443): group-scoped role assignments for a merchandise
+/// group. `role` is "creator" or "editor". Used by
+/// GET /api/v1/events/:id/groups/:group_name/members.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GroupMember {
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    /// "creator" or "editor"
+    #[prost(string, tag = "2")]
+    pub role: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "3")]
+    pub username: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListGroupMembersResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub members: ::prost::alloc::vec::Vec<GroupMember>,
+}
+/// Current-user group-role API (#443): the caller's standing on a single item
+/// group. Accessible to any active caller (no 403 for a plain viewer) so the
+/// frontend can gate the Manage Group Members control without a 403 on open.
+/// `can_manage_editors` / `can_transfer_creator` / `can_edit_group` mirror the
+/// exact backend decisions (RBAC or ownership).
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MyGroupRoleResponse {
+    /// group-scoped membership: "creator", "editor", or "none"
+    #[prost(string, tag = "1")]
+    pub role: ::prost::alloc::string::String,
+    /// a global admin/moderator role is in effect
+    #[prost(bool, tag = "2")]
+    pub global_override: bool,
+    /// caller may edit this group's metadata
+    #[prost(bool, tag = "3")]
+    pub can_edit_group: bool,
+    /// caller may list/assign/revoke group editors
+    #[prost(bool, tag = "4")]
+    pub can_manage_editors: bool,
+    /// caller is the current group creator (ownership)
+    #[prost(bool, tag = "5")]
+    pub can_transfer_creator: bool,
+}

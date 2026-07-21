@@ -231,6 +231,12 @@
   "pickEditorTitle": "イベント編集者を追加",
   "roleCreator": "作成者",
   "roleEditor": "編集者",
+  "manageGroupMembers": "グループメンバー管理",
+  "groupCreatorTransferred": "グループ作成者を更新しました",
+  "pickTransferGroupCreatorTitle": "グループ作成者を譲渡",
+  "confirmTransferGroupCreatorTitle": "グループ作成者を譲渡しますか？",
+  "confirmTransferGroupCreatorBody": "{username} にグループ所有権を譲渡しますか？このグループの作成者権限を失います。この操作は取り消せません。",
+  "pickGroupEditorTitle": "グループ編集者を追加",
 
   "mapPickerTitle": "場所を選択",
   "mapSearchHint": "場所や住所を検索",

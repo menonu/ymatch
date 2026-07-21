@@ -1014,6 +1014,37 @@
     "description": "Event-scoped role label for editor in member list (#442)"
   },
 
+  "manageGroupMembers": "Manage group members",
+  "@manageGroupMembers": {
+    "description": "Tooltip / dialog title for item-group creator/editor self-service member UI (#443)"
+  },
+  "groupCreatorTransferred": "Group creator updated",
+  "@groupCreatorTransferred": {
+    "description": "SnackBar after successful self-service group creator transfer (#443)"
+  },
+  "pickTransferGroupCreatorTitle": "Transfer group creator",
+  "@pickTransferGroupCreatorTitle": {
+    "description": "User picker title when transferring group ownership (#443)"
+  },
+  "confirmTransferGroupCreatorTitle": "Transfer group creator?",
+  "@confirmTransferGroupCreatorTitle": {
+    "description": "Confirmation dialog title before irreversible group creator transfer (#443)"
+  },
+  "confirmTransferGroupCreatorBody": "Transfer group ownership to {username}? You will lose creator privileges on this group. This cannot be undone.",
+  "@confirmTransferGroupCreatorBody": {
+    "description": "Confirmation dialog body for self-service group creator transfer (#443)",
+    "placeholders": {
+      "username": {
+        "type": "String",
+        "example": "alice"
+      }
+    }
+  },
+  "pickGroupEditorTitle": "Add group editor",
+  "@pickGroupEditorTitle": {
+    "description": "User picker title when assigning a group editor (#443)"
+  },
+
   "mapPickerTitle": "Pick location",
   "@mapPickerTitle": {
     "description": "App bar title on the chat map location picker (#448)"

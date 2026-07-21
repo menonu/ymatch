@@ -505,6 +505,182 @@ void main() {
     },
   );
 
+  // --- Group-scoped member management (#443) ---
+
+  testWidgets(
+    'Manage group members button shown when canManageEditors on group (#443)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [_testGroup(name: 'Pens', createdBy: 1)],
+            ),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()
+                ..canCreateMerch = true
+                ..canManageEditors = false
+                ..canTransferCreator = false,
+            ),
+            myGroupRoleProvider((eventId: 5, groupName: 'Pens')).overrideWith(
+              (ref) async => MyGroupRoleResponse()
+                ..role = 'editor'
+                ..canEditGroup = true
+                ..canManageEditors = true
+                ..canTransferCreator = false,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('manage_group_members_button')),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Manage group members'), findsOneWidget);
+      // Event-scoped manage remains hidden for this caller.
+      expect(find.byKey(const Key('manage_members_button')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Manage group members button shown when canTransferCreator on group (#443)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [_testGroup(name: 'Pens', createdBy: 1)],
+            ),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()..canCreateMerch = true,
+            ),
+            myGroupRoleProvider((eventId: 5, groupName: 'Pens')).overrideWith(
+              (ref) async => MyGroupRoleResponse()
+                ..role = 'creator'
+                ..canEditGroup = true
+                ..canManageEditors = true
+                ..canTransferCreator = true,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('manage_group_members_button')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('Manage group members button hidden for plain viewer (#443)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 2)]),
+          eventGroupsProvider(5).overrideWith(
+            (ref) async => [_testGroup(name: 'Pens', createdBy: 2)],
+          ),
+          myEventRoleProvider(5).overrideWith(
+            (ref) async => MyEventRoleResponse()..canCreateMerch = false,
+          ),
+          myGroupRoleProvider((eventId: 5, groupName: 'Pens')).overrideWith(
+            (ref) async => MyGroupRoleResponse()
+              ..role = 'none'
+              ..canEditGroup = false
+              ..canManageEditors = false
+              ..canTransferCreator = false,
+          ),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('manage_group_members_button')), findsNothing);
+  });
+
+  testWidgets(
+    'Group editor can open manage dialog without transfer action (#443)',
+    (tester) async {
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final client = ApiClient(
+        config,
+        client: MockClient((request) async {
+          final path = request.url.path;
+          if (request.method == 'GET' &&
+              path == '/api/v1/events/5/groups/Pens/members') {
+            return http.Response(
+              jsonEncode({
+                'members': [
+                  {'userId': 2, 'role': 'creator', 'username': 'owner'},
+                  {'userId': 1, 'role': 'editor', 'username': 'me'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => client),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 2)]),
+            eventGroupsProvider(5).overrideWith(
+              (ref) async => [_testGroup(name: 'Pens', createdBy: 2)],
+            ),
+            myEventRoleProvider(5).overrideWith(
+              (ref) async => MyEventRoleResponse()..canCreateMerch = false,
+            ),
+            myGroupRoleProvider((eventId: 5, groupName: 'Pens')).overrideWith(
+              (ref) async => MyGroupRoleResponse()
+                ..role = 'editor'
+                ..canEditGroup = true
+                ..canManageEditors = true
+                ..canTransferCreator = false,
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('manage_group_members_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage group members'), findsOneWidget);
+      expect(find.text('Add editor'), findsOneWidget);
+      // Editor cannot transfer creator.
+      expect(find.text('Transfer creator'), findsNothing);
+    },
+  );
+
   // --- Group description UI (#128) ---
 
   testWidgets(

@@ -1370,3 +1370,81 @@ final $typed_data.Uint8List myEventRoleResponseDescriptor = $convert.base64Decod
     'YW5DcmVhdGVNZXJjaBIkCg5jYW5fZWRpdF9ncm91cBgEIAEoCFIMY2FuRWRpdEdyb3VwEiwKEm'
     'Nhbl9tYW5hZ2VfZWRpdG9ycxgFIAEoCFIQY2FuTWFuYWdlRWRpdG9ycxIwChRjYW5fdHJhbnNm'
     'ZXJfY3JlYXRvchgGIAEoCFISY2FuVHJhbnNmZXJDcmVhdG9y');
+
+@$core.Deprecated('Use groupMemberDescriptor instead')
+const GroupMember$json = {
+  '1': 'GroupMember',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 5, '10': 'userId'},
+    {'1': 'role', '3': 2, '4': 1, '5': 9, '10': 'role'},
+    {
+      '1': 'username',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'username',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_username'},
+  ],
+};
+
+/// Descriptor for `GroupMember`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List groupMemberDescriptor = $convert.base64Decode(
+    'CgtHcm91cE1lbWJlchIXCgd1c2VyX2lkGAEgASgFUgZ1c2VySWQSEgoEcm9sZRgCIAEoCVIEcm'
+    '9sZRIfCgh1c2VybmFtZRgDIAEoCUgAUgh1c2VybmFtZYgBAUILCglfdXNlcm5hbWU=');
+
+@$core.Deprecated('Use listGroupMembersResponseDescriptor instead')
+const ListGroupMembersResponse$json = {
+  '1': 'ListGroupMembersResponse',
+  '2': [
+    {
+      '1': 'members',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.ymatch.GroupMember',
+      '10': 'members'
+    },
+  ],
+};
+
+/// Descriptor for `ListGroupMembersResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listGroupMembersResponseDescriptor =
+    $convert.base64Decode(
+        'ChhMaXN0R3JvdXBNZW1iZXJzUmVzcG9uc2USLQoHbWVtYmVycxgBIAMoCzITLnltYXRjaC5Hcm'
+        '91cE1lbWJlclIHbWVtYmVycw==');
+
+@$core.Deprecated('Use myGroupRoleResponseDescriptor instead')
+const MyGroupRoleResponse$json = {
+  '1': 'MyGroupRoleResponse',
+  '2': [
+    {'1': 'role', '3': 1, '4': 1, '5': 9, '10': 'role'},
+    {'1': 'global_override', '3': 2, '4': 1, '5': 8, '10': 'globalOverride'},
+    {'1': 'can_edit_group', '3': 3, '4': 1, '5': 8, '10': 'canEditGroup'},
+    {
+      '1': 'can_manage_editors',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '10': 'canManageEditors'
+    },
+    {
+      '1': 'can_transfer_creator',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '10': 'canTransferCreator'
+    },
+  ],
+};
+
+/// Descriptor for `MyGroupRoleResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List myGroupRoleResponseDescriptor = $convert.base64Decode(
+    'ChNNeUdyb3VwUm9sZVJlc3BvbnNlEhIKBHJvbGUYASABKAlSBHJvbGUSJwoPZ2xvYmFsX292ZX'
+    'JyaWRlGAIgASgIUg5nbG9iYWxPdmVycmlkZRIkCg5jYW5fZWRpdF9ncm91cBgDIAEoCFIMY2Fu'
+    'RWRpdEdyb3VwEiwKEmNhbl9tYW5hZ2VfZWRpdG9ycxgEIAEoCFIQY2FuTWFuYWdlRWRpdG9ycx'
+    'IwChRjYW5fdHJhbnNmZXJfY3JlYXRvchgFIAEoCFISY2FuVHJhbnNmZXJDcmVhdG9y');

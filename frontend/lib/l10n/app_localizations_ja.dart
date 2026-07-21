@@ -718,6 +718,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get roleEditor => '編集者';
 
   @override
+  String get manageGroupMembers => 'グループメンバー管理';
+
+  @override
+  String get groupCreatorTransferred => 'グループ作成者を更新しました';
+
+  @override
+  String get pickTransferGroupCreatorTitle => 'グループ作成者を譲渡';
+
+  @override
+  String get confirmTransferGroupCreatorTitle => 'グループ作成者を譲渡しますか？';
+
+  @override
+  String confirmTransferGroupCreatorBody(String username) {
+    return '$username にグループ所有権を譲渡しますか？このグループの作成者権限を失います。この操作は取り消せません。';
+  }
+
+  @override
+  String get pickGroupEditorTitle => 'グループ編集者を追加';
+
+  @override
   String get mapPickerTitle => '場所を選択';
 
   @override

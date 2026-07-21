@@ -427,6 +427,85 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// List group members via the public path (#443). Requires group.member.manage.
+  Future<List<GroupMemberInfo>> listGroupMembers(
+    int eventId,
+    String groupName,
+    int userId,
+  ) async {
+    final encoded = Uri.encodeComponent(groupName);
+    final json = await client.get(
+      '/api/v1/events/$eventId/groups/$encoded/members?user_id=$userId',
+    );
+    final members = (json as Map<String, dynamic>)['members'] as List? ?? [];
+    return members
+        .map((e) => GroupMemberInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Assign group editor via the public path (#443).
+  Future<void> assignGroupEditor(
+    int eventId,
+    String groupName,
+    int targetUserId,
+    int userId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final encoded = Uri.encodeComponent(groupName);
+      await client.post(
+        '/api/v1/events/$eventId/groups/$encoded/members/$targetUserId?user_id=$userId',
+        {},
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Revoke group editor via the public path (#443). Never removes creator.
+  Future<void> revokeGroupEditor(
+    int eventId,
+    String groupName,
+    int targetUserId,
+    int userId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final encoded = Uri.encodeComponent(groupName);
+      await client.delete(
+        '/api/v1/events/$eventId/groups/$encoded/members/$targetUserId?user_id=$userId',
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Self-service group creator transfer
+  /// (`PUT /events/:id/groups/:name/creator`, #443).
+  Future<void> transferGroupCreator(
+    int eventId,
+    String groupName,
+    int userId,
+    int newCreatorId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final encoded = Uri.encodeComponent(groupName);
+      await client.put(
+        '/api/v1/events/$eventId/groups/$encoded/creator?user_id=$userId',
+        {'newCreatorId': newCreatorId},
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
   Future<void> generateDebugData(int creatorId) async {
     state = const AsyncValue.loading();
     try {
@@ -523,6 +602,30 @@ final myEventRoleProvider = FutureProvider.autoDispose
         );
         if (json is! Map<String, dynamic>) return null;
         return MyEventRoleResponse()..mergeFromProto3Json(json);
+      } catch (_) {
+        return null;
+      }
+    });
+
+/// Caller's standing on a single item group (#443). Key is `(eventId, groupName)`.
+/// Returns null when not logged in, synthetic/missing group, or fetch fails —
+/// gated UI stays hidden (backend 403 is the defense-in-depth backstop).
+final myGroupRoleProvider = FutureProvider.autoDispose
+    .family<MyGroupRoleResponse?, ({int eventId, String groupName})>((
+      ref,
+      key,
+    ) async {
+      final user = ref.watch(currentUserProvider);
+      if (user == null) return null;
+      if (key.groupName.isEmpty) return null;
+      final client = ref.watch(apiClientProvider);
+      try {
+        final encoded = Uri.encodeComponent(key.groupName);
+        final json = await client.get(
+          '/api/v1/events/${key.eventId}/groups/$encoded/my-role?user_id=${user.id}',
+        );
+        if (json is! Map<String, dynamic>) return null;
+        return MyGroupRoleResponse()..mergeFromProto3Json(json);
       } catch (_) {
         return null;
       }
@@ -864,7 +967,8 @@ class AdminGroup {
   );
 }
 
-/// Event-scoped member row from list members APIs (#432).
+/// Scoped member row from event (#432) or group (#443) list-members APIs.
+/// Shape is identical across scopes (`userId`, `role`, optional `username`).
 class EventMemberInfo {
   const EventMemberInfo({
     required this.userId,
@@ -883,6 +987,9 @@ class EventMemberInfo {
         username: json['username'] as String?,
       );
 }
+
+/// Alias for group member rows (#443); same wire shape as [EventMemberInfo].
+typedef GroupMemberInfo = EventMemberInfo;
 
 final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
   final client = ref.watch(apiClientProvider);

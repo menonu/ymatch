@@ -231,6 +231,88 @@ Self-service transfer of event ownership (`events.creator_id` + event-scoped
 - **Errors**: `403` if caller is not the current creator; `400` if already the
   creator or target is banned; `404` if event or target user missing.
 
+### GET /api/v1/events/:id/groups/:group_name/my-role
+
+Report the caller's standing on a single item group (any active user; not gated
+by `group.member.manage`). Used to pre-gate Manage Group Members UI (#443).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+  ```json
+  {
+    "role": "creator",
+    "globalOverride": false,
+    "canEditGroup": true,
+    "canManageEditors": true,
+    "canTransferCreator": true
+  }
+  ```
+- **Notes**:
+  - `canManageEditors` is the exact `group.member.manage` RBAC decision.
+  - `canTransferCreator` is true only when the caller is the current
+    `merchandise_groups.created_by` (ownership; not a permission).
+  - `canEditGroup` is true for ownership, event-scoped `group.edit`, or
+    group-scoped `group.edit`.
+- **Errors**: `404` if the group does not exist.
+
+### GET /api/v1/events/:id/groups/:group_name/members
+
+List group-scoped role assignments (creator + editors) for an item group (#443).
+
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Response**: `200 OK`
+  ```json
+  {
+    "members": [
+      { "userId": 1, "role": "creator", "username": "alice" },
+      { "userId": 2, "role": "editor", "username": "bob" }
+    ]
+  }
+  ```
+- **Permissions**: Group creator or editor (`group.member.manage`), or admin
+  superuser bypass. No `*.any` for moderators.
+- **Errors**: `404` if the group is missing (before 403).
+
+### POST /api/v1/events/:id/groups/:group_name/members/:target_id
+
+Assign the group-scoped `editor` role (idempotent) (#443).
+
+- **Query Parameters**: `user_id` (required) — caller.
+- **Response**: `200 OK`
+- **Permissions**: Same as list group members (`group.member.manage`).
+
+### DELETE /api/v1/events/:id/groups/:group_name/members/:target_id
+
+Revoke the group-scoped `editor` role (idempotent). Never removes the group
+`creator` role (#443).
+
+- **Query Parameters**: `user_id` (required) — caller.
+- **Response**: `200 OK`
+- **Permissions**: Same as list group members (`group.member.manage`).
+
+### PUT /api/v1/events/:id/groups/:group_name/creator
+
+Self-service transfer of group ownership (`merchandise_groups.created_by` +
+group-scoped `creator` role). Does **not** auto-promote the previous creator to
+`editor` (#443). Staff use `PUT /admin/events/:id/groups/:name/creator` instead
+(#432).
+
+- **Query Parameters**: `user_id` (required) — must be the **current** group
+  creator (`created_by`).
+- **Request Body**:
+  ```json
+  { "newCreatorId": 9 }
+  ```
+- **Response**: `200 OK`
+- **Errors**: `403` if caller is not the current creator; `400` if already the
+  creator or target is banned; `404` if group or target user missing.
+
 ### GET /api/v1/user/:id/favorite_groups
 
 List a user's favorite merchandise groups.
@@ -591,7 +673,9 @@ Does **not** auto-promote the previous creator to `editor` (#432).
 
 ### PUT /api/v1/admin/events/:id/groups/:group_name/creator
 
-Transfer item-group ownership (`merchandise_groups.created_by`) (#432).
+Transfer item-group ownership (`merchandise_groups.created_by` + group-scoped
+`creator` role) in one transaction (#432 / #443). Does **not** auto-promote the
+previous creator to `editor`.
 
 - **Query Parameters**:
   | Param     | Type | Description                         |

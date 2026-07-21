@@ -264,8 +264,9 @@ pub async fn transfer_event_creator(
 }
 
 /// Transfer item-group ownership (`PUT /api/v1/admin/events/:id/groups/:name/creator`).
-/// Updates `merchandise_groups.created_by` only — group ownership is a
-/// column short-circuit, not an RBAC role (#432).
+/// Atomically updates `merchandise_groups.created_by` and swaps the
+/// group-scoped `creator` role (#432 / #443). Does **not** auto-promote the
+/// previous creator to `editor`.
 pub async fn transfer_group_creator(
     State(state): State<AppState>,
     Path((event_id, group_name)): Path<(i32, String)>,
@@ -286,13 +287,30 @@ pub async fn transfer_group_creator(
 
     require_active_target_user(&state, payload.new_creator_id).await?;
 
-    if !state
+    let mut tx = state.pool.begin().await?;
+    let locked = state
         .groups
-        .set_creator(event_id, &group_name, payload.new_creator_id)
+        .lock_for_update(&mut *tx, event_id, &group_name)
         .await?
-    {
+        .ok_or_else(|| AppError::not_found("Group not found"))?;
+    let (group_id, locked_previous) = locked;
+
+    if locked_previous == Some(payload.new_creator_id) {
+        return Err(AppError::bad_request("User is already the group creator"));
+    }
+
+    let updated = state
+        .groups
+        .set_creator(&mut *tx, event_id, &group_name, payload.new_creator_id)
+        .await?;
+    if !updated {
         return Err(AppError::not_found("Group not found"));
     }
+    state
+        .rbac
+        .transfer_group_creator_role(&mut tx, group_id, locked_previous, payload.new_creator_id)
+        .await?;
+    tx.commit().await?;
     Ok(StatusCode::OK)
 }
 

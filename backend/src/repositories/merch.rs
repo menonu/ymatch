@@ -153,23 +153,6 @@ impl MerchandiseRepository {
             .ok_or_else(|| AppError::bad_request("group_name is required"))?;
         let status = req.status.as_deref().unwrap_or("published");
 
-        // Auto-upsert: if a group row does not yet exist for
-        // (event_id, group_name), create it with empty description and
-        // created_by = creator_id. If it exists, do nothing (the
-        // description set via NewGroupDialog is preserved).
-        if let Some(creator_id) = req.creator_id {
-            sqlx::query(
-                r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by)
-                   VALUES ($1, $2, '', $3)
-                   ON CONFLICT (event_id, group_name) DO NOTHING"#,
-            )
-            .bind(event_id)
-            .bind(group_name)
-            .bind(creator_id)
-            .execute(&self.pool)
-            .await?;
-        }
-
         // Issue #299: reject a duplicate name within the same (event_id,
         // group_name) among live rows. The partial unique index
         // uq_merchandise_live_name_per_group is the race-condition backstop
@@ -191,6 +174,40 @@ impl MerchandiseRepository {
             )));
         }
 
+        // One transaction for group ensure + group/creator role + merch insert
+        // so #443's ownership/role sync rule cannot leave a partial write.
+        let mut tx = self.pool.begin().await?;
+
+        // Auto-upsert: if a group row does not yet exist for
+        // (event_id, group_name), create it with empty description and
+        // created_by = creator_id. If it exists, do nothing (the
+        // description set via NewGroupDialog is preserved).
+        if let Some(creator_id) = req.creator_id {
+            sqlx::query(
+                r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by)
+                   VALUES ($1, $2, '', $3)
+                   ON CONFLICT (event_id, group_name) DO NOTHING"#,
+            )
+            .bind(event_id)
+            .bind(group_name)
+            .bind(creator_id)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query(
+                r#"INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+                   SELECT mg.created_by, r.id, 'group', mg.id
+                   FROM merchandise_groups mg
+                   JOIN roles r ON r.scope_type = 'group' AND r.name = 'creator'
+                   WHERE mg.event_id = $1 AND mg.group_name = $2
+                     AND mg.created_by IS NOT NULL
+                   ON CONFLICT (user_id, role_id, scope_id) DO NOTHING"#,
+            )
+            .bind(event_id)
+            .bind(group_name)
+            .execute(&mut *tx)
+            .await?;
+        }
+
         let sql = format!(
             r#"INSERT INTO merchandise (event_id, name, photo_url, group_name, creator_id, status)
                VALUES ($1, $2, $3, $4, $5, $6)
@@ -204,7 +221,7 @@ impl MerchandiseRepository {
             .bind(&req.group_name)
             .bind(req.creator_id)
             .bind(status)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await
             .map_err(|e| map_name_conflict(e, &req.name, group_name))?;
 
@@ -215,9 +232,11 @@ impl MerchandiseRepository {
         )
         .bind(event_id)
         .bind(group_name)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .flatten();
+
+        tx.commit().await?;
 
         let mut merch = merch_from_row(&row);
         merch.group_description = description.filter(|s| !s.is_empty());
