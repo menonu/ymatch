@@ -138,22 +138,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return merchAsync.when(
       data: (merch) {
         if (merch.isEmpty) {
-          // #464: Manage Members lives bottom-left (not AppBar), same as the
-          // populated layout. Empty catalog still needs creator/editor access.
+          // #483: event member management is long-press on the event name
+          // (AppBar title), not a permanent bottom-left control.
           return Scaffold(
-            appBar: AppBar(),
-            body: Stack(
-              children: [
-                _buildEmptyState(context, ref),
-                if (_buildManageMembersButton(context, role)
-                    case final manageBtn?)
-                  Positioned(
-                    left: 16,
-                    bottom: 16 + MediaQuery.paddingOf(context).bottom,
-                    child: manageBtn,
-                  ),
-              ],
-            ),
+            appBar: AppBar(title: _buildEventNameTitle(context, role)),
+            body: _buildEmptyState(context, ref),
             floatingActionButton: _buildAddMerchFab(context),
           );
         }
@@ -231,33 +220,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
           child: Scaffold(
             appBar: AppBar(
-              titleSpacing: 16,
-              title: SizedBox(
-                height: 40,
-                child: SearchBar(
-                  elevation: WidgetStateProperty.all(0),
-                  backgroundColor: WidgetStateProperty.all(Colors.grey[200]),
-                  padding: WidgetStateProperty.all(
-                    const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  hintText: l10n.searchItemsHint,
-                  leading: const Icon(Icons.search, size: 20),
-                  trailing: [
-                    if (searchQuery.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          ref.read(itemSearchQueryProvider.notifier).state = '';
-                        },
-                      ),
-                  ],
-                  onChanged: (value) {
-                    ref.read(itemSearchQueryProvider.notifier).state = value;
-                  },
-                ),
-              ),
+              // #483: event identity in the title; long-press opens event
+              // member management when the caller may act.
+              title: _buildEventNameTitle(context, role),
               actions: [
                 // How-to guide entry point (#336) — emphasized on first login.
                 const HowToTradeIconButton(),
@@ -568,6 +533,45 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               children: [
                 Column(
                   children: [
+                    // Search moved out of AppBar so the title can show the
+                    // event name (long-press → event members, #483).
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: SizedBox(
+                        height: 40,
+                        child: SearchBar(
+                          elevation: WidgetStateProperty.all(0),
+                          backgroundColor: WidgetStateProperty.all(
+                            Colors.grey[200],
+                          ),
+                          padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(horizontal: 12),
+                          ),
+                          hintText: l10n.searchItemsHint,
+                          leading: const Icon(Icons.search, size: 20),
+                          trailing: [
+                            if (searchQuery.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () {
+                                  ref
+                                          .read(
+                                            itemSearchQueryProvider.notifier,
+                                          )
+                                          .state =
+                                      '';
+                                },
+                              ),
+                          ],
+                          onChanged: (value) {
+                            ref.read(itemSearchQueryProvider.notifier).state =
+                                value;
+                          },
+                        ),
+                      ),
+                    ),
                     Container(
                       width: double.infinity,
                       color: Colors.white,
@@ -786,20 +790,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     ),
                   ],
                 ),
-                // Bottom-left controls (#128 / #464): Group info (everyone) +
+                // Bottom-left controls (#128 / #443): Group info (everyone) +
                 // Edit group (creator / event or group canEditGroup, #425/#443)
-                // + Manage group members (group-scoped, #443) + Manage event
-                // members (canManageEditors / canTransferCreator, #442).
+                // + Manage group members (group-scoped, #443). Event-scoped
+                // member management is long-press on the event name (#483).
                 Positioned(
                   left: 16,
                   bottom: 16 + MediaQuery.paddingOf(context).bottom,
                   child: Builder(
                     builder: (context) {
                       final tabCtrl = DefaultTabController.of(context);
-                      final manageBtn = _buildManageMembersButton(
-                        context,
-                        role,
-                      );
                       return AnimatedBuilder(
                         animation: tabCtrl,
                         builder: (context, _) {
@@ -875,8 +875,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                               ],
                               // Group-scoped (#443); depends on active tab.
                               ?manageGroupBtn,
-                              // Event-scoped (#442); independent of active tab.
-                              ?manageBtn,
                             ],
                           );
                         },
@@ -926,23 +924,42 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  /// Bottom-left control for self-service **event** member management
-  /// (#442, #464). Visible when the caller can manage editors and/or
-  /// transfer event creator. Returns null when the control should be hidden.
-  Widget? _buildManageMembersButton(
-    BuildContext context,
-    MyEventRoleResponse? role,
-  ) {
-    if (role == null) return null;
-    final canManage = role.canManageEditors || role.canTransferCreator;
-    if (!canManage) return null;
+  /// AppBar title: event name, long-press opens **event** member management
+  /// when the caller can manage editors and/or transfer creator (#442, #483).
+  /// Viewers still see the name; they get no long-press affordance.
+  Widget _buildEventNameTitle(BuildContext context, MyEventRoleResponse? role) {
+    final events = ref.watch(eventsProvider).valueOrNull;
+    String displayName = '';
+    if (events != null) {
+      for (final e in events) {
+        if (e.id == widget.eventId) {
+          displayName = e.name;
+          break;
+        }
+      }
+    }
+    final canManage =
+        role != null && (role.canManageEditors || role.canTransferCreator);
+    final titleText = Text(
+      displayName,
+      key: const Key('event_name_title'),
+      overflow: TextOverflow.ellipsis,
+    );
+    if (!canManage) return titleText;
+
     final l10n = AppLocalizations.of(context)!;
-    return IconButton(
-      key: const Key('manage_members_button'),
-      icon: const Icon(Icons.manage_accounts),
-      tooltip: l10n.manageMembers,
-      iconSize: 24,
-      onPressed: () => _showManageMembersDialog(context, role),
+    return Tooltip(
+      message: l10n.manageMembers,
+      child: GestureDetector(
+        key: const Key('manage_members_long_press'),
+        onLongPress: () => _showManageMembersDialog(context, role),
+        // Ensure a hittable area even if the name has not loaded yet.
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: titleText,
+        ),
+      ),
     );
   }
 

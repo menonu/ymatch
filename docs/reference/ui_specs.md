@@ -71,22 +71,25 @@ BottomNavBar
 
 ### EventDetailScreen
 
-- **AppBar**: Search bar (items), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
+- **AppBar**: Event name (title), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh, popup menus:
   - Inventory display: Just Own / Wish & For Trade / Just For Trade / All (#472)
   - View mode: Detailed / Grid / Compact List
   - Overflow: Want All Missing / Export inventory
+  - **Long-press event name** — opens event Manage Members when `canManageEditors` / `canTransferCreator` (#442, #483); viewers see the name only (no dead control)
+- **Search bar**: Item search below AppBar (moved out of title so the event name can own long-press, #483)
 - **TabBar**: Dynamic scrollable tabs per merchandise group, each with favorite star
 - **Filter Bar**: `SegmentedButton` — All, Own, Wish, For Trade, Missing (#472)
 - **Content**: `TabBarView` with per-group content in selected view mode:
   - **Detailed View**: `ReorderableListView` with image, name, owner icon, stepper counters
   - **Grid View**: 3-column `GridView` with image, name, compact +/- counters
   - **Compact List**: `ListView` with thumbnail, name, inline counters
-- **Bottom-left controls** (icon-only, safe-area aware):
+- **Bottom-left controls** (icon-only, safe-area aware; **group-scope only**):
   - Group info (everyone) — toggles description panel (#128)
   - Edit Group — group creator or `canEditGroup` (#425)
-  - Manage Members — `canManageEditors` / `canTransferCreator` (#442); moved off AppBar (#464)
+  - Manage group members — group `canManageEditors` / `canTransferCreator` on active tab (#443); stays bottom-left
+  - Event member management is **not** here — use AppBar event-name long-press (#483; formerly bottom-left #464)
 - **FAB**: "Add Merch" — opens `AddMerchScreen`
-- **Long-press (owner only)**: Bottom sheet with "Edit Name" / "Delete"
+- **Long-press merch (owner only)**: Bottom sheet with "Edit Name" / "Delete"
 
 ### AddMerchScreen
 
