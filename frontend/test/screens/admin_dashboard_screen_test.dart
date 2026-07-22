@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/admin_dashboard_screen.dart';
@@ -13,6 +14,15 @@ import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+/// Admin dashboard under a localized [MaterialApp] so shared member dialogs
+/// (#446) resolve [AppLocalizations] the same way production does.
+Widget _adminApp(Widget home) => MaterialApp(
+  locale: const Locale('en'),
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: home,
+);
 
 User _adminUser() => User()
   ..id = 7
@@ -361,7 +371,7 @@ void main() {
             (ref) async => <String, dynamic>{},
           ),
         ],
-        child: const MaterialApp(home: AdminDashboardScreen()),
+        child: _adminApp(const AdminDashboardScreen()),
       ),
     );
     await tester.pumpAndSettle();

@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 import '../utils/image_helper.dart';
+import '../widgets/manage_event_members_dialog.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -430,11 +431,12 @@ class _AdminEventsTab extends ConsumerWidget {
 
                     switch (value) {
                       case 'change_creator':
-                        final selected = await _pickUser(
+                        final selected = await showUserPickerDialog(
                           context,
-                          ref,
                           title: 'Change event creator',
-                          excludeUserId: creatorId,
+                          loadUsers: () => ref.read(adminUsersProvider.future),
+                          excludeUserIds: {?creatorId},
+                          showRoleInSubtitle: true,
                         );
                         if (selected == null) return;
                         await runAction(
@@ -447,7 +449,7 @@ class _AdminEventsTab extends ConsumerWidget {
                         );
                         break;
                       case 'manage_editors':
-                        await _showManageEditorsDialog(
+                        await showAdminManageEventMembersDialog(
                           context,
                           ref,
                           eventId: event.id,
@@ -579,11 +581,12 @@ class _AdminGroupsTab extends ConsumerWidget {
 
                     switch (value) {
                       case 'change_creator':
-                        final selected = await _pickUser(
+                        final selected = await showUserPickerDialog(
                           context,
-                          ref,
                           title: 'Change group creator',
-                          excludeUserId: group.creatorId,
+                          loadUsers: () => ref.read(adminUsersProvider.future),
+                          excludeUserIds: {?group.creatorId},
+                          showRoleInSubtitle: true,
                         );
                         if (selected == null) return;
                         await runAction(
@@ -682,227 +685,6 @@ class _AdminGroupsTab extends ConsumerWidget {
       error: (error, _) => Center(child: Text('Error: $error')),
     );
   }
-}
-
-/// Shared user picker for admin ownership transfer (#432).
-Future<User?> _pickUser(
-  BuildContext context,
-  WidgetRef ref, {
-  required String title,
-  int? excludeUserId,
-}) async {
-  final users = await ref.read(adminUsersProvider.future);
-  final candidates =
-      users
-          .where((u) => excludeUserId == null || u.id != excludeUserId)
-          .where((u) => !(u.hasIsBanned() && u.isBanned))
-          .toList()
-        ..sort((a, b) => a.username.compareTo(b.username));
-
-  if (!context.mounted) return null;
-  return showDialog<User>(
-    context: context,
-    builder: (context) {
-      var filter = '';
-      return StatefulBuilder(
-        builder: (context, setState) {
-          final filtered = filter.isEmpty
-              ? candidates
-              : candidates
-                    .where(
-                      (u) =>
-                          u.username.toLowerCase().contains(
-                            filter.toLowerCase(),
-                          ) ||
-                          '${u.id}'.contains(filter),
-                    )
-                    .toList();
-          return AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 360,
-              child: Column(
-                children: [
-                  TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search by username or id',
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                    onChanged: (v) => setState(() => filter = v),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: filtered.isEmpty
-                        ? const Center(child: Text('No users found'))
-                        : ListView.builder(
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final u = filtered[index];
-                              final role = u.hasRole() ? u.role : 'user';
-                              return ListTile(
-                                title: Text(u.username),
-                                subtitle: Text('ID: ${u.id} | $role'),
-                                onTap: () => Navigator.pop(context, u),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
-
-/// Dialog to list / add / remove event editors via admin API (#432).
-Future<void> _showManageEditorsDialog(
-  BuildContext context,
-  WidgetRef ref, {
-  required int eventId,
-  required String eventName,
-  required int adminUserId,
-}) async {
-  final admin = ref.read(adminControllerProvider.notifier);
-
-  Future<List<EventMemberInfo>> loadMembers() =>
-      admin.listEventMembers(eventId, adminUserId);
-
-  await showDialog<void>(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('Editors — $eventName'),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 360,
-              child: FutureBuilder<List<EventMemberInfo>>(
-                future: loadMembers(),
-                builder: (context, snap) {
-                  if (snap.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snap.hasError) {
-                    return Text('Error: ${snap.error}');
-                  }
-                  final members = snap.data ?? [];
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: members.isEmpty
-                            ? const Center(child: Text('No members'))
-                            : ListView.builder(
-                                itemCount: members.length,
-                                itemBuilder: (context, index) {
-                                  final m = members[index];
-                                  final label =
-                                      m.username != null &&
-                                          m.username!.isNotEmpty
-                                      ? '${m.username} (${m.userId})'
-                                      : 'ID ${m.userId}';
-                                  return ListTile(
-                                    title: Text(label),
-                                    subtitle: Text(m.role),
-                                    trailing: m.role == 'editor'
-                                        ? IconButton(
-                                            icon: const Icon(
-                                              Icons.remove_circle_outline,
-                                              color: Colors.red,
-                                            ),
-                                            tooltip: 'Remove editor',
-                                            onPressed: () async {
-                                              try {
-                                                await admin.revokeEventEditor(
-                                                  eventId,
-                                                  m.userId,
-                                                  adminUserId,
-                                                );
-                                                setState(() {});
-                                              } catch (e) {
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        'Error: $e',
-                                                      ),
-                                                      backgroundColor: Theme.of(
-                                                        context,
-                                                      ).colorScheme.error,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                          )
-                                        : null,
-                                  );
-                                },
-                              ),
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.person_add_alt_1),
-                          label: const Text('Add editor'),
-                          onPressed: () async {
-                            final selected = await _pickUser(
-                              context,
-                              ref,
-                              title: 'Add event editor',
-                            );
-                            if (selected == null) return;
-                            try {
-                              await admin.assignEventEditor(
-                                eventId,
-                                selected.id,
-                                adminUserId,
-                              );
-                              setState(() {});
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error: $e'),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.error,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
 }
 
 class _AdminItemsTab extends ConsumerWidget {
