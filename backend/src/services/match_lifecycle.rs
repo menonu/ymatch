@@ -291,16 +291,34 @@ impl MatchLifecycleService {
     /// the giver's HAVE is left unchanged (legacy). The pure side selection
     /// lives in [`apply_inventory_delta`] (so it can be unit-tested without a
     /// database); the transaction-bearing part is covered by the integration
-    /// test `test_trade_lifecycle_offer_accept_complete_apply`.
+    /// tests `test_trade_lifecycle_offer_accept_complete_apply` and
+    /// `test_apply_inventory_concurrent_single_winner` (#492).
+    ///
+    /// # Concurrency (#492)
+    ///
+    /// Applied-flag check, inventory deltas, and conditional mark all run
+    /// inside one transaction under `SELECT … FOR UPDATE` on the match row.
+    /// A second concurrent apply for the same user blocks on the row lock,
+    /// then sees the flag set (or loses the conditional mark) and returns
+    /// `409 Conflict`. Clients that get 409 after a successful first apply
+    /// should treat inventory as already applied — do **not** retry apply
+    /// expecting another inventory change; refresh match/inventory state
+    /// instead. A pure network timeout with no response may safely retry:
+    /// at most one attempt wins and further attempts are 409 no-ops for
+    /// inventory.
     pub async fn apply_inventory(
         &self,
         match_id: i32,
         user_id: i32,
         skip_have_decrement: bool,
     ) -> Result<(), AppError> {
+        // Open the transaction *before* reading applied flags so the
+        // check + deltas + mark are one atomic unit under row lock (#492).
+        let mut tx = self.pool.begin().await?;
+
         let snapshot = self
             .matches
-            .get_status_snapshot(match_id)
+            .lock_for_update(&mut *tx, match_id)
             .await?
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
@@ -325,14 +343,13 @@ impl MatchLifecycleService {
             ));
         }
 
-        let items = self.matches.list_match_items(match_id).await?;
+        // Legs under the same lock/tx so we apply the proposal consistent
+        // with the locked match row.
+        let items = self
+            .matches
+            .list_match_items_in_tx(&mut *tx, match_id)
+            .await?;
 
-        // Open a single transaction so the inventory writes and the
-        // per-user applied flag are atomic. If we crash between the
-        // deltas and the flag, the next retry sees
-        // `user{1,2}_inventory_applied_at IS NOT NULL` and refuses to
-        // re-apply.
-        let mut tx = self.pool.begin().await?;
         // ADR 0010: TRADE decrements can zero mutual capacity for *other*
         // active matches the user is still negotiating.
         let mut traded = false;
@@ -358,6 +375,8 @@ impl MatchLifecycleService {
                 .await?;
         }
 
+        // Conditional mark (WHERE applied_at IS NULL): defense in depth if
+        // the pre-check and mark ever race without the row lock.
         self.matches
             .mark_inventory_applied(&mut *tx, match_id, is_user1)
             .await?;

@@ -128,7 +128,13 @@ Enforcement highlights:
 
 - Only the **non-proposer** may accept; balance Σ qty each side gives equal and > 0.
 - Legs are **absolute** (`giver_user_id`, merch, qty), not offerer-relative.
-- Apply is idempotent per user side once marked applied.
+- Apply is idempotent per user side once marked applied: the applied-flag
+  check, inventory deltas, and conditional mark
+  (`WHERE user{1,2}_inventory_applied_at IS NULL`) run under
+  `SELECT … FOR UPDATE` on the match row (#492). Concurrent applies for
+  the same user → one success, one `409 Conflict`; inventory deltas once.
+  Clients: on `409`, refresh state and do not re-apply for more deltas; on
+  ambiguous network failure, a single retry is safe.
 
 ## Inventory update (user-driven)
 

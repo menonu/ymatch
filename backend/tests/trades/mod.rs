@@ -310,6 +310,146 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
+/// #492: two simultaneous apply-inventory calls for the same user on a
+/// COMPLETED match must produce exactly one success and apply inventory
+/// deltas once (row lock + conditional mark).
+#[sqlx::test]
+async fn test_apply_inventory_concurrent_single_winner(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "apply-race",
+        MutualTradeOptions {
+            event_name: Some("Apply Race Event"),
+            group_name: "race-group",
+            merch_a_name: "Race A",
+            merch_b_name: "Race B",
+            // TRADE qty 2 so a double-apply would be visible (1 left vs 0).
+            u1_trade: 2,
+            u2_trade: 2,
+            have_qty: Some(3),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+    let user1_id = fx.user1_id;
+    let user2_id = fx.user2_id;
+    let merch_a_id = fx.merch_a_id;
+    let merch_b_id = fx.merch_b_id;
+
+    // Offer → accept → complete so apply-inventory is legal.
+    let offer_body = format!(
+        r#"{{"userId": {}, "items": [
+            {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+            {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
+        ]}}"#,
+        user1_id, merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &offer_body
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "COMPLETED", "userId": {}}}"#, user1_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    let uri = format!("/api/v1/matches/{}/apply-inventory", match_id);
+    let body = format!(r#"{{"userId": {}}}"#, user1_id);
+    let pool_a = pool.clone();
+    let pool_b = pool.clone();
+    let uri_a = uri.clone();
+    let uri_b = uri.clone();
+    let body_a = body.clone();
+    let body_b = body.clone();
+
+    let (resp_a, resp_b) = tokio::join!(
+        post_json(&pool_a, &uri_a, &body_a),
+        post_json(&pool_b, &uri_b, &body_b),
+    );
+    let status_a = resp_a.status();
+    let status_b = resp_b.status();
+
+    assert!(
+        (status_a == StatusCode::OK && status_b == StatusCode::CONFLICT)
+            || (status_a == StatusCode::CONFLICT && status_b == StatusCode::OK),
+        "expected one OK and one CONFLICT, got {status_a:?} and {status_b:?}"
+    );
+
+    // Inventory deltas applied exactly once for user1 as giver of merch A:
+    // TRADE 2→1, HAVE 3→2; as receiver of merch B: HAVE +1.
+    let trade_a: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'TRADE'",
+    )
+    .bind(user1_id as i32)
+    .bind(merch_a_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        trade_a, 1,
+        "user1 TRADE merch A must decrement once (2→1), not twice"
+    );
+
+    let have_a: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'HAVE'",
+    )
+    .bind(user1_id as i32)
+    .bind(merch_a_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        have_a, 2,
+        "user1 HAVE merch A must decrement once (3→2), not twice"
+    );
+
+    let have_b: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'HAVE'",
+    )
+    .bind(user1_id as i32)
+    .bind(merch_b_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(have_b, 1, "user1 HAVE merch B must increment once");
+
+    let applied: Option<chrono::DateTime<chrono::Utc>> =
+        sqlx::query_scalar("SELECT user1_inventory_applied_at FROM matches WHERE id = $1")
+            .bind(match_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        applied.is_some(),
+        "user1 inventory_applied_at must be set after the winning apply"
+    );
+}
+
 /// #429: `skipHaveDecrement: true` leaves giver HAVE unchanged (legacy).
 #[sqlx::test]
 async fn test_apply_inventory_skip_have_decrement(pool: PgPool) {
