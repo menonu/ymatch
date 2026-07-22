@@ -556,21 +556,3 @@ Future<User?> showUserPickerDialog(
     },
   );
 }
-
-/// Convenience wrapper: load public user directory then open the picker.
-///
-/// Used by callers that only need the directory picker outside the members
-/// dialog core.
-Future<User?> pickUserFromDirectory(
-  BuildContext context,
-  WidgetRef ref, {
-  required String title,
-  Set<int> excludeUserIds = const {},
-}) {
-  return showUserPickerDialog(
-    context,
-    title: title,
-    loadUsers: () => ref.read(usersDirectoryProvider.future),
-    excludeUserIds: excludeUserIds,
-  );
-}

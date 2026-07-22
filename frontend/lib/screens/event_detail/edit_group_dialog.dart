@@ -33,10 +33,10 @@ class EditGroupDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<EditGroupDialog> createState() => EditGroupDialogState();
+  ConsumerState<EditGroupDialog> createState() => _EditGroupDialogState();
 }
 
-class EditGroupDialogState extends ConsumerState<EditGroupDialog> {
+class _EditGroupDialogState extends ConsumerState<EditGroupDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descCtrl;
   bool _saving = false;

@@ -111,8 +111,12 @@ void main() {
     // Creator has no remove control; editor does.
     expect(find.byKey(const Key('remove_editor_1')), findsNothing);
     expect(find.byKey(const Key('remove_editor_2')), findsOneWidget);
-    // Stable Future: list loads once; parent rebuilds must not re-fetch (#494).
+    // Stable Future: MediaQuery-driven rebuilds must not re-fetch (#494).
     expect(loadCount, 1);
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pump();
     expect(loadCount, 1);
   });

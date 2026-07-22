@@ -23,10 +23,10 @@ class EditMerchDialog extends ConsumerStatefulWidget {
   const EditMerchDialog({super.key, required this.eventId, required this.item});
 
   @override
-  ConsumerState<EditMerchDialog> createState() => EditMerchDialogState();
+  ConsumerState<EditMerchDialog> createState() => _EditMerchDialogState();
 }
 
-class EditMerchDialogState extends ConsumerState<EditMerchDialog> {
+class _EditMerchDialogState extends ConsumerState<EditMerchDialog> {
   late final TextEditingController _nameCtrl;
   // Preview URL for a newly picked image (base64 data URI); null means "show
   // the item's existing photo".
