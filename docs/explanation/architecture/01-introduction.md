@@ -15,7 +15,7 @@ exist so partners can coordinate the hand-off.
 | ID | Goal |
 |----|------|
 | G1 | Let users organize merch around **events** and **item groups** (e.g. photo sets for a live show). |
-| G2 | Let users track personal inventory as **HAVE / WANT / TRADE** quantities per merch item. |
+| G2 | Let users track personal inventory as **HAVE / WANT / TRADE** quantities per merch item (**TRADE**/**WANT** drive matching and trade capacity; **HAVE** is optional ownership bookkeeping — [06 — Runtime](06-runtime.md#inventory-status-semantics)). |
 | G3 | Automatically **discover mutual trade opportunities** within a single item group ([ADR 0001](../adr/0001-match-scoped-to-item-group.md)). |
 | G4 | Support **balanced negotiation** (propose / counter / accept) before a trade is finalized ([ADR 0002](../adr/0002-negotiation-state-machine.md)). |
 | G5 | Provide a simple client (Flutter web + mobile targets) against one central backend. |

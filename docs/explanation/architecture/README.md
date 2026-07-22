@@ -23,7 +23,7 @@ resulting shape and points outward for details.
 | 03 | [Context & scope](03-context.md) | External actors and system boundary | **C4 L1** System Context (D2 → SVG) |
 | 04 | [Solution strategy](04-solution-strategy.md) | Tech stack, patterns, ADR index | prose |
 | 05 | [Building blocks](05-building-blocks.md) | Containers + components | **C4 L2–L3** (D2 → SVG) |
-| 06 | [Runtime view](06-runtime.md) | Auth, matching, trade negotiation, inventory apply | Mermaid (sequence / state / flowchart) |
+| 06 | [Runtime view](06-runtime.md) | Auth, matching, trade negotiation, **HAVE/WANT/TRADE semantics**, inventory apply | Mermaid (sequence / state / flowchart) |
 | 07 | [Deployment view](07-deployment.md) | Local, staging, production | **C4** (D2 → SVG); CI sketch Mermaid |
 | 08 | [Cross-cutting](08-crosscutting.md) | Security, RBAC, i18n, errors, images | prose + links |
 | 09 | [Quality](09-quality.md) | Quality attributes (SAiP 4th vocabulary), testing, performance | prose |
