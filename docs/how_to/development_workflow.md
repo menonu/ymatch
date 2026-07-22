@@ -126,7 +126,7 @@ Trigger the relevant workflow(s) if the PR touches any of:
 |----------|----------|--------|
 | **Proto / wire contract** | `proto/**`, generated Rust/Dart bindings, `toProto3Json` / offer-trade request bodies | Frontend E2E (`ci-e2e.yml`) |
 | **Match / trade lifecycle** | match state machine, offer/accept/apply, matcher job | Frontend E2E; backend coverage if guards change |
-| **Migrations / schema** | `backend/migrations/**`, SQL that integration tests exercise | Backend coverage (**70% floor / report**; PR `ci.yml` already runs DB tests) |
+| **Migrations / schema** | `backend/migrations/**`, SQL that integration tests exercise | Backend coverage (**85% floor / report**; PR `ci.yml` already runs DB tests) |
 | **AuthZ / RBAC matrix** | permissions, role checks, admin/moderator paths | Backend coverage; frontend coverage if UI gates change |
 | **Coverage-sensitive refactors** | large deletes, test moves, filtering scripts | Matching coverage workflow(s) |
 
@@ -143,7 +143,7 @@ BRANCH="$(git branch --show-current)"
 # Frontend wire E2E (docker-compose.e2e + Flutter e2e suite)
 gh workflow run ci-e2e.yml --ref "$BRANCH"
 
-# Backend line coverage (cargo-llvm-cov, 70% gate)
+# Backend line coverage (cargo-llvm-cov, 85% gate)
 gh workflow run coverage.yml --ref "$BRANCH"
 
 # Frontend line coverage (filtered LCOV, 68% gate)

@@ -2,7 +2,7 @@ name: Backend Coverage
 
 # Runs **post-merge on `main`** only (plus a manual `workflow_dispatch`)
 # to keep the PR feedback loop fast — see #279. PR validation is handled
-# by the lighter `ci.yml`. The 70% threshold gate below therefore
+# by the lighter `ci.yml`. The 85% threshold gate below therefore
 # surfaces a coverage drop as a failed `main` run after merge (fixed by
 # a follow-up) rather than blocking the PR; that is the accepted
 # cycle-time trade-off.
@@ -121,12 +121,19 @@ jobs:
           #   5 Functions  6 Missed  7 % (functions)  8 Lines
           #   9 Missed  10 % (lines)  11 Branches  12 Missed  13 % (branches)
           # We want the line-coverage percentage at field 10.
+          #
           # Bump history: 40% (#177) → 60% (#187) → 80% (#188) →
-          #              70% (this PR — #174 refactor adds new
-          #              `_conn` repo methods whose every-branch coverage
-          #              is not yet in the test suite; bumped back to 80%
-          #              in the follow-up PR that fills the gaps).
-          THRESHOLD=70
+          #              70% (#174 refactor; temporary while `_conn` repo
+          #              method gaps were filled) → 85% (#455 — observed
+          #              main line coverage ~92% with ~7 pts headroom;
+          #              restores a gate that fails real regressions).
+          #
+          # Intentional low-cover files (do not chase blindly):
+          #   - main.rs          — process bootstrap / wiring only
+          #   - storage/mod.rs   — thin trait re-exports / trait object glue
+          #   - handlers/auth.rs, handlers/search.rs — thinner path coverage;
+          #     improve when touching those areas, not for the gate alone
+          THRESHOLD=85
           COVERAGE=$(awk '/TOTAL/ {gsub("%","",$10); print $10; exit}' coverage/summary.txt)
           echo "Threshold: $THRESHOLD%  Line coverage: $COVERAGE%"
           awk -v c="$COVERAGE" -v t="$THRESHOLD" 'BEGIN {
