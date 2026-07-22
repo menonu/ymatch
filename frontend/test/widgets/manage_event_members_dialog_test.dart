@@ -111,7 +111,10 @@ void main() {
     // Creator has no remove control; editor does.
     expect(find.byKey(const Key('remove_editor_1')), findsNothing);
     expect(find.byKey(const Key('remove_editor_2')), findsOneWidget);
-    expect(loadCount, greaterThanOrEqualTo(1));
+    // Stable Future: list loads once; parent rebuilds must not re-fetch (#494).
+    expect(loadCount, 1);
+    await tester.pump();
+    expect(loadCount, 1);
   });
 
   testWidgets('assign editor calls callback, refreshes list, snackbar (#446)', (

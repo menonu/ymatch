@@ -1,7 +1,7 @@
-// Unit tests for Event Detail inventory filter + display-mode helpers (#472).
+// Unit tests for Event Detail inventory filter + display-mode helpers (#472 / #494).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/screens/event_detail_screen.dart';
+import 'package:frontend/screens/event_detail/merch_filters.dart';
 
 void main() {
   group('matchesMerchFilter (#472)', () {
@@ -93,6 +93,21 @@ void main() {
       expect(f.showHave, isTrue);
       expect(f.showWant, isTrue);
       expect(f.showTrade, isTrue);
+    });
+  });
+
+  group('naturalCompare / resolveInitialGroupTabIndex (#494)', () {
+    test('naturalCompare orders numeric runs by value', () {
+      expect(naturalCompare('item2', 'item10'), lessThan(0));
+      expect(naturalCompare('item10', 'item2'), greaterThan(0));
+      expect(naturalCompare('alpha', 'beta'), lessThan(0));
+    });
+
+    test('resolveInitialGroupTabIndex maps name or falls back', () {
+      expect(resolveInitialGroupTabIndex(['A', 'B'], 'B'), 1);
+      expect(resolveInitialGroupTabIndex(['A', 'B'], 'missing'), 0);
+      expect(resolveInitialGroupTabIndex(['A', 'B'], null), 0);
+      expect(resolveInitialGroupTabIndex([], 'B'), 0);
     });
   });
 }
