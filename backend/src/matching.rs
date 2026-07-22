@@ -339,11 +339,19 @@ async fn notify_pair(pool: &PgPool, user_a: i32, user_b: i32) {
         let u1_name: String = u1.get("username");
         let u2_name: String = u2.get("username");
 
+        // Fire-and-forget: do not serialize the matching loop on FCM RTT
+        // (ADR 0014 / #179 review — unhealthy FCM must not stall discovery).
         if let Some(token) = u1_token {
-            crate::notifications::send_match_notification(&token, &u2_name).await;
+            let partner = u2_name.clone();
+            tokio::spawn(async move {
+                crate::notifications::send_match_notification(&token, &partner).await;
+            });
         }
         if let Some(token) = u2_token {
-            crate::notifications::send_match_notification(&token, &u1_name).await;
+            let partner = u1_name;
+            tokio::spawn(async move {
+                crate::notifications::send_match_notification(&token, &partner).await;
+            });
         }
     }
 }

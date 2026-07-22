@@ -10,7 +10,7 @@ pub use fcm::{FcmConfig, FcmPushProvider, ServiceAccount};
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, RwLock};
 
 /// Boxed future returned by [`PushProvider`] methods (dyn-compatible).
 pub type PushFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -89,19 +89,20 @@ fn token_prefix(token: &str) -> String {
 // Process-global provider (used by matching.rs free-function call site)
 // ---------------------------------------------------------------------------
 
-static PROVIDER: OnceLock<Arc<dyn PushProvider>> = OnceLock::new();
+/// Interior mutability so tests can swap providers; production sets once at boot.
+static PROVIDER: RwLock<Option<Arc<dyn PushProvider>>> = RwLock::new(None);
 
-/// Install the process-wide push provider. Safe to call once at startup;
-/// subsequent calls are ignored (first write wins).
+/// Install the process-wide push provider (overwrites any previous value).
 pub fn set_provider(provider: Arc<dyn PushProvider>) {
-    let _ = PROVIDER.set(provider);
+    *PROVIDER.write().expect("push provider lock poisoned") = Some(provider);
 }
 
 /// Resolve the active provider, defaulting to [`LoggingPushProvider`].
 pub fn provider() -> Arc<dyn PushProvider> {
     PROVIDER
-        .get()
-        .cloned()
+        .read()
+        .expect("push provider lock poisoned")
+        .clone()
         .unwrap_or_else(|| Arc::new(LoggingPushProvider))
 }
 
@@ -212,12 +213,8 @@ mod tests {
             calls: Mutex::new(Vec::new()),
             fail: false,
         });
-        // Direct call through trait (does not rely on process-global OnceLock,
-        // which is sticky across tests in the same binary).
-        recorder
-            .send_match_notification("token-abc", "bob")
-            .await
-            .unwrap();
+        set_provider(recorder.clone());
+        send_match_notification("token-abc", "bob").await;
         let calls = recorder.calls.lock().unwrap().clone();
         assert_eq!(calls, vec![("token-abc".into(), "bob".into())]);
     }
@@ -228,10 +225,10 @@ mod tests {
             calls: Mutex::new(Vec::new()),
             fail: true,
         });
-        // send_match_notification free fn logs; exercise the same swallow path
-        // by matching its contract: provider error must not panic.
-        let result = recorder.send_match_notification("tok", "carol").await;
-        assert!(result.is_err());
+        set_provider(recorder.clone());
+        // Must not panic; free function logs and returns unit.
+        send_match_notification("tok", "carol").await;
+        assert_eq!(recorder.calls.lock().unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -244,39 +241,47 @@ mod tests {
 
     #[tokio::test]
     async fn empty_token_is_noop_on_free_function() {
-        // Must not panic even without a configured global provider.
-        send_match_notification("", "eve").await;
-    }
-
-    /// Counter-based mock used to prove the free function consults `provider()`.
-    struct CountingProvider {
-        hits: AtomicUsize,
-    }
-
-    impl PushProvider for CountingProvider {
-        fn send_match_notification<'a>(
-            &'a self,
-            _device_token: &'a str,
-            _partner_username: &'a str,
-        ) -> PushFuture<'a, Result<(), PushError>> {
-            Box::pin(async move {
-                self.hits.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            })
+        let hits = Arc::new(AtomicUsize::new(0));
+        struct CountingProvider {
+            hits: Arc<AtomicUsize>,
         }
+        impl PushProvider for CountingProvider {
+            fn send_match_notification<'a>(
+                &'a self,
+                _device_token: &'a str,
+                _partner_username: &'a str,
+            ) -> PushFuture<'a, Result<(), PushError>> {
+                Box::pin(async move {
+                    self.hits.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                })
+            }
+        }
+        set_provider(Arc::new(CountingProvider { hits: hits.clone() }));
+        send_match_notification("", "eve").await;
+        assert_eq!(hits.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
     async fn set_provider_is_used_by_free_function() {
-        let counter = Arc::new(CountingProvider {
-            hits: AtomicUsize::new(0),
-        });
-        // OnceLock: only first set wins. If another test already set it, we
-        // still exercise send_match_notification against whatever is installed.
-        set_provider(counter.clone());
+        let hits = Arc::new(AtomicUsize::new(0));
+        struct CountingProvider {
+            hits: Arc<AtomicUsize>,
+        }
+        impl PushProvider for CountingProvider {
+            fn send_match_notification<'a>(
+                &'a self,
+                _device_token: &'a str,
+                _partner_username: &'a str,
+            ) -> PushFuture<'a, Result<(), PushError>> {
+                Box::pin(async move {
+                    self.hits.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                })
+            }
+        }
+        set_provider(Arc::new(CountingProvider { hits: hits.clone() }));
         send_match_notification("tok-1", "frank").await;
-        // If we won the OnceLock race, hits >= 1; if not, the free function still
-        // completed without error (Logging or earlier provider).
-        let _ = counter.hits.load(Ordering::SeqCst);
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
     }
 }

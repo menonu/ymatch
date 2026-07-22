@@ -11,8 +11,8 @@ use super::{
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::Path;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 
@@ -22,9 +22,10 @@ const FCM_SCOPE: &str = "https://www.googleapis.com/auth/firebase.messaging";
 const TOKEN_REFRESH_SKEW_SECS: u64 = 60;
 const MAX_SEND_ATTEMPTS: u32 = 3;
 const RETRY_BASE_MS: u64 = 100;
+const HTTP_TIMEOUT_SECS: u64 = 5;
 
 /// Google service-account credentials (subset of the standard JSON key file).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct ServiceAccount {
     pub client_email: String,
     pub private_key: String,
@@ -34,8 +35,19 @@ pub struct ServiceAccount {
     pub token_uri: Option<String>,
 }
 
+impl fmt::Debug for ServiceAccount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ServiceAccount")
+            .field("client_email", &self.client_email)
+            .field("private_key", &"[redacted]")
+            .field("project_id", &self.project_id)
+            .field("token_uri", &self.token_uri)
+            .finish()
+    }
+}
+
 /// Runtime configuration for [`FcmPushProvider`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FcmConfig {
     pub project_id: String,
     pub service_account: ServiceAccount,
@@ -43,6 +55,17 @@ pub struct FcmConfig {
     pub token_url: String,
     /// FCM API origin without trailing path (override in tests).
     pub fcm_base_url: String,
+}
+
+impl fmt::Debug for FcmConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FcmConfig")
+            .field("project_id", &self.project_id)
+            .field("service_account", &self.service_account)
+            .field("token_url", &self.token_url)
+            .field("fcm_base_url", &self.fcm_base_url)
+            .finish()
+    }
 }
 
 impl FcmConfig {
@@ -139,7 +162,7 @@ impl FcmPushProvider {
         let encoding_key = EncodingKey::from_rsa_pem(config.service_account.private_key.as_bytes())
             .map_err(|e| PushError::Config(format!("invalid service account private_key: {e}")))?;
         let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(HTTP_TIMEOUT_SECS))
             .build()
             .map_err(|e| PushError::Config(format!("failed to build HTTP client: {e}")))?;
         Ok(Self {
@@ -160,6 +183,10 @@ impl FcmPushProvider {
             encoding_key,
             token_cache: Mutex::new(None),
         })
+    }
+
+    async fn clear_token_cache(&self) {
+        *self.token_cache.lock().await = None;
     }
 
     async fn access_token(&self) -> Result<String, PushError> {
@@ -191,6 +218,12 @@ impl FcmPushProvider {
             .await
             .map_err(|e| PushError::Transport(format!("oauth token body: {e}")))?;
         if !status.is_success() {
+            // 429 / 5xx on the token endpoint are transient (retryable).
+            if status.as_u16() == 429 || status.is_server_error() {
+                return Err(PushError::Transport(format!(
+                    "oauth token retryable HTTP {status}: {body}"
+                )));
+            }
             return Err(PushError::Provider(format!(
                 "oauth token HTTP {status}: {body}"
             )));
@@ -281,6 +314,13 @@ impl FcmPushProvider {
             return Ok(());
         }
 
+        // Stale/revoked bearer token — clear cache so the next attempt refreshes.
+        if status.as_u16() == 401 || status.as_u16() == 403 {
+            return Err(PushError::Transport(format!(
+                "FCM auth HTTP {status} (will refresh token): {body}"
+            )));
+        }
+
         // 429 / 5xx → retryable
         if status.as_u16() == 429 || status.is_server_error() {
             return Err(PushError::Transport(format!(
@@ -300,10 +340,27 @@ impl FcmPushProvider {
     ) -> Result<(), PushError> {
         let mut last_err = PushError::Transport("no attempts".into());
         for attempt in 0..MAX_SEND_ATTEMPTS {
-            let token = self.access_token().await?;
+            let token = match self.access_token().await {
+                Ok(t) => t,
+                Err(e @ PushError::Transport(_)) if attempt + 1 < MAX_SEND_ATTEMPTS => {
+                    let delay = Duration::from_millis(RETRY_BASE_MS * 2u64.pow(attempt));
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        error = %e,
+                        "FCM OAuth retrying after transport error"
+                    );
+                    last_err = e;
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
+
             match self.send_once(&token, device_token, partner_username).await {
                 Ok(()) => return Ok(()),
                 Err(e @ PushError::Transport(_)) if attempt + 1 < MAX_SEND_ATTEMPTS => {
+                    // Auth failures and other transport errors: drop cached token.
+                    self.clear_token_cache().await;
                     let delay = Duration::from_millis(RETRY_BASE_MS * 2u64.pow(attempt));
                     tracing::warn!(
                         attempt = attempt + 1,
@@ -327,16 +384,6 @@ impl PushProvider for FcmPushProvider {
         partner_username: &'a str,
     ) -> PushFuture<'a, Result<(), PushError>> {
         Box::pin(async move { self.send_with_retries(device_token, partner_username).await })
-    }
-}
-
-impl PushProvider for Arc<FcmPushProvider> {
-    fn send_match_notification<'a>(
-        &'a self,
-        device_token: &'a str,
-        partner_username: &'a str,
-    ) -> PushFuture<'a, Result<(), PushError>> {
-        (**self).send_match_notification(device_token, partner_username)
     }
 }
 
@@ -515,6 +562,93 @@ NcNw2X9hE/FB9y3HqXK0Idc5
             .await
             .unwrap_err();
         assert!(matches!(err, PushError::Provider(_)), "{err}");
+    }
+
+    #[tokio::test]
+    async fn fcm_401_refreshes_token_and_retries() {
+        let server = MockServer::start().await;
+
+        // First OAuth → stale-token; second OAuth → fresh-token
+        Mock::given(method("POST"))
+            .and(path("/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "access_token": "stale-token",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            })))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "access_token": "fresh-token",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/v1/projects/ymatch-test/messages:send"))
+            .and(header("authorization", "Bearer stale-token"))
+            .respond_with(ResponseTemplate::new(401).set_body_string("expired"))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/v1/projects/ymatch-test/messages:send"))
+            .and(header("authorization", "Bearer fresh-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"name": "m"})))
+            .mount(&server)
+            .await;
+
+        let provider = FcmPushProvider::new(test_config(&server.uri())).unwrap();
+        provider
+            .send_match_notification("tok", "auth-retry")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn oauth_503_is_retried() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/token"))
+            .respond_with(ResponseTemplate::new(503).set_body_string("busy"))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "access_token": "ok-token",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/v1/projects/ymatch-test/messages:send"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"name": "m"})))
+            .mount(&server)
+            .await;
+
+        let provider = FcmPushProvider::new(test_config(&server.uri())).unwrap();
+        provider
+            .send_match_notification("tok", "oauth-retry")
+            .await
+            .unwrap();
+    }
+
+    #[test]
+    fn service_account_debug_redacts_private_key() {
+        let sa = test_sa();
+        let dbg = format!("{sa:?}");
+        assert!(dbg.contains("[redacted]"));
+        assert!(!dbg.contains("BEGIN PRIVATE KEY"));
     }
 
     #[tokio::test]
