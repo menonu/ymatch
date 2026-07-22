@@ -158,6 +158,27 @@ void main() {
 
       expect(find.text('hello from peer'), findsOneWidget);
       expect(find.text('hello from me'), findsOneWidget);
+
+      // Own vs peer layout: peer left, own right.
+      Align peerAlign = tester.widget<Align>(
+        find
+            .ancestor(
+              of: find.text('hello from peer'),
+              matching: find.byType(Align),
+            )
+            .first,
+      );
+      Align ownAlign = tester.widget<Align>(
+        find
+            .ancestor(
+              of: find.text('hello from me'),
+              matching: find.byType(Align),
+            )
+            .first,
+      );
+      expect(peerAlign.alignment, Alignment.centerLeft);
+      expect(ownAlign.alignment, Alignment.centerRight);
+
       // SYSTEM reason code is localized, not shown raw.
       expect(find.text('MERCH_DELETED'), findsNothing);
       expect(

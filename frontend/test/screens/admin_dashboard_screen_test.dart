@@ -776,7 +776,7 @@ void main() {
   });
 
   testWidgets(
-    'empty tabs show empty-state copy; error tabs show Error: prefix (#454)',
+    'empty tabs and missing system resources show empty-state copy (#454)',
     (WidgetTester tester) async {
       final mockClient = MockClient(
         (request) async => http.Response('[]', 200),
