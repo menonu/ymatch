@@ -1,6 +1,67 @@
 use crate::repositories::match_::{REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON_AFTER_REJECTED};
 use sqlx::{PgPool, Row};
 
+// ---------------------------------------------------------------------------
+// Pure matching decisions (unit-tested; used by run_matching_algorithm)
+// ---------------------------------------------------------------------------
+
+/// ADR 0001: merchandise with a NULL / empty group is not matchable.
+///
+/// The matcher SQL also filters `group_name IS NOT NULL`; this helper pins the
+/// policy for call sites and tests without a DB.
+#[inline]
+pub fn is_group_matchable(group_name: Option<&str>) -> bool {
+    matches!(group_name, Some(g) if !g.is_empty())
+}
+
+/// Two merchandise rows share a matchable group identity only when both have
+/// the same non-null `(event_id, group_name)`.
+#[inline]
+pub fn same_match_group(
+    event_a: i32,
+    group_a: Option<&str>,
+    event_b: i32,
+    group_b: Option<&str>,
+) -> bool {
+    if !is_group_matchable(group_a) || !is_group_matchable(group_b) {
+        return false;
+    }
+    event_a == event_b && group_a == group_b
+}
+
+/// How the matcher should treat an existing match row for a rediscovered
+/// mutual edge (same pair + group). ADR 0012: reopen terminal rows; never
+/// insert a second row for active/COMPLETED.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExistingMatchAction {
+    /// No row — insert a new PENDING match.
+    Insert,
+    /// REJECTED / CANCELLED — reopen the same id to PENDING.
+    Reopen,
+    /// Active (PENDING/OFFERED/ACCEPTED) or COMPLETED — leave alone.
+    Skip,
+}
+
+/// Decide insert / reopen / skip for a rediscovered mutual edge.
+///
+/// `existing_status` is `None` when no row exists for the (pair, group).
+pub fn existing_match_action(existing_status: Option<&str>) -> ExistingMatchAction {
+    match existing_status {
+        None => ExistingMatchAction::Insert,
+        Some("REJECTED") | Some("CANCELLED") => ExistingMatchAction::Reopen,
+        Some(_) => ExistingMatchAction::Skip,
+    }
+}
+
+/// SYSTEM message reason when reopening a terminal match, if applicable.
+pub fn rematch_reason_for(prior_status: &str) -> Option<&'static str> {
+    match prior_status {
+        "REJECTED" => Some(REMATCH_REASON_AFTER_REJECTED),
+        "CANCELLED" => Some(REMATCH_REASON_AFTER_CANCELLED),
+        _ => None,
+    }
+}
+
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     // 1. Fetch all 'WANT' items, joining with merchandise to get group_name
     // Skip items from deleted/trade-disabled merchandise and banned users.
@@ -137,6 +198,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
                 match existing_match {
                     None => {
+                        debug_assert_eq!(existing_match_action(None), ExistingMatchAction::Insert);
                         sqlx::query(
                             "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name, created_at)
                              VALUES ($1, $2, 'PENDING', $3, $4, NOW())",
@@ -155,12 +217,18 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                     Some(row) => {
                         let match_id: i32 = row.get("id");
                         let status: String = row.get("status");
-                        // Active or COMPLETED: skip (no second match).
-                        if (status == "REJECTED" || status == "CANCELLED")
-                            && reopen_terminal_match(pool, match_id, &status).await?
-                        {
-                            matches_created += 1;
-                            notify_pair(pool, want_user_id, partner_id).await;
+                        match existing_match_action(Some(&status)) {
+                            ExistingMatchAction::Reopen => {
+                                if reopen_terminal_match(pool, match_id, &status).await? {
+                                    matches_created += 1;
+                                    notify_pair(pool, want_user_id, partner_id).await;
+                                }
+                            }
+                            ExistingMatchAction::Skip => {}
+                            ExistingMatchAction::Insert => {
+                                // Row exists; Insert is only for None.
+                                debug_assert!(false, "Insert action with existing row");
+                            }
                         }
                     }
                 }
@@ -181,10 +249,8 @@ async fn reopen_terminal_match(
     match_id: i32,
     prior_status: &str,
 ) -> Result<bool, String> {
-    let reason = match prior_status {
-        "REJECTED" => REMATCH_REASON_AFTER_REJECTED,
-        "CANCELLED" => REMATCH_REASON_AFTER_CANCELLED,
-        _ => return Ok(false),
+    let Some(reason) = rematch_reason_for(prior_status) else {
+        return Ok(false);
     };
 
     let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
@@ -274,5 +340,108 @@ async fn notify_pair(pool: &PgPool, user_a: i32, user_b: i32) {
         if let Some(token) = u2_token {
             crate::notifications::send_match_notification(&token, &u1_name).await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- is_group_matchable (ADR 0001 null-group skip) ---
+
+    #[test]
+    fn null_group_is_not_matchable() {
+        assert!(!is_group_matchable(None));
+    }
+
+    #[test]
+    fn empty_group_is_not_matchable() {
+        assert!(!is_group_matchable(Some("")));
+    }
+
+    #[test]
+    fn named_group_is_matchable() {
+        assert!(is_group_matchable(Some("Cards")));
+        assert!(is_group_matchable(Some("G1")));
+    }
+
+    // --- same_match_group (group scoping) ---
+
+    #[test]
+    fn same_event_and_group_match() {
+        assert!(same_match_group(1, Some("G"), 1, Some("G")));
+    }
+
+    #[test]
+    fn different_group_same_event_do_not_match() {
+        assert!(!same_match_group(1, Some("G1"), 1, Some("G2")));
+    }
+
+    #[test]
+    fn same_group_name_different_event_do_not_match() {
+        // group_name is only unique per event.
+        assert!(!same_match_group(1, Some("Cards"), 2, Some("Cards")));
+    }
+
+    #[test]
+    fn null_group_never_same_as_anything() {
+        assert!(!same_match_group(1, None, 1, None));
+        assert!(!same_match_group(1, None, 1, Some("G")));
+        assert!(!same_match_group(1, Some("G"), 1, None));
+    }
+
+    // --- existing_match_action (dedup / rematch ADR 0012) ---
+
+    #[test]
+    fn no_existing_row_inserts() {
+        assert_eq!(existing_match_action(None), ExistingMatchAction::Insert);
+    }
+
+    #[test]
+    fn rejected_and_cancelled_reopen() {
+        assert_eq!(
+            existing_match_action(Some("REJECTED")),
+            ExistingMatchAction::Reopen
+        );
+        assert_eq!(
+            existing_match_action(Some("CANCELLED")),
+            ExistingMatchAction::Reopen
+        );
+    }
+
+    #[test]
+    fn active_and_completed_skip() {
+        for status in ["PENDING", "OFFERED", "ACCEPTED", "COMPLETED"] {
+            assert_eq!(
+                existing_match_action(Some(status)),
+                ExistingMatchAction::Skip,
+                "status {status} must skip"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_status_skips_defensively() {
+        assert_eq!(
+            existing_match_action(Some("WEIRD")),
+            ExistingMatchAction::Skip
+        );
+    }
+
+    // --- rematch_reason_for ---
+
+    #[test]
+    fn rematch_reasons_for_terminal_only() {
+        assert_eq!(
+            rematch_reason_for("REJECTED"),
+            Some(REMATCH_REASON_AFTER_REJECTED)
+        );
+        assert_eq!(
+            rematch_reason_for("CANCELLED"),
+            Some(REMATCH_REASON_AFTER_CANCELLED)
+        );
+        assert_eq!(rematch_reason_for("PENDING"), None);
+        assert_eq!(rematch_reason_for("COMPLETED"), None);
+        assert_eq!(rematch_reason_for(""), None);
     }
 }

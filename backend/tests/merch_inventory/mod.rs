@@ -1333,30 +1333,47 @@ async fn seed_mutual_capacity_match(
     status: &str,
     qty: i32,
 ) -> (i64, i64, i64, i64, i64, i32) {
-    let (u1, event_id) =
-        create_test_user_and_event(pool.clone(), &format!("{label}-u1"), &format!("{label} Ev"))
-            .await;
-    let u2 = login_guest(pool, &format!("{label}-u2"), "t").await;
-    let m_a = create_merch(pool, event_id, &format!("{label} A"), "G").await;
-    let m_b = create_merch(pool, event_id, &format!("{label} B"), "G").await;
-    // u1 TRADEST A, WANTS B; u2 TRADEST B, WANTS A
-    set_inventory(pool, u1, m_a, "TRADE", qty).await;
-    set_inventory(pool, u1, m_b, "WANT", qty).await;
-    set_inventory(pool, u2, m_b, "TRADE", qty).await;
-    set_inventory(pool, u2, m_a, "WANT", qty).await;
+    // Shared reciprocal fixture (#457); match row is inserted directly so
+    // callers can pick an arbitrary starting status (PENDING/OFFERED/…).
+    let event_name = format!("{label} Ev");
+    let merch_a_name = format!("{label} A");
+    let merch_b_name = format!("{label} B");
+    let fx = setup_mutual_trade(
+        pool,
+        label,
+        MutualTradeOptions {
+            event_name: Some(&event_name),
+            group_name: "G",
+            merch_a_name: &merch_a_name,
+            merch_b_name: &merch_b_name,
+            u1_trade: qty,
+            u1_want: qty,
+            u2_trade: qty,
+            u2_want: qty,
+            have_qty: None,
+        },
+    )
+    .await;
 
     let match_id: i32 = sqlx::query_scalar(
         "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
          VALUES ($1, $2, $3, 'G', $4) RETURNING id",
     )
-    .bind(u1 as i32)
-    .bind(u2 as i32)
-    .bind(event_id as i32)
+    .bind(fx.user1_id as i32)
+    .bind(fx.user2_id as i32)
+    .bind(fx.event_id as i32)
     .bind(status)
     .fetch_one(pool)
     .await
     .unwrap();
-    (u1, u2, event_id, m_a, m_b, match_id)
+    (
+        fx.user1_id,
+        fx.user2_id,
+        fx.event_id,
+        fx.merch_a_id,
+        fx.merch_b_id,
+        match_id,
+    )
 }
 
 async fn match_status(pool: &PgPool, match_id: i32) -> String {

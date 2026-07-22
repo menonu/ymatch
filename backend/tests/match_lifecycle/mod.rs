@@ -22,119 +22,10 @@ async fn test_update_match_status_validation(pool: PgPool) {
 /// (user1_id, user2_id, match_id, merch_id_for_u1,
 /// merch_id_for_u2). Each user also has a TRADE inventory row of
 /// quantity 5 for their merch, so inventory deltas are exercisable.
+///
+/// Thin wrapper around the shared [`setup_pending_match_sql`] fixture (#457).
 async fn setup_pending_match_with_merch(pool: &PgPool) -> (i64, i64, i64, i32, i32) {
-    // Create two users and an event.
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/guest")
-                .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "u1-conn"}"#))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let u1: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
-
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/guest")
-                .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "u2-conn"}"#))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let u2: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
-
-    // ADR 0004 §4: event creation is moderator/admin-only.
-    grant_global_role(&pool, u1, "moderator").await;
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/events")
-                .header("content-type", "application/json")
-                .body(Body::from(format!(
-                    r#"{{"name": "Conn Event", "creatorId": {}}}"#,
-                    u1
-                )))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let event_id: i64 =
-        serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await).unwrap()
-            ["id"]
-            .as_i64()
-            .unwrap();
-
-    // One merch per user + a TRADE inventory row of qty 5.
-    // ADR 0005: merch creation is gated by `merch.create` (event scope). u1 is
-    // the event creator (authorized); grant u2 the event/editor role so it can
-    // create its own merch (creator_id = u2) for the match fixture below.
-    assign_event_role(&pool, u2, event_id, "editor").await;
-    let mut merch_ids = Vec::new();
-    for creator in [u1, u2] {
-        let app = backend::routes::create_router(pool.clone(), test_storage());
-        let resp = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri(format!("/api/v1/events/{}/merch", event_id))
-                    .header("content-type", "application/json")
-                    .body(Body::from(format!(
-                        r#"{{"name": "M{creator}", "groupName": "G", "creatorId": {creator}}}"#
-                    )))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let merch_id: i64 =
-            serde_json::from_str::<serde_json::Value>(&body_to_string(resp.into_body()).await)
-                .unwrap()["id"]
-                .as_i64()
-                .unwrap();
-        sqlx::query(
-            "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'TRADE', 5)",
-        )
-        .bind(creator as i32)
-        .bind(merch_id as i32)
-        .execute(pool)
-        .await
-        .unwrap();
-        merch_ids.push(merch_id as i32);
-    }
-
-    // Insert a PENDING match between the two users. ADR 0001: scope to the
-    // group the merch belongs to ("G", same event_id as the merch above).
-    let row: (i32,) = sqlx::query_as(
-        "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
-         VALUES ($1, $2, 'PENDING', $3, 'G') RETURNING id",
-    )
-    .bind(u1 as i32)
-    .bind(u2 as i32)
-    .bind(event_id as i32)
-    .fetch_one(pool)
-    .await
-    .unwrap();
-
-    (u1, u2, row.0 as i64, merch_ids[0], merch_ids[1])
+    setup_pending_match_sql(pool, "conn", "G", 5).await
 }
 
 #[sqlx::test]
@@ -437,7 +328,7 @@ async fn test_multiple_conn_calls_share_one_transaction(pool: PgPool) {
     // borrow before the next call, and `tx.commit()` must work at
     // the end. If the future's borrow leaked past the call (the
     // NLL/Drop issue we hit earlier), this test would fail.
-    let (u1, u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
+    let (u1, _u2, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
 
     let mut tx = pool.begin().await.unwrap();
     let matches = backend::repositories::match_::MatchRepository::new(pool.clone());

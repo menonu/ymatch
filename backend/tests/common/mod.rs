@@ -299,3 +299,218 @@ pub async fn has_event_role(pool: &PgPool, user_id: i64, event_id: i64, role_nam
     .unwrap();
     n > 0
 }
+
+// ---------------------------------------------------------------------------
+// Multi-user trade fixtures (#457)
+// ---------------------------------------------------------------------------
+//
+// Reciprocal layout used by most trade / match lifecycle tests:
+//
+//   user1: TRADE merch_a, WANT merch_b
+//   user2: TRADE merch_b, WANT merch_a
+//
+// Optional HAVE rows on each giver's TRADE merch (for apply-inventory tests).
+
+/// Two users, one event, and a merch pair with reciprocal TRADE/WANT inventory.
+#[derive(Debug, Clone, Copy)]
+pub struct MutualTradeFixture {
+    pub user1_id: i64,
+    pub user2_id: i64,
+    pub event_id: i64,
+    /// user1 TRADEs this; user2 WANTs it.
+    pub merch_a_id: i64,
+    /// user2 TRADEs this; user1 WANTs it.
+    pub merch_b_id: i64,
+}
+
+/// Options for [`setup_mutual_trade`]. Defaults yield a 1:1 reciprocal pair
+/// under group `"Cards"` with merch names `"Card A"` / `"Card B"`.
+#[derive(Debug, Clone)]
+pub struct MutualTradeOptions<'a> {
+    /// Event display name. When `None`, uses `"{label} Event"`.
+    pub event_name: Option<&'a str>,
+    pub group_name: &'a str,
+    pub merch_a_name: &'a str,
+    pub merch_b_name: &'a str,
+    /// user1 TRADE quantity of merch_a.
+    pub u1_trade: i32,
+    /// user1 WANT quantity of merch_b.
+    pub u1_want: i32,
+    /// user2 TRADE quantity of merch_b.
+    pub u2_trade: i32,
+    /// user2 WANT quantity of merch_a.
+    pub u2_want: i32,
+    /// When `Some(q)`, also seed HAVE for each user's TRADE merch at qty `q`
+    /// (used by apply-inventory / #429 tests).
+    pub have_qty: Option<i32>,
+}
+
+impl Default for MutualTradeOptions<'static> {
+    fn default() -> Self {
+        Self {
+            event_name: None,
+            group_name: "Cards",
+            merch_a_name: "Card A",
+            merch_b_name: "Card B",
+            u1_trade: 1,
+            u1_want: 1,
+            u2_trade: 1,
+            u2_want: 1,
+            have_qty: None,
+        }
+    }
+}
+
+/// Seed reciprocal TRADE/WANT inventory for a merch pair:
+///   user1 TRADE merch_a / WANT merch_b; user2 TRADE merch_b / WANT merch_a.
+pub async fn seed_reciprocal_inventory(
+    pool: &PgPool,
+    user1_id: i64,
+    user2_id: i64,
+    merch_a_id: i64,
+    merch_b_id: i64,
+    u1_trade: i32,
+    u1_want: i32,
+    u2_trade: i32,
+    u2_want: i32,
+) {
+    set_inventory(pool, user1_id, merch_a_id, "TRADE", u1_trade).await;
+    set_inventory(pool, user1_id, merch_b_id, "WANT", u1_want).await;
+    set_inventory(pool, user2_id, merch_b_id, "TRADE", u2_trade).await;
+    set_inventory(pool, user2_id, merch_a_id, "WANT", u2_want).await;
+}
+
+/// Create two guests, an event, a merch pair in one group, and reciprocal
+/// TRADE/WANT inventory (optionally HAVE). Does **not** run the matcher.
+///
+/// `label` is embedded in guest UUIDs so concurrent `#[sqlx::test]` cases
+/// stay unique (e.g. `"lifecycle"`, `"qty-cap"`).
+pub async fn setup_mutual_trade(
+    pool: &PgPool,
+    label: &str,
+    opts: MutualTradeOptions<'_>,
+) -> MutualTradeFixture {
+    let user1_id = login_guest(pool, &format!("{label}-u1"), "tok1").await;
+    let user2_id = login_guest(pool, &format!("{label}-u2"), "tok2").await;
+    let event_name = opts
+        .event_name
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{label} Event"));
+    let event_id = create_event(pool, &event_name, user1_id).await;
+    let merch_a_id = create_merch(pool, event_id, opts.merch_a_name, opts.group_name).await;
+    let merch_b_id = create_merch(pool, event_id, opts.merch_b_name, opts.group_name).await;
+
+    seed_reciprocal_inventory(
+        pool,
+        user1_id,
+        user2_id,
+        merch_a_id,
+        merch_b_id,
+        opts.u1_trade,
+        opts.u1_want,
+        opts.u2_trade,
+        opts.u2_want,
+    )
+    .await;
+
+    if let Some(have) = opts.have_qty {
+        set_inventory(pool, user1_id, merch_a_id, "HAVE", have).await;
+        set_inventory(pool, user2_id, merch_b_id, "HAVE", have).await;
+    }
+
+    MutualTradeFixture {
+        user1_id,
+        user2_id,
+        event_id,
+        merch_a_id,
+        merch_b_id,
+    }
+}
+
+/// List matches for `user_id` via the HTTP API.
+pub async fn list_user_matches(pool: &PgPool, user_id: i64) -> Vec<serde_json::Value> {
+    let resp = get_request(pool, &format!("/api/v1/matches/user/{}", user_id)).await;
+    assert_eq!(resp.status(), StatusCode::OK, "list matches failed");
+    serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap()
+}
+
+/// Run [`backend::matching::run_matching_algorithm`] and return the first
+/// match id for `user_id`. Asserts at least one match was created and the
+/// listed match is `PENDING`.
+pub async fn run_matcher_pending_match(pool: &PgPool, user_id: i64) -> i64 {
+    let created = backend::matching::run_matching_algorithm(pool)
+        .await
+        .expect("matching algorithm failed");
+    assert!(created >= 1, "matcher should create at least 1 match");
+    let matches = list_user_matches(pool, user_id).await;
+    assert!(!matches.is_empty(), "user should have at least one match");
+    assert_eq!(matches[0]["status"], "PENDING");
+    matches[0]["id"].as_i64().expect("match id")
+}
+
+/// [`setup_mutual_trade`] + matcher. Returns `(fixture, match_id)`.
+pub async fn setup_pending_mutual_match(
+    pool: &PgPool,
+    label: &str,
+    opts: MutualTradeOptions<'_>,
+) -> (MutualTradeFixture, i64) {
+    let fx = setup_mutual_trade(pool, label, opts).await;
+    let match_id = run_matcher_pending_match(pool, fx.user1_id).await;
+    (fx, match_id)
+}
+
+/// Seed a PENDING match via SQL (no matcher) with TRADE inventory of `trade_qty`
+/// per user for their own merch. Used by match-lifecycle / repository tests
+/// that need a fixed match row without going through the algorithm.
+///
+/// Returns `(user1_id, user2_id, match_id, merch_a, merch_b)`.
+pub async fn setup_pending_match_sql(
+    pool: &PgPool,
+    label: &str,
+    group_name: &str,
+    trade_qty: i32,
+) -> (i64, i64, i64, i32, i32) {
+    let user1_id = login_guest(pool, &format!("{label}-u1"), "tok1").await;
+    let user2_id = login_guest(pool, &format!("{label}-u2"), "tok2").await;
+    let event_id = create_event(pool, &format!("{label} Event"), user1_id).await;
+    // u2 needs event/editor to create merch under its own creator_id when
+    // tests assert per-creator merch (match_lifecycle style). Here both merch
+    // rows are created by the event creator via create_merch (creator_id from DB).
+    let merch_a = create_merch(pool, event_id, &format!("{label} A"), group_name).await;
+    let merch_b = create_merch(pool, event_id, &format!("{label} B"), group_name).await;
+
+    // Direct inventory rows (same effect as set_inventory, but keeps qty exact
+    // without going through the HTTP upsert path for lifecycle fixtures).
+    for (uid, mid) in [(user1_id, merch_a), (user2_id, merch_b)] {
+        sqlx::query(
+            "INSERT INTO inventory (user_id, merch_id, status, quantity)
+             VALUES ($1, $2, 'TRADE', $3)",
+        )
+        .bind(uid as i32)
+        .bind(mid as i32)
+        .bind(trade_qty)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
+         VALUES ($1, $2, 'PENDING', $3, $4) RETURNING id",
+    )
+    .bind(user1_id as i32)
+    .bind(user2_id as i32)
+    .bind(event_id as i32)
+    .bind(group_name)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+
+    (
+        user1_id,
+        user2_id,
+        match_id as i64,
+        merch_a as i32,
+        merch_b as i32,
+    )
+}
