@@ -2338,3 +2338,4 @@ frontend/.env
 # *local* convenience wrappers are ignored so a personal identifier can never
 # be committed. See scripts/grant_role.sh and docs/how_to/grant_roles.md.
 scripts/*local*
+*.swp

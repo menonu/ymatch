@@ -59,6 +59,12 @@ Screens / navigation  →  app state  →  API client  →  Backend
 | Authorization | RBAC roles/permissions global + event scopes | [0004](../adr/0004-rbac-permission-model.md) |
 | Merch create | Gated by `merch.create` (curated catalog) | [0005](../adr/0005-merch-create-permission.md) |
 | User.role field | Derived from `user_roles` at read time | [0006](../adr/0006-derive-user-role-from-user-roles.md) |
+| Apply HAVE | Default: giver HAVE− on apply; opt-out flag | [0009](../adr/0009-apply-inventory-decrements-giver-have.md) |
+| Capacity cancel | Zero mutual TRADE∩WANT → system CANCELLED | [0010](../adr/0010-inventory-mutual-capacity-invalidation.md) |
+| Trade capacity | Giver TRADE gates offer/accept/apply; HAVE optional | [0014](../adr/0014-fail-closed-inventory-apply.md) |
+
+Canonical narrative for **HAVE / WANT / TRADE** roles and gates:
+[06 — Runtime → Inventory status semantics](06-runtime.md#inventory-status-semantics).
 
 ## Matching strategy
 
@@ -69,6 +75,9 @@ A **background task** in the API process (`MATCHING_INTERVAL_SECONDS`) runs
 2. Find partners with **TRADE** on the wanted merch.
 3. Require reciprocal **TRADE/WANT** inside the **same (event_id, group_name)**.
 4. Insert a **PENDING** match when none already covers the pair in that group.
+
+Only **TRADE** and **WANT** participate in matching. **HAVE** is ignored by the
+matcher (optional ownership bookkeeping — see [inventory semantics](06-runtime.md#inventory-status-semantics)).
 
 Negotiation and inventory effects are **not** in the matcher — they live in
 `MatchLifecycleService` after users act (see [06 — Runtime](06-runtime.md)).

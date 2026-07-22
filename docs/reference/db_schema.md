@@ -147,6 +147,10 @@ CREATE TABLE inventory (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
     merch_id INTEGER NOT NULL REFERENCES merchandise(id),
+    -- HAVE  = optional ownership bookkeeping (not a trade gate)
+    -- WANT  = demand (matching + receive-side offer cap)
+    -- TRADE = supply (matching + give capacity; fail-closed on apply)
+    -- Semantics: docs/explanation/architecture/06-runtime.md#inventory-status-semantics
     status TEXT NOT NULL CHECK (status IN ('HAVE', 'WANT', 'TRADE')),
     quantity INTEGER NOT NULL DEFAULT 1,
     updated_at TIMESTAMPTZ DEFAULT NOW(),

@@ -415,6 +415,8 @@ Update the display sort order for merchandise in an event.
 
 Upsert a user's inventory entry. Creates or updates the record based on the unique `(user_id, merch_id, status)` constraint.
 
+`status` is one of `HAVE` / `WANT` / `TRADE`. **TRADE** and **WANT** participate in matching and trade capacity; **HAVE** is optional ownership bookkeeping and does not gate offer/accept. Full semantics: [architecture §06](../explanation/architecture/06-runtime.md#inventory-status-semantics).
+
 - **Request Body**:
   ```json
   {
@@ -474,12 +476,18 @@ Update the status of a match.
 Apply this user's inventory deltas for a **COMPLETED** match. Each participant
 applies independently; a second apply for the same user returns `409 Conflict`.
 
-Per absolute leg `(giver_user_id, merch_id, quantity)` ([ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md)):
+Per absolute leg `(giver_user_id, merch_id, quantity)`
+([ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md),
+[ADR 0014](../explanation/adr/0014-fail-closed-inventory-apply.md)):
 
 | Party | Default | `skipHaveDecrement: true` |
 |-------|---------|---------------------------|
-| Giver | `TRADE −qty`, `HAVE −qty` (clamped at 0) | `TRADE −qty` only |
+| Giver | `TRADE −qty` (**fail-closed** if insufficient), `HAVE −qty` (**clamp ≥ 0**) | `TRADE −qty` only |
 | Receiver | `HAVE +qty` | same (flag ignored) |
+
+HAVE is optional bookkeeping: short/missing HAVE never fails apply. TRADE is
+the trade pool and must cover `qty`. See
+[inventory status semantics](../explanation/architecture/06-runtime.md#inventory-status-semantics).
 
 - **Request Body**:
   ```json
@@ -492,8 +500,9 @@ Per absolute leg `(giver_user_id, merch_id, quantity)` ([ADR 0009](../explanatio
   - `skipHaveDecrement` (optional, default `false`): when `true`, do not
     decrement the giver's HAVE (legacy).
 - **Response**: `200 OK`
-- **Errors**: `400` if match is not `COMPLETED`; `403` if not a participant;
-  `404` if match missing; `409` if this user already applied.
+- **Errors**: `400` if match is not `COMPLETED`, or insufficient **TRADE** for
+  a give leg; `403` if not a participant; `404` if match missing; `409` if
+  this user already applied.
 - **Concurrency / client retry** (#492): check, deltas, and the per-user
   applied flag run in one transaction under a row lock, with a conditional
   mark (`WHERE applied_at IS NULL`). Concurrent applies for the same user
