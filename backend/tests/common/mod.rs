@@ -341,7 +341,9 @@ pub struct MutualTradeOptions<'a> {
     /// user2 WANT quantity of merch_a.
     pub u2_want: i32,
     /// When `Some(q)`, also seed HAVE for each user's TRADE merch at qty `q`
-    /// (used by apply-inventory / #429 tests).
+    /// (used by apply-inventory / #429 tests that assert HAVE deltas).
+    /// Default is `None`: HAVE is optional bookkeeping and does not gate
+    /// offer/accept (#493).
     pub have_qty: Option<i32>,
 }
 

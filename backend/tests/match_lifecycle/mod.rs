@@ -331,7 +331,8 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
     .unwrap();
     assert_eq!(qty.0, 3, "HAVE started at 5, decremented by 2");
 
-    // Over-decrement clamps at 0.
+    // HAVE is optional bookkeeping: over-decrement clamps at 0 and does not
+    // fail apply (#493 product clarification).
     inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -10)
         .await
         .unwrap();
@@ -344,6 +345,34 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(qty.0, 0, "HAVE decrement clamps at 0");
+}
+
+#[sqlx::test]
+async fn test_inventory_apply_trade_delta_insufficient_trade_fails(pool: PgPool) {
+    let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
+    // TRADE starts at 5 in the fixture.
+    let mut tx = pool.begin().await.unwrap();
+    let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
+    let err = inv
+        .apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 10, 0)
+        .await
+        .expect_err("TRADE over-decrement must fail closed");
+    assert!(
+        matches!(err, backend::error::AppError::BadRequest(_)),
+        "expected BadRequest, got: {err:?}"
+    );
+    let qty: (i32,) = sqlx::query_as(
+        "SELECT quantity FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'TRADE'",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(
+        qty.0, 5,
+        "failed TRADE decrement must leave quantity unchanged"
+    );
 }
 
 #[sqlx::test]

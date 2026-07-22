@@ -127,17 +127,20 @@ impl InventoryRepository {
     /// Apply a trade-delta to a user's inventory inside the
     /// caller's transaction.
     ///
-    /// - `delta_trade` (> 0): decrement the TRADE row by that amount
-    ///   (clamped at 0). `<= 0` skips TRADE.
+    /// - `delta_trade` (> 0): decrement the TRADE row by that amount.
+    ///   Fails with 400 if TRADE is missing or below `delta_trade` (#493 /
+    ///   ADR 0014). `<= 0` skips TRADE.
     /// - `delta_have` (signed, #429):
     ///   - `> 0`: upsert/increment the HAVE row by that amount
-    ///   - `< 0`: decrement the HAVE row by `|delta_have|` (clamped at 0)
+    ///   - `< 0`: decrement the HAVE row by `|delta_have|`, **clamped at 0**.
+    ///     HAVE is optional bookkeeping (not a trade gate); short HAVE never
+    ///     fails apply.
     ///   - `0`: skip HAVE
     ///
     /// Implemented as a single CTE so the generic `Executor` parameter
-    /// (consumed by `.execute()`) is used exactly once per call. The
+    /// (consumed by `.fetch_one()`) is used exactly once per call. The
     /// `$1 > 0` / `$4 > 0` / `$4 < 0` predicates short-circuit unused
-    /// branches.
+    /// branches. TRADE is fail-closed; HAVE decrement may soft-clamp.
     pub async fn apply_trade_delta<'c, E>(
         &self,
         exec: E,
@@ -149,18 +152,36 @@ impl InventoryRepository {
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        sqlx::query(
+        // TRADE is gated before write (fail-closed). HAVE is best-effort:
+        // clamp at 0 so missing/low HAVE never blocks a valid TRADE apply.
+        let row = sqlx::query(
             r#"
-            WITH trade_update AS (
+            WITH caps AS (
+                SELECT
+                    COALESCE(
+                        (SELECT quantity FROM inventory
+                         WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'),
+                        0
+                    ) AS trade_qty
+            ),
+            gate AS (
+                SELECT
+                    CASE WHEN $1 <= 0 OR trade_qty >= $1 THEN true ELSE false END AS trade_ok
+                FROM caps
+            ),
+            trade_update AS (
                 UPDATE inventory
-                SET quantity = GREATEST(quantity - $1, 0)
-                WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE' AND $1 > 0
+                SET quantity = quantity - $1
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'
+                  AND $1 > 0
+                  AND (SELECT trade_ok FROM gate)
                 RETURNING 1
             ),
             have_inc AS (
                 INSERT INTO inventory (user_id, merch_id, status, quantity)
                 SELECT $2, $3, 'HAVE', $4
                 WHERE $4 > 0
+                  AND (SELECT trade_ok FROM gate)
                 ON CONFLICT (user_id, merch_id, status)
                 DO UPDATE SET quantity = inventory.quantity + $4
                 RETURNING 1
@@ -168,19 +189,61 @@ impl InventoryRepository {
             have_dec AS (
                 UPDATE inventory
                 SET quantity = GREATEST(quantity + $4, 0)
-                WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE' AND $4 < 0
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE'
+                  AND $4 < 0
+                  AND (SELECT trade_ok FROM gate)
                 RETURNING 1
             )
-            SELECT 1
+            SELECT trade_ok FROM gate
             "#,
         )
         .bind(delta_trade)
         .bind(user_id)
         .bind(merch_id)
         .bind(delta_have)
-        .execute(exec)
+        .fetch_one(exec)
         .await?;
+
+        let trade_ok: bool = row.get("trade_ok");
+        if !trade_ok {
+            return Err(AppError::bad_request(
+                "Insufficient TRADE quantity to apply inventory",
+            ));
+        }
         Ok(())
+    }
+
+    /// Fetch a user's inventory quantities for `status` and the given
+    /// merch_ids as a `merch_id -> quantity` map. Missing rows are absent
+    /// (callers treat missing as 0). Runs on the supplied executor so the
+    /// read participates in the caller's transaction snapshot.
+    pub async fn quantities_for_status<'c, E>(
+        &self,
+        exec: E,
+        user_id: i32,
+        merch_ids: &[i32],
+        status: &str,
+    ) -> Result<std::collections::HashMap<i32, i32>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        if merch_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let rows = sqlx::query(
+            "SELECT merch_id, quantity FROM inventory \
+             WHERE user_id = $1 AND status = $2 AND merch_id = ANY($3)",
+        )
+        .bind(user_id)
+        .bind(status)
+        .bind(merch_ids)
+        .fetch_all(exec)
+        .await?;
+        let mut map = std::collections::HashMap::with_capacity(rows.len());
+        for r in rows {
+            map.insert(r.get::<i32, _>("merch_id"), r.get::<i32, _>("quantity"));
+        }
+        Ok(map)
     }
 
     /// Fetch a user's WANT quantities for the given merch_ids as a
@@ -198,21 +261,7 @@ impl InventoryRepository {
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        if merch_ids.is_empty() {
-            return Ok(std::collections::HashMap::new());
-        }
-        let rows = sqlx::query(
-            "SELECT merch_id, quantity FROM inventory \
-             WHERE user_id = $1 AND status = 'WANT' AND merch_id = ANY($2)",
-        )
-        .bind(user_id)
-        .bind(merch_ids)
-        .fetch_all(exec)
-        .await?;
-        let mut map = std::collections::HashMap::with_capacity(rows.len());
-        for r in rows {
-            map.insert(r.get::<i32, _>("merch_id"), r.get::<i32, _>("quantity"));
-        }
-        Ok(map)
+        self.quantities_for_status(exec, user_id, merch_ids, "WANT")
+            .await
     }
 }

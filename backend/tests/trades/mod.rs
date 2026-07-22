@@ -819,6 +819,121 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
     assert_eq!(matches[0]["status"], "OFFERED");
 }
 
+/// Issue #493: offer that exceeds the giver's TRADE (even when WANT allows it)
+/// must be rejected with 400. Fixture: TRADE x1, WANT x2, HAVE x2 so WANT is
+/// not the binding constraint.
+#[sqlx::test]
+async fn test_offer_over_trade_quantity_rejected(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "over-trade",
+        MutualTradeOptions {
+            event_name: Some("Over Trade Event"),
+            u1_trade: 1,
+            u1_want: 2,
+            u2_trade: 1,
+            u2_want: 2,
+            have_qty: Some(2),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+
+    // Giver user1 TRADE A x1 but offers qty 2 (WANT allows 2) → 400.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/offer", match_id),
+        &format!(
+            r#"{{"userId": {}, "items": [
+                {{"merchId": {}, "giverUserId": {}, "quantity": 2}}
+            ]}}"#,
+            fx.user1_id, fx.merch_a_id, fx.user1_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Match stays PENDING after rejected offer.
+    let matches = list_user_matches(&pool, fx.user1_id).await;
+    assert_eq!(matches[0]["status"], "PENDING");
+}
+
+/// HAVE is optional bookkeeping: zero HAVE does not block accept when TRADE
+/// still covers the legs (#493 product clarification).
+#[sqlx::test]
+async fn test_accept_ok_when_giver_have_is_zero(pool: PgPool) {
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 1, 1, 1, 1).await;
+
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 1}}, {{"merchId": {}, "giverUserId": {}, "quantity": 1}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &format!(r#"{{"userId": {}, "items": [{}]}}"#, user1_id, items)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    set_inventory(&pool, user1_id, merch_a_id, "HAVE", 0).await;
+    set_inventory(&pool, user2_id, merch_b_id, "HAVE", 0).await;
+
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id),
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+}
+
+/// Issue #493: accept fails when giver TRADE drops mid-negotiation.
+#[sqlx::test]
+async fn test_accept_rejected_when_giver_trade_drops_mid_negotiation(pool: PgPool) {
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 2}}, {{"merchId": {}, "giverUserId": {}, "quantity": 2}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &format!(r#"{{"userId": {}, "items": [{}]}}"#, user1_id, items)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    // Reduce user1 TRADE of A to 1 mid-negotiation (WANT still 2; cap still > 0).
+    set_inventory(&pool, user1_id, merch_a_id, "TRADE", 1).await;
+
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/status", match_id),
+        &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let matches = list_user_matches(&pool, user1_id).await;
+    assert_eq!(
+        matches[0]["status"], "OFFERED",
+        "failed accept must leave status OFFERED"
+    );
+}
+
 /// Issue #297: the negotiation state machine. A give-only opening proposal is
 /// unbalanced and cannot be accepted; the proposer cannot accept or counter
 /// their own; the non-proposer counter-offers to add the complementary leg
