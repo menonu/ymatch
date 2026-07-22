@@ -128,18 +128,19 @@ impl InventoryRepository {
     /// caller's transaction.
     ///
     /// - `delta_trade` (> 0): decrement the TRADE row by that amount.
-    ///   Fails with 400 if TRADE is missing or below `delta_trade` (#493).
-    ///   `<= 0` skips TRADE.
+    ///   Fails with 400 if TRADE is missing or below `delta_trade` (#493 /
+    ///   ADR 0014). `<= 0` skips TRADE.
     /// - `delta_have` (signed, #429):
     ///   - `> 0`: upsert/increment the HAVE row by that amount
-    ///   - `< 0`: decrement the HAVE row by `|delta_have|`. Fails with 400
-    ///     if HAVE is missing or below the decrement (#493 / ADR 0014).
+    ///   - `< 0`: decrement the HAVE row by `|delta_have|`, **clamped at 0**.
+    ///     HAVE is optional bookkeeping (not a trade gate); short HAVE never
+    ///     fails apply.
     ///   - `0`: skip HAVE
     ///
     /// Implemented as a single CTE so the generic `Executor` parameter
     /// (consumed by `.fetch_one()`) is used exactly once per call. The
     /// `$1 > 0` / `$4 > 0` / `$4 < 0` predicates short-circuit unused
-    /// branches. No silent clamp: insufficient stock is fail-closed.
+    /// branches. TRADE is fail-closed; HAVE decrement may soft-clamp.
     pub async fn apply_trade_delta<'c, E>(
         &self,
         exec: E,
@@ -151,10 +152,8 @@ impl InventoryRepository {
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        // Gate both decrements before any write so a dual-delta call
-        // (TRADE− and HAVE−) cannot partially mutate one status and still
-        // return 400 for the other — even if the executor is not wrapped
-        // in an outer transaction (#493 review).
+        // TRADE is gated before write (fail-closed). HAVE is best-effort:
+        // clamp at 0 so missing/low HAVE never blocks a valid TRADE apply.
         let row = sqlx::query(
             r#"
             WITH caps AS (
@@ -163,17 +162,11 @@ impl InventoryRepository {
                         (SELECT quantity FROM inventory
                          WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'),
                         0
-                    ) AS trade_qty,
-                    COALESCE(
-                        (SELECT quantity FROM inventory
-                         WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE'),
-                        0
-                    ) AS have_qty
+                    ) AS trade_qty
             ),
             gate AS (
                 SELECT
-                    CASE WHEN $1 <= 0 OR trade_qty >= $1 THEN true ELSE false END AS trade_ok,
-                    CASE WHEN $4 >= 0 OR have_qty >= (-$4) THEN true ELSE false END AS have_ok
+                    CASE WHEN $1 <= 0 OR trade_qty >= $1 THEN true ELSE false END AS trade_ok
                 FROM caps
             ),
             trade_update AS (
@@ -181,27 +174,27 @@ impl InventoryRepository {
                 SET quantity = quantity - $1
                 WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'
                   AND $1 > 0
-                  AND (SELECT trade_ok AND have_ok FROM gate)
+                  AND (SELECT trade_ok FROM gate)
                 RETURNING 1
             ),
             have_inc AS (
                 INSERT INTO inventory (user_id, merch_id, status, quantity)
                 SELECT $2, $3, 'HAVE', $4
                 WHERE $4 > 0
-                  AND (SELECT trade_ok AND have_ok FROM gate)
+                  AND (SELECT trade_ok FROM gate)
                 ON CONFLICT (user_id, merch_id, status)
                 DO UPDATE SET quantity = inventory.quantity + $4
                 RETURNING 1
             ),
             have_dec AS (
                 UPDATE inventory
-                SET quantity = quantity + $4
+                SET quantity = GREATEST(quantity + $4, 0)
                 WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE'
                   AND $4 < 0
-                  AND (SELECT trade_ok AND have_ok FROM gate)
+                  AND (SELECT trade_ok FROM gate)
                 RETURNING 1
             )
-            SELECT trade_ok, have_ok FROM gate
+            SELECT trade_ok FROM gate
             "#,
         )
         .bind(delta_trade)
@@ -212,15 +205,9 @@ impl InventoryRepository {
         .await?;
 
         let trade_ok: bool = row.get("trade_ok");
-        let have_ok: bool = row.get("have_ok");
         if !trade_ok {
             return Err(AppError::bad_request(
                 "Insufficient TRADE quantity to apply inventory",
-            ));
-        }
-        if !have_ok {
-            return Err(AppError::bad_request(
-                "Insufficient HAVE quantity to apply inventory",
             ));
         }
         Ok(())

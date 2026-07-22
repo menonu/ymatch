@@ -331,15 +331,11 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
     .unwrap();
     assert_eq!(qty.0, 3, "HAVE started at 5, decremented by 2");
 
-    // Over-decrement fails closed (#493 / ADR 0014) — no silent clamp.
-    let err = inv
-        .apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -10)
+    // HAVE is optional bookkeeping: over-decrement clamps at 0 and does not
+    // fail apply (#493 product clarification).
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -10)
         .await
-        .expect_err("insufficient HAVE must 400");
-    assert!(
-        matches!(err, backend::error::AppError::BadRequest(_)),
-        "expected BadRequest, got: {err:?}"
-    );
+        .unwrap();
     let qty: (i32,) = sqlx::query_as(
         "SELECT quantity FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'HAVE'",
     )
@@ -348,10 +344,7 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
     .fetch_one(&mut *tx)
     .await
     .unwrap();
-    assert_eq!(
-        qty.0, 3,
-        "failed HAVE decrement must leave quantity unchanged"
-    );
+    assert_eq!(qty.0, 0, "HAVE decrement clamps at 0");
 }
 
 #[sqlx::test]

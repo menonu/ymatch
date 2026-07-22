@@ -145,8 +145,8 @@ impl MatchLifecycleService {
         // Issue #294/#297: cap each leg's quantity by the receiver's WANT
         // quantity. The receiver of a leg is the non-giver, so we need both
         // participants' want quantities.
-        // Issue #493: also require giver TRADE and HAVE capacity (default
-        // apply decrements both; fail closed early for UX).
+        // Issue #493: also require giver TRADE capacity (HAVE is optional
+        // bookkeeping and is not a negotiation gate).
         let user1_wants = self
             .inventory
             .want_quantities(&mut *tx, locked.user1_id, &merch_ids)
@@ -162,14 +162,15 @@ impl MatchLifecycleService {
             &user1_wants,
             &user2_wants,
         )?;
-        let giver_maps = self
-            .load_giver_maps(&mut tx, locked.user1_id, locked.user2_id, &merch_ids)
+        let trade_maps = self
+            .load_trade_maps(&mut tx, locked.user1_id, locked.user2_id, &merch_ids)
             .await?;
-        validate_giver_capacity(
+        validate_giver_trade_capacity(
             &offer.items,
             locked.user1_id,
             locked.user2_id,
-            giver_maps.supply_with_have(),
+            &trade_maps.user1_trade,
+            &trade_maps.user2_trade,
         )?;
 
         self.matches
@@ -248,8 +249,8 @@ impl MatchLifecycleService {
             // WANT changed mid-negotiation; the per-propose cap only
             // checks the submitted legs, so the final gate re-checks the
             // whole set before inventory is applied (#297 review).
-            // #493: also re-check giver TRADE and HAVE so accept fails
-            // closed when capacity was reduced mid-negotiation.
+            // #493: also re-check giver TRADE so accept fails closed when
+            // capacity was reduced mid-negotiation. HAVE is not a gate.
             let offer_items: Vec<OfferItem> = items
                 .iter()
                 .map(|i| OfferItem {
@@ -274,14 +275,15 @@ impl MatchLifecycleService {
                 &user1_wants,
                 &user2_wants,
             )?;
-            let giver_maps = self
-                .load_giver_maps(&mut tx, locked.user1_id, locked.user2_id, &merch_ids)
+            let trade_maps = self
+                .load_trade_maps(&mut tx, locked.user1_id, locked.user2_id, &merch_ids)
                 .await?;
-            validate_giver_capacity(
+            validate_giver_trade_capacity(
                 &offer_items,
                 locked.user1_id,
                 locked.user2_id,
-                giver_maps.supply_with_have(),
+                &trade_maps.user1_trade,
+                &trade_maps.user2_trade,
             )?;
             self.matches
                 .set_status(&mut *tx, match_id, new_status)
@@ -310,9 +312,10 @@ impl MatchLifecycleService {
     /// Legs are absolute (#297 / #429): for each leg `(giver, merch, qty)`,
     /// by default the giver's TRADE **and** HAVE decrease by qty and the
     /// receiver's HAVE increases by qty. When `skip_have_decrement` is true,
-    /// the giver's HAVE is left unchanged (legacy). Apply is **fail-closed**
-    /// (#493 / ADR 0014): insufficient TRADE (or HAVE when decremented)
-    /// returns 400 — no silent clamp. The pure side selection lives in
+    /// the giver's HAVE is left unchanged (legacy). TRADE apply is
+    /// **fail-closed** (#493 / ADR 0014): insufficient TRADE returns 400.
+    /// HAVE is optional bookkeeping — short HAVE is clamped at 0 and never
+    /// fails apply. The pure side selection lives in
     /// [`apply_inventory_delta`] (so it can be unit-tested without a
     /// database); the transaction-bearing part is covered by the integration
     /// tests `test_trade_lifecycle_offer_accept_complete_apply` and
@@ -466,15 +469,16 @@ impl MatchLifecycleService {
         Ok(())
     }
 
-    /// Load both participants' TRADE and HAVE maps for the given merch
-    /// (shared by offer and accept #493 capacity gates).
-    async fn load_giver_maps(
+    /// Load both participants' TRADE maps for the given merch (shared by
+    /// offer and accept #493 capacity gates). HAVE is not loaded — it is
+    /// not a trade gate.
+    async fn load_trade_maps(
         &self,
         conn: &mut sqlx::PgConnection,
         user1_id: i32,
         user2_id: i32,
         merch_ids: &[i32],
-    ) -> Result<OwnedGiverMaps, AppError> {
+    ) -> Result<OwnedTradeMaps, AppError> {
         let user1_trade = self
             .inventory
             .quantities_for_status(&mut *conn, user1_id, merch_ids, "TRADE")
@@ -483,43 +487,20 @@ impl MatchLifecycleService {
             .inventory
             .quantities_for_status(&mut *conn, user2_id, merch_ids, "TRADE")
             .await?;
-        let user1_have = self
-            .inventory
-            .quantities_for_status(&mut *conn, user1_id, merch_ids, "HAVE")
-            .await?;
-        let user2_have = self
-            .inventory
-            .quantities_for_status(&mut *conn, user2_id, merch_ids, "HAVE")
-            .await?;
-        Ok(OwnedGiverMaps {
+        Ok(OwnedTradeMaps {
             user1_trade,
             user2_trade,
-            user1_have,
-            user2_have,
         })
     }
 }
 
 /// `merch_id -> quantity` for one participant.
 type QtyMap = std::collections::HashMap<i32, i32>;
-/// `(user1, user2)` quantity maps for one inventory status.
-type ParticipantQtyMaps<'a> = (&'a QtyMap, &'a QtyMap);
 
-/// Owned TRADE/HAVE maps for both participants (lifetime-free load result).
-struct OwnedGiverMaps {
+/// Owned TRADE maps for both participants (lifetime-free load result).
+struct OwnedTradeMaps {
     user1_trade: QtyMap,
     user2_trade: QtyMap,
-    user1_have: QtyMap,
-    user2_have: QtyMap,
-}
-
-impl OwnedGiverMaps {
-    fn supply_with_have(&self) -> GiverSupply<'_> {
-        GiverSupply {
-            trade: (&self.user1_trade, &self.user2_trade),
-            have: Some((&self.user1_have, &self.user2_have)),
-        }
-    }
 }
 
 // Note: the lifecycle service requires a real database (transactions are
@@ -527,7 +508,7 @@ impl OwnedGiverMaps {
 // `offer`, `change_status`, and `apply_inventory` are covered by the
 // integration test suite in backend/tests/api_tests.rs. The pure
 // state-machine guards are factored out below (`validate_propose_transition`,
-// `validate_participation`, `validate_legs`, `validate_giver_capacity`,
+// `validate_participation`, `validate_legs`, `validate_giver_trade_capacity`,
 // `is_balanced`, `validate_transition_target`, `validate_status_transition`,
 // `apply_inventory_delta`) so they can be unit-tested without a database.
 // ADR 0010 capacity predicate lives in `match_::capacity_requires_cancel`.
@@ -589,26 +570,18 @@ fn validate_legs(
     Ok(())
 }
 
-/// Per-participant TRADE maps, and optional HAVE maps when HAVE will
-/// decrement on apply (#493 / ADR 0009 default).
-struct GiverSupply<'a> {
-    /// `(user1_trade, user2_trade)` keyed by merch_id.
-    trade: ParticipantQtyMaps<'a>,
-    /// `Some((user1_have, user2_have))` when HAVE capacity is required.
-    have: Option<ParticipantQtyMaps<'a>>,
-}
-
-/// Validate that each giver still has enough supply for the offered legs
+/// Validate that each giver still has enough TRADE for the offered legs
 /// (#493). Aggregates quantity per `(giver, merch_id)` like [`validate_legs`].
 ///
-/// Always requires giver `TRADE >= total`. When `supply.have` is `Some`
-/// (offer and accept; default apply decrements HAVE per ADR 0009), also
-/// requires giver `HAVE >= total`. Missing inventory rows count as 0.
-fn validate_giver_capacity(
+/// Requires giver `TRADE >= total`. Missing TRADE rows count as 0.
+/// HAVE is intentionally **not** checked: it is optional user bookkeeping
+/// and does not gate negotiation or trade validity.
+fn validate_giver_trade_capacity(
     items: &[OfferItem],
     user1_id: i32,
     user2_id: i32,
-    supply: GiverSupply<'_>,
+    user1_trade: &QtyMap,
+    user2_trade: &QtyMap,
 ) -> Result<(), AppError> {
     let mut totals: std::collections::HashMap<i32, std::collections::HashMap<i32, i32>> =
         std::collections::HashMap::new();
@@ -629,27 +602,16 @@ fn validate_giver_capacity(
     }
     for (giver, merch_totals) in &totals {
         let trade_map = if *giver == user1_id {
-            supply.trade.0
+            user1_trade
         } else {
-            supply.trade.1
+            user2_trade
         };
-        let have_map = supply
-            .have
-            .map(|(u1, u2)| if *giver == user1_id { u1 } else { u2 });
         for (merch_id, total) in merch_totals {
             let trade_cap = trade_map.get(merch_id).copied().unwrap_or(0);
             if *total > trade_cap {
                 return Err(AppError::bad_request(
                     "Offered quantity exceeds the giver's TRADE quantity",
                 ));
-            }
-            if let Some(have) = have_map {
-                let have_cap = have.get(merch_id).copied().unwrap_or(0);
-                if *total > have_cap {
-                    return Err(AppError::bad_request(
-                        "Offered quantity exceeds the giver's HAVE quantity",
-                    ));
-                }
             }
         }
     }
@@ -977,48 +939,25 @@ mod tests {
         );
     }
 
-    // --- validate_giver_capacity (TRADE / HAVE supply, #493) ---
-
-    fn empty_qty() -> std::collections::HashMap<i32, i32> {
-        want_map(&[])
-    }
+    // --- validate_giver_trade_capacity (TRADE supply only, #493) ---
 
     #[test]
-    fn giver_within_trade_and_have_ok() {
-        // giver=1 gives merch 1 x2; TRADE=2, HAVE=3.
+    fn giver_within_trade_ok() {
+        // giver=1 gives merch 1 x2; TRADE=2. HAVE is irrelevant.
         let u1_trade = want_map(&[(1, 2)]);
-        let u1_have = want_map(&[(1, 3)]);
-        let empty = empty_qty();
+        let empty = want_map(&[]);
         assert_eq!(
-            validate_giver_capacity(
-                &legs(&[(1, 1, 2)]),
-                1,
-                2,
-                GiverSupply {
-                    trade: (&u1_trade, &empty),
-                    have: Some((&u1_have, &empty)),
-                },
-            ),
+            validate_giver_trade_capacity(&legs(&[(1, 1, 2)]), 1, 2, &u1_trade, &empty),
             Ok(())
         );
     }
 
     #[test]
     fn giver_exceeds_trade_rejected() {
-        // WANT would allow 3, but giver only has TRADE x1.
         let u1_trade = want_map(&[(1, 1)]);
-        let u1_have = want_map(&[(1, 5)]);
-        let empty = empty_qty();
+        let empty = want_map(&[]);
         assert_eq!(
-            validate_giver_capacity(
-                &legs(&[(1, 1, 3)]),
-                1,
-                2,
-                GiverSupply {
-                    trade: (&u1_trade, &empty),
-                    have: Some((&u1_have, &empty)),
-                },
-            ),
+            validate_giver_trade_capacity(&legs(&[(1, 1, 3)]), 1, 2, &u1_trade, &empty),
             Err(AppError::bad_request(
                 "Offered quantity exceeds the giver's TRADE quantity"
             ))
@@ -1026,42 +965,12 @@ mod tests {
     }
 
     #[test]
-    fn giver_exceeds_have_rejected_when_checked() {
-        // TRADE is enough; HAVE is short when have maps are provided.
+    fn giver_short_have_does_not_block_trade_capacity() {
+        // TRADE is enough; HAVE is not consulted by this gate.
         let u1_trade = want_map(&[(1, 5)]);
-        let u1_have = want_map(&[(1, 1)]);
-        let empty = empty_qty();
+        let empty = want_map(&[]);
         assert_eq!(
-            validate_giver_capacity(
-                &legs(&[(1, 1, 2)]),
-                1,
-                2,
-                GiverSupply {
-                    trade: (&u1_trade, &empty),
-                    have: Some((&u1_have, &empty)),
-                },
-            ),
-            Err(AppError::bad_request(
-                "Offered quantity exceeds the giver's HAVE quantity"
-            ))
-        );
-    }
-
-    #[test]
-    fn giver_have_not_checked_when_disabled() {
-        // skip_have path: TRADE ok, HAVE short, have: None → ok.
-        let u1_trade = want_map(&[(1, 5)]);
-        let empty = empty_qty();
-        assert_eq!(
-            validate_giver_capacity(
-                &legs(&[(1, 1, 2)]),
-                1,
-                2,
-                GiverSupply {
-                    trade: (&u1_trade, &empty),
-                    have: None,
-                },
-            ),
+            validate_giver_trade_capacity(&legs(&[(1, 1, 2)]), 1, 2, &u1_trade, &empty),
             Ok(())
         );
     }
@@ -1069,17 +978,9 @@ mod tests {
     #[test]
     fn split_legs_cannot_bypass_trade_cap() {
         let u1_trade = want_map(&[(1, 1)]);
-        let empty = empty_qty();
+        let empty = want_map(&[]);
         assert_eq!(
-            validate_giver_capacity(
-                &legs(&[(1, 1, 1), (1, 1, 1)]),
-                1,
-                2,
-                GiverSupply {
-                    trade: (&u1_trade, &empty),
-                    have: None,
-                },
-            ),
+            validate_giver_trade_capacity(&legs(&[(1, 1, 1), (1, 1, 1)]), 1, 2, &u1_trade, &empty),
             Err(AppError::bad_request(
                 "Offered quantity exceeds the giver's TRADE quantity"
             ))
@@ -1088,17 +989,9 @@ mod tests {
 
     #[test]
     fn missing_trade_row_counts_as_zero() {
-        let empty = empty_qty();
+        let empty = want_map(&[]);
         assert_eq!(
-            validate_giver_capacity(
-                &legs(&[(1, 1, 1)]),
-                1,
-                2,
-                GiverSupply {
-                    trade: (&empty, &empty),
-                    have: None,
-                },
-            ),
+            validate_giver_trade_capacity(&legs(&[(1, 1, 1)]), 1, 2, &empty, &empty),
             Err(AppError::bad_request(
                 "Offered quantity exceeds the giver's TRADE quantity"
             ))

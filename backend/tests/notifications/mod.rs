@@ -139,8 +139,7 @@ async fn test_notification_counts_values(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     let m_b_id = m_b["id"].as_i64().unwrap();
 
-    // Each user puts the other's card as WANT and their own as TRADE+HAVE
-    // (HAVE required for #493 giver-capacity checks on offer).
+    // Each user puts the other's card as WANT and their own as TRADE
     for (user_id, merch_id) in [(u1, m_b_id), (u2, m_a_id)] {
         let app = backend::routes::create_router(pool.clone(), test_storage());
         let _ = app
@@ -157,24 +156,22 @@ async fn test_notification_counts_values(pool: PgPool) {
             )
             .await
             .unwrap();
-        let own = if user_id == u1 { m_a_id } else { m_b_id };
-        for status in ["TRADE", "HAVE"] {
-            let app = backend::routes::create_router(pool.clone(), test_storage());
-            let _ = app
-                .oneshot(
-                    Request::builder()
-                        .method("POST")
-                        .uri("/api/v1/user/inventory")
-                        .header("content-type", "application/json")
-                        .body(Body::from(format!(
-                            r#"{{"userId": {}, "merchId": {}, "status": "{}", "quantity": 1}}"#,
-                            user_id, own, status
-                        )))
-                        .unwrap(),
-                )
-                .await
-                .unwrap();
-        }
+        let app = backend::routes::create_router(pool.clone(), test_storage());
+        let _ = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/user/inventory")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"userId": {}, "merchId": {}, "status": "TRADE", "quantity": 1}}"#,
+                        user_id,
+                        if user_id == u1 { m_a_id } else { m_b_id }
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
     }
 
     // Insert match directly (the matching algorithm is out of scope for
