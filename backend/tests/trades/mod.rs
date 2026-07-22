@@ -661,6 +661,9 @@ async fn setup_pending_trade_match_quantities(
     u2_trade: i32,
     u2_want: i32,
 ) -> (i64, i64, i64, i64, i64) {
+    // HAVE at least as large as TRADE so #493 giver-capacity checks do not
+    // fire when the test is about WANT caps only.
+    let have = u1_trade.max(u2_trade);
     let (fx, match_id) = setup_pending_mutual_match(
         &pool,
         "qty-cap",
@@ -670,6 +673,7 @@ async fn setup_pending_trade_match_quantities(
             u1_want,
             u2_trade,
             u2_want,
+            have_qty: Some(have),
             ..MutualTradeOptions::default()
         },
     )
@@ -817,6 +821,118 @@ async fn test_offer_over_want_quantity_rejected(pool: PgPool) {
     let matches: Vec<serde_json::Value> =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(matches[0]["status"], "OFFERED");
+}
+
+/// Issue #493: offer that exceeds the giver's TRADE (even when WANT allows it)
+/// must be rejected with 400. Fixture: TRADE x1, WANT x2, HAVE x2 so WANT is
+/// not the binding constraint.
+#[sqlx::test]
+async fn test_offer_over_trade_quantity_rejected(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "over-trade",
+        MutualTradeOptions {
+            event_name: Some("Over Trade Event"),
+            u1_trade: 1,
+            u1_want: 2,
+            u2_trade: 1,
+            u2_want: 2,
+            have_qty: Some(2),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+
+    // Giver user1 TRADE A x1 but offers qty 2 (WANT allows 2) → 400.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/offer", match_id),
+        &format!(
+            r#"{{"userId": {}, "items": [
+                {{"merchId": {}, "giverUserId": {}, "quantity": 2}}
+            ]}}"#,
+            fx.user1_id, fx.merch_a_id, fx.user1_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Match stays PENDING after rejected offer.
+    let matches = list_user_matches(&pool, fx.user1_id).await;
+    assert_eq!(matches[0]["status"], "PENDING");
+}
+
+/// Issue #493: offer that exceeds the giver's HAVE (TRADE and WANT ok) is 400.
+#[sqlx::test]
+async fn test_offer_over_have_quantity_rejected(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "over-have",
+        MutualTradeOptions {
+            event_name: Some("Over Have Event"),
+            u1_trade: 2,
+            u1_want: 2,
+            u2_trade: 2,
+            u2_want: 2,
+            have_qty: Some(1),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/offer", match_id),
+        &format!(
+            r#"{{"userId": {}, "items": [
+                {{"merchId": {}, "giverUserId": {}, "quantity": 2}}
+            ]}}"#,
+            fx.user1_id, fx.merch_a_id, fx.user1_id
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+/// Issue #493: accept re-checks giver TRADE; if TRADE drops mid-negotiation
+/// below the leg qty, accept is 400 (WANT still satisfied, proposal balanced).
+#[sqlx::test]
+async fn test_accept_rejected_when_giver_trade_insufficient(pool: PgPool) {
+    // TRADE x2 / WANT x2 / HAVE x2 so a 2:2 offer is initially valid.
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 2}}, {{"merchId": {}, "giverUserId": {}, "quantity": 2}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &format!(r#"{{"userId": {}, "items": [{}]}}"#, user1_id, items)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    // Reduce user1 TRADE of A to 1 mid-negotiation (WANT still 2; cap still > 0).
+    set_inventory(&pool, user1_id, merch_a_id, "TRADE", 1).await;
+
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/status", match_id),
+        &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let matches = list_user_matches(&pool, user1_id).await;
+    assert_eq!(
+        matches[0]["status"], "OFFERED",
+        "failed accept must leave status OFFERED"
+    );
 }
 
 /// Issue #297: the negotiation state machine. A give-only opening proposal is

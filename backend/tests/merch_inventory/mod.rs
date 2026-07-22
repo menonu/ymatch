@@ -829,8 +829,10 @@ async fn test_apply_inventory_handles_null_photo_url(pool: PgPool) {
     // 4. Set cross-trade inventory: user1 TRADES Card A + WANTs Card B;
     //    user2 TRADES Card B + WANTs Card A.
     set_inventory(&pool, user1_id, card_a, "TRADE", 1).await;
+    set_inventory(&pool, user1_id, card_a, "HAVE", 1).await;
     set_inventory(&pool, user1_id, card_b, "WANT", 1).await;
     set_inventory(&pool, user2_id, card_b, "TRADE", 1).await;
+    set_inventory(&pool, user2_id, card_b, "HAVE", 1).await;
     set_inventory(&pool, user2_id, card_a, "WANT", 1).await;
 
     // 5. Run the matcher directly (don't wait 60s for the periodic run).
@@ -1350,7 +1352,8 @@ async fn seed_mutual_capacity_match(
             u1_want: qty,
             u2_trade: qty,
             u2_want: qty,
-            have_qty: None,
+            // #493: seed HAVE so offer/accept capacity gates pass when used.
+            have_qty: Some(qty),
         },
     )
     .await;

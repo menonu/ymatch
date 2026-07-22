@@ -1,6 +1,6 @@
 # ADR 0009: Apply Inventory Decrements Giver HAVE by Default
 
-- **Status**: Accepted
+- **Status**: Accepted (insufficient-stock clamp superseded in part by [ADR 0014](0014-fail-closed-inventory-apply.md))
 - **Date**: 2026-07-15
 - **Supersedes**: Partial supersession of [ADR 0002](0002-negotiation-state-machine.md) § Decision point 6 (apply-inventory deltas only)
 

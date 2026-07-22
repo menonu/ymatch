@@ -341,7 +341,9 @@ pub struct MutualTradeOptions<'a> {
     /// user2 WANT quantity of merch_a.
     pub u2_want: i32,
     /// When `Some(q)`, also seed HAVE for each user's TRADE merch at qty `q`
-    /// (used by apply-inventory / #429 tests).
+    /// (used by apply-inventory / #429 / #493 tests). Default is `Some(1)` so
+    /// offer/accept can satisfy giver HAVE capacity under ADR 0009 default
+    /// apply. Use `None` only when a test must omit HAVE rows.
     pub have_qty: Option<i32>,
 }
 
@@ -356,7 +358,9 @@ impl Default for MutualTradeOptions<'static> {
             u1_want: 1,
             u2_trade: 1,
             u2_want: 1,
-            have_qty: None,
+            // #493: default apply decrements HAVE; seed ownership so 1:1
+            // offers pass giver capacity without every fixture repeating this.
+            have_qty: Some(1),
         }
     }
 }

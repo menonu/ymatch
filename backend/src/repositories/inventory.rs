@@ -127,17 +127,19 @@ impl InventoryRepository {
     /// Apply a trade-delta to a user's inventory inside the
     /// caller's transaction.
     ///
-    /// - `delta_trade` (> 0): decrement the TRADE row by that amount
-    ///   (clamped at 0). `<= 0` skips TRADE.
+    /// - `delta_trade` (> 0): decrement the TRADE row by that amount.
+    ///   Fails with 400 if TRADE is missing or below `delta_trade` (#493).
+    ///   `<= 0` skips TRADE.
     /// - `delta_have` (signed, #429):
     ///   - `> 0`: upsert/increment the HAVE row by that amount
-    ///   - `< 0`: decrement the HAVE row by `|delta_have|` (clamped at 0)
+    ///   - `< 0`: decrement the HAVE row by `|delta_have|`. Fails with 400
+    ///     if HAVE is missing or below the decrement (#493 / ADR 0014).
     ///   - `0`: skip HAVE
     ///
     /// Implemented as a single CTE so the generic `Executor` parameter
-    /// (consumed by `.execute()`) is used exactly once per call. The
+    /// (consumed by `.fetch_one()`) is used exactly once per call. The
     /// `$1 > 0` / `$4 > 0` / `$4 < 0` predicates short-circuit unused
-    /// branches.
+    /// branches. No silent clamp: insufficient stock is fail-closed.
     pub async fn apply_trade_delta<'c, E>(
         &self,
         exec: E,
@@ -149,12 +151,13 @@ impl InventoryRepository {
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        sqlx::query(
+        let row = sqlx::query(
             r#"
             WITH trade_update AS (
                 UPDATE inventory
-                SET quantity = GREATEST(quantity - $1, 0)
-                WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE' AND $1 > 0
+                SET quantity = quantity - $1
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'
+                  AND $1 > 0 AND quantity >= $1
                 RETURNING 1
             ),
             have_inc AS (
@@ -167,20 +170,71 @@ impl InventoryRepository {
             ),
             have_dec AS (
                 UPDATE inventory
-                SET quantity = GREATEST(quantity + $4, 0)
-                WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE' AND $4 < 0
+                SET quantity = quantity + $4
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE'
+                  AND $4 < 0 AND quantity >= (-$4)
                 RETURNING 1
             )
-            SELECT 1
+            SELECT
+                CASE WHEN $1 > 0 AND NOT EXISTS (SELECT 1 FROM trade_update)
+                    THEN false ELSE true END AS trade_ok,
+                CASE WHEN $4 < 0 AND NOT EXISTS (SELECT 1 FROM have_dec)
+                    THEN false ELSE true END AS have_ok
             "#,
         )
         .bind(delta_trade)
         .bind(user_id)
         .bind(merch_id)
         .bind(delta_have)
-        .execute(exec)
+        .fetch_one(exec)
         .await?;
+
+        let trade_ok: bool = row.get("trade_ok");
+        let have_ok: bool = row.get("have_ok");
+        if !trade_ok {
+            return Err(AppError::bad_request(
+                "Insufficient TRADE quantity to apply inventory",
+            ));
+        }
+        if !have_ok {
+            return Err(AppError::bad_request(
+                "Insufficient HAVE quantity to apply inventory",
+            ));
+        }
         Ok(())
+    }
+
+    /// Fetch a user's inventory quantities for `status` and the given
+    /// merch_ids as a `merch_id -> quantity` map. Missing rows are absent
+    /// (callers treat missing as 0). Runs on the supplied executor so the
+    /// read participates in the caller's transaction snapshot.
+    pub async fn quantities_for_status<'c, E>(
+        &self,
+        exec: E,
+        user_id: i32,
+        merch_ids: &[i32],
+        status: &str,
+    ) -> Result<std::collections::HashMap<i32, i32>, AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        if merch_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let rows = sqlx::query(
+            "SELECT merch_id, quantity FROM inventory \
+             WHERE user_id = $1 AND status = $2 AND merch_id = ANY($3)",
+        )
+        .bind(user_id)
+        .bind(status)
+        .bind(merch_ids)
+        .fetch_all(exec)
+        .await?;
+        let mut map = std::collections::HashMap::with_capacity(rows.len());
+        for r in rows {
+            map.insert(r.get::<i32, _>("merch_id"), r.get::<i32, _>("quantity"));
+        }
+        Ok(map)
     }
 
     /// Fetch a user's WANT quantities for the given merch_ids as a
@@ -198,21 +252,7 @@ impl InventoryRepository {
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        if merch_ids.is_empty() {
-            return Ok(std::collections::HashMap::new());
-        }
-        let rows = sqlx::query(
-            "SELECT merch_id, quantity FROM inventory \
-             WHERE user_id = $1 AND status = 'WANT' AND merch_id = ANY($2)",
-        )
-        .bind(user_id)
-        .bind(merch_ids)
-        .fetch_all(exec)
-        .await?;
-        let mut map = std::collections::HashMap::with_capacity(rows.len());
-        for r in rows {
-            map.insert(r.get::<i32, _>("merch_id"), r.get::<i32, _>("quantity"));
-        }
-        Ok(map)
+        self.quantities_for_status(exec, user_id, merch_ids, "WANT")
+            .await
     }
 }
