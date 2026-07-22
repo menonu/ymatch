@@ -1,3 +1,8 @@
+// Widget tests for ProfileScreen (#319, #454).
+//
+// Covers How-to-Trade copy, null-user loading, username edit success/failure,
+// logout, and backend revision error path.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,9 +20,63 @@ Widget _localized(Widget child, {Locale? locale}) => MaterialApp(
   home: child,
 );
 
-User _user() => User()
-  ..id = 1
-  ..username = 'me';
+User _user({String username = 'me', String? uuid}) {
+  final u = User()
+    ..id = 1
+    ..username = username;
+  if (uuid != null) u.uuid = uuid;
+  return u;
+}
+
+class MockAuthController extends StateNotifier<AsyncValue<User?>>
+    implements AuthController {
+  MockAuthController(User? user) : super(AsyncValue.data(user));
+
+  int logoutCalls = 0;
+  Object? updateError;
+  String? lastUpdatedUsername;
+
+  @override
+  Future<void> checkLogin() async {}
+
+  @override
+  Future<void> startGuestSession() async {}
+
+  @override
+  Future<void> guestLogin(String uuid) async {}
+
+  @override
+  Future<void> restoreAccount(String uuid) async {}
+
+  @override
+  Future<void> login(String username, String password) async {}
+
+  @override
+  Future<void> signup(String username, String password) async {}
+
+  @override
+  void logout() {
+    logoutCalls++;
+    state = const AsyncValue.data(null);
+  }
+
+  @override
+  Future<void> updateUsername(int userId, String newUsername) async {
+    if (updateError != null) throw updateError!;
+    lastUpdatedUsername = newUsername;
+    final current = state.value;
+    if (current == null) return;
+    final updated = User()
+      ..id = current.id
+      ..username = newUsername;
+    if (current.hasUuid()) updated.uuid = current.uuid;
+    if (current.hasRole()) updated.role = current.role;
+    state = AsyncValue.data(updated);
+  }
+
+  @override
+  get client => throw UnimplementedError();
+}
 
 void main() {
   testWidgets(
@@ -87,36 +146,171 @@ void main() {
       expect(find.textContaining('Events tab'), findsNothing);
     },
   );
-}
 
-class MockAuthController extends StateNotifier<AsyncValue<User?>>
-    implements AuthController {
-  MockAuthController(User user) : super(AsyncValue.data(user));
+  testWidgets('null user shows loading spinner (#454)', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(null)),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pump();
 
-  @override
-  Future<void> checkLogin() async {}
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Log Out'), findsNothing);
+  });
 
-  @override
-  Future<void> startGuestSession() async {}
+  testWidgets(
+    'profile shows username, master key, logout, and revision (#454)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(
+              (ref) => MockAuthController(
+                _user(username: 'alice', uuid: 'uuid-abc-123'),
+              ),
+            ),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => {'backend_version': 'abcdef0123456789'},
+            ),
+          ],
+          child: _localized(const ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-  @override
-  Future<void> guestLogin(String uuid) async {}
+      expect(find.text('alice'), findsOneWidget);
+      expect(find.text('Master Key (UUID)'), findsOneWidget);
+      expect(find.text('uuid-abc-123'), findsOneWidget);
+      expect(find.text('Log Out'), findsOneWidget);
+      // Short hash of backend revision (first 7 chars).
+      expect(find.textContaining('abcdef0'), findsOneWidget);
+    },
+  );
 
-  @override
-  Future<void> restoreAccount(String uuid) async {}
+  testWidgets('backend status error path shows error in revision line (#454)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          backendSystemStatusProvider.overrideWith((ref) async {
+            throw Exception('status down');
+          }),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-  @override
-  Future<void> login(String username, String password) async {}
+    expect(find.textContaining('error'), findsOneWidget);
+  });
 
-  @override
-  Future<void> signup(String username, String password) async {}
+  testWidgets('username edit success updates label and snackbar (#454)', (
+    tester,
+  ) async {
+    final auth = MockAuthController(_user(username: 'oldname'));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => auth),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-  @override
-  void logout() {}
+    await tester.tap(find.byTooltip('Edit username'));
+    await tester.pumpAndSettle();
 
-  @override
-  Future<void> updateUsername(int userId, String newUsername) async {}
+    expect(find.byType(TextField), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'newname');
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pumpAndSettle();
 
-  @override
-  get client => throw UnimplementedError();
+    expect(auth.lastUpdatedUsername, 'newname');
+    expect(find.text('newname'), findsOneWidget);
+    expect(find.text('Username updated'), findsOneWidget);
+    // Edit mode closed.
+    expect(find.byIcon(Icons.check), findsNothing);
+  });
+
+  testWidgets('username edit failure shows error snackbar (#454)', (
+    tester,
+  ) async {
+    final auth = MockAuthController(_user(username: 'oldname'))
+      ..updateError = Exception('taken');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => auth),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit username'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'taken-name');
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Failed to update username:'), findsOneWidget);
+    // Still in edit mode after failure (username not committed).
+    expect(find.byIcon(Icons.check), findsOneWidget);
+  });
+
+  testWidgets('empty username save is a no-op (#454)', (tester) async {
+    final auth = MockAuthController(_user(username: 'oldname'));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => auth),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit username'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '   ');
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pumpAndSettle();
+
+    expect(auth.lastUpdatedUsername, isNull);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+  });
+
+  testWidgets('Log Out calls authController.logout (#454)', (tester) async {
+    final auth = MockAuthController(_user());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => auth),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Profile is a SingleChildScrollView; Log Out sits below How-to-Trade.
+    await tester.ensureVisible(find.text('Log Out'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Log Out'));
+    await tester.pump();
+
+    expect(auth.logoutCalls, 1);
+  });
 }
