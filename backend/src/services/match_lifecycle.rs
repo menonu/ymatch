@@ -162,30 +162,14 @@ impl MatchLifecycleService {
             &user1_wants,
             &user2_wants,
         )?;
-        let user1_trade = self
-            .inventory
-            .quantities_for_status(&mut *tx, locked.user1_id, &merch_ids, "TRADE")
-            .await?;
-        let user2_trade = self
-            .inventory
-            .quantities_for_status(&mut *tx, locked.user2_id, &merch_ids, "TRADE")
-            .await?;
-        let user1_have = self
-            .inventory
-            .quantities_for_status(&mut *tx, locked.user1_id, &merch_ids, "HAVE")
-            .await?;
-        let user2_have = self
-            .inventory
-            .quantities_for_status(&mut *tx, locked.user2_id, &merch_ids, "HAVE")
+        let giver_maps = self
+            .load_giver_maps(&mut tx, locked.user1_id, locked.user2_id, &merch_ids)
             .await?;
         validate_giver_capacity(
             &offer.items,
             locked.user1_id,
             locked.user2_id,
-            GiverSupply {
-                trade: (&user1_trade, &user2_trade),
-                have: Some((&user1_have, &user2_have)),
-            },
+            giver_maps.supply_with_have(),
         )?;
 
         self.matches
@@ -290,30 +274,14 @@ impl MatchLifecycleService {
                 &user1_wants,
                 &user2_wants,
             )?;
-            let user1_trade = self
-                .inventory
-                .quantities_for_status(&mut *tx, locked.user1_id, &merch_ids, "TRADE")
-                .await?;
-            let user2_trade = self
-                .inventory
-                .quantities_for_status(&mut *tx, locked.user2_id, &merch_ids, "TRADE")
-                .await?;
-            let user1_have = self
-                .inventory
-                .quantities_for_status(&mut *tx, locked.user1_id, &merch_ids, "HAVE")
-                .await?;
-            let user2_have = self
-                .inventory
-                .quantities_for_status(&mut *tx, locked.user2_id, &merch_ids, "HAVE")
+            let giver_maps = self
+                .load_giver_maps(&mut tx, locked.user1_id, locked.user2_id, &merch_ids)
                 .await?;
             validate_giver_capacity(
                 &offer_items,
                 locked.user1_id,
                 locked.user2_id,
-                GiverSupply {
-                    trade: (&user1_trade, &user2_trade),
-                    have: Some((&user1_have, &user2_have)),
-                },
+                giver_maps.supply_with_have(),
             )?;
             self.matches
                 .set_status(&mut *tx, match_id, new_status)
@@ -497,6 +465,61 @@ impl MatchLifecycleService {
         }
         Ok(())
     }
+
+    /// Load both participants' TRADE and HAVE maps for the given merch
+    /// (shared by offer and accept #493 capacity gates).
+    async fn load_giver_maps(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        user1_id: i32,
+        user2_id: i32,
+        merch_ids: &[i32],
+    ) -> Result<OwnedGiverMaps, AppError> {
+        let user1_trade = self
+            .inventory
+            .quantities_for_status(&mut *conn, user1_id, merch_ids, "TRADE")
+            .await?;
+        let user2_trade = self
+            .inventory
+            .quantities_for_status(&mut *conn, user2_id, merch_ids, "TRADE")
+            .await?;
+        let user1_have = self
+            .inventory
+            .quantities_for_status(&mut *conn, user1_id, merch_ids, "HAVE")
+            .await?;
+        let user2_have = self
+            .inventory
+            .quantities_for_status(&mut *conn, user2_id, merch_ids, "HAVE")
+            .await?;
+        Ok(OwnedGiverMaps {
+            user1_trade,
+            user2_trade,
+            user1_have,
+            user2_have,
+        })
+    }
+}
+
+/// `merch_id -> quantity` for one participant.
+type QtyMap = std::collections::HashMap<i32, i32>;
+/// `(user1, user2)` quantity maps for one inventory status.
+type ParticipantQtyMaps<'a> = (&'a QtyMap, &'a QtyMap);
+
+/// Owned TRADE/HAVE maps for both participants (lifetime-free load result).
+struct OwnedGiverMaps {
+    user1_trade: QtyMap,
+    user2_trade: QtyMap,
+    user1_have: QtyMap,
+    user2_have: QtyMap,
+}
+
+impl OwnedGiverMaps {
+    fn supply_with_have(&self) -> GiverSupply<'_> {
+        GiverSupply {
+            trade: (&self.user1_trade, &self.user2_trade),
+            have: Some((&self.user1_have, &self.user2_have)),
+        }
+    }
 }
 
 // Note: the lifecycle service requires a real database (transactions are
@@ -565,11 +588,6 @@ fn validate_legs(
     }
     Ok(())
 }
-
-/// `merch_id -> quantity` for one participant.
-type QtyMap = std::collections::HashMap<i32, i32>;
-/// `(user1, user2)` quantity maps for one inventory status.
-type ParticipantQtyMaps<'a> = (&'a QtyMap, &'a QtyMap);
 
 /// Per-participant TRADE maps, and optional HAVE maps when HAVE will
 /// decrement on apply (#493 / ADR 0009 default).

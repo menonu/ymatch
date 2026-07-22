@@ -343,7 +343,10 @@ pub struct MutualTradeOptions<'a> {
     /// When `Some(q)`, also seed HAVE for each user's TRADE merch at qty `q`
     /// (used by apply-inventory / #429 / #493 tests). Default is `Some(1)` so
     /// offer/accept can satisfy giver HAVE capacity under ADR 0009 default
-    /// apply. Use `None` only when a test must omit HAVE rows.
+    /// apply for 1:1 fixtures. **When `u1_trade` / `u2_trade` exceed 1,
+    /// set `have_qty` ≥ the max leg qty under test** (see
+    /// `setup_pending_trade_match_quantities`). Use `None` only when a test
+    /// must omit HAVE rows.
     pub have_qty: Option<i32>,
 }
 

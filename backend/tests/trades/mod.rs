@@ -935,6 +935,43 @@ async fn test_accept_rejected_when_giver_trade_insufficient(pool: PgPool) {
     );
 }
 
+/// Issue #493: accept re-checks giver HAVE; if HAVE drops mid-negotiation
+/// below the leg qty, accept is 400 (TRADE and WANT still ok).
+#[sqlx::test]
+async fn test_accept_rejected_when_giver_have_insufficient(pool: PgPool) {
+    let (match_id, user1_id, user2_id, merch_a_id, merch_b_id) =
+        setup_pending_trade_match_quantities(pool.clone(), 2, 2, 2, 2).await;
+
+    let items = format!(
+        r#"{{"merchId": {}, "giverUserId": {}, "quantity": 2}}, {{"merchId": {}, "giverUserId": {}, "quantity": 2}}"#,
+        merch_a_id, user1_id, merch_b_id, user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &format!(r#"{{"userId": {}, "items": [{}]}}"#, user1_id, items)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    // Reduce user1 HAVE of A to 1 (TRADE still 2; mutual cap still > 0).
+    set_inventory(&pool, user1_id, merch_a_id, "HAVE", 1).await;
+
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/status", match_id),
+        &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, user2_id),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let matches = list_user_matches(&pool, user1_id).await;
+    assert_eq!(matches[0]["status"], "OFFERED");
+}
+
 /// Issue #297: the negotiation state machine. A give-only opening proposal is
 /// unbalanced and cannot be accepted; the proposer cannot accept or counter
 /// their own; the non-proposer counter-offers to add the complementary leg

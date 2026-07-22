@@ -151,19 +151,44 @@ impl InventoryRepository {
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
+        // Gate both decrements before any write so a dual-delta call
+        // (TRADE− and HAVE−) cannot partially mutate one status and still
+        // return 400 for the other — even if the executor is not wrapped
+        // in an outer transaction (#493 review).
         let row = sqlx::query(
             r#"
-            WITH trade_update AS (
+            WITH caps AS (
+                SELECT
+                    COALESCE(
+                        (SELECT quantity FROM inventory
+                         WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'),
+                        0
+                    ) AS trade_qty,
+                    COALESCE(
+                        (SELECT quantity FROM inventory
+                         WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE'),
+                        0
+                    ) AS have_qty
+            ),
+            gate AS (
+                SELECT
+                    CASE WHEN $1 <= 0 OR trade_qty >= $1 THEN true ELSE false END AS trade_ok,
+                    CASE WHEN $4 >= 0 OR have_qty >= (-$4) THEN true ELSE false END AS have_ok
+                FROM caps
+            ),
+            trade_update AS (
                 UPDATE inventory
                 SET quantity = quantity - $1
                 WHERE user_id = $2 AND merch_id = $3 AND status = 'TRADE'
-                  AND $1 > 0 AND quantity >= $1
+                  AND $1 > 0
+                  AND (SELECT trade_ok AND have_ok FROM gate)
                 RETURNING 1
             ),
             have_inc AS (
                 INSERT INTO inventory (user_id, merch_id, status, quantity)
                 SELECT $2, $3, 'HAVE', $4
                 WHERE $4 > 0
+                  AND (SELECT trade_ok AND have_ok FROM gate)
                 ON CONFLICT (user_id, merch_id, status)
                 DO UPDATE SET quantity = inventory.quantity + $4
                 RETURNING 1
@@ -172,14 +197,11 @@ impl InventoryRepository {
                 UPDATE inventory
                 SET quantity = quantity + $4
                 WHERE user_id = $2 AND merch_id = $3 AND status = 'HAVE'
-                  AND $4 < 0 AND quantity >= (-$4)
+                  AND $4 < 0
+                  AND (SELECT trade_ok AND have_ok FROM gate)
                 RETURNING 1
             )
-            SELECT
-                CASE WHEN $1 > 0 AND NOT EXISTS (SELECT 1 FROM trade_update)
-                    THEN false ELSE true END AS trade_ok,
-                CASE WHEN $4 < 0 AND NOT EXISTS (SELECT 1 FROM have_dec)
-                    THEN false ELSE true END AS have_ok
+            SELECT trade_ok, have_ok FROM gate
             "#,
         )
         .bind(delta_trade)
