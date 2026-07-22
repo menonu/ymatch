@@ -323,36 +323,6 @@ impl MatchRepository {
         Ok(out)
     }
 
-    /// Read the snapshot of a match's status fields. Used by the
-    /// inventory-apply endpoint.
-    pub async fn get_status_snapshot(
-        &self,
-        match_id: i32,
-    ) -> Result<Option<MatchStatusSnapshot>, AppError> {
-        let row = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
-                    user1_inventory_applied_at, user2_inventory_applied_at
-             FROM matches WHERE id = $1",
-        )
-        .bind(match_id)
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.map(|r| MatchStatusSnapshot {
-            user1_id: r.get("user1_id"),
-            user2_id: r.get("user2_id"),
-            status: r.get("status"),
-            offered_by: r.get("offered_by"),
-            event_id: r.get("event_id"),
-            group_name: r.get("group_name"),
-            user1_applied: r
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
-                .is_some(),
-            user2_applied: r
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
-                .is_some(),
-        }))
-    }
-
     /// List `match_items` joined with `merchandise` for the apply endpoint.
     ///
     /// Delegates to [`list_match_items_in_tx`] on the pool. The
