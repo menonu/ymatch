@@ -44,7 +44,7 @@ Coverage workflows (post-merge on `main`, plus `workflow_dispatch`; see #279):
 
 | Stack | Workflow | What is measured | Floor |
 |-------|----------|------------------|-------|
-| Backend | `coverage.yml` | `cargo llvm-cov`, ignores `generated/` | **70%** lines |
+| Backend | `coverage.yml` | `cargo llvm-cov`, ignores `generated/` | **85%** lines (#455) |
 | Frontend | `coverage-frontend.yml` | `flutter test --coverage`, then filter via `scripts/frontend_coverage_report.sh` (drops `lib/generated/**` and gen-l10n) | **68%** filtered lines (#453) |
 
 Local: `task backend:coverage` / `task frontend:coverage`. Interpret frontend
