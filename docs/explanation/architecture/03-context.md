@@ -28,11 +28,12 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 - Guest and account auth, RBAC
 - Admin/moderator surfaces
 - Image upload serving (local volume in OCI)
+- Match push notifications via FCM HTTP v1 when credentials are configured (ADR 0014)
 
 ### Out of scope (external or not productized)
 
 - Physical logistics of the meetup
-- Production push providers (FCM/APNs) — notification module logs only
+- Direct APNs integration (iOS delivery is via FCM registration tokens; ADR 0014)
 - Third-party payment rails
 - Multi-region active-active failover
 
@@ -43,6 +44,7 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 | Browser ↔ API | HTTPS JSON REST | Base path `/api/v1`; see [API spec](../../reference/api_spec.md). |
 | Browser ↔ images | HTTPS | `/uploads/*` via API static files (`UPLOAD_DIR`). |
 | API ↔ Postgres | TCP SQL | Connection string from env (`DATABASE_URL`). |
+| API ↔ FCM | HTTPS | Match pushes when `FCM_PROJECT_ID` + service account are set (ADR 0014). |
 | CI ↔ VM | SSH + Docker | GitHub Actions deploy workflows. |
 | Ops ↔ OCI | OCI API / Terraform | Infra and Object Storage; secrets never in git. |
 

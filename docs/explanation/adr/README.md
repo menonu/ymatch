@@ -77,3 +77,4 @@ Record every ADR in the index below, newest last.
 | [0011](0011-hide-deleted-merch-from-catalog.md) | Hide Soft-Deleted Merchandise from Catalog Surfaces by Default | Accepted | 2026-07-18 |
 | [0012](0012-rematch-after-reject-or-cancel.md) | Rematch After Reject or Cancel (Reopen PENDING with Prior-History Annotation) | Accepted | 2026-07-18 |
 | [0013](0013-group-scope-rbac.md) | Group-Scoped RBAC (`scope_type = 'group'`) | Accepted | 2026-07-21 |
+| [0014](0014-fcm-push-notifications.md) | Firebase Cloud Messaging for Match Push Notifications | Accepted | 2026-07-22 |

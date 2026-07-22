@@ -1,4 +1,5 @@
 use backend::matching;
+use backend::notifications;
 use backend::routes;
 use backend::storage;
 
@@ -29,6 +30,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Failed to run migrations");
 
     tracing::info!("Migrations applied successfully!");
+
+    // Outbound match pushes (FCM when configured; log-only otherwise). ADR 0014 / #179.
+    notifications::init_from_env();
 
     let port: u16 = std::env::var("PORT")
         .ok()

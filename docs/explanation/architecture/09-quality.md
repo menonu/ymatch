@@ -71,8 +71,8 @@ a backlog dump:
 - **Security — unauthenticated image upload/delete:** `POST /api/v1/images/upload`
   and `DELETE /api/v1/images/:filename` enforce content-type and 1MB size only
   (no `user_id` / RBAC). Abuse risk on a public API surface.
-- Push notifications are **stubbed** (`notifications.rs` logs only) — limits
-  **usability** for “notify me when matched” until a real provider lands.
+- Push notifications use FCM when configured (ADR 0014); without credentials the
+  process falls back to log-only delivery, so local/CI never depends on Google.
 - Some operational runbooks assume maintainer familiarity with OCI free-tier
   quotas (see disaster recovery lessons) — **availability** / ops friction.
 

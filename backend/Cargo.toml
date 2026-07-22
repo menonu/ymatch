@@ -22,8 +22,11 @@ pbjson = "0.6.0"
 sysinfo = "0.38.3"
 axum-extra = { version = "0.9", features = ["multipart"] }
 base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+jsonwebtoken = { version = "9", default-features = false, features = ["use_pem"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 hyper = "1.0"
+wiremock = "0.6"

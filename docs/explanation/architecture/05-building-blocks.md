@@ -66,7 +66,7 @@ Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 | **Matching job** | Periodic discovery of mutual TRADE/WANT pairs within a group (raw SQL today) |
 | **Image storage** | Pluggable store for uploaded merch photos (local volume or object store) |
 | **Wire models** | Shared request/response shapes (protobuf-generated types) |
-| **Notifications** | Outbound user alerts (currently a log-only stub; not drawn on the L3 diagram) |
+| **Notifications** | Outbound match pushes via FCM HTTP v1 (log-only fallback; ADR 0014; not drawn on the L3 diagram) |
 
 Layering sketch (same idea as [04 — Solution strategy](04-solution-strategy.md)):
 
