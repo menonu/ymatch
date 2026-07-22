@@ -31,7 +31,7 @@ User _adminUser() => User()
 
 class _MockAuthController extends StateNotifier<AsyncValue<User?>>
     implements AuthController {
-  _MockAuthController(User user) : super(AsyncValue.data(user));
+  _MockAuthController(User? user) : super(AsyncValue.data(user));
 
   @override
   Future<void> checkLogin() async {}
@@ -721,4 +721,153 @@ void main() {
       expect(find.text('Test data generated successfully!'), findsNothing);
     },
   );
+
+  // ---- #454: permission / empty / error branches ----
+
+  testWidgets('non-admin user is denied access to the admin dashboard (#454)', (
+    WidgetTester tester,
+  ) async {
+    final regular = User()
+      ..id = 3
+      ..username = 'regular'
+      ..role = 'user';
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(regular)),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Access denied. Admin or moderator role required.'),
+      findsOneWidget,
+    );
+    expect(find.text('System'), findsNothing);
+    expect(find.text('Users'), findsNothing);
+  });
+
+  testWidgets('null user is denied access to the admin dashboard (#454)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(null)),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Access denied. Admin or moderator role required.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'empty tabs and missing system resources show empty-state copy (#454)',
+    (WidgetTester tester) async {
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+      final api = ApiClient(
+        ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+        client: mockClient,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(
+              (ref) => _MockAuthController(_adminUser()),
+            ),
+            apiClientProvider.overrideWith((ref) => api),
+            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+            adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+            adminUsersProvider.overrideWith((ref) async => <User>[]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{
+                // resources null → System tab empty/error copy.
+              },
+            ),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // System tab (default): missing resources map.
+      expect(find.text('Failed to load system resources.'), findsOneWidget);
+
+      await tester.tap(find.text('Users'));
+      await tester.pumpAndSettle();
+      expect(find.text('No users found.'), findsOneWidget);
+
+      await tester.tap(find.text('Events'));
+      await tester.pumpAndSettle();
+      expect(find.text('No events found.'), findsOneWidget);
+
+      await tester.tap(find.text('Groups'));
+      await tester.pumpAndSettle();
+      expect(find.text('No groups found.'), findsOneWidget);
+
+      await tester.tap(find.text('Items'));
+      await tester.pumpAndSettle();
+      expect(find.text('No items found.'), findsOneWidget);
+
+      await tester.tap(find.text('Matches'));
+      await tester.pumpAndSettle();
+      expect(find.text('No matches found.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Users tab provider error surfaces Error: prefix (#454)', (
+    WidgetTester tester,
+  ) async {
+    final mockClient = MockClient((request) async => http.Response('[]', 200));
+    final api = ApiClient(
+      ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+      client: mockClient,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+          apiClientProvider.overrideWith((ref) => api),
+          adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+          adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+          adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+          adminUsersProvider.overrideWith((ref) async {
+            throw Exception('users boom');
+          }),
+          eventsProvider.overrideWith((ref) async => <Event>[]),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Users'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Error:'), findsOneWidget);
+    expect(find.textContaining('users boom'), findsOneWidget);
+  });
 }
