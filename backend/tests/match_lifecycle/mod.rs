@@ -213,8 +213,33 @@ async fn test_match_mark_inventory_applied_errors_if_match_vanished(pool: PgPool
     let result = matches
         .mark_inventory_applied(&mut *tx, 999_999, true)
         .await;
-    assert!(result.is_err(), "mark should fail if match_id is missing");
+    // Missing match → rows_affected=0 → 409 Conflict (conditional mark, #492).
+    assert!(
+        matches!(result, Err(backend::error::AppError::Conflict(_))),
+        "mark should conflict if match_id is missing, got: {result:?}"
+    );
     // tx will be rolled back when it drops.
+}
+
+/// #492: second conditional mark on the same user column must lose
+/// (`rows_affected = 0` → Conflict) so inventory cannot be stamped twice.
+#[sqlx::test]
+async fn test_match_mark_inventory_applied_second_call_conflicts(pool: PgPool) {
+    let (_, _, match_id, _, _) = setup_pending_match_with_merch(&pool).await;
+
+    let matches = backend::repositories::match_::MatchRepository::new(pool.clone());
+    let mut tx = pool.begin().await.unwrap();
+    matches
+        .mark_inventory_applied(&mut *tx, match_id as i32, true)
+        .await
+        .unwrap();
+    let second = matches
+        .mark_inventory_applied(&mut *tx, match_id as i32, true)
+        .await;
+    assert!(
+        matches!(second, Err(backend::error::AppError::Conflict(_))),
+        "second mark for same user must be 409 Conflict, got: {second:?}"
+    );
 }
 
 #[sqlx::test]

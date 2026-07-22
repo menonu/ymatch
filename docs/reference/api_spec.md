@@ -494,6 +494,16 @@ Per absolute leg `(giver_user_id, merch_id, quantity)` ([ADR 0009](../explanatio
 - **Response**: `200 OK`
 - **Errors**: `400` if match is not `COMPLETED`; `403` if not a participant;
   `404` if match missing; `409` if this user already applied.
+- **Concurrency / client retry** (#492): check, deltas, and the per-user
+  applied flag run in one transaction under a row lock, with a conditional
+  mark (`WHERE applied_at IS NULL`). Concurrent applies for the same user
+  yield exactly one `200` and one `409`; inventory changes once.
+  - **`409 Conflict`**: treat as already applied — refresh match /
+    inventory UI; **do not** retry apply expecting further inventory
+    mutation.
+  - **Network timeout / no response**: safe to retry once. At most one
+    attempt applies deltas; further successful attempts are impossible
+    (they return `409`).
 
 ---
 

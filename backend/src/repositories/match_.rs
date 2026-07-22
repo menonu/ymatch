@@ -323,36 +323,6 @@ impl MatchRepository {
         Ok(out)
     }
 
-    /// Read the snapshot of a match's status fields. Used by the
-    /// inventory-apply endpoint.
-    pub async fn get_status_snapshot(
-        &self,
-        match_id: i32,
-    ) -> Result<Option<MatchStatusSnapshot>, AppError> {
-        let row = sqlx::query(
-            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
-                    user1_inventory_applied_at, user2_inventory_applied_at
-             FROM matches WHERE id = $1",
-        )
-        .bind(match_id)
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.map(|r| MatchStatusSnapshot {
-            user1_id: r.get("user1_id"),
-            user2_id: r.get("user2_id"),
-            status: r.get("status"),
-            offered_by: r.get("offered_by"),
-            event_id: r.get("event_id"),
-            group_name: r.get("group_name"),
-            user1_applied: r
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
-                .is_some(),
-            user2_applied: r
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
-                .is_some(),
-        }))
-    }
-
     /// List `match_items` joined with `merchandise` for the apply endpoint.
     ///
     /// Delegates to [`list_match_items_in_tx`] on the pool. The
@@ -668,6 +638,14 @@ impl MatchRepository {
 
     /// Set the per-user inventory-applied timestamp. `is_user1` picks
     /// which column to write.
+    ///
+    /// The update is conditional on the column still being NULL so a
+    /// concurrent apply cannot stamp the flag twice (#492). When
+    /// `rows_affected == 0` (already applied, or match missing), returns
+    /// [`AppError::Conflict`] (HTTP 409). Callers that hold
+    /// [`Self::lock_for_update`] should still pre-check the flag under
+    /// the lock so they never apply inventory deltas before discovering
+    /// the conflict.
     pub async fn mark_inventory_applied<'c, E>(
         &self,
         exec: E,
@@ -682,14 +660,18 @@ impl MatchRepository {
         } else {
             "user2_inventory_applied_at"
         };
-        let sql = format!("UPDATE matches SET {} = NOW() WHERE id = $1", col);
+        // Conditional mark: only the first writer wins. Column name is
+        // one of two fixed literals above, not user input.
+        let sql = format!("UPDATE matches SET {col} = NOW() WHERE id = $1 AND {col} IS NULL");
         let affected = sqlx::query(&sql)
             .bind(match_id)
             .execute(exec)
             .await?
             .rows_affected();
         if affected == 0 {
-            return Err(AppError::not_found("Match disappeared mid-apply"));
+            return Err(AppError::conflict(
+                "Inventory already applied for this user",
+            ));
         }
         Ok(())
     }
