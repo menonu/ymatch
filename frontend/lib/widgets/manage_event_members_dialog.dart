@@ -24,7 +24,6 @@ class EventMemberActions {
     this.transferCreator,
     required this.loadPickerUsers,
     this.onMutated,
-    this.showRoleInUserPicker = false,
   });
 
   final Future<List<EventMemberInfo>> Function() loadMembers;
@@ -43,9 +42,6 @@ class EventMemberActions {
 
   /// Called after a successful mutation (provider invalidation, etc.).
   final VoidCallback? onMutated;
-
-  /// When true, user-picker subtitles include the global role (admin UI).
-  final bool showRoleInUserPicker;
 }
 
 /// Core dialog: list members, assign/revoke editors, optional transfer.
@@ -58,9 +54,12 @@ Future<void> showManageEventMembersDialogCore(
   required bool canManageEditors,
   required bool canTransferCreator,
   String? title,
+  String? dismissLabel,
+  bool showRoleInUserPicker = false,
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final dialogTitle = title ?? l10n.manageMembers;
+  final closeLabel = dismissLabel ?? l10n.cancel;
 
   final canAssign = canManageEditors && actions.assignEditor != null;
   final canRevoke = canManageEditors && actions.revokeEditor != null;
@@ -183,7 +182,7 @@ Future<void> showManageEventMembersDialogCore(
                               excludeUserIds: members
                                   .map((m) => m.userId)
                                   .toSet(),
-                              showRoleInSubtitle: actions.showRoleInUserPicker,
+                              showRoleInSubtitle: showRoleInUserPicker,
                             );
                             if (selected == null) return;
                             await runAction(
@@ -203,7 +202,7 @@ Future<void> showManageEventMembersDialogCore(
                               title: l10n.pickTransferCreatorTitle,
                               loadUsers: actions.loadPickerUsers,
                               excludeUserIds: {?creatorId},
-                              showRoleInSubtitle: actions.showRoleInUserPicker,
+                              showRoleInSubtitle: showRoleInUserPicker,
                             );
                             if (selected == null) return;
                             // Irreversible: confirm before PUT (#442 pr-review).
@@ -248,7 +247,7 @@ Future<void> showManageEventMembersDialogCore(
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: Text(l10n.cancel),
+                child: Text(closeLabel),
               ),
             ],
           );
@@ -293,6 +292,10 @@ Future<void> showManageEventMembersDialog(
 ///
 /// Hits `/admin/events/...` endpoints via [AdminController]. Creator transfer
 /// remains a separate popup-menu action on the Events tab.
+///
+/// No [EventMemberActions.onMutated]: the Events tab list does not show editor
+/// membership, so invalidating [eventsProvider] would only force a full-tab
+/// reload under the open dialog. Member list refresh is via setDialogState.
 Future<void> showAdminManageEventMembersDialog(
   BuildContext context,
   WidgetRef ref, {
@@ -306,6 +309,8 @@ Future<void> showAdminManageEventMembersDialog(
     context,
     // Preserve #432 admin wording so existing dashboard tests keep matching.
     title: 'Editors — $eventName',
+    dismissLabel: 'Close',
+    showRoleInUserPicker: true,
     canManageEditors: true,
     canTransferCreator: false,
     actions: EventMemberActions(
@@ -315,8 +320,6 @@ Future<void> showAdminManageEventMembersDialog(
       revokeEditor: (targetId) =>
           admin.revokeEventEditor(eventId, targetId, adminUserId),
       loadPickerUsers: () => ref.read(adminUsersProvider.future),
-      onMutated: () => ref.invalidate(eventsProvider),
-      showRoleInUserPicker: true,
     ),
   );
 }

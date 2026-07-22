@@ -42,12 +42,16 @@ class _DialogHost extends StatefulWidget {
     required this.canManageEditors,
     required this.canTransferCreator,
     this.title,
+    this.dismissLabel,
+    this.showRoleInUserPicker = false,
   });
 
   final EventMemberActions actions;
   final bool canManageEditors;
   final bool canTransferCreator;
   final String? title;
+  final String? dismissLabel;
+  final bool showRoleInUserPicker;
 
   @override
   State<_DialogHost> createState() => _DialogHostState();
@@ -64,6 +68,8 @@ class _DialogHostState extends State<_DialogHost> {
         canManageEditors: widget.canManageEditors,
         canTransferCreator: widget.canTransferCreator,
         title: widget.title,
+        dismissLabel: widget.dismissLabel,
+        showRoleInUserPicker: widget.showRoleInUserPicker,
       );
     });
   }
@@ -297,13 +303,15 @@ void main() {
     expect(find.text('Manage members'), findsOneWidget);
   });
 
-  testWidgets('custom title override for admin-style heading (#446)', (
+  testWidgets('custom title and dismiss label for admin-style heading (#446)', (
     tester,
   ) async {
     await tester.pumpWidget(
       _localized(
         _DialogHost(
           title: 'Editors — Live Event',
+          dismissLabel: 'Close',
+          showRoleInUserPicker: true,
           canManageEditors: true,
           canTransferCreator: false,
           actions: EventMemberActions(
@@ -316,7 +324,6 @@ void main() {
             ],
             assignEditor: (_) async {},
             revokeEditor: (_) async {},
-            showRoleInUserPicker: true,
           ),
         ),
       ),
@@ -324,6 +331,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Editors — Live Event'), findsOneWidget);
+    expect(find.text('Close'), findsOneWidget);
     expect(find.text('alice (1)'), findsOneWidget);
     expect(find.text('creator'), findsOneWidget);
   });
