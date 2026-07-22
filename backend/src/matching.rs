@@ -2,20 +2,26 @@ use crate::repositories::match_::{REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON
 use sqlx::{PgPool, Row};
 
 // ---------------------------------------------------------------------------
-// Pure matching decisions (unit-tested; used by run_matching_algorithm)
+// Pure matching decisions (unit-tested)
+//
+// `existing_match_action` / `rematch_reason_for` gate the insert-vs-reopen
+// branch inside `run_matching_algorithm`. `is_group_matchable` /
+// `same_match_group` are policy mirrors of the SQL filters (ADR 0001) so
+// group-scoping edges stay cheap to pin without a DB; the algorithm still
+// enforces them in SQL.
 // ---------------------------------------------------------------------------
 
-/// ADR 0001: merchandise with a NULL / empty group is not matchable.
+/// ADR 0001: merchandise with a NULL or empty group is not matchable.
 ///
-/// The matcher SQL also filters `group_name IS NOT NULL`; this helper pins the
-/// policy for call sites and tests without a DB.
+/// Mirrors the matcher SQL (`group_name IS NOT NULL AND group_name <> ''`).
 #[inline]
 pub fn is_group_matchable(group_name: Option<&str>) -> bool {
     matches!(group_name, Some(g) if !g.is_empty())
 }
 
 /// Two merchandise rows share a matchable group identity only when both have
-/// the same non-null `(event_id, group_name)`.
+/// the same non-null, non-empty `(event_id, group_name)`. Policy mirror of the
+/// SQL join on `(event_id, group_name)` after the null/empty filter.
 #[inline]
 pub fn same_match_group(
     event_a: i32,
@@ -45,6 +51,7 @@ pub enum ExistingMatchAction {
 /// Decide insert / reopen / skip for a rediscovered mutual edge.
 ///
 /// `existing_status` is `None` when no row exists for the (pair, group).
+/// Used by `run_matching_algorithm` on the existing-row branch.
 pub fn existing_match_action(existing_status: Option<&str>) -> ExistingMatchAction {
     match existing_status {
         None => ExistingMatchAction::Insert,
@@ -54,6 +61,7 @@ pub fn existing_match_action(existing_status: Option<&str>) -> ExistingMatchActi
 }
 
 /// SYSTEM message reason when reopening a terminal match, if applicable.
+/// Used by `reopen_terminal_match`.
 pub fn rematch_reason_for(prior_status: &str) -> Option<&'static str> {
     match prior_status {
         "REJECTED" => Some(REMATCH_REASON_AFTER_REJECTED),
@@ -77,7 +85,8 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
           -- ADR 0012 / ADR 0010: zero-qty rows do not contribute to mutual cap.
           AND i.quantity > 0
           AND m.is_deleted = false AND m.trade_enabled = true
-          AND m.group_name IS NOT NULL
+          -- ADR 0001: NULL or empty group is not matchable (see is_group_matchable).
+          AND m.group_name IS NOT NULL AND m.group_name <> ''
           AND u.is_banned = false
           AND NOT EXISTS (
             SELECT 1 FROM match_items mi
@@ -198,7 +207,6 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 
                 match existing_match {
                     None => {
-                        debug_assert_eq!(existing_match_action(None), ExistingMatchAction::Insert);
                         sqlx::query(
                             "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name, created_at)
                              VALUES ($1, $2, 'PENDING', $3, $4, NOW())",
@@ -217,6 +225,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                     Some(row) => {
                         let match_id: i32 = row.get("id");
                         let status: String = row.get("status");
+                        // Insert is only for None (handled above).
                         match existing_match_action(Some(&status)) {
                             ExistingMatchAction::Reopen => {
                                 if reopen_terminal_match(pool, match_id, &status).await? {
@@ -224,11 +233,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                                     notify_pair(pool, want_user_id, partner_id).await;
                                 }
                             }
-                            ExistingMatchAction::Skip => {}
-                            ExistingMatchAction::Insert => {
-                                // Row exists; Insert is only for None.
-                                debug_assert!(false, "Insert action with existing row");
-                            }
+                            ExistingMatchAction::Skip | ExistingMatchAction::Insert => {}
                         }
                     }
                 }

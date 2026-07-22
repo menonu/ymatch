@@ -473,9 +473,7 @@ pub async fn setup_pending_match_sql(
     let user1_id = login_guest(pool, &format!("{label}-u1"), "tok1").await;
     let user2_id = login_guest(pool, &format!("{label}-u2"), "tok2").await;
     let event_id = create_event(pool, &format!("{label} Event"), user1_id).await;
-    // u2 needs event/editor to create merch under its own creator_id when
-    // tests assert per-creator merch (match_lifecycle style). Here both merch
-    // rows are created by the event creator via create_merch (creator_id from DB).
+    // Both merch rows are created by the event creator via create_merch.
     let merch_a = create_merch(pool, event_id, &format!("{label} A"), group_name).await;
     let merch_b = create_merch(pool, event_id, &format!("{label} B"), group_name).await;
 
