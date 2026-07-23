@@ -69,24 +69,23 @@ class _AddMerchScreenState extends ConsumerState<AddMerchScreen> {
     try {
       // Upload image first if one was picked
       String photoUrl = _urlController.text.trim();
+      final user = ref.read(currentUserProvider);
       if (_pickedImageBytes != null) {
+        if (user == null) {
+          throw StateError('Must be signed in to upload images');
+        }
         final apiClient = ref.read(apiClientProvider);
         final uploadedUrl = await apiClient.uploadImage(
           _pickedImageBytes!,
           _pickedImageName ?? 'image.png',
+          userId: user.id,
         );
         photoUrl = uploadedUrl;
       }
 
       await ref
           .read(merchControllerProvider.notifier)
-          .addMerch(
-            widget.eventId,
-            name,
-            photoUrl,
-            _selectedGroup,
-            ref.read(currentUserProvider)?.id,
-          );
+          .addMerch(widget.eventId, name, photoUrl, _selectedGroup, user?.id);
 
       // Clear inputs for continuous adding, but KEEP the selected group!
       _nameController.clear();

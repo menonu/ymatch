@@ -169,19 +169,12 @@ async fn test_signup_duplicate_username_returns_409(pool: PgPool) {
 #[sqlx::test]
 async fn test_list_users(pool: PgPool) {
     // Create a user first
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    app.oneshot(
-        Request::builder()
-            .method("POST")
-            .uri("/api/v1/auth/guest")
-            .header("content-type", "application/json")
-            .body(Body::from(r#"{"uuid": "list-users-test"}"#))
-            .unwrap(),
-    )
-    .await
-    .unwrap();
+    let caller = login_guest(&pool, "list-users-test", "tok").await;
+    // Seed a second user so the directory has more than the caller.
+    let _other = login_guest(&pool, "list-users-other", "tok").await;
 
-    let app = backend::routes::create_router(pool, test_storage());
+    // #491: missing user_id rejected.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let response = app
         .oneshot(
             Request::builder()
@@ -191,10 +184,65 @@ async fn test_list_users(pool: PgPool) {
         )
         .await
         .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    // Plain active user gets lean directory (id + username only).
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/users?user_id={}", caller))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let body = body_to_string(response.into_body()).await;
     let users: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
-    assert!(!users.is_empty());
+    assert!(users.len() >= 2);
+    let sample = &users[0];
+    assert!(sample.get("id").is_some());
+    assert!(sample.get("username").is_some());
+    // Secrets and ban metadata must not appear on the lean path.
+    assert!(
+        sample.get("deviceToken").is_none() || sample["deviceToken"].is_null(),
+        "device_token must be stripped from directory: {sample}"
+    );
+    assert!(
+        sample.get("uuid").is_none() || sample["uuid"].is_null(),
+        "uuid restore key must be stripped from directory: {sample}"
+    );
+    assert!(
+        sample.get("isBanned").is_none() || sample["isBanned"].is_null(),
+        "ban metadata not for lean directory: {sample}"
+    );
+
+    // Staff with user.read get role/ban fields (still no secrets).
+    grant_global_role(&pool, caller, "moderator").await;
+    let app = backend::routes::create_router(pool, test_storage());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/users?user_id={}", caller))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_to_string(response.into_body()).await;
+    let users: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    let me = users
+        .iter()
+        .find(|u| u["id"].as_i64() == Some(caller))
+        .expect("caller in list");
+    assert_eq!(me["role"].as_str().unwrap(), "moderator");
+    assert!(
+        me.get("deviceToken").is_none() || me["deviceToken"].is_null(),
+        "staff list still strips device_token"
+    );
+    assert!(me.get("uuid").is_none() || me["uuid"].is_null());
 }
 
 #[sqlx::test]

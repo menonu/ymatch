@@ -120,8 +120,16 @@ class ApiClient {
   }
 
   /// Upload an image file via multipart POST. Returns the image URL.
-  Future<String> uploadImage(List<int> bytes, String filename) async {
-    final uri = Uri.parse('${config.baseUrl}/api/v1/images/upload');
+  ///
+  /// #491: `userId` is required so the backend can verify an active caller.
+  Future<String> uploadImage(
+    List<int> bytes,
+    String filename, {
+    required int userId,
+  }) async {
+    final uri = Uri.parse(
+      '${config.baseUrl}/api/v1/images/upload?user_id=$userId',
+    );
     final ext = filename.split('.').last.toLowerCase();
     final contentType = switch (ext) {
       'jpg' || 'jpeg' => 'image/jpeg',

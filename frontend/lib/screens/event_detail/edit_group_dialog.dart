@@ -104,7 +104,11 @@ class _EditGroupDialogState extends ConsumerState<EditGroupDialog> {
       if (_pickedImageBytes != null) {
         final uploaded = await ref
             .read(apiClientProvider)
-            .uploadImage(_pickedImageBytes!, _pickedImageName ?? 'group.png');
+            .uploadImage(
+              _pickedImageBytes!,
+              _pickedImageName ?? 'group.png',
+              userId: widget.userId,
+            );
         photoUrl = uploaded;
         updatePhoto = true;
       } else if (_removePhoto) {

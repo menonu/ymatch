@@ -10,6 +10,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::common::{UserIdQuery, require_global};
 use crate::routes::AppState;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
@@ -25,7 +26,10 @@ pub struct ListMerchQuery {
 
 pub async fn list_all_merch(
     State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<Vec<Merchandise>>, AppError> {
+    // #491: admin catalog list — same global gate as admin merch delete.
+    require_global(&state, query.user_id, Permission::MerchDeleteAny).await?;
     let items = state.merch.list_all().await?;
     Ok(Json(items))
 }

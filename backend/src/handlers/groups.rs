@@ -33,11 +33,31 @@ pub async fn create_event_group(
             "event_id in path and body must match",
         ));
     }
+    // #491: group create was open and assigned group/creator from body
+    // user_id. Require active caller + event-scoped merch.create (same
+    // family as catalog curation / add-merch). Ownership is forced to the
+    // verified caller — never trust an arbitrary body user_id for the role.
+    let user = state.policy.verify_active(payload.user_id).await?;
+    // 404 before 403 so a missing event is not leaked as Forbidden.
+    let _ = state
+        .events
+        .get_creator(event_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    state
+        .rbac_service
+        .check(&user, &Scope::Event(event_id), Permission::MerchCreate)
+        .await?;
+
+    // Force created_by / creator role onto the verified caller.
+    let mut owned = payload;
+    owned.user_id = user.id;
+
     // #443: group row + group/creator role in one transaction (mirrors event
     // creation). On upsert conflict, created_by is preserved; we still ensure
     // a group/creator row exists for the *actual* created_by (idempotent).
     let mut tx = state.pool.begin().await?;
-    let group = state.groups.create_in_tx(&mut tx, &payload).await?;
+    let group = state.groups.create_in_tx(&mut tx, &owned).await?;
     if let Some(creator_id) = group.created_by {
         state
             .rbac

@@ -410,18 +410,15 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
             "/api/v1/matches/:id/messages",
             get(handlers::list_messages).post(handlers::send_message),
         )
+        // #491: images share AppState so upload/delete can require an active user.
+        .route("/api/v1/images/upload", post(handlers::upload_image))
+        .route("/api/v1/images/:filename", delete(handlers::delete_image))
         .layer(middleware::from_fn_with_state(
             api_limiter.clone(),
             |axum::extract::State(lim): axum::extract::State<Arc<IpLimiter>>,
              req: Request<Body>,
              next: Next| async move { rate_limit(req, next, lim).await },
         ));
-
-    // Image upload/delete routes (separate state: Arc<dyn ImageStorage>)
-    let image_routes = Router::new()
-        .route("/api/v1/images/upload", post(handlers::upload_image))
-        .route("/api/v1/images/:filename", delete(handlers::delete_image))
-        .with_state(state.storage.clone());
 
     // Serve local uploads directory as static files
     let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
@@ -430,7 +427,6 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     Router::new()
         .merge(auth_routes.with_state(state.clone()))
         .merge(api_routes.with_state(state.clone()))
-        .merge(image_routes)
         .nest_service("/uploads", static_service)
         .layer(cors)
 }

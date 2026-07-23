@@ -76,13 +76,36 @@ Future<String> _uploadImage(List<int> bytes, String filename) async {
   return _uploadImageRaw(bytes, filename, contentType);
 }
 
+/// Guest login so image upload has an active user_id (#491).
+Future<int> _guestUserId() async {
+  final client = HttpClient();
+  try {
+    final uri = Uri.parse('http://localhost:3000/api/v1/auth/guest');
+    final request = await client.postUrl(uri);
+    request.headers.set('Content-Type', 'application/json');
+    final uuid = 'img-int-${DateTime.now().microsecondsSinceEpoch}';
+    request.write(jsonEncode({'uuid': uuid}));
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    if (response.statusCode != 200) {
+      throw Exception('guest login failed: ${response.statusCode} $body');
+    }
+    return (jsonDecode(body) as Map<String, dynamic>)['id'] as int;
+  } finally {
+    client.close();
+  }
+}
+
 Future<String> _uploadImageRaw(
   List<int> bytes,
   String filename,
   String contentType,
 ) async {
+  final userId = await _guestUserId();
   final boundary = '----TestBoundary${DateTime.now().millisecondsSinceEpoch}';
-  final uri = Uri.parse('http://localhost:3000/api/v1/images/upload');
+  final uri = Uri.parse(
+    'http://localhost:3000/api/v1/images/upload?user_id=$userId',
+  );
 
   final body = <int>[];
   void addString(String s) => body.addAll(utf8.encode(s));

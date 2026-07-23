@@ -11,8 +11,10 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::common::{UserIdQuery, require_global};
 use crate::repositories::match_::MatchRepository;
 use crate::routes::AppState;
+use crate::services::rbac::Permission;
 use axum::{
     Json,
     extract::{Path, State},
@@ -21,9 +23,12 @@ use axum::{
 use std::sync::Arc;
 
 pub async fn list_all_matches(
-    State(matches): State<Arc<MatchRepository>>,
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<Vec<TradeMatch>>, AppError> {
-    let items = matches.list_all().await?;
+    // #491: admin match list — same global gate as admin match delete.
+    require_global(&state, query.user_id, Permission::MatchDelete).await?;
+    let items = state.matches.list_all().await?;
     Ok(Json(items))
 }
 

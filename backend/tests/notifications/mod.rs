@@ -55,7 +55,41 @@ async fn test_messages_empty_list(pool: PgPool) {
     .unwrap();
     let match_id: i32 = sqlx::Row::get(&match_row, "id");
 
-    // Send a message
+    // #491: outsider cannot send into a match they are not part of.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let outsider_resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/guest")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"uuid": "msg-outsider"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let outsider: serde_json::Value =
+        serde_json::from_str(&body_to_string(outsider_resp.into_body()).await).unwrap();
+    let outsider_id = outsider["id"].as_i64().unwrap();
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/messages", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"matchId": {}, "senderId": {}, "content": "pwn"}}"#,
+                    match_id, outsider_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Send a message as participant
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -73,12 +107,44 @@ async fn test_messages_empty_list(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // List messages
-    let app = backend::routes::create_router(pool, test_storage());
+    // List without user_id rejected
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
                 .uri(&format!("/api/v1/matches/{}/messages", match_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Outsider cannot list
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/matches/{}/messages?user_id={}",
+                    match_id, outsider_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // Participant can list
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/matches/{}/messages?user_id={}",
+                    match_id, u1_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )

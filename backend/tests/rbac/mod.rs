@@ -782,8 +782,9 @@ async fn test_rbac_update_group_roles(pool: PgPool) {
     let (creator_id, event_id) =
         create_test_user_and_event(pool.clone(), "group-edit-creator", "Group Edit Event").await;
 
-    // Group creation is not gated, so a plain user can create a group and own
-    // it (created_by = user_id).
+    // #491: group create requires merch.create. Event creator creates the
+    // group, then we transfer ownership to `owner` so ownership short-circuit
+    // tests still cover a non-event-creator group owner.
     let owner = login_guest(&pool, "group-edit-owner", "t").await;
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -794,13 +795,28 @@ async fn test_rbac_update_group_roles(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"eventId": {}, "userId": {}, "groupName": "Pins", "description": "orig"}}"#,
-                    event_id, owner
+                    event_id, creator_id
                 )))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+    // Self-service transfer: current creator hands group to `owner`.
+    let resp = put_json(
+        &pool,
+        &format!(
+            "/api/v1/events/{}/groups/Pins/creator?user_id={}",
+            event_id, creator_id
+        ),
+        &format!(r#"{{"newCreatorId": {}}}"#, owner),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "transfer group creator to owner for ownership tests"
+    );
 
     async fn update_group(pool: &PgPool, event_id: i64, user_id: i64, desc: &str) -> StatusCode {
         let app = backend::routes::create_router(pool.clone(), test_storage());

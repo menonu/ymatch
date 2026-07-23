@@ -73,7 +73,11 @@ class _EditMerchDialogState extends ConsumerState<EditMerchDialog> {
       if (_pickedImageBytes != null) {
         newPhotoUrl = await ref
             .read(apiClientProvider)
-            .uploadImage(_pickedImageBytes!, _pickedImageName ?? 'image.png');
+            .uploadImage(
+              _pickedImageBytes!,
+              _pickedImageName ?? 'image.png',
+              userId: user.id,
+            );
       }
 
       await ref
