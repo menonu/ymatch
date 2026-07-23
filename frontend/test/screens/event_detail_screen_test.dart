@@ -1244,9 +1244,9 @@ void main() {
           apiClientProvider.overrideWith((ref) => _emptyGetClient()),
           authProvider.overrideWith((ref) => _MockAuthController(_user())),
           merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
-          inventoryDisplayModeProvider.overrideWith(
-            (ref) => InventoryDisplayMode.trade,
-          ),
+          inventoryDisplayModeProvider(
+            5,
+          ).overrideWith((ref) => InventoryDisplayMode.trade),
         ],
         child: _localized(const EventDetailScreen(eventId: 5)),
       ),

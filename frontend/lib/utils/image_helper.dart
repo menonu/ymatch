@@ -23,7 +23,7 @@ class PickedImage {
 /// Returns null if the user cancels source selection or image picking.
 /// On a pick error, shows a `failedToPickImage` snackbar and returns null.
 ///
-/// Shared by `AddMerchScreen` (item creation) and `_EditMerchDialog`
+/// Shared by `AddMerchScreen` (item creation) and `EditMerchDialog`
 /// (item editing, #205) so the two flows cannot drift apart.
 Future<PickedImage?> pickMerchImage(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;

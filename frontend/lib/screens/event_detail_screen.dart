@@ -1,74 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../l10n/app_localizations.dart';
-import '../providers/providers.dart';
 import '../models/models.dart';
-import '../services/api_client.dart';
+import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import '../utils/group_display.dart';
-import '../utils/image_helper.dart';
 import '../widgets/export_inventory_dialog.dart';
 import '../widgets/how_to_trade.dart';
 import '../widgets/manage_event_members_dialog.dart';
 import 'add_merch_screen.dart';
+import 'event_detail/edit_group_dialog.dart';
+import 'event_detail/group_info_panel.dart';
+import 'event_detail/inventory_item_tiles.dart';
+import 'event_detail/merch_filters.dart';
 
-enum ViewMode { detailed, grid, list }
-
-final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.detailed);
-
-enum MerchFilter { all, have, want, trade, missing }
-
-final merchFilterProvider = StateProvider<MerchFilter>(
-  (ref) => MerchFilter.all,
-);
-
-enum InventoryDisplayMode { have, wantTrade, trade, all }
-
-final inventoryDisplayModeProvider = StateProvider<InventoryDisplayMode>(
-  (ref) => InventoryDisplayMode.all,
-);
-
-/// Whether [item] inventory quantities pass [filter] (#472).
-///
-/// [missing] keeps pre-existing semantics: HAVE == 0 && WANT == 0 (TRADE is
-/// ignored). TRADE-only stock therefore still matches Missing.
-bool matchesMerchFilter(
-  MerchFilter filter, {
-  required int have,
-  required int want,
-  required int trade,
-}) {
-  switch (filter) {
-    case MerchFilter.all:
-      return true;
-    case MerchFilter.have:
-      return have > 0;
-    case MerchFilter.want:
-      return want > 0;
-    case MerchFilter.trade:
-      return trade > 0;
-    case MerchFilter.missing:
-      return have == 0 && want == 0;
-  }
-}
-
-/// Which inventory steppers to show for [mode] (#472).
-({bool showHave, bool showWant, bool showTrade}) inventoryDisplayFlags(
-  InventoryDisplayMode mode,
-) {
-  switch (mode) {
-    case InventoryDisplayMode.have:
-      return (showHave: true, showWant: false, showTrade: false);
-    case InventoryDisplayMode.wantTrade:
-      return (showHave: false, showWant: true, showTrade: true);
-    case InventoryDisplayMode.trade:
-      return (showHave: false, showWant: false, showTrade: true);
-    case InventoryDisplayMode.all:
-      return (showHave: true, showWant: true, showTrade: true);
-  }
-}
-
-final itemSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
+export 'event_detail/merch_filters.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
   final int eventId;
@@ -84,17 +31,6 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
-}
-
-/// Index of [initialGroupName] in [groupKeys], or 0 if absent/unknown (#406).
-int resolveInitialGroupTabIndex(
-  List<String> groupKeys,
-  String? initialGroupName,
-) {
-  if (groupKeys.isEmpty) return 0;
-  if (initialGroupName == null || initialGroupName.isEmpty) return 0;
-  final i = groupKeys.indexOf(initialGroupName);
-  return i >= 0 ? i : 0;
 }
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
@@ -129,10 +65,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final inventoryAsync = user != null
         ? ref.watch(inventoryProvider(user.id))
         : null;
-    final viewMode = ref.watch(viewModeProvider);
-    final filterMode = ref.watch(merchFilterProvider);
-    final displayMode = ref.watch(inventoryDisplayModeProvider);
-    final searchQuery = ref.watch(itemSearchQueryProvider);
+    final viewMode = ref.watch(viewModeProvider(widget.eventId));
+    final filterMode = ref.watch(merchFilterProvider(widget.eventId));
+    final displayMode = ref.watch(inventoryDisplayModeProvider(widget.eventId));
+    final searchQuery = ref.watch(itemSearchQueryProvider(widget.eventId));
     final l10n = AppLocalizations.of(context)!;
     final otherItems = l10n.otherItems;
 
@@ -198,11 +134,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         groupKeys.sort((a, b) {
           if (a == otherItems) return 1;
           if (b == otherItems) return -1;
-          return _naturalCompare(a, b);
+          return naturalCompare(a, b);
         });
         // Natural sort items within each group
         for (final items in groupedMerch.values) {
-          items.sort((a, b) => _naturalCompare(a.name, b.name));
+          items.sort((a, b) => naturalCompare(a.name, b.name));
         }
 
         // Index group metadata by name for the tab shield + info panel (#128).
@@ -238,12 +174,24 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         onPressed: () {
-                          ref.read(itemSearchQueryProvider.notifier).state = '';
+                          ref
+                                  .read(
+                                    itemSearchQueryProvider(
+                                      widget.eventId,
+                                    ).notifier,
+                                  )
+                                  .state =
+                              '';
                         },
                       ),
                   ],
                   onChanged: (value) {
-                    ref.read(itemSearchQueryProvider.notifier).state = value;
+                    ref
+                            .read(
+                              itemSearchQueryProvider(widget.eventId).notifier,
+                            )
+                            .state =
+                        value;
                   },
                 ),
               ),
@@ -257,8 +205,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   onPressed: () {
                     ref.invalidate(merchProvider(widget.eventId));
                     ref.invalidate(eventGroupsProvider(widget.eventId));
-                    if (user != null)
+                    if (user != null) {
                       ref.invalidate(inventoryProvider(user.id));
+                    }
                   },
                 ),
                 // Show controls (display mode) moved to AppBar
@@ -284,7 +233,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ),
                   tooltip: l10n.showControls,
                   onSelected: (InventoryDisplayMode result) {
-                    ref.read(inventoryDisplayModeProvider.notifier).state =
+                    ref
+                            .read(
+                              inventoryDisplayModeProvider(
+                                widget.eventId,
+                              ).notifier,
+                            )
+                            .state =
                         result;
                   },
                   itemBuilder: (BuildContext context) => [
@@ -316,7 +271,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   icon: const Icon(Icons.view_agenda),
                   tooltip: l10n.changeViewMode,
                   onSelected: (ViewMode result) {
-                    ref.read(viewModeProvider.notifier).state = result;
+                    ref.read(viewModeProvider(widget.eventId).notifier).state =
+                        result;
                   },
                   itemBuilder: (BuildContext context) =>
                       <PopupMenuEntry<ViewMode>>[
@@ -630,9 +586,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                 onSelectionChanged:
                                     (Set<MerchFilter> newSelection) {
                                       ref
-                                          .read(merchFilterProvider.notifier)
-                                          .state = newSelection
-                                          .first;
+                                              .read(
+                                                merchFilterProvider(
+                                                  widget.eventId,
+                                                ).notifier,
+                                              )
+                                              .state =
+                                          newSelection.first;
                                     },
                                 style: SegmentedButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
@@ -667,12 +627,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     ),
                     // Group description panel for the active tab (#128).
                     if (_groupInfoOpen)
-                      _buildGroupInfoPanel(
-                        context,
-                        groupKeys,
-                        groupByName,
-                        user,
-                        otherItems,
+                      GroupInfoPanel(
+                        groupKeys: groupKeys,
+                        groupByName: groupByName,
+                        user: user,
+                        otherItems: otherItems,
+                        onClose: () => setState(() => _groupInfoOpen = false),
+                        onEditGroup: (name, meta) =>
+                            _showEditGroupDialog(context, name, meta),
                       ),
                     Expanded(
                       child: TabBarView(
@@ -714,9 +676,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                             ),
                                         itemCount: items.length,
                                         itemBuilder: (context, index) =>
-                                            _buildGridItem(
+                                            buildGridInventoryItem(
                                               context,
                                               ref,
+                                              widget.eventId,
                                               user,
                                               items[index],
                                               inventoryLookup,
@@ -731,9 +694,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         ),
                                         itemCount: items.length,
                                         itemBuilder: (context, index) =>
-                                            _buildCompactListItem(
+                                            buildCompactInventoryItem(
                                               context,
                                               ref,
+                                              widget.eventId,
                                               user,
                                               items[index],
                                               inventoryLookup,
@@ -754,9 +718,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         itemCount: items.length,
                                         itemBuilder: (context, index) {
                                           final item = items[index];
-                                          return _buildDetailedListItem(
+                                          return buildDetailedInventoryItem(
                                             context,
                                             ref,
+                                            widget.eventId,
                                             user,
                                             item,
                                             inventoryLookup,
@@ -927,340 +892,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       icon: const Icon(Icons.group),
       tooltip: l10n.manageGroupMembers,
       iconSize: 24,
-      onPressed: () => _showManageGroupMembersDialog(context, groupName, role),
-    );
-  }
-
-  Future<void> _showManageGroupMembersDialog(
-    BuildContext context,
-    String groupName,
-    MyGroupRoleResponse role,
-  ) async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-    final l10n = AppLocalizations.of(context)!;
-    final events = ref.read(eventsControllerProvider.notifier);
-
-    Future<List<GroupMemberInfo>> loadMembers() =>
-        events.listGroupMembers(widget.eventId, groupName, user.id);
-
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: Text(l10n.manageGroupMembers),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 400,
-                child: FutureBuilder<List<GroupMemberInfo>>(
-                  future: loadMembers(),
-                  builder: (context, snap) {
-                    if (snap.connectionState != ConnectionState.done) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snap.hasError) {
-                      return Text(l10n.errorPrefix(snap.error.toString()));
-                    }
-                    final members = snap.data ?? [];
-                    final creatorId = members
-                        .where((m) => m.role == 'creator')
-                        .map((m) => m.userId)
-                        .firstOrNull;
-
-                    Future<void> runAction(
-                      Future<void> Function() action,
-                      String successLabel, {
-                      bool closeOnSuccess = false,
-                    }) async {
-                      try {
-                        await action();
-                        ref.invalidate(
-                          myGroupRoleProvider((
-                            eventId: widget.eventId,
-                            groupName: groupName,
-                          )),
-                        );
-                        ref.invalidate(eventGroupsProvider(widget.eventId));
-                        if (closeOnSuccess && dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        } else {
-                          setDialogState(() {});
-                        }
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(successLabel)));
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(l10n.errorPrefix(e.toString())),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                          );
-                        }
-                      }
-                    }
-
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: members.isEmpty
-                              ? Center(child: Text(l10n.noMembers))
-                              : ListView.builder(
-                                  itemCount: members.length,
-                                  itemBuilder: (context, index) {
-                                    final m = members[index];
-                                    final label =
-                                        m.username != null &&
-                                            m.username!.isNotEmpty
-                                        ? '${m.username} (${m.userId})'
-                                        : 'ID ${m.userId}';
-                                    final roleLabel = m.role == 'creator'
-                                        ? l10n.roleCreator
-                                        : m.role == 'editor'
-                                        ? l10n.roleEditor
-                                        : m.role;
-                                    return ListTile(
-                                      title: Text(label),
-                                      subtitle: Text(roleLabel),
-                                      trailing:
-                                          role.canManageEditors &&
-                                              m.role == 'editor'
-                                          ? IconButton(
-                                              icon: const Icon(
-                                                Icons.remove_circle_outline,
-                                                color: Colors.red,
-                                              ),
-                                              tooltip: l10n.removeEditor,
-                                              onPressed: () => runAction(
-                                                () => events.revokeGroupEditor(
-                                                  widget.eventId,
-                                                  groupName,
-                                                  m.userId,
-                                                  user.id,
-                                                ),
-                                                l10n.editorRemoved,
-                                              ),
-                                            )
-                                          : null,
-                                    );
-                                  },
-                                ),
-                        ),
-                        const Divider(),
-                        if (role.canManageEditors)
-                          ListTile(
-                            leading: const Icon(Icons.person_add_alt_1),
-                            title: Text(l10n.addEditor),
-                            onTap: () async {
-                              final selected = await pickUserFromDirectory(
-                                dialogContext,
-                                ref,
-                                title: l10n.pickGroupEditorTitle,
-                                excludeUserIds: members
-                                    .map((m) => m.userId)
-                                    .toSet(),
-                              );
-                              if (selected == null) return;
-                              await runAction(
-                                () => events.assignGroupEditor(
-                                  widget.eventId,
-                                  groupName,
-                                  selected.id,
-                                  user.id,
-                                ),
-                                l10n.editorAssigned,
-                              );
-                            },
-                          ),
-                        if (role.canTransferCreator)
-                          ListTile(
-                            leading: const Icon(Icons.swap_horiz),
-                            title: Text(l10n.transferCreator),
-                            onTap: () async {
-                              final selected = await pickUserFromDirectory(
-                                dialogContext,
-                                ref,
-                                title: l10n.pickTransferGroupCreatorTitle,
-                                excludeUserIds: {?creatorId},
-                              );
-                              if (selected == null) return;
-                              if (!dialogContext.mounted) return;
-                              final confirmed = await showDialog<bool>(
-                                context: dialogContext,
-                                builder: (ctx) => AlertDialog(
-                                  title: Text(
-                                    l10n.confirmTransferGroupCreatorTitle,
-                                  ),
-                                  content: Text(
-                                    l10n.confirmTransferGroupCreatorBody(
-                                      selected.username,
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(ctx, false),
-                                      child: Text(l10n.cancel),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: Text(
-                                        l10n.confirmTransferCreatorAction,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirmed != true) return;
-                              await runAction(
-                                () => events.transferGroupCreator(
-                                  widget.eventId,
-                                  groupName,
-                                  user.id,
-                                  selected.id,
-                                ),
-                                l10n.groupCreatorTransferred,
-                                closeOnSuccess: true,
-                              );
-                            },
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(l10n.cancel),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  /// Panel showing the active tab's group name + description (#128).
-  /// Tracks the current tab via [DefaultTabController] so switching tabs
-  /// updates the panel without closing it.
-  Widget _buildGroupInfoPanel(
-    BuildContext context,
-    List<String> groupKeys,
-    Map<String, MerchandiseGroup> groupByName,
-    User? user,
-    String otherItems,
-  ) {
-    final l10n = AppLocalizations.of(context)!;
-    return Builder(
-      builder: (context) {
-        final tabCtrl = DefaultTabController.of(context);
-        return AnimatedBuilder(
-          animation: tabCtrl,
-          builder: (context, _) {
-            final index = tabCtrl.index.clamp(0, groupKeys.length - 1);
-            final groupName = groupKeys[index];
-            final meta = groupByName[groupName];
-            final description =
-                meta != null &&
-                    meta.hasDescription() &&
-                    meta.description.trim().isNotEmpty
-                ? meta.description.trim()
-                : null;
-            final isGroupCreator =
-                user != null &&
-                meta != null &&
-                meta.hasCreatedBy() &&
-                meta.createdBy == user.id;
-            // Synthetic "Other items" bucket has no formal group row.
-            final isSynthetic = groupName == otherItems;
-
-            return Material(
-              elevation: 1,
-              color: Colors.blueGrey.shade50,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(Icons.info_outline, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            groupDisplayName(groupName, groupByName),
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            isSynthetic
-                                ? l10n.noGroupDescription
-                                : (description ?? l10n.noGroupDescription),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: description == null
-                                      ? Colors.grey[600]
-                                      : null,
-                                  fontStyle: description == null
-                                      ? FontStyle.italic
-                                      : FontStyle.normal,
-                                ),
-                          ),
-                          // Description image below text, width-fit (#404).
-                          if (!isSynthetic &&
-                              meta != null &&
-                              meta.hasPhotoUrl() &&
-                              meta.photoUrl.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: buildImage(
-                                  meta.photoUrl,
-                                  width: double.infinity,
-                                  fit: BoxFit.fitWidth,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (isGroupCreator && !isSynthetic)
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: l10n.editGroup,
-                        onPressed: () =>
-                            _showEditGroupDialog(context, groupName, meta),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: l10n.cancel,
-                      onPressed: () => setState(() => _groupInfoOpen = false),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      onPressed: () => showManageGroupMembersDialog(
+        context,
+        ref,
+        eventId: widget.eventId,
+        groupName: groupName,
+        role: role,
+      ),
     );
   }
 
@@ -1277,7 +915,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
     await showDialog<void>(
       context: context,
-      builder: (context) => _EditGroupDialog(
+      builder: (context) => EditGroupDialog(
         eventId: widget.eventId,
         userId: user.id,
         groupName: groupName,
@@ -1312,660 +950,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  // --- Grid View Item ---
-  Widget _buildGridItem(
-    BuildContext context,
-    WidgetRef ref,
-    User? user,
-    Merchandise item,
-    Map<int, Map<String, int>> lookup,
-    InventoryDisplayMode displayMode,
-  ) {
-    final merchInv = lookup[item.id] ?? {};
-    final haveQty = merchInv['HAVE'] ?? 0;
-    final wantQty = merchInv['WANT'] ?? 0;
-    final tradeQty = merchInv['TRADE'] ?? 0;
-
-    final flags = inventoryDisplayFlags(displayMode);
-    final showHave = flags.showHave;
-    final showWant = flags.showWant;
-    final showTrade = flags.showTrade;
-
-    final isOwner =
-        user != null && item.hasCreatorId() && item.creatorId == user.id;
-    final isDeleted = item.hasIsDeleted() && item.isDeleted;
-    final l10n = AppLocalizations.of(context)!;
-
-    return Opacity(
-      opacity: isDeleted ? 0.65 : 1.0,
-      child: GestureDetector(
-        onLongPress: (isOwner && !isDeleted)
-            ? () => _showMerchActions(context, ref, item)
-            : null,
-        child: Card(
-          margin: EdgeInsets.zero,
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: buildImage(
-                        item.hasPhotoUrl() ? item.photoUrl : null,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    if (isDeleted)
-                      Positioned(
-                        top: 2,
-                        left: 2,
-                        child: _DeletedBadge(label: l10n.itemDeleted),
-                      ),
-                    if (isOwner && !isDeleted)
-                      Positioned(
-                        top: 2,
-                        right: 2,
-                        child: Icon(
-                          Icons.edit_note,
-                          size: 14,
-                          color: Colors.blue[400],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: Text(
-                  item.name,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Row(
-                children: [
-                  if (showHave)
-                    Expanded(
-                      child: _buildGridCounter(
-                        context,
-                        l10n.haveShort,
-                        haveQty,
-                        AppTheme.haveColor,
-                        isDeleted
-                            ? null
-                            : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
-                      ),
-                    ),
-                  if (showWant)
-                    Expanded(
-                      child: _buildGridCounter(
-                        context,
-                        l10n.wantShort,
-                        wantQty,
-                        AppTheme.wantColor,
-                        isDeleted
-                            ? null
-                            : (q) => _updateInv(ref, user, item.id, 'WANT', q),
-                      ),
-                    ),
-                  if (showTrade)
-                    Expanded(
-                      child: _buildGridCounter(
-                        context,
-                        l10n.tradeShort,
-                        tradeQty,
-                        AppTheme.tradeColor,
-                        isDeleted
-                            ? null
-                            : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGridCounter(
-    BuildContext context,
-    String label,
-    int qty,
-    Color color,
-    void Function(int)? onUpdate,
-  ) {
-    final enabled = onUpdate != null;
-    return Container(
-      decoration: BoxDecoration(
-        color: qty > 0 ? color.withValues(alpha: 0.1) : Colors.transparent,
-        border: Border(
-          top: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 8,
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Icon(
-                      Icons.remove,
-                      size: 12,
-                      color: enabled && qty > 0 ? color : Colors.grey,
-                    ),
-                  ),
-                ),
-              ),
-              Text(
-                '$qty',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: qty > 0 ? color : Colors.grey,
-                ),
-              ),
-              Expanded(
-                child: InkWell(
-                  onTap: enabled ? () => onUpdate(qty + 1) : null,
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Icon(
-                      Icons.add,
-                      size: 12,
-                      color: enabled ? color : Colors.grey,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Compact List View Item ---
-  Widget _buildCompactListItem(
-    BuildContext context,
-    WidgetRef ref,
-    User? user,
-    Merchandise item,
-    Map<int, Map<String, int>> lookup,
-    InventoryDisplayMode displayMode,
-  ) {
-    final merchInv = lookup[item.id] ?? {};
-    final haveQty = merchInv['HAVE'] ?? 0;
-    final wantQty = merchInv['WANT'] ?? 0;
-    final tradeQty = merchInv['TRADE'] ?? 0;
-
-    final flags = inventoryDisplayFlags(displayMode);
-    final showHave = flags.showHave;
-    final showWant = flags.showWant;
-    final showTrade = flags.showTrade;
-
-    final isOwner =
-        user != null && item.hasCreatorId() && item.creatorId == user.id;
-    final isDeleted = item.hasIsDeleted() && item.isDeleted;
-    final l10n = AppLocalizations.of(context)!;
-
-    return Opacity(
-      opacity: isDeleted ? 0.65 : 1.0,
-      child: GestureDetector(
-        onLongPress: (isOwner && !isDeleted)
-            ? () => _showMerchActions(context, ref, item)
-            : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-            ),
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: buildImage(
-                  item.hasPhotoUrl() ? item.photoUrl : null,
-                  width: 28,
-                  height: 28,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        item.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isDeleted) ...[
-                      const SizedBox(width: 6),
-                      _DeletedBadge(label: l10n.itemDeleted),
-                    ],
-                  ],
-                ),
-              ),
-              if (isOwner && !isDeleted)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Icon(
-                    Icons.edit_note,
-                    size: 14,
-                    color: Colors.blue[400],
-                  ),
-                ),
-              if (showHave)
-                _buildCompactCounter(
-                  context,
-                  l10n.haveShort,
-                  haveQty,
-                  AppTheme.haveColor,
-                  isDeleted
-                      ? null
-                      : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
-                ),
-              if (showHave && (showWant || showTrade)) const SizedBox(width: 4),
-              if (showWant)
-                _buildCompactCounter(
-                  context,
-                  l10n.wantShort,
-                  wantQty,
-                  AppTheme.wantColor,
-                  isDeleted
-                      ? null
-                      : (q) => _updateInv(ref, user, item.id, 'WANT', q),
-                ),
-              if (showWant && showTrade) const SizedBox(width: 4),
-              if (showTrade)
-                _buildCompactCounter(
-                  context,
-                  l10n.tradeShort,
-                  tradeQty,
-                  AppTheme.tradeColor,
-                  isDeleted
-                      ? null
-                      : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactCounter(
-    BuildContext context,
-    String label,
-    int qty,
-    Color color,
-    void Function(int)? onUpdate,
-  ) {
-    final enabled = onUpdate != null;
-    return Container(
-      height: 26,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Icon(
-                Icons.remove,
-                size: 12,
-                color: enabled && qty > 0 ? color : Colors.grey[400],
-              ),
-            ),
-          ),
-          Text(
-            '$label$qty',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          InkWell(
-            onTap: enabled ? () => onUpdate(qty + 1) : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Icon(
-                Icons.add,
-                size: 12,
-                color: enabled ? color : Colors.grey[400],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Detailed List View Item (Original) ---
-  Widget _buildDetailedListItem(
-    BuildContext context,
-    WidgetRef ref,
-    User? user,
-    Merchandise item,
-    Map<int, Map<String, int>> lookup,
-    InventoryDisplayMode displayMode,
-  ) {
-    final merchInv = lookup[item.id] ?? {};
-    final haveQty = merchInv['HAVE'] ?? 0;
-    final wantQty = merchInv['WANT'] ?? 0;
-    final tradeQty = merchInv['TRADE'] ?? 0;
-
-    final flags = inventoryDisplayFlags(displayMode);
-    final showHave = flags.showHave;
-    final showWant = flags.showWant;
-    final showTrade = flags.showTrade;
-
-    final isOwner =
-        user != null && item.hasCreatorId() && item.creatorId == user.id;
-    final isDeleted = item.hasIsDeleted() && item.isDeleted;
-    final l10n = AppLocalizations.of(context)!;
-
-    return Opacity(
-      opacity: isDeleted ? 0.65 : 1.0,
-      child: GestureDetector(
-        onLongPress: (isOwner && !isDeleted)
-            ? () => _showMerchActions(context, ref, item)
-            : null,
-        child: Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // #203: removed ReorderableDragStartListener wrapper; the
-                // image is no longer a drag handle. Long-press on the
-                // card (handled by the outer GestureDetector) is now the
-                // only way to trigger the owner's edit/delete menu.
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
-                    width: 72,
-                    height: 72,
-                    child: buildImage(
-                      item.hasPhotoUrl() ? item.photoUrl : null,
-                      width: 72,
-                      height: 72,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.name,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          if (isDeleted)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: _DeletedBadge(label: l10n.itemDeleted),
-                            ),
-                          if (isOwner && !isDeleted)
-                            Tooltip(
-                              message: l10n.youCreatedThisItem,
-                              child: Icon(
-                                Icons.edit_note,
-                                size: 18,
-                                color: Colors.blue[400],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          if (showHave)
-                            Expanded(
-                              flex: 5,
-                              child: _buildStepper(
-                                label: 'HAVE',
-                                displayLabel: l10n.have,
-                                color: AppTheme.haveColor,
-                                qty: haveQty,
-                                onUpdate: isDeleted
-                                    ? null
-                                    : (q) => _updateInv(
-                                        ref,
-                                        user,
-                                        item.id,
-                                        'HAVE',
-                                        q,
-                                      ),
-                              ),
-                            ),
-                          if (showHave && (showWant || showTrade))
-                            const Spacer(flex: 1),
-                          if (showWant)
-                            Expanded(
-                              flex: 5,
-                              child: _buildStepper(
-                                label: 'WANT',
-                                displayLabel: l10n.want,
-                                color: AppTheme.wantColor,
-                                qty: wantQty,
-                                onUpdate: isDeleted
-                                    ? null
-                                    : (q) => _updateInv(
-                                        ref,
-                                        user,
-                                        item.id,
-                                        'WANT',
-                                        q,
-                                      ),
-                              ),
-                            ),
-                          if (showWant && showTrade) const Spacer(flex: 1),
-                          if (showTrade)
-                            Expanded(
-                              flex: 5,
-                              child: _buildStepper(
-                                label: 'TRADE',
-                                displayLabel: l10n.trade,
-                                color: AppTheme.tradeColor,
-                                qty: tradeQty,
-                                onUpdate: isDeleted
-                                    ? null
-                                    : (q) => _updateInv(
-                                        ref,
-                                        user,
-                                        item.id,
-                                        'TRADE',
-                                        q,
-                                      ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _updateInv(
-    WidgetRef ref,
-    User? user,
-    int merchId,
-    String status,
-    int qty,
-  ) async {
-    if (user != null) {
-      // updateItem rethrows on failure (#239); the optimistic state is
-      // rolled back inside the notifier, so the UI reverts on its own.
-      // Swallow here so the +/- steppers don't surface an uncaught
-      // async error; the rollback is the user-visible signal.
-      try {
-        await ref
-            .read(inventoryProvider(user.id).notifier)
-            .updateItem(merchId, status, qty);
-      } catch (_) {
-        // Optimistic rollback already handled by the notifier.
-      }
-    }
-  }
-
-  void _showMerchActions(
-    BuildContext context,
-    WidgetRef ref,
-    Merchandise item,
-  ) {
-    final l10n = AppLocalizations.of(context)!;
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: Text(l10n.editItem),
-              onTap: () {
-                Navigator.pop(ctx);
-                _editMerch(context, ref, item);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: Text(
-                l10n.delete,
-                style: const TextStyle(color: Colors.red),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmDeleteMerch(context, ref, item);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _editMerch(BuildContext context, WidgetRef ref, Merchandise item) {
-    // The dialog holds its own state (picked image + name) and its own ref,
-    // so it is a separate ConsumerStatefulWidget rather than an inline
-    // AlertDialog. On save it invalidates `merchProvider` so the card list
-    // refreshes with the new name/image.
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => _EditMerchDialog(eventId: widget.eventId, item: item),
-    );
-  }
-
-  void _confirmDeleteMerch(
-    BuildContext context,
-    WidgetRef ref,
-    Merchandise item,
-  ) {
-    final user = ref.read(currentUserProvider);
-    final l10n = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.deleteItem),
-        content: Text(l10n.deleteEventConfirm(item.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              if (user != null) {
-                try {
-                  await ref
-                      .read(merchControllerProvider.notifier)
-                      .deleteMerchByCreator(item.eventId, item.id, user.id);
-                  ref.invalidate(merchProvider(widget.eventId));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                } catch (e) {
-                  // #266: surface delete failure; keep dialog open.
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.errorPrefix(e.toString())),
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                      ),
-                    );
-                  }
-                }
-              } else if (ctx.mounted) {
-                Navigator.pop(ctx);
-              }
-            },
-            child: Text(l10n.delete),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ... rest of the helpers
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     return Center(
@@ -1989,557 +973,6 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStepper({
-    required String label,
-    required String displayLabel,
-    required Color color,
-    required int qty,
-    void Function(int)? onUpdate,
-  }) {
-    final enabled = onUpdate != null;
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          // Tap areas: left = decrease, right = increase
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  key: Key('stepper_inc_$label'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: enabled ? () => onUpdate(qty + 1) : null,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-            ],
-          ),
-          // −/+ hint icons centered on left/right edges.
-          // IgnorePointer so taps on the glyphs reach the half-area
-          // GestureDetectors below (#408) — same as the center label.
-          Positioned(
-            left: 2,
-            top: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              child: Center(
-                child: Text(
-                  '−',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: enabled && qty > 0
-                        ? color.withValues(alpha: 0.5)
-                        : Colors.grey.withValues(alpha: 0.3),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 3,
-            top: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              child: Center(
-                child: Text(
-                  '+',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: enabled
-                        ? color.withValues(alpha: 0.5)
-                        : Colors.grey.withValues(alpha: 0.3),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Centered label + quantity (non-interactive, taps pass through)
-          Center(
-            child: IgnorePointer(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    displayLabel,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      color: qty > 0 ? color : Colors.grey[500],
-                    ),
-                  ),
-                  Text(
-                    '$qty',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      height: 1.1,
-                      color: qty > 0 ? color : Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Group description edit dialog (#128 / #404). Owns its controller so dispose
-/// cannot race the route close animation. Image attach/replace uses the same
-/// pick + upload flow as merch edit.
-class _EditGroupDialog extends ConsumerStatefulWidget {
-  final int eventId;
-  final int userId;
-  final String groupName;
-  // #425: editable cosmetic label. Pre-filled with the current display_name,
-  // falling back to the (immutable) group_name key so the field never opens
-  // empty. Saving writes `display_name`; the key is never sent.
-  final String initialDisplayName;
-  final String initialDescription;
-  final String? initialPhotoUrl;
-
-  const _EditGroupDialog({
-    required this.eventId,
-    required this.userId,
-    required this.groupName,
-    required this.initialDisplayName,
-    required this.initialDescription,
-    this.initialPhotoUrl,
-  });
-
-  @override
-  ConsumerState<_EditGroupDialog> createState() => _EditGroupDialogState();
-}
-
-class _EditGroupDialogState extends ConsumerState<_EditGroupDialog> {
-  late final TextEditingController _nameCtrl;
-  late final TextEditingController _descCtrl;
-  bool _saving = false;
-
-  /// Preview URL (existing remote or base64 of a newly picked image).
-  String? _previewUrl;
-
-  /// Raw bytes of a newly picked image (null if no change / no new pick).
-  List<int>? _pickedImageBytes;
-  String? _pickedImageName;
-
-  /// True when the user explicitly cleared the image.
-  bool _removePhoto = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameCtrl = TextEditingController(text: widget.initialDisplayName);
-    _descCtrl = TextEditingController(text: widget.initialDescription);
-    _previewUrl = widget.initialPhotoUrl;
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final picked = await pickMerchImage(context);
-    if (picked == null || !mounted) return;
-    setState(() {
-      _pickedImageBytes = picked.bytes;
-      _pickedImageName = picked.name;
-      _previewUrl = picked.previewUrl;
-      _removePhoto = false;
-    });
-  }
-
-  void _clearImage() {
-    setState(() {
-      _pickedImageBytes = null;
-      _pickedImageName = null;
-      _previewUrl = null;
-      _removePhoto = true;
-    });
-  }
-
-  Future<void> _save() async {
-    final l10n = AppLocalizations.of(context)!;
-    final messenger = ScaffoldMessenger.of(context);
-    final errorColor = Theme.of(context).colorScheme.error;
-
-    // An empty display name clears it (the backend stores NULL), so the label
-    // reverts to the immutable group_name key — that is the UI's "reset to
-    // key" path (#425 AC #8). The field opens pre-filled with the current
-    // display name (or the key), so clearing is a deliberate action.
-    final displayName = _nameCtrl.text.trim();
-
-    setState(() => _saving = true);
-    try {
-      String? photoUrl;
-      var updatePhoto = false;
-      if (_pickedImageBytes != null) {
-        final uploaded = await ref
-            .read(apiClientProvider)
-            .uploadImage(_pickedImageBytes!, _pickedImageName ?? 'group.png');
-        photoUrl = uploaded;
-        updatePhoto = true;
-      } else if (_removePhoto) {
-        photoUrl = '';
-        updatePhoto = true;
-      }
-
-      await ref
-          .read(groupControllerProvider.notifier)
-          .updateGroup(
-            eventId: widget.eventId,
-            userId: widget.userId,
-            groupName: widget.groupName,
-            displayName: displayName,
-            updateDisplayName: true,
-            description: _descCtrl.text.trim(),
-            photoUrl: photoUrl,
-            updatePhoto: updatePhoto,
-          );
-      // Info panel reads eventGroupsProvider only — do not invalidate merch:
-      // that forces a full-screen loading scaffold and resets the active tab.
-      ref.invalidate(eventGroupsProvider(widget.eventId));
-      if (!mounted) return;
-      Navigator.pop(context);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.groupSaved)));
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.failedToSaveGroup(e.toString())),
-          backgroundColor: errorColor,
-        ),
-      );
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final hasPreview = _previewUrl != null && _previewUrl!.isNotEmpty;
-    return AlertDialog(
-      title: Text(l10n.editGroup),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _nameCtrl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                labelText: l10n.groupNameLabel,
-                helperText: l10n.groupDisplayNameHelper,
-              ),
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              decoration: InputDecoration(
-                labelText: l10n.groupDescription,
-                hintText: l10n.groupDescriptionHint,
-              ),
-              maxLines: 4,
-              enabled: !_saving,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.groupPhoto,
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 8),
-            if (hasPreview)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: buildImage(
-                    _previewUrl,
-                    width: double.infinity,
-                    fit: BoxFit.fitWidth,
-                  ),
-                ),
-              )
-            else
-              Container(
-                height: 80,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  l10n.noGroupPhoto,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _saving ? null : _pickImage,
-                  icon: const Icon(Icons.image, size: 18),
-                  label: Text(hasPreview ? l10n.changeImage : l10n.chooseImage),
-                ),
-                if (hasPreview) ...[
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: _saving ? null : _clearImage,
-                    child: Text(
-                      l10n.remove,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.pop(context),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(l10n.save),
-        ),
-      ],
-    );
-  }
-}
-
-int _naturalCompare(String a, String b) {
-  final regExp = RegExp(r'(\d+)|(\D+)');
-  final partsA = regExp.allMatches(a).toList();
-  final partsB = regExp.allMatches(b).toList();
-  for (int i = 0; i < partsA.length && i < partsB.length; i++) {
-    final pa = partsA[i].group(0)!;
-    final pb = partsB[i].group(0)!;
-    final na = int.tryParse(pa);
-    final nb = int.tryParse(pb);
-    int cmp;
-    if (na != null && nb != null) {
-      cmp = na.compareTo(nb);
-    } else {
-      cmp = pa.toLowerCase().compareTo(pb.toLowerCase());
-    }
-    if (cmp != 0) return cmp;
-  }
-  return a.length.compareTo(b.length);
-}
-
-/// Small badge marking soft-deleted merch.
-///
-/// ADR 0011: event catalog lists are live-only, so this is primarily defensive
-/// for stale client state. Inventory rows still carry `is_deleted` (ADR 0008).
-class _DeletedBadge extends StatelessWidget {
-  final String label;
-
-  const _DeletedBadge({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: Colors.grey[700],
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-/// Dialog for editing a merch item's name and image (#205).
-///
-/// The backend `PUT /events/:eventId/merch/:merchId` already accepts `name`
-/// and `photo_url`; the previous UI only exposed name editing. This dialog
-/// reuses the same image-pick + upload flow as `AddMerchScreen` so a creator
-/// can also replace the item's photo. The `photoUrl` is sent only when a new
-/// image was picked, so leaving the image untouched does not clobber it.
-class _EditMerchDialog extends ConsumerStatefulWidget {
-  final int eventId;
-  final Merchandise item;
-
-  const _EditMerchDialog({required this.eventId, required this.item});
-
-  @override
-  ConsumerState<_EditMerchDialog> createState() => _EditMerchDialogState();
-}
-
-class _EditMerchDialogState extends ConsumerState<_EditMerchDialog> {
-  late final TextEditingController _nameCtrl;
-  // Preview URL for a newly picked image (base64 data URI); null means "show
-  // the item's existing photo".
-  String? _previewUrl;
-  List<int>? _pickedImageBytes;
-  String? _pickedImageName;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameCtrl = TextEditingController(text: widget.item.name);
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final picked = await pickMerchImage(context);
-    if (picked != null) {
-      setState(() {
-        _pickedImageBytes = picked.bytes;
-        _pickedImageName = picked.name;
-        _previewUrl = picked.previewUrl;
-      });
-    }
-  }
-
-  Future<void> _save() async {
-    final l10n = AppLocalizations.of(context)!;
-    final newName = _nameCtrl.text.trim();
-    if (newName.isEmpty) return;
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-
-    setState(() => _saving = true);
-    try {
-      // Only upload + send photoUrl when a new image was picked, so an
-      // unchanged image is not overwritten with an empty/stale value.
-      String? newPhotoUrl;
-      if (_pickedImageBytes != null) {
-        newPhotoUrl = await ref
-            .read(apiClientProvider)
-            .uploadImage(_pickedImageBytes!, _pickedImageName ?? 'image.png');
-      }
-
-      await ref
-          .read(merchControllerProvider.notifier)
-          .updateMerch(
-            widget.eventId,
-            widget.item.id,
-            user.id,
-            name: newName,
-            photoUrl: newPhotoUrl,
-          );
-      ref.invalidate(merchProvider(widget.eventId));
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
-      // #299: updateMerch rethrows on failure (e.g. a duplicate-name 400).
-      // Surface the backend error instead of silently closing the dialog.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.failedToUpdateItem(newName, e.toString())),
-            duration: const Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final currentPhotoUrl = widget.item.hasPhotoUrl()
-        ? widget.item.photoUrl
-        : null;
-    return AlertDialog(
-      title: Text(l10n.editItem),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 120,
-                  height: 120,
-                  child: buildImage(
-                    _previewUrl ?? currentPhotoUrl,
-                    width: 120,
-                    height: 120,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: TextButton.icon(
-                onPressed: _saving ? null : _pickImage,
-                icon: const Icon(Icons.add_a_photo),
-                label: Text(l10n.changeImage),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameCtrl,
-              autofocus: true,
-              decoration: InputDecoration(hintText: l10n.editItemNameHint),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: _saving ? null : _save,
-          child: Text(l10n.save),
-        ),
-      ],
     );
   }
 }

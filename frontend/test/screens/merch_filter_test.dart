@@ -1,7 +1,8 @@
-// Unit tests for Event Detail inventory filter + display-mode helpers (#472).
+// Unit tests for Event Detail inventory filter + display-mode helpers (#472 / #494).
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/screens/event_detail_screen.dart';
+import 'package:frontend/screens/event_detail/merch_filters.dart';
 
 void main() {
   group('matchesMerchFilter (#472)', () {
@@ -93,6 +94,47 @@ void main() {
       expect(f.showHave, isTrue);
       expect(f.showWant, isTrue);
       expect(f.showTrade, isTrue);
+    });
+  });
+
+  group('naturalCompare / resolveInitialGroupTabIndex (#494)', () {
+    test('naturalCompare orders numeric runs by value', () {
+      expect(naturalCompare('item2', 'item10'), lessThan(0));
+      expect(naturalCompare('item10', 'item2'), greaterThan(0));
+      expect(naturalCompare('alpha', 'beta'), lessThan(0));
+    });
+
+    test('resolveInitialGroupTabIndex maps name or falls back', () {
+      expect(resolveInitialGroupTabIndex(['A', 'B'], 'B'), 1);
+      expect(resolveInitialGroupTabIndex(['A', 'B'], 'missing'), 0);
+      expect(resolveInitialGroupTabIndex(['A', 'B'], null), 0);
+      expect(resolveInitialGroupTabIndex([], 'B'), 0);
+    });
+  });
+
+  group('per-event view/filter providers (#494)', () {
+    test('family keys isolate state across eventIds', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(viewModeProvider(1).notifier).state = ViewMode.grid;
+      container.read(merchFilterProvider(1).notifier).state = MerchFilter.have;
+      container.read(inventoryDisplayModeProvider(1).notifier).state =
+          InventoryDisplayMode.trade;
+
+      expect(container.read(viewModeProvider(2)), ViewMode.detailed);
+      expect(container.read(merchFilterProvider(2)), MerchFilter.all);
+      expect(
+        container.read(inventoryDisplayModeProvider(2)),
+        InventoryDisplayMode.all,
+      );
+
+      expect(container.read(viewModeProvider(1)), ViewMode.grid);
+      expect(container.read(merchFilterProvider(1)), MerchFilter.have);
+      expect(
+        container.read(inventoryDisplayModeProvider(1)),
+        InventoryDisplayMode.trade,
+      );
     });
   });
 }
