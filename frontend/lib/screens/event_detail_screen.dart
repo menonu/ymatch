@@ -673,6 +673,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                     final itemCountWithTotals =
                                         items.length + 1;
 
+                                    // Shared last-slot totals card so grid /
+                                    // compact / detailed cannot drift.
+                                    Widget groupTotalsCard({
+                                      bool compact = false,
+                                    }) => GroupInventoryTotalsCard(
+                                      totals: groupTotals,
+                                      displayMode: displayMode,
+                                      compact: compact,
+                                    );
+
                                     if (viewMode == ViewMode.grid) {
                                       return GridView.builder(
                                         padding: const EdgeInsets.only(
@@ -691,9 +701,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         itemCount: itemCountWithTotals,
                                         itemBuilder: (context, index) {
                                           if (index == items.length) {
-                                            return GroupInventoryTotalsCard(
-                                              totals: groupTotals,
-                                              displayMode: displayMode,
+                                            return groupTotalsCard(
                                               compact: true,
                                             );
                                           }
@@ -717,10 +725,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         itemCount: itemCountWithTotals,
                                         itemBuilder: (context, index) {
                                           if (index == items.length) {
-                                            return GroupInventoryTotalsCard(
-                                              totals: groupTotals,
-                                              displayMode: displayMode,
-                                            );
+                                            return groupTotalsCard();
                                           }
                                           return buildCompactInventoryItem(
                                             context,
@@ -747,18 +752,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                         itemCount: itemCountWithTotals,
                                         itemBuilder: (context, index) {
                                           if (index == items.length) {
-                                            return GroupInventoryTotalsCard(
-                                              totals: groupTotals,
-                                              displayMode: displayMode,
-                                            );
+                                            return groupTotalsCard();
                                           }
-                                          final item = items[index];
                                           return buildDetailedInventoryItem(
                                             context,
                                             ref,
                                             widget.eventId,
                                             user,
-                                            item,
+                                            items[index],
                                             inventoryLookup,
                                             displayMode,
                                           );

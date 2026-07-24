@@ -138,6 +138,7 @@ class _TotalCounter extends StatelessWidget {
     final bg = qty > 0 ? color.withValues(alpha: 0.12) : Colors.transparent;
     return Semantics(
       label: '$fullLabel: $qty',
+      excludeSemantics: true,
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 6 : 8,
