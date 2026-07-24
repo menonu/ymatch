@@ -25,32 +25,36 @@ class AdminDashboardScreen extends ConsumerWidget {
       );
     }
 
+    // Debug tab (test data + dev_user guest URLs) is debug-build only (#499).
+    final showDebug = enableDevSessionOverrides;
+    final tabCount = showDebug ? 7 : 6;
+
     return DefaultTabController(
-      length: 7,
+      length: tabCount,
       child: Scaffold(
         appBar: AppBar(
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'System'),
-              Tab(text: 'Users'),
-              Tab(text: 'Events'),
-              Tab(text: 'Groups'),
-              Tab(text: 'Items'),
-              Tab(text: 'Matches'),
-              Tab(text: 'Debug'),
+              const Tab(text: 'System'),
+              const Tab(text: 'Users'),
+              const Tab(text: 'Events'),
+              const Tab(text: 'Groups'),
+              const Tab(text: 'Items'),
+              const Tab(text: 'Matches'),
+              if (showDebug) const Tab(text: 'Debug'),
             ],
           ),
         ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
-            _AdminSystemTab(),
-            _AdminUsersTab(),
-            _AdminEventsTab(),
-            _AdminGroupsTab(),
-            _AdminItemsTab(),
-            _AdminMatchesTab(),
-            _AdminDebugTab(),
+            const _AdminSystemTab(),
+            const _AdminUsersTab(),
+            const _AdminEventsTab(),
+            const _AdminGroupsTab(),
+            const _AdminItemsTab(),
+            const _AdminMatchesTab(),
+            if (showDebug) const _AdminDebugTab(),
           ],
         ),
       ),

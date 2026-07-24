@@ -143,7 +143,7 @@ BottomNavBar
   - **Events**: Event list with DRAFT badge, delete button
   - **Items**: Merch list with photo, delete button
   - **Matches**: Match list with status, delete button
-  - **Debug**: Version info, generate test data, open guest session
+  - **Debug** (debug builds only, #499): Version info, generate test data, open guest session via `dev_user` URL. Hidden in release/production builds.
 
 ## Permissions
 
