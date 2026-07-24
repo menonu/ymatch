@@ -722,6 +722,71 @@ void main() {
     },
   );
 
+  // ---- #499: Admin Debug tab is debug-build only ----
+
+  testWidgets('Debug tab is shown when enableDevSessionOverrides is true', (
+    WidgetTester tester,
+  ) async {
+    enableDevSessionOverrides = true;
+    addTearDown(() => enableDevSessionOverrides = true);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(_adminUser())),
+          backendSystemStatusProvider.overrideWith(
+            (ref) async => <String, dynamic>{},
+          ),
+          adminUsersProvider.overrideWith((ref) async => <User>[]),
+          eventsProvider.overrideWith((ref) async => <Event>[]),
+          adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+          adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+          adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+        ],
+        child: const MaterialApp(home: AdminDashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Debug'), findsOneWidget);
+    await tester.tap(find.text('Debug'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open New Guest Session in Browser'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Debug tab is hidden when enableDevSessionOverrides is false (release)',
+    (WidgetTester tester) async {
+      enableDevSessionOverrides = false;
+      addTearDown(() => enableDevSessionOverrides = true);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(
+              (ref) => _MockAuthController(_adminUser()),
+            ),
+            backendSystemStatusProvider.overrideWith(
+              (ref) async => <String, dynamic>{},
+            ),
+            adminUsersProvider.overrideWith((ref) async => <User>[]),
+            eventsProvider.overrideWith((ref) async => <Event>[]),
+            adminGroupsProvider.overrideWith((ref) async => <AdminGroup>[]),
+            adminMerchProvider.overrideWith((ref) async => <Merchandise>[]),
+            adminMatchesProvider.overrideWith((ref) async => <TradeMatch>[]),
+          ],
+          child: const MaterialApp(home: AdminDashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Debug'), findsNothing);
+      expect(find.text('Open New Guest Session in Browser'), findsNothing);
+      expect(find.text('System'), findsOneWidget);
+      expect(find.text('Matches'), findsOneWidget);
+    },
+  );
+
   // ---- #454: permission / empty / error branches ----
 
   testWidgets('non-admin user is denied access to the admin dashboard (#454)', (

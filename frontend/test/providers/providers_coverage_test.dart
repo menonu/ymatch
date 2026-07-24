@@ -58,6 +58,166 @@ void main() {
 
   // ---- AuthController / authProvider / currentUserProvider ----
 
+  // ---- #499: dev_user URL overrides are debug-only ----
+
+  group('parseDevUserFromUri (#499)', () {
+    test('reads dev_user from query parameters', () {
+      expect(
+        parseDevUserFromUri(
+          Uri.parse('http://localhost:8081/?dev_user=uuid-a'),
+        ),
+        'uuid-a',
+      );
+    });
+
+    test('reads dev_user from hash fragment (Flutter web hash route)', () {
+      expect(
+        parseDevUserFromUri(
+          Uri.parse('http://localhost:8081/#/?dev_user=uuid-b'),
+        ),
+        'uuid-b',
+      );
+    });
+
+    test('returns null when absent or empty', () {
+      expect(parseDevUserFromUri(Uri.parse('http://localhost:8081/')), isNull);
+      expect(
+        parseDevUserFromUri(Uri.parse('http://localhost:8081/?dev_user=')),
+        isNull,
+      );
+      expect(
+        parseDevUserFromUri(Uri.parse('http://localhost:8081/#/')),
+        isNull,
+      );
+    });
+  });
+
+  group('AuthController checkLogin dev_user gate (#499)', () {
+    tearDown(() {
+      enableDevSessionOverrides = true; // tests run in kDebugMode
+      currentAppUri = () => Uri.base;
+    });
+
+    test(
+      'honors dev_user when enableDevSessionOverrides is true (debug)',
+      () async {
+        enableDevSessionOverrides = true;
+        currentAppUri = () =>
+            Uri.parse('http://localhost:8081/#/?dev_user=dev-uuid-1');
+
+        var guestCalls = 0;
+        String? lastUuid;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/auth/guest') {
+              guestCalls++;
+              final body = jsonDecode(request.body) as Map<String, dynamic>;
+              lastUuid = body['uuid'] as String?;
+              return _ok({'id': 9, 'username': 'guest-dev', 'uuid': lastUuid});
+            }
+            return _okEmpty();
+          }),
+        );
+
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        // Constructor runs checkLogin(); wait for guestLogin to finish.
+        for (
+          var i = 0;
+          i < 50 && container.read(authProvider).value == null;
+          i++
+        ) {
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        expect(guestCalls, 1);
+        expect(lastUuid, 'dev-uuid-1');
+        expect(container.read(authProvider).value?.uuid, 'dev-uuid-1');
+      },
+    );
+
+    test(
+      'ignores dev_user when enableDevSessionOverrides is false (release)',
+      () async {
+        enableDevSessionOverrides = false;
+        currentAppUri = () =>
+            Uri.parse('http://localhost:8081/#/?dev_user=dev-uuid-ignored');
+        // No saved prefs uuid either.
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+
+        var guestCalls = 0;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/auth/guest') {
+              guestCalls++;
+              return _ok({'id': 1, 'username': 'x', 'uuid': 'should-not'});
+            }
+            return _okEmpty();
+          }),
+        );
+
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        // Allow checkLogin microtasks to settle.
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        expect(guestCalls, 0);
+        expect(container.read(authProvider).value, isNull);
+      },
+    );
+
+    test(
+      'release path still restores session from SharedPreferences',
+      () async {
+        enableDevSessionOverrides = false;
+        currentAppUri = () =>
+            Uri.parse('http://localhost:8081/#/?dev_user=should-ignore');
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'user_uuid': 'persisted-uuid',
+        });
+
+        String? lastUuid;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/auth/guest') {
+              final body = jsonDecode(request.body) as Map<String, dynamic>;
+              lastUuid = body['uuid'] as String?;
+              return _ok({'id': 2, 'username': 'restored', 'uuid': lastUuid});
+            }
+            return _okEmpty();
+          }),
+        );
+
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        for (
+          var i = 0;
+          i < 50 && container.read(authProvider).value == null;
+          i++
+        ) {
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        expect(lastUuid, 'persisted-uuid');
+        expect(container.read(authProvider).value?.uuid, 'persisted-uuid');
+      },
+    );
+  });
+
   group('AuthController', () {
     test('login sets state to the returned user', () async {
       final api = _apiWith(

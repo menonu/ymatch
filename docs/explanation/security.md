@@ -64,6 +64,23 @@ belongs there. Notable covered patterns:
 If you are unsure whether a file is safe to commit, run
 `git check-ignore -v <path>` — if it is ignored, do not force-add it.
 
+## Runtime: debug guest-session overrides (#499)
+
+The Flutter web app supports a **debug-only** multi-tab helper: the URL
+param `dev_user` (query or hash fragment) can force a guest login with a
+chosen UUID without writing SharedPreferences. That is useful for local
+multi-account testing but must never ship to production:
+
+- `AuthController.checkLogin` honors `dev_user` only when
+  `enableDevSessionOverrides` is true (defaults to `kDebugMode`).
+- The Admin **Debug** tab (which builds `…/#/?dev_user=…` links) is
+  similarly gated and is absent from release builds.
+- Guest UUIDs remain bearer secrets (SharedPreferences + Profile copy)
+  until a real session-token model lands (#373). Do not paste production
+  guest UUIDs into shareable URLs.
+
+See [Developer Quickstart — multi-tab guest sessions](../tutorials/developer_quickstart.md#multi-tab-guest-sessions-debug-builds-only).
+
 ## History Is Public Too
 
 A secret removed from the current tree is **not** removed from git

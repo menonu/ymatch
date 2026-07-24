@@ -33,6 +33,40 @@ final backendHealthProvider = FutureProvider.autoDispose<bool>((ref) async {
 });
 
 // --- Auth / Current User ---
+
+/// Whether debug-only guest-session overrides are enabled.
+///
+/// Defaults to [kDebugMode]: production/release builds never honor `dev_user`
+/// URL params and never surface the Admin Debug tab (#499). Tests may flip
+/// this for release-path coverage; always restore in tearDown.
+bool enableDevSessionOverrides = kDebugMode;
+
+/// URI used when resolving `dev_user` overrides. Defaults to [Uri.base];
+/// tests may override to inject query/fragment params.
+@visibleForTesting
+Uri Function() currentAppUri = () => Uri.base;
+
+/// Parse a non-empty `dev_user` value from [uri] query or hash fragment.
+///
+/// Supports both `?dev_user=...` and hash-based routes (`#/?dev_user=...`).
+@visibleForTesting
+String? parseDevUserFromUri(Uri uri) {
+  final fromQuery = uri.queryParameters['dev_user'];
+  if (fromQuery != null && fromQuery.isNotEmpty) return fromQuery;
+
+  final fragment = uri.fragment;
+  if (!fragment.contains('dev_user=')) return null;
+  try {
+    // Hash routes look like `/#/?dev_user=uuid` or `/?dev_user=uuid`.
+    final fragmentUri = Uri.parse(fragment.replaceFirst(RegExp(r'^/+'), ''));
+    final fromFragment = fragmentUri.queryParameters['dev_user'];
+    if (fromFragment != null && fromFragment.isNotEmpty) return fromFragment;
+  } catch (_) {
+    // Non-web / malformed fragment — ignore.
+  }
+  return null;
+}
+
 class AuthController extends StateNotifier<AsyncValue<User?>> {
   final ApiClient client;
 
@@ -43,23 +77,19 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   Future<void> checkLogin() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Support dev_user URL parameter for easier testing (multi-tab support)
-    String? devUser;
-    try {
-      // Try to find dev_user in query parameters (handling both normal and hash-based URLs)
-      devUser = Uri.base.queryParameters['dev_user'];
-      if (devUser == null && Uri.base.fragment.contains('dev_user=')) {
-        final fragmentUri = Uri.parse(Uri.base.fragment.replaceFirst('/', ''));
-        devUser = fragmentUri.queryParameters['dev_user'];
+    // Debug-only: multi-tab testing via `?dev_user=` / hash `dev_user=`.
+    // Production builds must never auto-login from shareable URL params (#499).
+    if (enableDevSessionOverrides) {
+      try {
+        final devUser = parseDevUserFromUri(currentAppUri());
+        if (devUser != null) {
+          // Do NOT persist to SharedPreferences — each tab keeps its own session.
+          await guestLogin(devUser);
+          return;
+        }
+      } catch (_) {
+        // Fallback for non-web environments if necessary
       }
-    } catch (_) {
-      // Fallback for non-web environments if necessary
-    }
-
-    if (devUser != null && devUser.isNotEmpty) {
-      // Do NOT persist dev_user to SharedPreferences - each tab uses its own dev session
-      await guestLogin(devUser);
-      return;
     }
 
     // Normal flow: check for saved UUID

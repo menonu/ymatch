@@ -117,6 +117,33 @@ flutter run -d web-server --web-port 8081
 ```
 The Flutter app will be available in your browser at `http://localhost:8081`.
 
+### Multi-tab guest sessions (debug builds only)
+
+To exercise two accounts at once (e.g. offer/accept a trade), open a second
+browser tab as a different guest. **This only works in Flutter debug builds**
+(`flutter run`); production/release builds ignore the override (#499).
+
+**Option A — Admin Debug tab**
+
+1. Sign in as an admin or moderator.
+2. Open **Admin → Debug**.
+3. Click **Open New Guest Session in Browser**. A new tab loads with a fresh
+   guest UUID via `?dev_user=…` (hash route).
+
+**Option B — URL by hand**
+
+```text
+http://localhost:8081/#/?dev_user=<uuid>
+```
+
+Use any UUID (or generate one). The tab logs in as that guest without writing
+to `SharedPreferences`, so each tab keeps an independent session.
+
+**Production note:** release builds never honor `dev_user` and never show the
+Admin Debug tab. Do not rely on shareable query params for real sessions
+(guest UUID is already a bearer secret; see also #373 for the planned
+session-token model).
+
 ---
 
 ## Step 4: Run Linting and Code Style Checks
