@@ -48,8 +48,8 @@ JP, ~1.5 MB, with font metadata (kerning, etc.) retained:
   `frontend.Dockerfile.prod` and the three CI workflows. The font now reaches
   the build via `COPY frontend ./` (Docker) and the repo checkout (CI / local).
 
-`lib/theme/app_theme.dart` is unchanged — `fontFamily: 'NotoSansJP'` still
-resolves to the bundled font.
+The app theme is unchanged — `fontFamily: 'NotoSansJP'` still resolves to the
+bundled font.
 
 ## Consequences
 

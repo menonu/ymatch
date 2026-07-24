@@ -32,9 +32,9 @@ red from #362 to #369 because a seed set `users.role` but not `user_roles`, and
 RBAC correctly ignored the mirror.
 
 The frontend still reads `currentUser.role` (the logged-in `User` proto) in two
-places: `scaffold_with_nav_bar.dart` (Admin nav tab) and
-`admin_dashboard_screen.dart` (dashboard gate + per-user role badge). So the
-`User.role` proto field must keep working — only the storage behind it changes.
+places: the nav scaffold Admin tab and the admin dashboard (gate + per-user role
+badge). So the `User.role` proto field must keep working — only the storage
+behind it changes.
 
 ## Decision
 
@@ -48,9 +48,9 @@ Concretely:
   `ALTER TABLE users DROP COLUMN IF EXISTS role`. No backfill is needed:
   `user_roles` is already authoritative (the RBAC migration backfilled every
   pre-existing `users.role` into a `user_roles` global row).
-- The standard `users` SELECT list (`USER_COLUMNS` in
-  `backend/src/repositories/user.rs`) replaces the literal `role` column with a
-  correlated subquery that reads the user's global role from `user_roles`:
+- The standard `users` SELECT list (`USER_COLUMNS` in the user repository)
+  replaces the literal `role` column with a correlated subquery that reads the
+  user's global role from `user_roles`:
 
   ```sql
   COALESCE((SELECT r.name FROM user_roles ur

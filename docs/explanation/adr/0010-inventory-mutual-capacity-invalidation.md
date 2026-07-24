@@ -7,7 +7,7 @@
 
 ## Context
 
-Matches are created by the periodic matcher when two users have **mutual** complementary inventory in the same event+group: each side has at least one positive `TRADE` that the other `WANT`s (see [06 — Runtime](../architecture/06-runtime.md), `backend/src/matching.rs`).
+Matches are created by the periodic matcher when two users have **mutual** complementary inventory in the same event+group: each side has at least one positive `TRADE` that the other `WANT`s (see [06 — Runtime](../architecture/06-runtime.md)).
 
 At decision time:
 

@@ -11,7 +11,7 @@
 
 At decision time:
 
-1. The periodic matcher ([`matching.rs`](../../../backend/src/matching.rs)) inserts a `PENDING` match only when **no** `matches` row exists for that pair+group — **status is ignored**.
+1. The periodic matcher inserts a `PENDING` match only when **no** `matches` row exists for that pair+group — **status is ignored**.
 2. Migration `20260704000000` enforces the same with unique index `idx_matches_unique_pair_group` (canonical pair + event + group), also **status-agnostic**.
 3. User reject sets `REJECTED` ([ADR 0002](0002-negotiation-state-machine.md)); system invalidation sets `CANCELLED` ([ADR 0008](0008-merchandise-deletion-semantics.md), [ADR 0010](0010-inventory-mutual-capacity-invalidation.md)). Both are terminal: the row remains.
 4. ADR 0010 explicitly left rematch after `CANCELLED` **out of scope**.

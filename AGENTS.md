@@ -70,6 +70,7 @@ Significant, hard-to-reverse architectural decisions are recorded as **ADRs** in
 **Rules:**
 
 - **Append-only — never rewrite an existing ADR's decision.** To change or reverse a decision, create a **new** ADR with the next free sequence number (`NNNN-kebab-case-title.md`), set its `Status` to `Accepted`, and add a `Supersedes:` line linking to the old one. Then update **only the `Status` line** of the old ADR to `Superseded by [ADR NNNN](NNNN-...)`, linking forward. Leave the old ADR's body intact as a historical record.
+- **Do not rewrite accepted ADRs for path moves, renames, or “bring up to date with the tree.”** Bodies are frozen; see **Stability & references** in the ADR README (no concrete source paths; prefer concept names and architecture/ADR links).
 - Write an ADR for framework/library/data-store choices, cross-cutting patterns, structural refactors, and decisions to *not* adopt something. Skip trivial, easily-reversed choices.
 - Every ADR must follow the template in `docs/explanation/adr/README.md` (Status / Date / Supersedes / Context / Decision / Consequences / Alternatives Considered) and be added to the index table in that README.
 

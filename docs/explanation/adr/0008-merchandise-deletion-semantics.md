@@ -9,32 +9,32 @@
 Merchandise (`merchandise` table) carries soft-delete and trade-control columns
 `is_deleted` and `trade_enabled` (migration `20250322000001_draft_and_soft_delete.sql`).
 Until this decision, deletion was governed by a single heuristic in
-`MerchandiseRepository::delete_by_id` (`src/repositories/merch.rs:365-399`), the
-funnel for both the creator path (`DELETE /api/v1/events/:id/merch/:id` →
-`delete_merch_by_creator`) and the admin path (`DELETE /api/v1/admin/merch/:id`):
+`MerchandiseRepository::delete_by_id`, the funnel for both the creator path
+(`DELETE /api/v1/events/:id/merch/:id` → `delete_merch_by_creator`) and the admin
+path (`DELETE /api/v1/admin/merch/:id`):
 
 - if any `inventory` row with `quantity > 0` referenced the merch → **soft-delete**
   (`is_deleted = true, trade_enabled = false`);
 - otherwise → **hard delete** (`DELETE FROM merchandise`).
 
 New matching skips soft-deleted / trade-disabled merch
-(`src/matching.rs:15`: `m.is_deleted = false AND m.trade_enabled = true`), and
-group removal (`src/repositories/group.rs:81-121`) already soft-deletes a group's
-merch while hard-deleting its matches, messages, and favorites — its comment
-states the rationale: "so inventory history remains valid."
+(`m.is_deleted = false AND m.trade_enabled = true`), and group removal already
+soft-deletes a group's merch while hard-deleting its matches, messages, and
+favorites — its comment states the rationale: "so inventory history remains
+valid."
 
 This left several gaps, all documented in issue #421:
 
 1. **Hard delete can raise an unhandled FK violation.** Both `inventory.merch_id`
    and `match_items.merch_id` are `REFERENCES merchandise(id)` with no `ON DELETE`
-   clause (→ RESTRICT; `20250101000000_initial_schema.sql:30`,
-   `20250405000000_trade_lifecycle.sql:15`). `delete_by_id` only checks
+   clause (→ RESTRICT; migrations `20250101000000_initial_schema.sql`,
+   `20250405000000_trade_lifecycle.sql`). `delete_by_id` only checks
    `inventory.quantity > 0`, not `match_items`. A merch with zero positive
    inventory that still has `match_items` rows (an `OFFERED`/`ACCEPTED` match, or
    a `COMPLETED` match whose items persist — `match_items` are only deleted on the
-   `REJECTED` transition, `src/services/match_lifecycle.rs:255`) makes
-   `DELETE FROM merchandise` raise FK violation 23503 → HTTP 500. A lingering
-   `quantity = 0` inventory row triggers the same violation for the same reason.
+   `REJECTED` transition in the match lifecycle) makes `DELETE FROM merchandise`
+   raise FK violation 23503 → HTTP 500. A lingering `quantity = 0` inventory row
+   triggers the same violation for the same reason.
 
 2. **Deleting an item does not stop existing matches that reference it.** The
    matching algorithm excludes soft-deleted merch from *new* matches, but nothing
@@ -43,11 +43,10 @@ This left several gaps, all documented in issue #421:
    longer trade; accept/complete behavior on a deleted item was undefined.
 
 3. **Deleted items were fully hidden, including from their own holder.** The event
-   merch list and search filter `is_deleted = false`
-   (`src/repositories/merch.rs`, `src/handlers/search.rs:46`). A holder could not
-   see that an item they owned had been deleted. (`inventory.list_for_user`,
-   `src/repositories/inventory.rs:75`, was already inconsistent — it returns the
-   holder's rows with no `is_deleted` filter, but without marking them deleted.)
+   merch list and search filter `is_deleted = false`. A holder could not see that
+   an item they owned had been deleted. (`InventoryRepository::list_for_user` was
+   already inconsistent — it returns the holder's rows with no `is_deleted`
+   filter, but without marking them deleted.)
 
 4. **"Existing item" re-creation semantics were undefined.** Soft-deleted rows
    keep `is_deleted = true`; the per-group live-name unique index
@@ -70,8 +69,8 @@ delete path.
    merchandise` is no longer issued by the delete API. This eliminates gap #1
    entirely — the RESTRICT FKs on `inventory.merch_id` / `match_items.merch_id`
    never fire on the delete path, because the merch row is never removed — and
-   unifies item deletion with `group.rs:remove_for_admin`, which already
-   soft-deletes merch.
+   unifies item deletion with admin group removal, which already soft-deletes
+   merch.
 
 2. **Introduce a `CANCELLED` terminal match status; deleting an item cancels
    every match that references it.** The `matches.status` domain gains
@@ -109,7 +108,7 @@ delete path.
    deleted for holders. The proto `Merchandise.is_deleted` field is the API marker;
    the frontend renders a "deleted" badge and disables offer/edit/trade actions on
    such rows. `trade_enabled` is always `false` when `is_deleted` is `true`; it
-   remains as the matchability flag consumed by `src/matching.rs` but has no
+   remains as the matchability flag consumed by the periodic matcher but has no
    independent meaning for a deleted row.
 
 5. **Re-creation of a soft-deleted name creates a new row; there is no revival.**
@@ -124,9 +123,9 @@ delete path.
 
 6. **Delete + cancel is one transaction.** The soft-delete of the merch and the
    `CANCELLED` transition of all referencing matches occur in a single Postgres
-   transaction, mirroring `group.rs:remove_for_admin`. This preserves the
-   invariant that no `PENDING`/`OFFERED`/`ACCEPTED` match can outlive a deleted
-   item it references.
+   transaction, mirroring admin group removal. This preserves the invariant that
+   no `PENDING`/`OFFERED`/`ACCEPTED` match can outlive a deleted item it
+   references.
 
 7. **Historical match detail is exempt from the holder-only rule.** A `COMPLETED`
    or `CANCELLED` match still renders the deleted merch's name to *both*
@@ -183,8 +182,8 @@ delete path.
   would be required — out of scope here.
 - `trade_enabled` now has overlapping meaning with `is_deleted` (a deleted row is
   always `trade_enabled = false`). The column is retained because it predates this
-  decision and is consumed by `src/matching.rs`, but readers must understand that
-  `is_deleted = true` implies `trade_enabled = false`.
+  decision and is consumed by the periodic matcher, but readers must understand
+  that `is_deleted = true` implies `trade_enabled = false`.
 - The holder-only rule adds a per-viewer filter to the merch-list and search
   queries (join/union against the viewer's `HAVE` inventory rows), a small
   complexity and query cost on those endpoints.
@@ -192,9 +191,8 @@ delete path.
 **Follow-up work required:**
 
 - Migration extending `matches_status_check` to include `CANCELLED`, and
-  state-machine extension in `src/services/match_lifecycle.rs` (a
-  `STATUS_CANCELLED` const and transition rules for `PENDING/OFFERED/ACCEPTED →
-  CANCELLED`).
+  state-machine extension in the match lifecycle service (a `STATUS_CANCELLED`
+  const and transition rules for `PENDING/OFFERED/ACCEPTED → CANCELLED`).
 - Rewrite `delete_by_id` to always-soft-delete and to cancel referencing matches
   in one transaction (new repository/service method to find and cancel matches by
   `merch_id`).
@@ -207,10 +205,10 @@ delete path.
   `PENDING`/`OFFERED`/`ACCEPTED` matches on delete; `COMPLETED` left as history;
   holder-only visibility of deleted items (hidden from non-holders); re-creation
   of a soft-deleted name (new row, no collision, no cross-link).
-- Decide whether `group.rs:remove_for_admin` should also move matches to
-  `CANCELLED` instead of hard-deleting them, for consistency with Decision 2.
-  Today it hard-deletes the group's matches; that remains valid but is
-  inconsistent with the item-level rule. Left as a separate follow-up.
+- Decide whether admin group removal should also move matches to `CANCELLED`
+  instead of hard-deleting them, for consistency with Decision 2. Today it
+  hard-deletes the group's matches; that remains valid but is inconsistent with
+  the item-level rule. Left as a separate follow-up.
 
 ## Alternatives Considered
 
@@ -229,8 +227,8 @@ delete path.
 
 - **Stop matches by reusing `REJECTED` instead of adding `CANCELLED`.** Rejected:
   `REJECTED` is the user-driven "I decline this offer" path and is reachable only
-  from `PENDING`/`OFFERED` (`src/services/match_lifecycle.rs:485`), so it cannot
-  express invalidation of an `ACCEPTED` match without loosening that guard and
+  from `PENDING`/`OFFERED` in the match lifecycle, so it cannot express
+  invalidation of an `ACCEPTED` match without loosening that guard and
   overloading the status with a second meaning (user reject vs. system
   invalidation). A distinct `CANCELLED` keeps the two causes separate and lets
   the UI hide only the system-invalidated ones (Decision 3) while still showing
