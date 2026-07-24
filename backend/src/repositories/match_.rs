@@ -928,11 +928,13 @@ impl MatchRepository {
     /// Set-based discovery of distinct mutual TRADE/WANT edges for the
     /// periodic matcher.
     ///
-    /// Each row is a unique `(user_a, user_b, event_id, group_name)` where the
-    /// pair currently has complementary live inventory in that group (ADR 0001
-    /// group scope, ADR 0010 qty > 0, banned users excluded, merch live +
-    /// trade-enabled). Merch locked in OFFERED/ACCEPTED for a participant is
-    /// excluded (same filter as the pre-#497 nested-loop matcher).
+    /// Each row is a unique unordered pair within `(event_id, group_name)`:
+    /// `user1_id = LEAST(a,b)`, `user2_id = GREATEST(a,b)` so a mutual edge is
+    /// not returned twice as `(A,B)` and `(B,A)`. Filters: complementary live
+    /// inventory in that group (ADR 0001 group scope, ADR 0010 qty > 0, banned
+    /// users excluded, merch live + trade-enabled). Merch locked in
+    /// OFFERED/ACCEPTED for a participant is excluded (same idea as the
+    /// pre-#497 nested-loop matcher).
     ///
     /// Callers decide insert vs reopen via
     /// [`crate::matching::existing_match_action`] after
@@ -941,8 +943,8 @@ impl MatchRepository {
         let rows = sqlx::query(
             r#"
             SELECT DISTINCT
-                a_want.user_id AS user_a_id,
-                b_trade.user_id AS user_b_id,
+                LEAST(a_want.user_id, b_trade.user_id) AS user1_id,
+                GREATEST(a_want.user_id, b_trade.user_id) AS user2_id,
                 m_want.event_id AS event_id,
                 m_want.group_name AS group_name
             FROM inventory a_want
@@ -1003,6 +1005,7 @@ impl MatchRepository {
                   AND mat.status IN ('OFFERED', 'ACCEPTED')
                   AND (mat.user1_id = b_trade.user_id OR mat.user2_id = b_trade.user_id)
               )
+            ORDER BY event_id, group_name, user1_id, user2_id
             "#,
         )
         .fetch_all(&self.pool)
@@ -1011,8 +1014,8 @@ impl MatchRepository {
         Ok(rows
             .iter()
             .map(|r| MutualMatchEdge {
-                user_a_id: r.get("user_a_id"),
-                user_b_id: r.get("user_b_id"),
+                user1_id: r.get("user1_id"),
+                user2_id: r.get("user2_id"),
                 event_id: r.get("event_id"),
                 group_name: r.get("group_name"),
             })
@@ -1102,10 +1105,7 @@ impl MatchRepository {
 
         let user1_id: i32 = row.get("user1_id");
 
-        sqlx::query("DELETE FROM match_items WHERE match_id = $1")
-            .bind(match_id)
-            .execute(&mut *tx)
-            .await?;
+        self.delete_match_items(&mut *tx, match_id).await?;
 
         sqlx::query(
             r#"
@@ -1126,13 +1126,12 @@ impl MatchRepository {
 
 /// Mutual complementary inventory edge for the periodic matcher (#497).
 ///
-/// `user_a` is the WANT-side discoverer in the set-based query; `user_b` is
-/// the TRADE partner. Pair order is not canonicalized (insert uses these ids
-/// as user1/user2 respectively, matching pre-#497 behavior).
+/// Pair is canonicalized: `user1_id < user2_id` (`LEAST` / `GREATEST` in
+/// discovery). Insert uses these columns as `matches.user1_id` / `user2_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutualMatchEdge {
-    pub user_a_id: i32,
-    pub user_b_id: i32,
+    pub user1_id: i32,
+    pub user2_id: i32,
     pub event_id: i32,
     pub group_name: String,
 }

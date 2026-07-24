@@ -96,8 +96,8 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     for edge in edges {
         let existing = matches
             .find_for_pair_group(
-                edge.user_a_id,
-                edge.user_b_id,
+                edge.user1_id,
+                edge.user2_id,
                 edge.event_id,
                 &edge.group_name,
             )
@@ -108,15 +108,15 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
             ExistingMatchAction::Insert => {
                 matches
                     .insert_pending(
-                        edge.user_a_id,
-                        edge.user_b_id,
+                        edge.user1_id,
+                        edge.user2_id,
                         edge.event_id,
                         &edge.group_name,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
                 matches_created += 1;
-                notify_pair(&users, edge.user_a_id, edge.user_b_id).await;
+                notify_pair(&users, edge.user1_id, edge.user2_id).await;
             }
             ExistingMatchAction::Reopen => {
                 // Insert is only for None; existing is Some here.
@@ -132,7 +132,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                     .map_err(|e| e.to_string())?;
                 if reopened {
                     matches_created += 1;
-                    notify_pair(&users, edge.user_a_id, edge.user_b_id).await;
+                    notify_pair(&users, edge.user1_id, edge.user2_id).await;
                 }
             }
             ExistingMatchAction::Skip => {}
