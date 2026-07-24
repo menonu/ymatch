@@ -61,7 +61,7 @@ Three text formats ship initially, selected via a format chooser in the UI. The 
 ### Rules shared by all formats
 
 - **Scope**: a single item group (`(event_id, group_name)`). Items whose `group_name` does not match are excluded. Exporting across multiple groups is not supported in this ADR.
-- **Quantity 0 / negative rows are excluded** — matches the matching engine, which only ever considers `quantity > 0` (`repositories/match_/mod.rs`, `matching.rs`). This avoids `a*0` noise.
+- **Quantity 0 / negative rows are excluded** — matches the matching engine, which only ever considers `quantity > 0` (`repositories/match_.rs`, `matching.rs`). This avoids `a*0` noise.
 - **Quantity 1** is emitted as bare `name` in `basic`; CSV and markdown emit the literal `1` so their columns stay numeric.
 - **Status ordering** is fixed: 所持, 求, 譲, regardless of checkbox order.
 - **Labels** come from the existing `have` / `want` / `trade` `.arb` keys, so the export is localized the same way the rest of the inventory UI is.
