@@ -1,8 +1,9 @@
 //! Handlers for event-related operations.
 //!
-//! Phase 5 of #163 splits this file into:
-//! - thin handlers in this file (parse + delegate)
-//! - [`crate::repositories::event::EventRepository`] (events table SQL)
+//! Thin HTTP layer: parse/validate, authz gates, map responses.
+//! Multi-step create/transfer transactions live in
+//! [`crate::services::event::EventService`]; single-statement SQL lives in:
+//! - [`crate::repositories::event::EventRepository`]
 //! - [`crate::repositories::event_favorites::EventFavoritesRepository`]
 //! - [`crate::repositories::event_views::EventViewsRepository`]
 //! - [`crate::repositories::group_favorites::GroupFavoritesRepository`]

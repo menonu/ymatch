@@ -34,10 +34,10 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
   negotiation and inventory apply).
 
 **Known exceptions on `main`:** group create/transfer still open transactions
-in handlers; search merch still has inline SQL; the background **matching
-job** also issues raw SQL rather than going through repositories. Treat
-those as follow-up cleanup (#497), not the target. (Event create/transfer
-transactions live in `EventService`.)
+in handlers; the background **matching job** also issues raw SQL rather than
+going through repositories. Treat those as follow-up cleanup (#497), not the
+target. (Event create/transfer transactions live in `EventService`; global
+search merch SQL lives in `MerchandiseRepository::search`.)
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
 (not a source-tree listing).

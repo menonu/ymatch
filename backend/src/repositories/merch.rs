@@ -95,7 +95,7 @@ impl MerchandiseRepository {
     /// viewer — including the merch creator, moderators, and HAVE holders.
     /// Soft-deleted rows remain in the DB (ADR 0008) and still surface on
     /// holder inventory via `InventoryRepository::list_for_user`. Search is
-    /// also live-only (handlers/search.rs).
+    /// also live-only ([`Self::search`]).
     pub async fn list_for_event(
         &self,
         event_id: i32,
@@ -468,6 +468,55 @@ impl MerchandiseRepository {
             .await?;
         Ok(row.map(|r| r.get::<Option<i32>, _>("creator_id")))
     }
+
+    /// Global search over published merchandise on published events.
+    ///
+    /// Matches `name` or `group_name` with a case-insensitive pattern
+    /// (caller supplies the `%…%` ILIKE term). Soft-deleted rows and
+    /// draft merch/events are excluded. Used by
+    /// [`crate::handlers::search::global_search`].
+    pub async fn search(
+        &self,
+        search_term: &str,
+        limit: i32,
+    ) -> Result<Vec<MerchSearchHit>, AppError> {
+        let rows = sqlx::query(
+            "SELECT m.id, m.name, m.group_name, m.photo_url, m.event_id, e.name as event_name
+             FROM merchandise m
+             JOIN events e ON m.event_id = e.id
+             WHERE (m.name ILIKE $1 OR m.group_name ILIKE $1)
+               AND m.is_deleted = false AND m.status = 'published'
+               AND e.status = 'published'
+             LIMIT $2",
+        )
+        .bind(search_term)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .iter()
+            .map(|row| MerchSearchHit {
+                id: row.get("id"),
+                name: row.get("name"),
+                group_name: row.get("group_name"),
+                photo_url: row.get("photo_url"),
+                event_id: row.get("event_id"),
+                event_name: row.get("event_name"),
+            })
+            .collect())
+    }
+}
+
+/// A merchandise hit for global search (published merch on a published event).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MerchSearchHit {
+    pub id: i32,
+    pub name: String,
+    pub group_name: Option<String>,
+    pub photo_url: Option<String>,
+    pub event_id: i32,
+    pub event_name: String,
 }
 
 /// SELECT list for the merch columns in isolation. Use this for INSERT/UPDATE
