@@ -10,7 +10,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::common::{TransferCreatorRequest, UserIdQuery};
+use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_event_member_manage};
 use crate::repositories::event::EventRepository;
 use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
@@ -153,40 +153,6 @@ pub async fn publish_event(
         .await?;
     state.events.publish(event_id).await?;
     Ok(StatusCode::OK)
-}
-
-/// Resolve the caller from the `?user_id=` query param and require they hold
-/// `event.member.manage` on `event_id` (ADR 0004 §5 / #442): the event
-/// `creator` or `editor`, or the admin superuser bypass. There is deliberately
-/// no `*.any` override for this permission, so a global moderator cannot use
-/// the public members API (they use the admin path with
-/// `event.member.manage.any` instead, #432).
-///
-/// The event's existence is confirmed (404) **before** the RBAC check, so a
-/// missing event is reported as 404 rather than leaked as a 403 to a caller
-/// who lacks the event role — matches `update_event`'s convention.
-async fn require_event_member_manage(
-    state: &AppState,
-    caller_user_id: Option<i32>,
-    event_id: i32,
-) -> Result<(), AppError> {
-    let uid =
-        caller_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
-    let user = state.policy.verify_active(uid).await?;
-    let _ = state
-        .events
-        .get_creator(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
-    state
-        .rbac_service
-        .check(
-            &user,
-            &Scope::Event(event_id),
-            Permission::EventMemberManage,
-        )
-        .await?;
-    Ok(())
 }
 
 /// Assign the `event/editor` role to `target_id` for `event_id`
