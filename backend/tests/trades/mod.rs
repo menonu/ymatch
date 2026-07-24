@@ -1924,3 +1924,150 @@ async fn test_rematch_skips_cancelled_after_merch_soft_delete(pool: PgPool) {
         .unwrap();
     assert_eq!(rematch_count, 0);
 }
+
+// ---------------------------------------------------------------------------
+// Multi-user matcher: more than one pair in a single algorithm pass
+// ---------------------------------------------------------------------------
+
+/// Helper: PENDING match rows involving both `a` and `b` (either column order).
+async fn match_count_for_pair(pool: &PgPool, a: i64, b: i64) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint FROM matches
+         WHERE (user1_id = $1 AND user2_id = $2)
+            OR (user1_id = $2 AND user2_id = $1)",
+    )
+    .bind(a as i32)
+    .bind(b as i32)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Three users A, B, C: A–B and A–C have independent reciprocal inventory in
+/// the **same** event/group. B–C does not.
+///
+/// One matcher pass must create exactly **two** PENDING matches (A–B and A–C)
+/// and must not invent a B–C match (no cross-pair pollution).
+#[sqlx::test]
+async fn test_matcher_hub_user_two_partners_same_group(pool: PgPool) {
+    let a = login_guest(&pool, "multi-hub-a", "ta").await;
+    let b = login_guest(&pool, "multi-hub-b", "tb").await;
+    let c = login_guest(&pool, "multi-hub-c", "tc").await;
+    let event_id = create_event(&pool, "Multi Hub Event", a).await;
+
+    // Pair A–B merch (group G).
+    let ab_a = create_merch(&pool, event_id, "ab-a", "G").await;
+    let ab_b = create_merch(&pool, event_id, "ab-b", "G").await;
+    // Pair A–C merch (same group G — different items so B–C has no mutual edge).
+    let ac_a = create_merch(&pool, event_id, "ac-a", "G").await;
+    let ac_c = create_merch(&pool, event_id, "ac-c", "G").await;
+
+    seed_reciprocal_inventory(&pool, a, b, ab_a, ab_b, 1, 1, 1, 1).await;
+    seed_reciprocal_inventory(&pool, a, c, ac_a, ac_c, 1, 1, 1, 1).await;
+
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher multi-hub");
+    assert_eq!(
+        created, 2,
+        "expected A–B and A–C matches only (got {created})"
+    );
+
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM matches")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(total, 2, "exactly two match rows in the DB");
+
+    assert_eq!(match_count_for_pair(&pool, a, b).await, 1, "A–B match");
+    assert_eq!(match_count_for_pair(&pool, a, c).await, 1, "A–C match");
+    assert_eq!(
+        match_count_for_pair(&pool, b, c).await,
+        0,
+        "B–C must not match (no reciprocal inventory)"
+    );
+
+    // Both matches PENDING and scoped to group G.
+    let statuses: Vec<(String, String)> =
+        sqlx::query_as("SELECT status, group_name FROM matches ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(
+        statuses.iter().all(|(s, g)| s == "PENDING" && g == "G"),
+        "both matches PENDING in group G: {statuses:?}"
+    );
+
+    // Hub A lists both partners; B and C each list only A.
+    let a_matches = list_user_matches(&pool, a).await;
+    assert_eq!(a_matches.len(), 2, "hub A should see two matches");
+    let a_other_ids: std::collections::HashSet<i64> = a_matches
+        .iter()
+        .map(|m| m["otherUser"]["id"].as_i64().expect("otherUser.id"))
+        .collect();
+    assert_eq!(
+        a_other_ids,
+        [b, c].into_iter().collect(),
+        "A's partners must be B and C"
+    );
+
+    let b_matches = list_user_matches(&pool, b).await;
+    assert_eq!(b_matches.len(), 1);
+    assert_eq!(b_matches[0]["otherUser"]["id"].as_i64(), Some(a));
+
+    let c_matches = list_user_matches(&pool, c).await;
+    assert_eq!(c_matches.len(), 1);
+    assert_eq!(c_matches[0]["otherUser"]["id"].as_i64(), Some(a));
+}
+
+/// Four users, two **disjoint** pairs (A–B and C–D) in one event.
+///
+/// One matcher pass creates exactly two matches; no A–C / A–D / B–C / B–D rows.
+#[sqlx::test]
+async fn test_matcher_two_disjoint_pairs_no_cross_match(pool: PgPool) {
+    let a = login_guest(&pool, "multi-disj-a", "ta").await;
+    let b = login_guest(&pool, "multi-disj-b", "tb").await;
+    let c = login_guest(&pool, "multi-disj-c", "tc").await;
+    let d = login_guest(&pool, "multi-disj-d", "td").await;
+    // Event creator is A (moderator via create_event path).
+    let event_id = create_event(&pool, "Multi Disjoint Event", a).await;
+
+    let ab_a = create_merch(&pool, event_id, "pair1-a", "P1").await;
+    let ab_b = create_merch(&pool, event_id, "pair1-b", "P1").await;
+    let cd_c = create_merch(&pool, event_id, "pair2-c", "P2").await;
+    let cd_d = create_merch(&pool, event_id, "pair2-d", "P2").await;
+
+    seed_reciprocal_inventory(&pool, a, b, ab_a, ab_b, 1, 1, 1, 1).await;
+    seed_reciprocal_inventory(&pool, c, d, cd_c, cd_d, 1, 1, 1, 1).await;
+
+    let created = backend::matching::run_matching_algorithm(&pool)
+        .await
+        .expect("matcher two disjoint pairs");
+    assert_eq!(created, 2, "expected one match per disjoint pair");
+
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM matches")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(total, 2);
+
+    assert_eq!(match_count_for_pair(&pool, a, b).await, 1);
+    assert_eq!(match_count_for_pair(&pool, c, d).await, 1);
+
+    // Every cross combination must be empty.
+    for (x, y) in [(a, c), (a, d), (b, c), (b, d)] {
+        assert_eq!(
+            match_count_for_pair(&pool, x, y).await,
+            0,
+            "no cross-pair match between {x} and {y}"
+        );
+    }
+
+    // Groups stay separate.
+    let groups: Vec<String> =
+        sqlx::query_scalar("SELECT group_name FROM matches ORDER BY group_name")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(groups, vec!["P1".to_string(), "P2".to_string()]);
+}

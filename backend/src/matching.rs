@@ -1,27 +1,47 @@
-use crate::repositories::match_::{REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON_AFTER_REJECTED};
-use sqlx::{PgPool, Row};
+//! Periodic matching algorithm.
+//!
+//! ## Layout (#497)
+//!
+//! - **Pure policy** (unit-tested here): [`is_group_matchable`],
+//!   [`same_match_group`], [`existing_match_action`], [`rematch_reason_for`].
+//! - **SQL** lives in [`MatchRepository`] as small named steps (one concern
+//!   each) so filters can be changed without reading a mega-query.
+//! - **This module** orchestrates the steps in plain nested loops that
+//!   mirror the product narrative: WANT → TRADE partners → reciprocal
+//!   TRADE/WANT in the same group → insert or rematch.
+//!
+//! ```text
+//! for each matchable WANT (user A, merch X, group G):
+//!   for each user B who TRADEs X:
+//!     for each merch Y that A TRADEs in G:
+//!       if B WANTs Y (live):
+//!         ensure match for (A, B, G)   // insert | rematch | skip
+//!         break  // one mutual edge is enough for this partner+group
+//! ```
+
+use crate::repositories::match_::{
+    MatchRepository, REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON_AFTER_REJECTED,
+};
+use crate::repositories::user::UserRepository;
+use sqlx::PgPool;
 
 // ---------------------------------------------------------------------------
 // Pure matching decisions (unit-tested)
 //
-// `existing_match_action` / `rematch_reason_for` gate the insert-vs-reopen
-// branch inside `run_matching_algorithm`. `is_group_matchable` /
-// `same_match_group` are policy mirrors of the SQL filters (ADR 0001) so
-// group-scoping edges stay cheap to pin without a DB; the algorithm still
-// enforces them in SQL.
+// Policy mirrors of SQL filters (ADR 0001) and insert-vs-reopen (ADR 0012).
+// SQL is the runtime source of truth; these helpers pin the rules cheaply.
 // ---------------------------------------------------------------------------
 
 /// ADR 0001: merchandise with a NULL or empty group is not matchable.
 ///
-/// Mirrors the matcher SQL (`group_name IS NOT NULL AND group_name <> ''`).
+/// Mirrors matcher SQL: `group_name IS NOT NULL AND group_name <> ''`.
 #[inline]
 pub fn is_group_matchable(group_name: Option<&str>) -> bool {
     matches!(group_name, Some(g) if !g.is_empty())
 }
 
-/// Two merchandise rows share a matchable group identity only when both have
-/// the same non-null, non-empty `(event_id, group_name)`. Policy mirror of the
-/// SQL join on `(event_id, group_name)` after the null/empty filter.
+/// Two rows share a matchable group only when both have the same non-null,
+/// non-empty `(event_id, group_name)`.
 #[inline]
 pub fn same_match_group(
     event_a: i32,
@@ -35,9 +55,9 @@ pub fn same_match_group(
     event_a == event_b && group_a == group_b
 }
 
-/// How the matcher should treat an existing match row for a rediscovered
-/// mutual edge (same pair + group). ADR 0012: reopen terminal rows; never
-/// insert a second row for active/COMPLETED.
+/// How the matcher treats an existing match row for a rediscovered mutual
+/// edge (same pair + group). ADR 0012: reopen terminal; never insert a
+/// second row for active/COMPLETED.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExistingMatchAction {
     /// No row — insert a new PENDING match.
@@ -51,7 +71,6 @@ pub enum ExistingMatchAction {
 /// Decide insert / reopen / skip for a rediscovered mutual edge.
 ///
 /// `existing_status` is `None` when no row exists for the (pair, group).
-/// Used by `run_matching_algorithm` on the existing-row branch.
 pub fn existing_match_action(existing_status: Option<&str>) -> ExistingMatchAction {
     match existing_status {
         None => ExistingMatchAction::Insert,
@@ -61,7 +80,6 @@ pub fn existing_match_action(existing_status: Option<&str>) -> ExistingMatchActi
 }
 
 /// SYSTEM message reason when reopening a terminal match, if applicable.
-/// Used by `reopen_terminal_match`.
 pub fn rematch_reason_for(prior_status: &str) -> Option<&'static str> {
     match prior_status {
         "REJECTED" => Some(REMATCH_REASON_AFTER_REJECTED),
@@ -70,172 +88,57 @@ pub fn rematch_reason_for(prior_status: &str) -> Option<&'static str> {
     }
 }
 
+/// Run one matching pass.
+///
+/// Returns the number of PENDING rows newly created or reopened.
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
-    // 1. Fetch all 'WANT' items, joining with merchandise to get group_name
-    // Skip items from deleted/trade-disabled merchandise and banned users.
-    // ADR 0001: NULL-grouped merchandise is not matchable, so filter it out here
-    // (no later NULL<->NULL matching branch).
-    let rows = sqlx::query(
-        r#"
-        SELECT i.id, i.user_id, i.merch_id, i.status, i.quantity, m.group_name, m.event_id
-        FROM inventory i
-        JOIN merchandise m ON i.merch_id = m.id
-        JOIN users u ON i.user_id = u.id
-        WHERE i.status = 'WANT'
-          -- ADR 0012 / ADR 0010: zero-qty rows do not contribute to mutual cap.
-          AND i.quantity > 0
-          AND m.is_deleted = false AND m.trade_enabled = true
-          -- ADR 0001: NULL or empty group is not matchable (see is_group_matchable).
-          AND m.group_name IS NOT NULL AND m.group_name <> ''
-          AND u.is_banned = false
-          AND NOT EXISTS (
-            SELECT 1 FROM match_items mi
-            JOIN matches mat ON mi.match_id = mat.id
-            WHERE mi.merch_id = i.merch_id
-              AND mat.status IN ('OFFERED', 'ACCEPTED')
-              AND (mat.user1_id = i.user_id OR mat.user2_id = i.user_id)
-          )
-        ORDER BY i.updated_at ASC
-        "#,
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(|e| e.to_string())?;
-
+    let matches = MatchRepository::new(pool.clone());
+    let users = UserRepository::new(pool.clone());
     let mut matches_created = 0;
 
-    for want_row in rows {
-        let want_user_id: i32 = want_row.get("user_id");
-        let want_merch_id: i32 = want_row.get("merch_id");
-        // group_name is NOT NULL here (filtered above); event_id pins the group
-        // identity since group_name is only unique per event.
-        let want_group_name: String = want_row.get("group_name");
-        let want_event_id: i32 = want_row.get("event_id");
-
-        // Potential partners who are TRADING what User A wants (exclude banned users).
-        // Merch liveness is implied by want_merch_id (outer query already filtered
-        // live/trade-enabled), but re-check for defense in depth.
-        let potential_partners = sqlx::query(
-            r#"SELECT i.user_id, i.merch_id FROM inventory i
-            JOIN users u ON i.user_id = u.id
-            JOIN merchandise m ON m.id = i.merch_id
-            WHERE i.merch_id = $1 AND i.status = 'TRADE' AND i.user_id != $2
-              AND i.quantity > 0
-              AND m.is_deleted = false AND m.trade_enabled = true
-              AND u.is_banned = false
-              AND NOT EXISTS (
-                SELECT 1 FROM match_items mi
-                JOIN matches mat ON mi.match_id = mat.id
-                WHERE mi.merch_id = i.merch_id
-                  AND mat.status IN ('OFFERED', 'ACCEPTED')
-                  AND (mat.user1_id = i.user_id OR mat.user2_id = i.user_id)
-              )"#,
-        )
-        .bind(want_merch_id)
-        .bind(want_user_id)
-        .fetch_all(pool)
+    // 1. Seed: every eligible WANT (ordered for stable fairness).
+    let wants = matches
+        .list_matchable_wants()
         .await
         .map_err(|e| e.to_string())?;
 
-        for partner_row in potential_partners {
-            let partner_id: i32 = partner_row.get("user_id");
-
-            // Does Partner (User B) WANT anything that User A is TRADING, AND
-            // is it in the same group (same (event_id, group_name))? ADR 0001.
-            // ADR 0010 / 0012: only live, trade-enabled merch contribute to cap.
-            let user_a_trades = sqlx::query(
-                r#"
-                SELECT i.merch_id
-                FROM inventory i
-                JOIN merchandise m ON i.merch_id = m.id
-                WHERE i.user_id = $1 AND i.status = 'TRADE' AND i.quantity > 0
-                  AND m.event_id = $2 AND m.group_name = $3
-                  AND m.is_deleted = false AND m.trade_enabled = true
-                "#,
-            )
-            .bind(want_user_id)
-            .bind(want_event_id)
-            .bind(&want_group_name)
-            .fetch_all(pool)
+    for want in wants {
+        // 2. Who is TRADEing the merch this user wants?
+        let partner_ids = matches
+            .list_users_trading_merch(want.merch_id, want.user_id)
             .await
             .map_err(|e| e.to_string())?;
 
-            for a_trade_row in user_a_trades {
-                let a_trade_merch_id: i32 = a_trade_row.get("merch_id");
-
-                // Partner WANT must be on live, trade-enabled merch too.
-                let partner_want = sqlx::query(
-                    r#"
-                    SELECT i.id FROM inventory i
-                    JOIN merchandise m ON m.id = i.merch_id
-                    WHERE i.user_id = $1 AND i.merch_id = $2
-                      AND i.status = 'WANT' AND i.quantity > 0
-                      AND m.is_deleted = false AND m.trade_enabled = true
-                    "#,
-                )
-                .bind(partner_id)
-                .bind(a_trade_merch_id)
-                .fetch_optional(pool)
+        for partner_id in partner_ids {
+            // 3. What is the wanter TRADEing in this same group?
+            //    (reciprocal inventory must be in-group — ADR 0001)
+            let trade_merch_ids = matches
+                .list_user_trade_merch_ids_in_group(want.user_id, want.event_id, &want.group_name)
                 .await
                 .map_err(|e| e.to_string())?;
 
-                if partner_want.is_none() {
+            for trade_merch_id in trade_merch_ids {
+                // 4. Does the partner WANT that trade merch (live)?
+                let partner_wants = matches
+                    .user_wants_live_merch(partner_id, trade_merch_id)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                if !partner_wants {
                     continue;
                 }
 
-                // MATCH FOUND!
-                // Check if a match already exists for this (pair, group) to
-                // avoid duplicates. ADR 0001: one match per (user1, user2,
-                // group), so the same pair may have a separate match in a
-                // different group — dedup only within the same group.
-                //
-                // ADR 0012: if the row is REJECTED or CANCELLED, reopen it
-                // to PENDING (same id) instead of inserting a second row.
-                // COMPLETED and active statuses are left alone.
-                let existing_match = sqlx::query(
-                    "SELECT id, status FROM matches
-                     WHERE event_id = $3 AND group_name = $4
-                       AND ((user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1))",
+                // Mutual edge found for (want.user_id, partner_id, group).
+                if ensure_match_for_pair(
+                    &matches,
+                    &users,
+                    want.user_id,
+                    partner_id,
+                    want.event_id,
+                    &want.group_name,
                 )
-                .bind(want_user_id)
-                .bind(partner_id)
-                .bind(want_event_id)
-                .bind(&want_group_name)
-                .fetch_optional(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-
-                match existing_match {
-                    None => {
-                        sqlx::query(
-                            "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name, created_at)
-                             VALUES ($1, $2, 'PENDING', $3, $4, NOW())",
-                        )
-                        .bind(want_user_id)
-                        .bind(partner_id)
-                        .bind(want_event_id)
-                        .bind(&want_group_name)
-                        .execute(pool)
-                        .await
-                        .map_err(|e| e.to_string())?;
-
-                        matches_created += 1;
-                        notify_pair(pool, want_user_id, partner_id).await;
-                    }
-                    Some(row) => {
-                        let match_id: i32 = row.get("id");
-                        let status: String = row.get("status");
-                        // Insert is only for None (handled above).
-                        match existing_match_action(Some(&status)) {
-                            ExistingMatchAction::Reopen => {
-                                if reopen_terminal_match(pool, match_id, &status).await? {
-                                    matches_created += 1;
-                                    notify_pair(pool, want_user_id, partner_id).await;
-                                }
-                            }
-                            ExistingMatchAction::Skip | ExistingMatchAction::Insert => {}
-                        }
-                    }
+                .await?
+                {
+                    matches_created += 1;
                 }
                 // One mutual edge is enough for this partner+group.
                 break;
@@ -246,104 +149,73 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     Ok(matches_created)
 }
 
-/// ADR 0012: reopen a REJECTED/CANCELLED match to PENDING with annotation + SYSTEM message.
+/// Insert, rematch, or skip for one rediscovered (pair, group) edge.
 ///
-/// Returns `true` if the row was reopened (still terminal at update time).
-async fn reopen_terminal_match(
-    pool: &PgPool,
-    match_id: i32,
-    prior_status: &str,
+/// Returns `true` when a new PENDING was created or a terminal row reopened.
+async fn ensure_match_for_pair(
+    matches: &MatchRepository,
+    users: &UserRepository,
+    user_a: i32,
+    user_b: i32,
+    event_id: i32,
+    group_name: &str,
 ) -> Result<bool, String> {
-    let Some(reason) = rematch_reason_for(prior_status) else {
-        return Ok(false);
-    };
-
-    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
-
-    let updated = sqlx::query(
-        r#"
-        UPDATE matches
-        SET status = 'PENDING',
-            offered_by = NULL,
-            rematch_count = rematch_count + 1,
-            last_terminal_status = $2,
-            last_terminal_at = NOW()
-        WHERE id = $1
-          AND status IN ('REJECTED', 'CANCELLED')
-        RETURNING id, user1_id
-        "#,
-    )
-    .bind(match_id)
-    .bind(prior_status)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    let Some(row) = updated else {
-        tx.rollback().await.map_err(|e| e.to_string())?;
-        return Ok(false);
-    };
-
-    let user1_id: i32 = row.get("user1_id");
-
-    sqlx::query("DELETE FROM match_items WHERE match_id = $1")
-        .bind(match_id)
-        .execute(&mut *tx)
+    let existing = matches
+        .find_for_pair_group(user_a, user_b, event_id, group_name)
         .await
         .map_err(|e| e.to_string())?;
 
-    sqlx::query(
-        r#"
-        INSERT INTO messages (match_id, sender_id, content, message_type)
-        VALUES ($1, $2, $3, 'SYSTEM')
-        "#,
-    )
-    .bind(match_id)
-    .bind(user1_id)
-    .bind(reason)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    tx.commit().await.map_err(|e| e.to_string())?;
-    Ok(true)
+    match existing_match_action(existing.as_ref().map(|(_, s)| s.as_str())) {
+        ExistingMatchAction::Insert => {
+            matches
+                .insert_pending(user_a, user_b, event_id, group_name)
+                .await
+                .map_err(|e| e.to_string())?;
+            notify_pair(users, user_a, user_b).await;
+            Ok(true)
+        }
+        ExistingMatchAction::Reopen => {
+            let Some((match_id, status)) = existing else {
+                return Ok(false);
+            };
+            let Some(reason) = rematch_reason_for(&status) else {
+                return Ok(false);
+            };
+            let reopened = matches
+                .reopen_terminal(match_id, &status, reason)
+                .await
+                .map_err(|e| e.to_string())?;
+            if reopened {
+                notify_pair(users, user_a, user_b).await;
+            }
+            Ok(reopened)
+        }
+        ExistingMatchAction::Skip => Ok(false),
+    }
 }
 
-async fn notify_pair(pool: &PgPool, user_a: i32, user_b: i32) {
-    // Notify both users. Treat RowNotFound as "user vanished"; log any other
-    // DB error so infra failures are observable (#266).
-    let load_notify_user = |user_id: i32| async move {
-        match sqlx::query("SELECT username, device_token FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_one(pool)
-            .await
-        {
-            Ok(row) => Some(row),
-            Err(sqlx::Error::RowNotFound) => None,
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    user_id,
-                    "match notification: failed to load user"
-                );
-                None
-            }
+async fn notify_pair(users: &UserRepository, user_a: i32, user_b: i32) {
+    // Best-effort push. Missing user = vanished; other load errors logged (#266).
+    let load = async |user_id: i32| match users.get_by_id(user_id).await {
+        Ok(u) => u,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                user_id,
+                "match notification: failed to load user"
+            );
+            None
         }
     };
-    let user1_row = load_notify_user(user_a).await;
-    let user2_row = load_notify_user(user_b).await;
 
-    if let (Some(u1), Some(u2)) = (user1_row, user2_row) {
-        let u1_token: Option<String> = u1.get("device_token");
-        let u2_token: Option<String> = u2.get("device_token");
-        let u1_name: String = u1.get("username");
-        let u2_name: String = u2.get("username");
-
-        if let Some(token) = u1_token {
-            crate::notifications::send_match_notification(&token, &u2_name).await;
+    let u1 = load(user_a).await;
+    let u2 = load(user_b).await;
+    if let (Some(u1), Some(u2)) = (u1, u2) {
+        if let Some(token) = u1.device_token.as_deref() {
+            crate::notifications::send_match_notification(token, &u2.username).await;
         }
-        if let Some(token) = u2_token {
-            crate::notifications::send_match_notification(&token, &u1_name).await;
+        if let Some(token) = u2.device_token.as_deref() {
+            crate::notifications::send_match_notification(token, &u1.username).await;
         }
     }
 }

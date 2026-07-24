@@ -33,11 +33,12 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
 - **Services** own multi-step rules (active/ban gate, RBAC checks, trade
   negotiation and inventory apply).
 
-**Known exceptions on `main`:** the background **matching job** still issues
-raw SQL rather than going through repositories. Treat that as follow-up
-cleanup (#497), not the target. (Event create/transfer transactions live in
-`EventService`; group create/transfer in `GroupService`; global search merch
-SQL in `MerchandiseRepository::search`.)
+**Layering status:** handlers parse/gate/map; services own multi-step
+transactions (event/group ownership, match lifecycle); repositories own
+domain SQL — including matcher discovery/insert/rematch on
+[`MatchRepository`](../../../backend/src/repositories/match_.rs) and global
+search merch on [`MerchandiseRepository::search`](../../../backend/src/repositories/merch.rs).
+See #497 for the layering completion work.
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
 (not a source-tree listing).
@@ -71,12 +72,15 @@ Canonical narrative for **HAVE / WANT / TRADE** roles and gates:
 ## Matching strategy
 
 A **background task** in the API process (`MATCHING_INTERVAL_SECONDS`) runs
-`matching::run_matching_algorithm`:
+`matching::run_matching_algorithm`. The job is a thin nested loop; each SQL
+step is a named `MatchRepository` method:
 
-1. Scan **WANT** rows (active merch, non-banned users, non-null group).
-2. Find partners with **TRADE** on the wanted merch.
-3. Require reciprocal **TRADE/WANT** inside the **same (event_id, group_name)**.
-4. Insert a **PENDING** match when none already covers the pair in that group.
+1. `list_matchable_wants` — WANT rows (live merch, non-banned, non-null group).
+2. `list_users_trading_merch` — partners TRADEing that merch.
+3. `list_user_trade_merch_ids_in_group` — reciprocal TRADs in the same group.
+4. `user_wants_live_merch` — partner WANTs that reciprocal merch.
+5. `find_for_pair_group` → `insert_pending` or `reopen_terminal` (ADR 0012),
+   then best-effort notify.
 
 Only **TRADE** and **WANT** participate in matching. **HAVE** is ignored by the
 matcher (optional ownership bookkeeping — see [inventory semantics](06-runtime.md#inventory-status-semantics)).
