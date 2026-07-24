@@ -72,8 +72,7 @@ void main() {
       expect(find.text('Recv Notebook'), findsOneWidget);
       expect(find.text('Unbalanced'), findsOneWidget);
 
-      // Select one give + one receive at qty 1 each → still unbalanced (1/1
-      // is balanced when both > 0). Toggle both legs.
+      // Select both legs at default qty 1 → give 1 / receive 1 → Balanced.
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
       await tester.tap(find.byType(Checkbox).last);
