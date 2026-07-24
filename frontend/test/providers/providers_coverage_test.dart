@@ -979,6 +979,50 @@ void main() {
       expect(container.read(adminControllerProvider).hasError, isTrue);
     });
 
+    test(
+      'deleteGroup encodes group name and failure rethrows (#496)',
+      () async {
+        String? path;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'DELETE' &&
+                request.url.path.startsWith('/api/v1/admin/events/')) {
+              path = request.url.path;
+              return _okEmpty();
+            }
+            return http.Response('nope', 404);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(adminControllerProvider.notifier)
+            .deleteGroup(5, 'a/b', 1);
+        expect(path, '/api/v1/admin/events/5/groups/a%2Fb');
+        expect(container.read(adminControllerProvider).hasError, isFalse);
+
+        final failApi = _apiWith(
+          client: MockClient(
+            (request) async => http.Response('Forbidden', 403),
+          ),
+        );
+        final failContainer = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => failApi)],
+        );
+        addTearDown(failContainer.dispose);
+        await expectLater(
+          failContainer
+              .read(adminControllerProvider.notifier)
+              .deleteGroup(5, 'pins', 1),
+          throwsA(isA<Exception>()),
+        );
+        expect(failContainer.read(adminControllerProvider).hasError, isTrue);
+      },
+    );
+
     test('transferEventCreator success and failure rethrow (#432)', () async {
       var putCalls = 0;
       final api = _apiWith(
