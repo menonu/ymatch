@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
-import '../services/api_client.dart';
 import '../utils/image_helper.dart';
 import '../widgets/manage_event_members_dialog.dart';
 
@@ -628,16 +627,14 @@ class _AdminGroupsTab extends ConsumerWidget {
                           ),
                         );
                         if (confirmed != true) return;
+                        // #496: mutation via AdminController; cascade invalidation
+                        // stays here (group removal affects merch/matches/favorites).
                         try {
-                          final userId = ref.read(currentUserProvider)?.id ?? 0;
-                          final encodedName = Uri.encodeComponent(
+                          await admin.deleteGroup(
+                            group.eventId,
                             group.groupName,
+                            adminId,
                           );
-                          await ref
-                              .read(apiClientProvider)
-                              .delete(
-                                '/api/v1/admin/events/${group.eventId}/groups/$encodedName?user_id=$userId',
-                              );
                           ref.invalidate(adminGroupsProvider);
                           ref.invalidate(adminMerchProvider);
                           ref.invalidate(adminMatchesProvider);
@@ -743,23 +740,25 @@ class _AdminItemsTab extends ConsumerWidget {
                     ),
                   );
                   if (confirm == true) {
+                    // #496: route through AdminController (no direct apiClient).
                     try {
-                      final client = ref.read(apiClientProvider);
                       final user = ref.read(currentUserProvider);
                       final userId = user?.id ?? 0;
-                      await client.delete(
-                        '/api/v1/admin/merch/${item.id}?user_id=$userId',
-                      );
+                      await ref
+                          .read(adminControllerProvider.notifier)
+                          .deleteMerch(item.id, userId);
                       ref.invalidate(adminMerchProvider);
-                      if (context.mounted)
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Item deleted')),
                         );
+                      }
                     } catch (e) {
-                      if (context.mounted)
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Failed to delete: $e')),
                         );
+                      }
                     }
                   }
                 },
@@ -830,23 +829,25 @@ class _AdminMatchesTab extends ConsumerWidget {
                         ),
                       );
                       if (confirm == true) {
+                        // #496: route through AdminController (no direct apiClient).
                         try {
-                          final client = ref.read(apiClientProvider);
                           final user = ref.read(currentUserProvider);
                           final userId = user?.id ?? 0;
-                          await client.delete(
-                            '/api/v1/admin/matches/${match.id}?user_id=$userId',
-                          );
+                          await ref
+                              .read(adminControllerProvider.notifier)
+                              .deleteMatch(match.id, userId);
                           ref.invalidate(adminMatchesProvider);
-                          if (context.mounted)
+                          if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Match deleted')),
                             );
+                          }
                         } catch (e) {
-                          if (context.mounted)
+                          if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Failed to delete: $e')),
                             );
+                          }
                         }
                       }
                     },

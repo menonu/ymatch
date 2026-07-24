@@ -1194,6 +1194,24 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Soft-remove an item group (`DELETE /admin/events/:id/groups/:name`) (#496).
+  ///
+  /// Group name is URL-encoded so keys with `/` and other reserved characters
+  /// round-trip correctly (same encoding as [transferGroupCreator]).
+  Future<void> deleteGroup(int eventId, String groupName, int userId) async {
+    state = const AsyncValue.loading();
+    try {
+      final encoded = Uri.encodeComponent(groupName);
+      await client.delete(
+        '/api/v1/admin/events/$eventId/groups/$encoded?user_id=$userId',
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
   /// Transfer event ownership (`PUT /admin/events/:id/creator`) (#432).
   Future<void> transferEventCreator(
     int eventId,
