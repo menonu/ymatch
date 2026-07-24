@@ -1,8 +1,10 @@
 //! Handlers for the `merchandise_groups` endpoints introduced in Issue #128.
 //!
-//! These handlers are intentionally thin: they parse + validate the request,
-//! delegate to [`MerchandiseGroupRepository`], and format the response.
-//! All SQL lives in the repository. Group-scoped RBAC member APIs are #443.
+//! Thin HTTP layer: parse/validate, authz gates, map responses.
+//! Multi-step create/transfer transactions live in
+//! [`crate::services::group::GroupService`]; single-statement SQL lives in
+//! [`crate::repositories::group::MerchandiseGroupRepository`]. Group-scoped
+//! RBAC member APIs are #443.
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
