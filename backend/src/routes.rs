@@ -35,6 +35,7 @@ use crate::repositories::message::MessageRepository;
 use crate::repositories::rbac::RbacRepository;
 use crate::repositories::user::UserRepository;
 use crate::services::event::EventService;
+use crate::services::group::GroupService;
 use crate::services::match_lifecycle::MatchLifecycleService;
 use crate::services::permissions::PermissionPolicy;
 use crate::services::rbac::RbacService;
@@ -84,6 +85,7 @@ pub struct AppState {
     pub policy: Arc<PermissionPolicy>,
     pub match_lifecycle: Arc<MatchLifecycleService>,
     pub event_service: Arc<EventService>,
+    pub group_service: Arc<GroupService>,
     pub rbac: Arc<RbacRepository>,
     pub rbac_service: Arc<RbacService>,
 }
@@ -151,6 +153,12 @@ impl FromRef<AppState> for Arc<MatchLifecycleService> {
 impl FromRef<AppState> for Arc<EventService> {
     fn from_ref(input: &AppState) -> Self {
         input.event_service.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<GroupService> {
+    fn from_ref(input: &AppState) -> Self {
+        input.group_service.clone()
     }
 }
 
@@ -222,6 +230,11 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         events.clone(),
         rbac.clone(),
     ));
+    let group_service = Arc::new(GroupService::new(
+        pool.clone(),
+        groups.clone(),
+        rbac.clone(),
+    ));
     let state = AppState {
         pool,
         storage,
@@ -238,6 +251,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         policy,
         match_lifecycle,
         event_service,
+        group_service,
         rbac,
         rbac_service,
     };

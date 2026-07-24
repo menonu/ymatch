@@ -268,34 +268,12 @@ impl MerchandiseGroupRepository {
         Ok(group_from_row(&row))
     }
 
-    /// Upsert a group row and ensure `group/creator` for the row's
-    /// `created_by` (#443). Prefer the handler path that uses
-    /// [`Self::create_in_tx`] + `RbacRepository::assign_group_creator` when
-    /// the role assignment must share an existing transaction.
-    pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
-        let mut tx = self.pool.begin().await?;
-        let group = self.create_in_tx(&mut tx, &req).await?;
-        if let Some(creator_id) = group.created_by {
-            sqlx::query(
-                r#"INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
-                   SELECT $1, r.id, 'group', $2
-                   FROM roles r
-                   WHERE r.scope_type = 'group' AND r.name = 'creator'
-                   ON CONFLICT (user_id, role_id, scope_id) DO NOTHING"#,
-            )
-            .bind(creator_id)
-            .bind(group.id)
-            .execute(&mut *tx)
-            .await?;
-        }
-        tx.commit().await?;
-        Ok(group)
-    }
-
     /// Update description (and optionally photo_url / display_name) of an
     /// existing group. Returns `None` if the group row does not yet exist
-    /// (caller should use `create` first). The `group_name` key is never
-    /// mutated — "renaming" is done by setting `display_name` (#425).
+    /// (caller should create via
+    /// [`crate::services::group::GroupService::create`] first). The
+    /// `group_name` key is never mutated — "renaming" is done by setting
+    /// `display_name` (#425).
     ///
     /// `photo_url` and `display_name` share the same partial-update semantic:
     /// when `Some`, the value is applied (empty/whitespace string clears it to

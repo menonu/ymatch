@@ -2,7 +2,8 @@ use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_global};
 use crate::routes::AppState;
-use crate::services::event::TransferCaller;
+use crate::services::event::TransferCaller as EventTransferCaller;
+use crate::services::group::TransferCaller as GroupTransferCaller;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
@@ -220,7 +221,7 @@ pub async fn transfer_event_creator(
     // transfers cannot leave two live `event/creator` assignments (#445).
     state
         .event_service
-        .transfer_creator(event_id, payload.new_creator_id, TransferCaller::Admin)
+        .transfer_creator(event_id, payload.new_creator_id, EventTransferCaller::Admin)
         .await?;
     Ok(StatusCode::OK)
 }
@@ -249,30 +250,17 @@ pub async fn transfer_group_creator(
 
     require_active_target_user(&state, payload.new_creator_id).await?;
 
-    let mut tx = state.pool.begin().await?;
-    let locked = state
-        .groups
-        .lock_for_update(&mut *tx, event_id, &group_name)
-        .await?
-        .ok_or_else(|| AppError::not_found("Group not found"))?;
-    let (group_id, locked_previous) = locked;
-
-    if locked_previous == Some(payload.new_creator_id) {
-        return Err(AppError::bad_request("User is already the group creator"));
-    }
-
-    let updated = state
-        .groups
-        .set_creator(&mut *tx, event_id, &group_name, payload.new_creator_id)
-        .await?;
-    if !updated {
-        return Err(AppError::not_found("Group not found"));
-    }
+    // GroupService owns the row lock + created_by + role swap so concurrent
+    // transfers cannot leave two live `group/creator` assignments (#445).
     state
-        .rbac
-        .transfer_group_creator_role(&mut tx, group_id, locked_previous, payload.new_creator_id)
+        .group_service
+        .transfer_creator(
+            event_id,
+            &group_name,
+            payload.new_creator_id,
+            GroupTransferCaller::Admin,
+        )
         .await?;
-    tx.commit().await?;
     Ok(StatusCode::OK)
 }
 
