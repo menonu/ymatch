@@ -81,7 +81,9 @@ void main() {
       expect(find.text('Balanced'), findsOneWidget);
 
       // Submit uses the localized sendOfferItems label (count of qty>0 legs).
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Send Offer (2 items)'));
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Send Offer (2 items)'),
+      );
       await tester.pumpAndSettle();
 
       expect(submitted, isNotNull);
