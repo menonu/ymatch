@@ -35,9 +35,9 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
 
 **Known exceptions on `main`:** some admin create/transfer paths still open
 transactions in handlers; the background **matching job** also issues raw SQL
-rather than going through repositories. Global search merch SQL lives in
-`MerchandiseRepository::search`. Treat remaining exceptions as follow-up
-cleanup (#497), not the target.
+rather than going through repositories. Treat those as follow-up cleanup
+(#497), not the target. (Global search merch SQL already lives in
+`MerchandiseRepository::search`.)
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
 (not a source-tree listing).
