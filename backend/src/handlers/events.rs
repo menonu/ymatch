@@ -91,26 +91,12 @@ pub async fn create_event(
         .rbac_service
         .check(&user, &Scope::Global, Permission::EventCreate)
         .await?;
-    // ADR 0004 §5: the event row and the auto-assigned `event/creator`
-    // `user_roles` row are written in one transaction so the creator can
-    // never end up with a persisted event they cannot edit/publish (the
-    // `EventEdit` check on their own event would otherwise fail if the
-    // role assignment were lost to a mid-flight failure).
-    let mut tx = state.pool.begin().await?;
+    // ADR 0004 §5: EventService owns the event row + `event/creator` role
+    // assignment in one transaction.
     let event = state
-        .events
-        .create(
-            &mut *tx,
-            &payload.name,
-            payload.creator_id,
-            payload.status.as_deref(),
-        )
+        .event_service
+        .create(&payload.name, payload.creator_id, payload.status.as_deref())
         .await?;
-    state
-        .rbac
-        .assign_event_creator(&mut tx, payload.creator_id, event.id)
-        .await?;
-    tx.commit().await?;
     Ok(Json(event))
 }
 
@@ -299,36 +285,12 @@ pub async fn self_transfer_event_creator(
         return Err(AppError::bad_request("Target user is banned"));
     }
 
-    let mut tx = state.pool.begin().await?;
-    // Re-assert ownership under the row lock: a concurrent transfer may have
-    // moved `creator_id` since the pre-check above.
-    let locked_previous = state
-        .events
-        .lock_creator_for_update(&mut *tx, event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
-
-    if locked_previous != Some(user.id) {
-        return Err(AppError::forbidden(
-            "Only the event creator can transfer ownership",
-        ));
-    }
-    if locked_previous == Some(payload.new_creator_id) {
-        return Err(AppError::bad_request("User is already the event creator"));
-    }
-
-    let updated = state
-        .events
-        .set_creator(&mut *tx, event_id, payload.new_creator_id)
-        .await?;
-    if !updated {
-        return Err(AppError::not_found("Event not found"));
-    }
+    // Ownership is re-checked under `SELECT … FOR UPDATE` inside the service
+    // so concurrent transfers cannot leave multiple live `event/creator` rows.
     state
-        .rbac
-        .transfer_event_creator_role(&mut tx, event_id, locked_previous, payload.new_creator_id)
+        .event_service
+        .transfer_creator(event_id, payload.new_creator_id, Some(user.id))
         .await?;
-    tx.commit().await?;
     Ok(StatusCode::OK)
 }
 
