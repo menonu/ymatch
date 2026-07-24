@@ -36,8 +36,10 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
 **Layering status:** handlers parse/gate/map; services own multi-step
 transactions (event/group ownership, match lifecycle); repositories own
 domain SQL — including matcher discovery/insert/rematch on
-[`MatchRepository`](../../../backend/src/repositories/match_.rs) and global
+[`MatchRepository`](../../../backend/src/repositories/match_/mod.rs) and global
 search merch on [`MerchandiseRepository::search`](../../../backend/src/repositories/merch.rs).
+`MatchRepository` is split by cohesion into `read` / `write` / `capacity` /
+`matcher` submodules under `repositories/match_/` (public API unchanged).
 See #497 for the layering completion work.
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
