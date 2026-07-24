@@ -15,7 +15,7 @@ Before this decision, `ymatch` had an ad-hoc, single-dimension permission model:
 - `services::PermissionPolicy` exposed `require_role(&["admin","moderator"])` and
   `require_owner_or_role(owner, &["admin","moderator"])`. Handlers called these
   inline, often hard-coding the role list at each call site
-  (`admin.rs`, `events.rs`, `merch.rs`, `groups.rs`).
+  (admin, events, merch, and groups handlers).
 - Event "creator" was **implicit**: `events.creator_id` was an ownership column,
   not a role. There was no `editor` role and no way to delegate event
   management to a second user. `MerchPermissionPolicy` encoded a one-off 3-way
@@ -40,7 +40,7 @@ the caller's `user_id` still arrives in the request payload exactly as today.
 RBAC is an authorization concern layered on top of the existing auth identity.
 
 The frontend gates the admin dashboard on `proto.User.role`
-(`scaffold_with_nav_bar.dart`, `admin_dashboard_screen.dart`), so the `User.role`
+(nav scaffold Admin tab, admin dashboard gate), so the `User.role`
 proto field and the `users.role` column it reads must keep working through this
 change. A group/role **editor UI is explicitly out of scope** for this round and
 will be built later; the backend model and API must be ready for it.

@@ -6,7 +6,7 @@
 
 ## Context
 
-Before this decision, `create_merch` (`backend/src/handlers/merch.rs`) had **no
+Before this decision, the merch create handler (`create_merch`) had **no
 authorization**: any active user could `POST /api/v1/events/:id/merch` and add
 merchandise to any event. The handler only ran `verify_active` on the optional
 `creator_id` (to populate the merch's owner column) and otherwise delegated
@@ -24,8 +24,8 @@ action** by the event owner/editors (plus platform moderators/admins), not
 open participation. A regular user posting merch into someone else's event is
 unwanted — events are curated by their creator and delegated editors.
 
-The frontend `event_detail_screen.dart` shows an "Add Merch" button to every
-viewer, and `MerchController.addMerch` posts without sending a caller identity.
+The event detail screen shows an "Add Merch" button to every viewer, and
+`MerchController.addMerch` posts without sending a caller identity.
 This change is therefore a **breaking change** for the frontend: after the
 backend gate ships, non-editors who click Add Merch receive a 403. Proper
 frontend button gating requires a "current user's event role" endpoint that

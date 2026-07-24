@@ -36,7 +36,7 @@ groups. Each match is then an independent offer/counter-offer/acceptance unit.
 
 This is a **target invariant**, not a description of the current code. Today the
 `matches` table carries no group reference — only `user1_id`, `user2_id`,
-`status`, `offered_by` — and `backend/src/matching.rs` creates **one match per
+`status`, `offered_by` — and the periodic matcher creates **one match per
 user pair**, deduplicating purely on `(user1_id, user2_id)`. The same-group
 constraint is enforced only at *candidate generation* time (reciprocal WANT/TRADE
 pairs must share `group_name`), so a second reciprocal pair in a different group
@@ -88,10 +88,10 @@ rules that `NULL`-grouped merchandise does not participate in matching at all.
 **Negative / costs:**
 
 - The `matches` table must gain a group reference (e.g. `event_id` + `group_name`,
-  or a `merchandise_groups` foreign key), and the unique/dedup logic in
-  `backend/src/matching.rs` must move from `(user1_id, user2_id)` to
-  `(user1_id, user2_id, group)`. This is a schema migration plus algorithm change
-  and is **not yet implemented**; it will be tracked in a separate issue/PR.
+  or a `merchandise_groups` foreign key), and the matcher's unique/dedup logic
+  must move from `(user1_id, user2_id)` to `(user1_id, user2_id, group)`. This is
+  a schema migration plus algorithm change and is **not yet implemented**; it
+  will be tracked in a separate issue/PR.
 - Existing `matches` rows (per-pair, no group) have no recorded group. A migration
   strategy is required: either backfill the group from the surviving `match_items`
   rows, or treat un-migrated rows as legacy and prevent new cross-group activity on
@@ -99,10 +99,10 @@ rules that `NULL`-grouped merchandise does not participate in matching at all.
 - The offer/counter-offer endpoints must add group-membership validation for
   selected items (a new check that does not exist today).
 - `NULL`-grouped merchandise being non-matchable is a stricter rule than the
-  current `matching.rs` behavior (which treats `NULL` as its own bucket and
-  matches `NULL` to `NULL`). Inventory or merchandise creation flows must ensure a
-  group is assigned for an item to be matchable; otherwise it is silently inert.
-- Match uniqueness and the "already-matched" guard in `matching.rs` must be
+  current matcher behavior (which treats `NULL` as its own bucket and matches
+  `NULL` to `NULL`). Inventory or merchandise creation flows must ensure a group
+  is assigned for an item to be matchable; otherwise it is silently inert.
+- Match uniqueness and the "already-matched" guard in the matcher must be
   reworked, since a user pair may now legitimately coexist in multiple active
   matches (one per group).
 
@@ -110,7 +110,7 @@ rules that `NULL`-grouped merchandise does not participate in matching at all.
 
 - Implementation tracked in #341.
 - Migration adding group scoping to `matches` and a backfill/cutover plan.
-- Rewrite of `matching.rs` dedup to `(user1, user2, group)` and removal of the
+- Rewrite of matcher dedup to `(user1, user2, group)` and removal of the
   `NULL`-to-`NULL` matching branch.
 - Group-membership validation in the offer/counter-offer handlers.
 

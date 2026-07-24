@@ -56,9 +56,47 @@ ADRs are **never edited in place** once their decision is made. To change or rev
 2. In the new ADR, set **Status** to `Accepted` and add a `Supersedes:` line linking to the old one.
 3. In the **old** ADR, change **Status** to `Superseded by [ADR NNNN](NNNN-...)` (and link forward). Do **not** rewrite or delete the old ADR's body — its `Context` / `Decision` / `Consequences` must remain a faithful record of what was decided at the time.
 
-Typo fixes, link corrections, and formatting cleanup are permitted; anything that changes the *meaning* of a decision must go through the supersede flow above.
-
 Record every ADR in the index below, newest last.
+
+## Stability & references
+
+Accepted ADRs are **historical decision records**, not living design docs. Architecture docs under `docs/explanation/architecture/` may track the current tree; ADRs must not.
+
+### Freeze (accepted ADRs)
+
+Once **Status** is `Accepted` (or later Superseded / Deprecated), the ADR body is **frozen**.
+
+**Do not** edit accepted ADRs for:
+
+- code renames, module splits, or path moves
+- “bring the narrative up to date with the current tree”
+- behavior or decision changes (those need a **new** ADR that supersedes)
+
+**Allowed exceptions** (narrow):
+
+| Exception | Scope |
+|-----------|--------|
+| **Status** line only | When superseding (append-only workflow above) |
+| Index table in this `README.md` | Add/update ADR rows |
+| Pure typos / broken relative links to other docs or ADRs | Must **not** change decision meaning |
+| One-time path cleanup | Explicit exception for issue-driven mechanical cleanup of fragile locations (no meaning change) |
+
+Do **not** treat formatting or “cleanup” as a license to rewrite paths, module names, or narrative after every refactor.
+
+### No concrete source locations
+
+In new ADRs (and in any one-time cleanup of older ones), prefer stable concept names and Diátaxis links over filesystem paths and line anchors:
+
+| Prefer | Avoid |
+|--------|--------|
+| Component / type / permission names (`MatchRepository`, `merch.create`) | `backend/src/repositories/match_.rs` |
+| Behavioral description (“periodic matcher”) | `src/matching.rs:15` |
+| Links to architecture docs / other ADRs | Markdown links into `backend/src/...` or `frontend/lib/...` |
+| Table / API / proto field names | `file.rs:line-line` spans |
+
+If a decision was motivated by a specific code shape at the time, describe it in prose (“the merch create handler had no authz gate”) rather than pinning a path that will move.
+
+Migrations, issue numbers, and API routes (`POST /api/v1/...`) are fine when they identify a stable product or schema contract — they are not source-tree locations.
 
 ## Index
 
