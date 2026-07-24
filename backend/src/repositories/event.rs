@@ -98,9 +98,9 @@ impl EventRepository {
     /// Create a new event. `status` defaults to `"published"` if `None`.
     ///
     /// Takes a generic [`sqlx::Executor`] so the caller can run the insert
-    /// inside an open transaction (the `create_event` handler does this so
-    /// the event row and the auto-assigned `event/creator` `user_roles` row
-    /// commit atomically — ADR 0004 §5).
+    /// inside an open transaction ([`crate::services::event::EventService`]
+    /// does this so the event row and the auto-assigned `event/creator`
+    /// `user_roles` row commit atomically — ADR 0004 §5).
     pub async fn create<'c, E>(
         &self,
         exec: E,

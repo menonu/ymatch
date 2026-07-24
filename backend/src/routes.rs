@@ -34,6 +34,7 @@ use crate::repositories::merch::MerchandiseRepository;
 use crate::repositories::message::MessageRepository;
 use crate::repositories::rbac::RbacRepository;
 use crate::repositories::user::UserRepository;
+use crate::services::event::EventService;
 use crate::services::match_lifecycle::MatchLifecycleService;
 use crate::services::permissions::PermissionPolicy;
 use crate::services::rbac::RbacService;
@@ -82,6 +83,7 @@ pub struct AppState {
     pub group_favorites: Arc<GroupFavoritesRepository>,
     pub policy: Arc<PermissionPolicy>,
     pub match_lifecycle: Arc<MatchLifecycleService>,
+    pub event_service: Arc<EventService>,
     pub rbac: Arc<RbacRepository>,
     pub rbac_service: Arc<RbacService>,
 }
@@ -143,6 +145,12 @@ impl FromRef<AppState> for Arc<MessageRepository> {
 impl FromRef<AppState> for Arc<MatchLifecycleService> {
     fn from_ref(input: &AppState) -> Self {
         input.match_lifecycle.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<EventService> {
+    fn from_ref(input: &AppState) -> Self {
+        input.event_service.clone()
     }
 }
 
@@ -209,6 +217,11 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     // call sites in the integration tests. A misconfigured (unseeded) DB
     // surfaces as a 500 on the first check instead of at startup.
     let rbac_service = Arc::new(RbacService::new(rbac.clone(), pool.clone()));
+    let event_service = Arc::new(EventService::new(
+        pool.clone(),
+        events.clone(),
+        rbac.clone(),
+    ));
     let state = AppState {
         pool,
         storage,
@@ -224,6 +237,7 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         group_favorites,
         policy,
         match_lifecycle,
+        event_service,
         rbac,
         rbac_service,
     };

@@ -2,7 +2,8 @@
 //!
 //! [`MatchLifecycleService`] owns the multi-statement transactions for
 //! the match state machine. Repositories are single-statement; this
-//! service is the only place we open `pool.begin()`.
+//! service is the place that opens `pool.begin()` for match lifecycle
+//! paths (other domains have their own services, e.g. event ownership).
 //!
 //! State machine (#297 negotiation + ADR 0008 / ADR 0010 cancel):
 //!
