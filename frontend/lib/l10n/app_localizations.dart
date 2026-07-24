@@ -800,6 +800,12 @@ abstract class AppLocalizations {
   /// **'All'**
   String get invModeAll;
 
+  /// Label on the group-level inventory totals card (sum of HAVE/WANT/TRADE in the active group tab)
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get groupInventoryTotal;
+
   /// Floating action button label to add merchandise
   ///
   /// In en, this message translates to:

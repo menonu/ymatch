@@ -126,6 +126,7 @@
   "invModeWantTrade": "求・譲",
   "invModeJustTrade": "譲のみ",
   "invModeAll": "すべて",
+  "groupInventoryTotal": "合計",
 
   "addMerch": "グッズを追加",
   "otherItems": "その他のアイテム",

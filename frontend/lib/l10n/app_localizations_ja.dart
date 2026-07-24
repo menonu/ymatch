@@ -394,6 +394,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get invModeAll => 'すべて';
 
   @override
+  String get groupInventoryTotal => '合計';
+
+  @override
   String get addMerch => 'グッズを追加';
 
   @override

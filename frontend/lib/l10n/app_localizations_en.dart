@@ -396,6 +396,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invModeAll => 'All';
 
   @override
+  String get groupInventoryTotal => 'Total';
+
+  @override
   String get addMerch => 'Add Merch';
 
   @override

@@ -1261,6 +1261,151 @@ void main() {
     expect(find.text('−'), findsOneWidget);
   });
 
+  // --- Group inventory totals card (#508) ---
+
+  testWidgets(
+    'group totals card is last item and sums HAVE/WANT/TRADE (#508)',
+    (tester) async {
+      final a = Merchandise()
+        ..id = 21
+        ..eventId = 5
+        ..name = 'AlphaMerch'
+        ..groupName = 'Pens'
+        ..creatorId = 1;
+      final b = Merchandise()
+        ..id = 22
+        ..eventId = 5
+        ..name = 'BetaMerch'
+        ..groupName = 'Pens'
+        ..creatorId = 1;
+
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final client = ApiClient(
+        config,
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/user/1/inventory') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 1,
+                  'userId': 1,
+                  'merchId': 21,
+                  'status': 'HAVE',
+                  'quantity': 2,
+                  'merchName': 'AlphaMerch',
+                },
+                {
+                  'id': 2,
+                  'userId': 1,
+                  'merchId': 21,
+                  'status': 'WANT',
+                  'quantity': 1,
+                  'merchName': 'AlphaMerch',
+                },
+                {
+                  'id': 3,
+                  'userId': 1,
+                  'merchId': 22,
+                  'status': 'HAVE',
+                  'quantity': 1,
+                  'merchName': 'BetaMerch',
+                },
+                {
+                  'id': 4,
+                  'userId': 1,
+                  'merchId': 22,
+                  'status': 'TRADE',
+                  'quantity': 3,
+                  'merchName': 'BetaMerch',
+                },
+              ]),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => client),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(5).overrideWith((ref) async => [a, b]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('groupInventoryTotalsCard')), findsOneWidget);
+      expect(find.text('Total'), findsOneWidget);
+      // Aggregates: HAVE 2+1=3, WANT 1, TRADE 3 (short labels O/W/F).
+      final card = find.byKey(const Key('groupInventoryTotalsCard'));
+      expect(
+        find.descendant(of: card, matching: find.text('3')),
+        findsNWidgets(2),
+      ); // HAVE total 3 and TRADE total 3
+      expect(
+        find.descendant(of: card, matching: find.text('1')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('group totals card omitted when no items match filter (#508)', (
+    tester,
+  ) async {
+    final onlyHave = Merchandise()
+      ..id = 31
+      ..eventId = 5
+      ..name = 'HaveOnlyX'
+      ..groupName = 'Pens'
+      ..creatorId = 1;
+
+    final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+    final client = ApiClient(
+      config,
+      client: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.path == '/api/v1/user/1/inventory') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 1,
+                'userId': 1,
+                'merchId': 31,
+                'status': 'HAVE',
+                'quantity': 2,
+                'merchName': 'HaveOnlyX',
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => client),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [onlyHave]),
+          merchFilterProvider(5).overrideWith((ref) => MerchFilter.trade),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No items match this filter.'), findsOneWidget);
+    expect(find.byKey(const Key('groupInventoryTotalsCard')), findsNothing);
+  });
+
   // Regression for the 0.3.13 export-from-3-dots-menu wiring: the menu's
   // onSelected called DefaultTabController.of on the State's build context,
   // which is the controller's *parent* — the lookup threw at runtime and the

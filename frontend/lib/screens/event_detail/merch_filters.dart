@@ -72,6 +72,54 @@ bool matchesMerchFilter(
   }
 }
 
+/// Sum of HAVE / WANT / TRADE quantities across a merchandise group (#508).
+///
+/// Totals cover **items currently shown in the group** (after search + merch
+/// filter). Soft-deleted rows that still appear in the list contribute their
+/// displayed quantities so the card matches visible steppers.
+class GroupInventoryTotals {
+  const GroupInventoryTotals({
+    required this.totalHave,
+    required this.totalWant,
+    required this.totalTrade,
+  });
+
+  final int totalHave;
+  final int totalWant;
+  final int totalTrade;
+
+  static const zero = GroupInventoryTotals(
+    totalHave: 0,
+    totalWant: 0,
+    totalTrade: 0,
+  );
+
+  /// Sum inventory quantities for each merchandise id in [merchIds].
+  ///
+  /// [lookup] is merchId → status → quantity (same map built on the event
+  /// detail screen). Missing ids/statuses count as 0.
+  factory GroupInventoryTotals.fromMerchIds(
+    Iterable<int> merchIds,
+    Map<int, Map<String, int>> lookup,
+  ) {
+    var have = 0;
+    var want = 0;
+    var trade = 0;
+    for (final id in merchIds) {
+      final inv = lookup[id];
+      if (inv == null) continue;
+      have += inv['HAVE'] ?? 0;
+      want += inv['WANT'] ?? 0;
+      trade += inv['TRADE'] ?? 0;
+    }
+    return GroupInventoryTotals(
+      totalHave: have,
+      totalWant: want,
+      totalTrade: trade,
+    );
+  }
+}
+
 /// Index of [initialGroupName] in [groupKeys], or 0 if absent/unknown (#406).
 int resolveInitialGroupTabIndex(
   List<String> groupKeys,
