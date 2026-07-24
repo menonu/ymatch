@@ -662,10 +662,12 @@ final myGroupRoleProvider = FutureProvider.autoDispose
     });
 
 /// Directory of users for pickers (self-service member UI, #442).
-/// Same public list endpoint as the admin user directory.
+/// #491: requires active caller; lean DTO without secrets for non-staff.
 final usersDirectoryProvider = FutureProvider<List<User>>((ref) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/users');
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  final json = await client.get('/api/v1/users?user_id=${user.id}');
   return (json as List).map((e) => User()..mergeFromProto3Json(e)).toList();
 });
 
@@ -1023,7 +1025,10 @@ typedef GroupMemberInfo = EventMemberInfo;
 
 final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/admin/groups');
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  // #491: admin catalog lists require staff + user_id.
+  final json = await client.get('/api/v1/admin/groups?user_id=${user.id}');
   return (json as List)
       .map((e) => AdminGroup.fromJson(e as Map<String, dynamic>))
       .toList();
@@ -1031,7 +1036,9 @@ final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
 
 final adminMerchProvider = FutureProvider<List<Merchandise>>((ref) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/admin/merch');
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  final json = await client.get('/api/v1/admin/merch?user_id=${user.id}');
   return (json as List)
       .map((e) => Merchandise()..mergeFromProto3Json(e))
       .toList();
@@ -1039,7 +1046,9 @@ final adminMerchProvider = FutureProvider<List<Merchandise>>((ref) async {
 
 final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/admin/matches');
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  final json = await client.get('/api/v1/admin/matches?user_id=${user.id}');
   return (json as List)
       .map((e) => TradeMatch()..mergeFromProto3Json(e))
       .toList();
@@ -1048,7 +1057,10 @@ final adminMatchesProvider = FutureProvider<List<TradeMatch>>((ref) async {
 // --- Admin Users ---
 final adminUsersProvider = FutureProvider<List<User>>((ref) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/users');
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  // Staff path of GET /users (user.read) returns role + ban fields (#491).
+  final json = await client.get('/api/v1/users?user_id=${user.id}');
   return (json as List).map((e) => User()..mergeFromProto3Json(e)).toList();
 });
 
@@ -1395,7 +1407,12 @@ final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((
   matchId,
 ) async {
   final client = ref.watch(apiClientProvider);
-  final json = await client.get('/api/v1/matches/$matchId/messages');
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  // #491: membership gate via caller user_id.
+  final json = await client.get(
+    '/api/v1/matches/$matchId/messages?user_id=${user.id}',
+  );
   return (json as List).map((e) => Message()..mergeFromProto3Json(e)).toList();
 });
 

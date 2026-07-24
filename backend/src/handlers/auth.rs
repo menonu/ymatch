@@ -1,8 +1,10 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
+use crate::handlers::common::UserIdQuery;
 use crate::repositories::user::UsernameLookup;
 use crate::routes::AppState;
-use axum::{Json, extract::Path, extract::State};
+use crate::services::rbac::{Permission, Scope};
+use axum::{Json, extract::Path, extract::Query, extract::State};
 
 pub async fn guest_login(
     State(state): State<AppState>,
@@ -78,9 +80,65 @@ pub async fn signup(
     Ok(Json(user))
 }
 
-pub async fn list_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, AppError> {
+/// List users for member pickers and the admin users tab (#491).
+///
+/// Requires an active caller via `?user_id=`.
+/// - Callers with global `user.read` (moderator/admin) get the full admin
+///   directory fields (role, ban state) but **never** `device_token` or
+///   `uuid` (restore key) on this list — use `GET /admin/users/:id` for
+///   detail inspection.
+/// - Other active users get a **lean directory** (`id` + `username` only)
+///   for self-service member pickers.
+pub async fn list_users(
+    State(state): State<AppState>,
+    Query(query): Query<UserIdQuery>,
+) -> Result<Json<Vec<User>>, AppError> {
+    let uid = query
+        .user_id
+        .ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
+    let caller = state.policy.verify_active(uid).await?;
+
     let all = state.users.list_all().await?;
-    Ok(Json(all))
+    // #491 review: do not treat Internal as "not staff" via `.is_ok()` —
+    // Forbidden means lean directory; other errors must propagate.
+    let is_staff = match state
+        .rbac_service
+        .check(&caller, &Scope::Global, Permission::UserRead)
+        .await
+    {
+        Ok(()) => true,
+        Err(AppError::Forbidden(_)) => false,
+        Err(e) => return Err(e),
+    };
+
+    if is_staff {
+        let staff_view = all
+            .into_iter()
+            .map(|mut u| {
+                // Strip secrets even for staff list; detail endpoint retains them.
+                u.device_token = None;
+                u.uuid = None;
+                u
+            })
+            .collect();
+        return Ok(Json(staff_view));
+    }
+
+    let lean = all
+        .into_iter()
+        .map(|u| User {
+            id: u.id,
+            username: u.username,
+            uuid: None,
+            device_token: None,
+            created_at: None,
+            role: None,
+            is_banned: None,
+            ban_reason: None,
+            banned_until: None,
+        })
+        .collect();
+    Ok(Json(lean))
 }
 
 pub async fn update_username(

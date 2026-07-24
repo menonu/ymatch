@@ -56,19 +56,20 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 
 | Permission | Granted to | Satisfies | Enforced by |
 |---|---|---|---|
-| `user.read` | admin, moderator | `user.read` | `admin::get_user_details` (`GET /admin/users/:id`) |
+| `user.read` | admin, moderator | `user.read` | `admin::get_user_details` (`GET /admin/users/:id`); also unlocks full (non-secret) fields on `GET /users?user_id=` (#491) |
+
 | `user.ban` | admin, moderator | `user.ban` | `admin::ban_user` (`POST /admin/users/:id/ban`) |
 | `user.unban` | admin, moderator | `user.unban` | `admin::unban_user` (`POST /admin/users/:id/unban`) |
 | `user.role.manage` | admin | `user.role.manage` | `admin::update_user_role` (`PUT /admin/users/:id/role`) |
 | `event.create` | admin, moderator | `event.create` | `events::create_event` (`POST /events`) |
 | `event.edit.any` | admin, moderator | `event.edit` (the event-scope check) | — (override; satisfies `event.edit`) |
 | `event.delete.any` | admin, moderator | `event.delete` (the event-scope check) | — (override; satisfies `event.delete` on `DELETE /admin/events/:id`) |
-| `merch.delete.any` | admin, moderator | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`) |
+| `merch.delete.any` | admin, moderator | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`); also gates admin catalog list `GET /admin/merch?user_id=` (#491 — intentional reuse: same staff set; no separate `*.list` yet) |
 | `merch.create.any` | admin, moderator | `merch.create` (the event-scope check) | — (override; satisfies `merch.create`) |
 | `merch.edit.any` | admin, moderator | `merch.edit` (the event-scope check) | — (override; satisfies `merch.edit`) |
 | `group.edit.any` | admin, moderator | `group.edit` (the event-scope check) | — (override; satisfies `group.edit`) |
-| `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`) |
-| `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`) |
+| `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`); also gates `GET /admin/groups?user_id=` (#491 — list reuses delete staff set) |
+| `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`); also gates `GET /admin/matches?user_id=` (#491 — list reuses delete staff set) |
 | `event.creator.transfer` | admin, moderator | `event.creator.transfer` | `admin::transfer_event_creator` (`PUT /admin/events/:id/creator`) |
 | `group.creator.transfer` | admin, moderator | `group.creator.transfer` | `admin::transfer_group_creator` (`PUT /admin/events/:id/groups/:name/creator`) |
 | `event.member.manage.any` | admin, moderator | `event.member.manage.any` | Admin members path (`GET/POST/DELETE /admin/events/:id/members…`). **Not** an override of `event.member.manage` — the public members API stays creator/editor + admin-bypass only (#432 / #442). |
@@ -86,7 +87,7 @@ also satisfies each event-scope check.
 | `event.delete` | creator | `event.delete.any` | `admin::delete_event` (`DELETE /admin/events/:id`) — event-scope check (#233) |
 | `event.member.manage` | creator, editor | *(none by design)* | event-member API (`POST/DELETE/GET /events/:id/members`) (#442 grants editor) |
 | `merch.delete` | creator, editor | `merch.delete.any` | `merch::delete_merch_by_creator` (`DELETE /events/:id/merch/:id`) |
-| `merch.create` | creator, editor | `merch.create.any` | `merch::create_merch` (`POST /events/:id/merch`) |
+| `merch.create` | creator, editor | `merch.create.any` | `merch::create_merch` (`POST /events/:id/merch`); `groups::create_event_group` (`POST /events/:id/groups`) (#491) |
 | `merch.edit` | creator, editor | `merch.edit.any` | `merch::update_merch` (`PUT /events/:id/merch/:id`), `merch::publish_merch` (`POST /events/:id/merch/:id/publish`) |
 | `group.edit` | creator, editor | `group.edit.any` | `groups::update_event_group` (`PUT /events/:id/groups/:name`) — also satisfied by group-scoped `group.edit` (#443) |
 

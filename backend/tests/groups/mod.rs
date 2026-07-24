@@ -497,8 +497,25 @@ async fn test_group_photo_url_create_update_and_clear(pool: PgPool) {
         "https://cdn.example/g3.png"
     );
 
-    // POST create upsert must NOT clobber an existing photo_url (#404 review).
+    // #491: plain users can no longer POST create (would previously hijack
+    // description). Re-create as the authorized creator: upsert must NOT
+    // clobber an existing photo_url (#404 review).
     let other_id = login_guest(&pool, "group-photo-clobber", "tok").await;
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "hostile", "photoUrl": "https://evil.example/x.png"}}"#,
+            event_id, other_id
+        ),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "plain user must not create/upsert groups (#491)"
+    );
+
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -508,7 +525,7 @@ async fn test_group_photo_url_create_update_and_clear(pool: PgPool) {
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"eventId": {}, "userId": {}, "groupName": "Art", "description": "hostile", "photoUrl": "https://evil.example/x.png"}}"#,
-                    event_id, other_id
+                    event_id, creator_id
                 )))
                 .unwrap(),
         )
@@ -954,7 +971,13 @@ async fn admin_groups_list_includes_display_name_with_fallback(pool: PgPool) {
     .await;
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let resp = get_request(&pool, "/api/v1/admin/groups").await;
+    // #491: admin groups list requires staff + user_id.
+    // create_test_user_and_event grants moderator to creator_id.
+    let resp = get_request(
+        &pool,
+        &format!("/api/v1/admin/groups?user_id={}", creator_id),
+    )
+    .await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
@@ -978,4 +1001,45 @@ async fn admin_groups_list_includes_display_name_with_fallback(pool: PgPool) {
         "unset display_name must be absent/null so UI falls back to group_name, got {:?}",
         stickers.get("displayName")
     );
+}
+
+// --- #491: group create requires active caller + merch.create ---
+
+#[sqlx::test]
+async fn test_create_group_rejects_plain_user(pool: PgPool) {
+    let (_moderator, event_id) =
+        create_test_user_and_event(pool.clone(), "grp-create-mod", "Gate Event").await;
+    let plain = login_guest(&pool, "grp-create-plain", "t").await;
+
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/events/{}/groups", event_id),
+        &format!(
+            r#"{{"eventId": {}, "userId": {}, "groupName": "Hijack", "description": "nope"}}"#,
+            event_id, plain
+        ),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "plain user must not create groups / claim creator"
+    );
+}
+
+#[sqlx::test]
+async fn test_create_group_rejects_missing_event(pool: PgPool) {
+    let plain = login_guest(&pool, "grp-create-missing-ev", "t").await;
+    grant_global_role(&pool, plain, "moderator").await;
+
+    let resp = post_json(
+        &pool,
+        "/api/v1/events/999999/groups",
+        &format!(
+            r#"{{"eventId": 999999, "userId": {}, "groupName": "Ghost", "description": "x"}}"#,
+            plain
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }

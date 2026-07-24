@@ -58,14 +58,40 @@ Guest login by device UUID. Creates the guest account on first use.
 
 ### GET /api/v1/users
 
-List all users.
+User directory for member pickers and the admin users tab (#491).
 
+- **Query Parameters**:
+  | Param     | Type | Description                                      |
+  |-----------|------|--------------------------------------------------|
+  | `user_id` | int  | Required. Active caller identity.                |
+- **Authorization**:
+  - Any **active** caller receives a **lean** directory (`id`, `username` only).
+  - Callers with global `user.read` (moderator/admin) also receive `role` and
+    ban fields. `device_token` and `uuid` are **never** returned on this list
+    (use `GET /admin/users/:id` for detail inspection).
 - **Response**: `200 OK`
+
+  Lean (non-staff):
   ```json
   [
-    { "id": 1, "username": "user123", "role": "user", "is_banned": false }
+    { "id": 1, "username": "user123" }
   ]
   ```
+
+  Staff (`user.read`):
+  ```json
+  [
+    {
+      "id": 1,
+      "username": "user123",
+      "role": "user",
+      "is_banned": false,
+      "created_at": "2025-07-01T00:00:00Z"
+    }
+  ]
+  ```
+- **Errors**: `400` if `user_id` missing; `403` if caller is banned; `404` if
+  caller does not exist.
 
 ---
 
@@ -520,8 +546,12 @@ the trade pool and must cover `qty`. See
 
 ### GET /api/v1/matches/:id/messages
 
-List all messages in a match conversation.
+List all messages in a match conversation (#491).
 
+- **Query Parameters**:
+  | Param     | Type | Description                                      |
+  |-----------|------|--------------------------------------------------|
+  | `user_id` | int  | Required. Must be an active match participant.   |
 - **Response**: `200 OK`
   ```json
   [
@@ -537,10 +567,12 @@ List all messages in a match conversation.
     }
   ]
   ```
+- **Errors**: `400` missing `user_id`; `403` not a participant / banned;
+  `404` match not found.
 
 ### POST /api/v1/matches/:id/messages
 
-Send a message in a match conversation.
+Send a message in a match conversation (#491).
 
 - **Request Body**:
   ```json
@@ -548,12 +580,16 @@ Send a message in a match conversation.
     "match_id": 500,
     "sender_id": 1,
     "content": "Let's meet at the north gate.",
-    "message_type": "LOCATION",       // optional, defaults to "TEXT"
+    "message_type": "LOCATION",       // optional, defaults to "TEXT"; client may send TEXT or LOCATION only
     "latitude": 35.6762,              // optional
     "longitude": 139.6503             // optional
   }
   ```
-- **Response**: `201 Created`
+- **Authorization**: `sender_id` must be an active match participant. Content
+  max length 2000 characters. `SYSTEM` type is server-only.
+- **Response**: `200 OK` — the created message.
+- **Errors**: `400` invalid type/length; `403` not a participant / banned;
+  `404` match not found.
 
 ---
 
@@ -565,12 +601,22 @@ All admin endpoints require the `user_id` query parameter, and the requesting us
 
 List all merchandise (published + drafts). Soft-deleted rows are excluded (same live-only catalog rule as event list; ADR 0011).
 
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Permissions**: Admin or moderator (`merch.delete.any`).
 - **Response**: `200 OK` — Array of merchandise objects.
 
 ### GET /api/v1/admin/matches
 
 List all matches.
 
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Permissions**: Admin or moderator (`match.delete`).
 - **Response**: `200 OK` — Array of match objects.
 
 ### DELETE /api/v1/admin/events/:id
@@ -756,6 +802,11 @@ event `creator` role (#432).
 
 List all item groups for the moderation dashboard.
 
+- **Query Parameters**:
+  | Param     | Type | Description                         |
+  |-----------|------|-------------------------------------|
+  | `user_id` | int  | Required. The requesting user's ID. |
+- **Permissions**: Admin or moderator (`group.delete`).
 - **Response**: `200 OK` — Array of objects:
   ```json
   [

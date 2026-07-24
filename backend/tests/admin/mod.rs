@@ -310,12 +310,27 @@ async fn test_admin_list_all_merch_returns_array(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let app = backend::routes::create_router(pool, test_storage());
+    // #491: unauthenticated list is rejected.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
             Request::builder()
                 .method("GET")
                 .uri("/api/v1/admin/merch")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // create_test_user_and_event grants moderator — has merch.delete.any.
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/admin/merch?user_id={}", user_id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -329,17 +344,15 @@ async fn test_admin_list_all_merch_returns_array(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_admin_list_all_matches_returns_array(pool: PgPool) {
-    let app = backend::routes::create_router(pool, test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("GET")
-                .uri("/api/v1/admin/matches")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+    let admin = login_guest(&pool, "admin-list-matches", "t").await;
+    grant_global_role(&pool, admin, "moderator").await;
+
+    // #491: plain guest cannot list all matches.
+    let plain = login_guest(&pool, "plain-list-matches", "t").await;
+    let resp = get_request(&pool, &format!("/api/v1/admin/matches?user_id={}", plain)).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    let resp = get_request(&pool, &format!("/api/v1/admin/matches?user_id={}", admin)).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_to_string(resp.into_body()).await;
     let items: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
@@ -977,7 +990,10 @@ async fn test_admin_transfer_group_creator_success(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let resp = get_request(&pool, "/api/v1/admin/groups").await;
+    // Transfer path grants moderator/admin to actor; use them for #491 gate.
+    let admin = login_guest(&pool, "admin-list-groups-after-xfer", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    let resp = get_request(&pool, &format!("/api/v1/admin/groups?user_id={}", admin)).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value =
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();

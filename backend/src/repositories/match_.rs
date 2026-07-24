@@ -417,6 +417,23 @@ impl MatchRepository {
 
     // ---- Transactional methods (take a generic Executor) ----
 
+    /// Read-only status snapshot (no row lock). Used by chat membership gates
+    /// (#491) and other non-mutating checks.
+    pub async fn get_status_snapshot(
+        &self,
+        match_id: i32,
+    ) -> Result<Option<MatchStatusSnapshot>, AppError> {
+        let row = sqlx::query(
+            "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
+                    user1_inventory_applied_at, user2_inventory_applied_at
+             FROM matches WHERE id = $1",
+        )
+        .bind(match_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(match_status_snapshot_from_row))
+    }
+
     /// `SELECT ... FOR UPDATE` on a match row. Returns the snapshot if
     /// the row exists, `None` otherwise. The row lock is held until
     /// the surrounding transaction ends.
@@ -436,20 +453,7 @@ impl MatchRepository {
         .bind(match_id)
         .fetch_optional(exec)
         .await?;
-        Ok(row.map(|r| MatchStatusSnapshot {
-            user1_id: r.get("user1_id"),
-            user2_id: r.get("user2_id"),
-            status: r.get("status"),
-            offered_by: r.get("offered_by"),
-            event_id: r.get("event_id"),
-            group_name: r.get("group_name"),
-            user1_applied: r
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
-                .is_some(),
-            user2_applied: r
-                .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
-                .is_some(),
-        }))
+        Ok(row.map(match_status_snapshot_from_row))
     }
 
     /// Set the match's `status` column.
@@ -976,6 +980,23 @@ mod capacity_tests {
 }
 
 const MATCH_COLUMNS: &str = "id, user1_id, user2_id, status, offered_by, user1_inventory_applied_at, user2_inventory_applied_at, created_at, rematch_count, last_terminal_status, last_terminal_at";
+
+fn match_status_snapshot_from_row(r: sqlx::postgres::PgRow) -> MatchStatusSnapshot {
+    MatchStatusSnapshot {
+        user1_id: r.get("user1_id"),
+        user2_id: r.get("user2_id"),
+        status: r.get("status"),
+        offered_by: r.get("offered_by"),
+        event_id: r.get("event_id"),
+        group_name: r.get("group_name"),
+        user1_applied: r
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
+            .is_some(),
+        user2_applied: r
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
+            .is_some(),
+    }
+}
 
 /// Helper: parse a `matches` row into a partial `TradeMatch` (no related data).
 fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {

@@ -1,20 +1,27 @@
 use crate::error::AppError;
-use crate::storage::ImageStorage;
+use crate::handlers::common::{UserIdQuery, require_active_query_user};
+use crate::routes::AppState;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::Json,
 };
 use axum_extra::extract::Multipart;
 use serde_json::{Value, json};
-use std::sync::Arc;
 
-/// POST /api/v1/images/upload
+/// POST /api/v1/images/upload?user_id=
 /// Accepts multipart/form-data with a single "file" field.
 /// Returns JSON: { "url": "https://..." }
+///
+/// #491: requires an active caller. Full per-object ownership is not tracked
+/// yet (no image owner table); active-user gate is the minimum anti-abuse bar
+/// until session auth (#373) and optional ownership metadata.
 pub async fn upload_image(
-    State(storage): State<Arc<dyn ImageStorage>>,
+    State(state): State<AppState>,
+    Query(query): Query<UserIdQuery>,
     mut multipart: Multipart,
 ) -> Result<Json<Value>, AppError> {
+    require_active_query_user(&state, query.user_id).await?;
+
     while let Some(field) = multipart
         .next_field()
         .await
@@ -48,7 +55,10 @@ pub async fn upload_image(
         let ext = original_filename.rsplit('.').next().unwrap_or("png");
         let unique_name = format!("{}.{}", uuid::Uuid::new_v4(), ext);
 
-        let url = storage.upload(&bytes, &unique_name, &content_type).await?;
+        let url = state
+            .storage
+            .upload(&bytes, &unique_name, &content_type)
+            .await?;
 
         return Ok(Json(json!({"url": url})));
     }
@@ -58,15 +68,23 @@ pub async fn upload_image(
     ))
 }
 
-/// DELETE /api/v1/images/:filename
+/// DELETE /api/v1/images/:filename?user_id=
+///
+/// #491: requires an active caller. Without an ownership record any active
+/// user can still delete by filename — residual risk documented in
+/// `docs/explanation/architecture/09-quality.md`; tighten when storage
+/// tracks an owner.
 pub async fn delete_image(
-    State(storage): State<Arc<dyn ImageStorage>>,
+    State(state): State<AppState>,
     Path(filename): Path<String>,
+    Query(query): Query<UserIdQuery>,
 ) -> Result<Json<Value>, AppError> {
+    require_active_query_user(&state, query.user_id).await?;
+
     // Reconstruct a path-like identifier; LocalFileStorage extracts the filename.
     let url = format!("images/{}", filename);
 
-    storage.delete(&url).await?;
+    state.storage.delete(&url).await?;
 
     Ok(Json(json!({"status": "deleted"})))
 }

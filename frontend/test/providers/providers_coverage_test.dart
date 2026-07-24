@@ -656,11 +656,14 @@ void main() {
   // ---- Admin read providers ----
 
   group('admin read providers', () {
+    final adminUser = _proto<User>({'id': 7, 'username': 'admin'}, User.new);
+
     test('adminMerchProvider fetches merch', () async {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'GET' &&
-              request.url.path == '/api/v1/admin/merch') {
+              request.url.path == '/api/v1/admin/merch' &&
+              request.url.queryParameters['user_id'] == '7') {
             return _ok([
               {'id': 1, 'name': 'M1'},
             ]);
@@ -669,7 +672,10 @@ void main() {
         }),
       );
       final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
+        overrides: [
+          apiClientProvider.overrideWith((ref) => api),
+          currentUserProvider.overrideWithValue(adminUser),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -681,7 +687,8 @@ void main() {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'GET' &&
-              request.url.path == '/api/v1/admin/groups') {
+              request.url.path == '/api/v1/admin/groups' &&
+              request.url.queryParameters['user_id'] == '7') {
             return _ok([
               {
                 'eventId': 42,
@@ -695,7 +702,10 @@ void main() {
         }),
       );
       final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
+        overrides: [
+          apiClientProvider.overrideWith((ref) => api),
+          currentUserProvider.overrideWithValue(adminUser),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -711,7 +721,8 @@ void main() {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'GET' &&
-              request.url.path == '/api/v1/admin/matches') {
+              request.url.path == '/api/v1/admin/matches' &&
+              request.url.queryParameters['user_id'] == '7') {
             return _ok([
               {'id': 1, 'status': 'PENDING'},
             ]);
@@ -720,7 +731,10 @@ void main() {
         }),
       );
       final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
+        overrides: [
+          apiClientProvider.overrideWith((ref) => api),
+          currentUserProvider.overrideWithValue(adminUser),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -731,7 +745,9 @@ void main() {
     test('adminUsersProvider fetches users', () async {
       final api = _apiWith(
         client: MockClient((request) async {
-          if (request.method == 'GET' && request.url.path == '/api/v1/users') {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/users' &&
+              request.url.queryParameters['user_id'] == '7') {
             return _ok([
               {'id': 1, 'username': 'alice'},
             ]);
@@ -740,7 +756,10 @@ void main() {
         }),
       );
       final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
+        overrides: [
+          apiClientProvider.overrideWith((ref) => api),
+          currentUserProvider.overrideWithValue(adminUser),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -1336,6 +1355,8 @@ void main() {
   // ---- ChatController / messagesProvider (#245) ----
 
   group('ChatController', () {
+    final chatUser = _proto<User>({'id': 7, 'username': 'bob'}, User.new);
+
     test(
       'sendMessage POSTs SendMessageRequest proto body and invalidates',
       () async {
@@ -1350,7 +1371,8 @@ void main() {
             }
             // Invalidation re-fetches messages after a successful send.
             if (request.method == 'GET' &&
-                request.url.path == '/api/v1/matches/9/messages') {
+                request.url.path == '/api/v1/matches/9/messages' &&
+                request.url.queryParameters['user_id'] == '7') {
               getCount++;
               return _ok([]);
             }
@@ -1358,7 +1380,10 @@ void main() {
           }),
         );
         final container = ProviderContainer(
-          overrides: [apiClientProvider.overrideWith((ref) => api)],
+          overrides: [
+            apiClientProvider.overrideWith((ref) => api),
+            currentUserProvider.overrideWithValue(chatUser),
+          ],
         );
         addTearDown(container.dispose);
 
@@ -1401,7 +1426,8 @@ void main() {
               return http.Response('bad message', 422);
             }
             if (request.method == 'GET' &&
-                request.url.path == '/api/v1/matches/9/messages') {
+                request.url.path == '/api/v1/matches/9/messages' &&
+                request.url.queryParameters['user_id'] == '7') {
               getCount++;
               return _ok([]);
             }
@@ -1409,7 +1435,10 @@ void main() {
           }),
         );
         final container = ProviderContainer(
-          overrides: [apiClientProvider.overrideWith((ref) => api)],
+          overrides: [
+            apiClientProvider.overrideWith((ref) => api),
+            currentUserProvider.overrideWithValue(chatUser),
+          ],
         );
         addTearDown(container.dispose);
 
@@ -1440,7 +1469,8 @@ void main() {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'GET' &&
-              request.url.path == '/api/v1/matches/9/messages') {
+              request.url.path == '/api/v1/matches/9/messages' &&
+              request.url.queryParameters['user_id'] == '7') {
             return _ok([
               {'id': 1, 'matchId': 9, 'senderId': 7, 'content': 'hi'},
             ]);
@@ -1449,7 +1479,12 @@ void main() {
         }),
       );
       final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
+        overrides: [
+          apiClientProvider.overrideWith((ref) => api),
+          currentUserProvider.overrideWithValue(
+            _proto<User>({'id': 7, 'username': 'bob'}, User.new),
+          ),
+        ],
       );
       addTearDown(container.dispose);
 

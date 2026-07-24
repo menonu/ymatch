@@ -1,7 +1,6 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::common::{TransferCreatorRequest, UserIdQuery};
-use crate::repositories::user::VerifiedUser;
+use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_global};
 use crate::routes::AppState;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
@@ -9,28 +8,6 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-
-/// Resolve the caller from the `user_id` query param and require they hold
-/// `permission` in the global scope (ADR 0004 §3). This is the RBAC entry
-/// point for the admin endpoints: `user.read`, `user.ban`, `user.unban`,
-/// `user.role.manage`, `merch.delete.any`, `group.delete`, and
-/// `match.delete`. The admin superuser bypass is handled inside
-/// [`RbacService::check`].
-async fn require_global(
-    state: &AppState,
-    query_user_id: Option<i32>,
-    permission: Permission,
-) -> Result<VerifiedUser, AppError> {
-    let uid =
-        query_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
-    let user = state.policy.verify(uid).await?;
-    state.policy.require_not_banned(&user)?;
-    state
-        .rbac_service
-        .check(&user, &Scope::Global, permission)
-        .await?;
-    Ok(user)
-}
 
 pub async fn delete_event(
     State(state): State<AppState>,
@@ -88,7 +65,10 @@ pub async fn delete_match(
 
 pub async fn list_groups(
     State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<Vec<crate::repositories::group::AdminGroup>>, AppError> {
+    // #491: same staff gate as group delete (admin + moderator).
+    require_global(&state, query.user_id, Permission::GroupDelete).await?;
     Ok(Json(state.groups.list_all_for_admin().await?))
 }
 

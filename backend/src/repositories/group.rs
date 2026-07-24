@@ -245,8 +245,9 @@ impl MerchandiseGroupRepository {
         }
 
         // On conflict, never touch photo_url here — that write is gated by the
-        // PUT update path (creator / group.edit RBAC). Create remains an
-        // unauthenticated-ish upsert for description metadata only (#404).
+        // PUT update path (creator / group.edit RBAC). Create upserts
+        // description metadata only; handler gates create with merch.create
+        // (#404 / #491).
         let sql = format!(
             r#"INSERT INTO merchandise_groups (event_id, group_name, description, created_by, photo_url)
                VALUES ($1, $2, $3, $4, $5)
