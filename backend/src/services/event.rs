@@ -18,6 +18,19 @@ use crate::repositories::rbac::RbacRepository;
 use sqlx::PgPool;
 use std::sync::Arc;
 
+/// Who is initiating an event creator transfer (authorization already done).
+///
+/// Distinguishes self-service (must still own the row under lock) from admin
+/// (may reassign regardless of locked previous creator).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransferCaller {
+    /// Current event creator self-service path. Locked `creator_id` must equal
+    /// `expected_creator_id` or the transfer is Forbidden.
+    SelfService { expected_creator_id: i32 },
+    /// Admin path (`event.creator.transfer`). Any previous creator is accepted.
+    Admin,
+}
+
 /// Service for event create and creator-transfer transactions.
 #[derive(Clone)]
 pub struct EventService {
@@ -56,18 +69,15 @@ impl EventService {
     /// Transfer event ownership: set `events.creator_id` and swap the
     /// event-scoped `creator` role under a row lock.
     ///
-    /// When `assert_previous` is `Some(uid)`, the locked creator must equal
-    /// `uid` or the call fails with Forbidden (self-service path). When
-    /// `None`, any previous creator is accepted (admin path).
-    ///
     /// Callers should pre-check event existence, target-user validity, and
-    /// authorization; this method re-validates the locked previous creator
-    /// so concurrent transfers stay correct (#445).
+    /// authorization; this method re-validates ownership for
+    /// [`TransferCaller::SelfService`] under the lock so concurrent transfers
+    /// stay correct (#445).
     pub async fn transfer_creator(
         &self,
         event_id: i32,
         new_creator_id: i32,
-        assert_previous: Option<i32>,
+        caller: TransferCaller,
     ) -> Result<(), AppError> {
         let mut tx = self.pool.begin().await?;
         let locked_previous = self
@@ -76,8 +86,10 @@ impl EventService {
             .await?
             .ok_or_else(|| AppError::not_found("Event not found"))?;
 
-        if let Some(expected) = assert_previous
-            && locked_previous != Some(expected)
+        if let TransferCaller::SelfService {
+            expected_creator_id,
+        } = caller
+            && locked_previous != Some(expected_creator_id)
         {
             return Err(AppError::forbidden(
                 "Only the event creator can transfer ownership",

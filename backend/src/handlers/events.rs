@@ -287,9 +287,16 @@ pub async fn self_transfer_event_creator(
 
     // Ownership is re-checked under `SELECT … FOR UPDATE` inside the service
     // so concurrent transfers cannot leave multiple live `event/creator` rows.
+    use crate::services::event::TransferCaller;
     state
         .event_service
-        .transfer_creator(event_id, payload.new_creator_id, Some(user.id))
+        .transfer_creator(
+            event_id,
+            payload.new_creator_id,
+            TransferCaller::SelfService {
+                expected_creator_id: user.id,
+            },
+        )
         .await?;
     Ok(StatusCode::OK)
 }

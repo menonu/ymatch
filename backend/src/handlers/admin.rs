@@ -217,9 +217,10 @@ pub async fn transfer_event_creator(
 
     // EventService owns the row lock + creator_id + role swap so concurrent
     // transfers cannot leave two live `event/creator` assignments (#445).
+    use crate::services::event::TransferCaller;
     state
         .event_service
-        .transfer_creator(event_id, payload.new_creator_id, None)
+        .transfer_creator(event_id, payload.new_creator_id, TransferCaller::Admin)
         .await?;
     Ok(StatusCode::OK)
 }
