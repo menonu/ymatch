@@ -104,14 +104,14 @@ pub enum Permission {
     /// Create merch in a specific event. Event creator + editor.
     MerchCreate,
     /// Edit merch in a specific event (update, publish). Event creator +
-    /// editor. The merch *creator* passes via an ownership short-circuit in
-    /// the handler, not via this permission.
+    /// editor. The merch *creator* passes via
+    /// [`RbacService::require_owner_or`], not via this permission alone.
     MerchEdit,
     /// Edit a group in a specific event (event-scope) **or** a specific item
     /// group (group-scope, #443). Event creator + editor hold the event-scoped
     /// grant; group creator + editor hold the group-scoped grant. The group
-    /// *owner* (`created_by`) also passes via an ownership short-circuit in
-    /// the handler.
+    /// *owner* (`created_by`) also passes via
+    /// [`RbacService::require_owner_or`].
     GroupEdit,
     /// Manage editor roles for a specific item group. Group creator + editor
     /// (#443). No `*.any` override — public path only; staff use admin
@@ -290,6 +290,36 @@ impl RbacService {
         let role_ids = self.rbac.role_ids_for_user(user.id, scope).await?;
         let catalog = self.catalog().await?;
         Self::evaluate(&role_ids, catalog, permission)
+    }
+
+    /// Ownership short-circuit (#370 / #497 finding 5): if `user.id` equals
+    /// `owner_id`, allow without an RBAC query. Otherwise require
+    /// `permission` on **any** of `scopes` (first success wins; last failure
+    /// is returned). Empty `scopes` after a non-owner is Forbidden.
+    ///
+    /// Used by merch update/publish/delete (single event scope) and group
+    /// update (event scope, then group scope). Ordinary trading ownership is
+    /// not a role — only the RBAC fallbacks are role-checked (ADR 0004).
+    pub async fn require_owner_or(
+        &self,
+        user: &VerifiedUser,
+        owner_id: Option<i32>,
+        permission: Permission,
+        scopes: &[Scope],
+    ) -> Result<(), AppError> {
+        if Some(user.id) == owner_id {
+            return Ok(());
+        }
+        let mut last_err: Option<AppError> = None;
+        for scope in scopes {
+            match self.check(user, scope, permission).await {
+                Ok(()) => return Ok(()),
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Err(last_err.unwrap_or_else(|| {
+            AppError::forbidden(format!("Missing permission: {}", permission.as_str()))
+        }))
     }
 }
 
@@ -674,7 +704,7 @@ mod tests {
         denied(&[MODERATOR], Permission::EventMemberManage);
     }
 
-    // --- integration: RbacService::check against a real seeded DB ---
+    // --- require_owner_or (pure ownership short-circuit; no DB) ---
 
     fn verified(id: i32) -> VerifiedUser {
         VerifiedUser {
@@ -682,6 +712,52 @@ mod tests {
             is_banned: false,
         }
     }
+
+    /// Lazy pool never used when ownership short-circuits before `check`.
+    fn service_lazy() -> RbacService {
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
+        RbacService::new(
+            Arc::new(crate::repositories::rbac::RbacRepository::new(pool.clone())),
+            pool,
+        )
+    }
+
+    #[tokio::test]
+    async fn require_owner_or_allows_matching_owner_without_scopes() {
+        let service = service_lazy();
+        service
+            .require_owner_or(&verified(42), Some(42), Permission::MerchEdit, &[])
+            .await
+            .expect("owner short-circuit must not touch RBAC");
+    }
+
+    #[tokio::test]
+    async fn require_owner_or_denies_non_owner_with_empty_scopes() {
+        let service = service_lazy();
+        let err = service
+            .require_owner_or(&verified(1), Some(2), Permission::MerchDelete, &[])
+            .await
+            .unwrap_err();
+        match err {
+            AppError::Forbidden(msg) => assert!(msg.contains("merch.delete")),
+            other => panic!("expected Forbidden, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn require_owner_or_denies_none_owner_with_empty_scopes() {
+        let service = service_lazy();
+        let err = service
+            .require_owner_or(&verified(1), None, Permission::GroupEdit, &[])
+            .await
+            .unwrap_err();
+        match err {
+            AppError::Forbidden(msg) => assert!(msg.contains("group.edit")),
+            other => panic!("expected Forbidden, got {other:?}"),
+        }
+    }
+
+    // --- integration: RbacService::check against a real seeded DB ---
 
     async fn role_id(pool: &PgPool, scope_type: &str, name: &str) -> i32 {
         sqlx::query_scalar("SELECT id FROM roles WHERE scope_type = $1 AND name = $2")

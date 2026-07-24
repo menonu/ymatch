@@ -8,7 +8,7 @@
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::handlers::common::{TransferCreatorRequest, UserIdQuery};
+use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_group_member_manage};
 use crate::routes::AppState;
 use crate::services::group::TransferCaller;
 use crate::services::rbac::{Permission, Scope};
@@ -89,23 +89,17 @@ pub async fn update_event_group(
         .get(event_id, &group_name)
         .await?
         .ok_or_else(|| AppError::not_found("Group not found. Create it first via POST /groups"))?;
-    let group_creator_id = group.created_by;
-    // #370 / #443: ownership short-circuit for the group owner; else event-
-    // scoped `group.edit` (event creator/editor / moderator *.any / admin) or
-    // group-scoped `group.edit` (group creator role / group editor).
-    if group_creator_id != Some(user.id) {
-        let event_ok = state
-            .rbac_service
-            .check(&user, &Scope::Event(event_id), Permission::GroupEdit)
-            .await
-            .is_ok();
-        if !event_ok {
-            state
-                .rbac_service
-                .check(&user, &Scope::Group(group.id), Permission::GroupEdit)
-                .await?;
-        }
-    }
+    // #370 / #443 / #497: ownership short-circuit for the group owner; else
+    // event-scoped `group.edit` then group-scoped `group.edit`.
+    state
+        .rbac_service
+        .require_owner_or(
+            &user,
+            group.created_by,
+            Permission::GroupEdit,
+            &[Scope::Event(event_id), Scope::Group(group.id)],
+        )
+        .await?;
 
     let updated = state
         .groups
@@ -113,33 +107,6 @@ pub async fn update_event_group(
         .await?
         .ok_or_else(|| AppError::not_found("Group disappeared mid-update"))?;
     Ok(Json(updated))
-}
-
-/// Resolve the caller and require `group.member.manage` on the group (#443).
-/// Confirms the group exists (404) **before** the RBAC check.
-async fn require_group_member_manage(
-    state: &AppState,
-    caller_user_id: Option<i32>,
-    event_id: i32,
-    group_name: &str,
-) -> Result<MerchandiseGroup, AppError> {
-    let uid =
-        caller_user_id.ok_or_else(|| AppError::bad_request("user_id query parameter required"))?;
-    let user = state.policy.verify_active(uid).await?;
-    let group = state
-        .groups
-        .get(event_id, group_name)
-        .await?
-        .ok_or_else(|| AppError::not_found("Group not found"))?;
-    state
-        .rbac_service
-        .check(
-            &user,
-            &Scope::Group(group.id),
-            Permission::GroupMemberManage,
-        )
-        .await?;
-    Ok(group)
 }
 
 /// Assign the `group/editor` role (`POST …/groups/:name/members/:target_id`).

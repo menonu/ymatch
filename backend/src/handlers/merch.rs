@@ -88,18 +88,17 @@ pub async fn update_merch(
         .get_creator(event_id, merch_id)
         .await?
         .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
-    // #370: the prior `require_owner_or_role(creator, &["admin","moderator"])`
-    // is now ownership + RBAC. The merch creator is an ownership check
-    // (ordinary trading is ownership-checked, not role-checked); the event
-    // creator / editor / admin / moderator path is the `merch.edit` permission
-    // (event scope), with the admin bypass and `merch.edit.any` (moderator)
-    // overlap resolved inside `RbacService::check`.
-    if Some(user.id) != merch_creator_id {
-        state
-            .rbac_service
-            .check(&user, &Scope::Event(event_id), Permission::MerchEdit)
-            .await?;
-    }
+    // #370 / #497: ownership short-circuit for merch creator; else event-
+    // scoped `merch.edit` (event creator/editor / moderator *.any / admin).
+    state
+        .rbac_service
+        .require_owner_or(
+            &user,
+            merch_creator_id,
+            Permission::MerchEdit,
+            &[Scope::Event(event_id)],
+        )
+        .await?;
     let item = state
         .merch
         .update(event_id, merch_id, payload)
@@ -119,13 +118,16 @@ pub async fn publish_merch(
         .get_creator(event_id, merch_id)
         .await?
         .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
-    // #370: same ownership + `merch.edit` rule as `update_merch` (see above).
-    if Some(user.id) != merch_creator_id {
-        state
-            .rbac_service
-            .check(&user, &Scope::Event(event_id), Permission::MerchEdit)
-            .await?;
-    }
+    // #370 / #497: same ownership + `merch.edit` rule as `update_merch`.
+    state
+        .rbac_service
+        .require_owner_or(
+            &user,
+            merch_creator_id,
+            Permission::MerchEdit,
+            &[Scope::Event(event_id)],
+        )
+        .await?;
     state.merch.publish(event_id, merch_id).await?;
     Ok(StatusCode::OK)
 }
@@ -141,25 +143,21 @@ pub async fn delete_merch_by_creator(
 
     let user = state.policy.verify_active(requester_id).await?;
 
-    // ADR 0004: the prior 3-way rule (merch creator OR event creator OR
-    // admin/moderator) is now expressed as ownership + RBAC. The merch
-    // creator is an ownership check (ordinary trading is ownership-checked,
-    // not role-checked); the event creator / editor / admin / moderator path
-    // is the `merch.delete` permission (event scope), with the admin bypass
-    // and `merch.delete.any` (moderator) overlap resolved inside
-    // RbacService::check.
+    // ADR 0004 / #497: merch creator ownership short-circuit, else event-
+    // scoped `merch.delete` (event creator/editor / moderator *.any / admin).
     let merch_creator_id: Option<i32> = state
         .merch
         .get_creator(event_id, merch_id)
         .await?
         .ok_or_else(|| AppError::not_found("Merchandise not found"))?;
-    if Some(user.id) == merch_creator_id {
-        state.merch.delete_merch(event_id, merch_id).await?;
-        return Ok(StatusCode::OK);
-    }
     state
         .rbac_service
-        .check(&user, &Scope::Event(event_id), Permission::MerchDelete)
+        .require_owner_or(
+            &user,
+            merch_creator_id,
+            Permission::MerchDelete,
+            &[Scope::Event(event_id)],
+        )
         .await?;
 
     state.merch.delete_merch(event_id, merch_id).await?;
