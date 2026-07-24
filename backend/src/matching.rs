@@ -1,10 +1,23 @@
 //! Periodic matching algorithm.
 //!
-//! Pure policy helpers ([`is_group_matchable`], [`same_match_group`],
-//! [`existing_match_action`], [`rematch_reason_for`]) are unit-tested here.
-//! Domain SQL lives in [`MatchRepository`] (set-based mutual-edge discovery,
-//! PENDING insert, ADR 0012 rematch reopen). The job loop only decides
-//! insert/reopen/skip and fires notifications (#497).
+//! ## Layout (#497)
+//!
+//! - **Pure policy** (unit-tested here): [`is_group_matchable`],
+//!   [`same_match_group`], [`existing_match_action`], [`rematch_reason_for`].
+//! - **SQL** lives in [`MatchRepository`] as small named steps (one concern
+//!   each) so filters can be changed without reading a mega-query.
+//! - **This module** orchestrates the steps in plain nested loops that
+//!   mirror the product narrative: WANT → TRADE partners → reciprocal
+//!   TRADE/WANT in the same group → insert or rematch.
+//!
+//! ```text
+//! for each matchable WANT (user A, merch X, group G):
+//!   for each user B who TRADEs X:
+//!     for each merch Y that A TRADEs in G:
+//!       if B WANTs Y (live):
+//!         ensure match for (A, B, G)   // insert | rematch | skip
+//!         break  // one mutual edge is enough for this partner+group
+//! ```
 
 use crate::repositories::match_::{
     MatchRepository, REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON_AFTER_REJECTED,
@@ -15,23 +28,20 @@ use sqlx::PgPool;
 // ---------------------------------------------------------------------------
 // Pure matching decisions (unit-tested)
 //
-// `existing_match_action` / `rematch_reason_for` gate the insert-vs-reopen
-// branch inside `run_matching_algorithm`. `is_group_matchable` /
-// `same_match_group` are policy mirrors of the discovery SQL filters
-// (ADR 0001) so group-scoping edges stay cheap to pin without a DB.
+// Policy mirrors of SQL filters (ADR 0001) and insert-vs-reopen (ADR 0012).
+// SQL is the runtime source of truth; these helpers pin the rules cheaply.
 // ---------------------------------------------------------------------------
 
 /// ADR 0001: merchandise with a NULL or empty group is not matchable.
 ///
-/// Mirrors the matcher discovery SQL (`group_name IS NOT NULL AND group_name <> ''`).
+/// Mirrors matcher SQL: `group_name IS NOT NULL AND group_name <> ''`.
 #[inline]
 pub fn is_group_matchable(group_name: Option<&str>) -> bool {
     matches!(group_name, Some(g) if !g.is_empty())
 }
 
-/// Two merchandise rows share a matchable group identity only when both have
-/// the same non-null, non-empty `(event_id, group_name)`. Policy mirror of the
-/// SQL join on `(event_id, group_name)` after the null/empty filter.
+/// Two rows share a matchable group only when both have the same non-null,
+/// non-empty `(event_id, group_name)`.
 #[inline]
 pub fn same_match_group(
     event_a: i32,
@@ -45,9 +55,9 @@ pub fn same_match_group(
     event_a == event_b && group_a == group_b
 }
 
-/// How the matcher should treat an existing match row for a rediscovered
-/// mutual edge (same pair + group). ADR 0012: reopen terminal rows; never
-/// insert a second row for active/COMPLETED.
+/// How the matcher treats an existing match row for a rediscovered mutual
+/// edge (same pair + group). ADR 0012: reopen terminal; never insert a
+/// second row for active/COMPLETED.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExistingMatchAction {
     /// No row — insert a new PENDING match.
@@ -61,7 +71,6 @@ pub enum ExistingMatchAction {
 /// Decide insert / reopen / skip for a rediscovered mutual edge.
 ///
 /// `existing_status` is `None` when no row exists for the (pair, group).
-/// Used by `run_matching_algorithm` on the existing-row branch.
 pub fn existing_match_action(existing_status: Option<&str>) -> ExistingMatchAction {
     match existing_status {
         None => ExistingMatchAction::Insert,
@@ -79,72 +88,114 @@ pub fn rematch_reason_for(prior_status: &str) -> Option<&'static str> {
     }
 }
 
-/// Run one matching pass: discover mutual edges, then insert or rematch.
+/// Run one matching pass.
 ///
-/// Returns the number of new PENDING rows created or reopened.
+/// Returns the number of PENDING rows newly created or reopened.
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     let matches = MatchRepository::new(pool.clone());
     let users = UserRepository::new(pool.clone());
+    let mut matches_created = 0;
 
-    let edges = matches
-        .discover_mutual_edges()
+    // 1. Seed: every eligible WANT (ordered for stable fairness).
+    let wants = matches
+        .list_matchable_wants()
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut matches_created = 0;
-
-    for edge in edges {
-        let existing = matches
-            .find_for_pair_group(
-                edge.user1_id,
-                edge.user2_id,
-                edge.event_id,
-                &edge.group_name,
-            )
+    for want in wants {
+        // 2. Who is TRADEing the merch this user wants?
+        let partner_ids = matches
+            .list_users_trading_merch(want.merch_id, want.user_id)
             .await
             .map_err(|e| e.to_string())?;
 
-        match existing_match_action(existing.as_ref().map(|(_, status)| status.as_str())) {
-            ExistingMatchAction::Insert => {
-                matches
-                    .insert_pending(
-                        edge.user1_id,
-                        edge.user2_id,
-                        edge.event_id,
-                        &edge.group_name,
-                    )
+        for partner_id in partner_ids {
+            // 3. What is the wanter TRADEing in this same group?
+            //    (reciprocal inventory must be in-group — ADR 0001)
+            let trade_merch_ids = matches
+                .list_user_trade_merch_ids_in_group(want.user_id, want.event_id, &want.group_name)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            for trade_merch_id in trade_merch_ids {
+                // 4. Does the partner WANT that trade merch (live)?
+                let partner_wants = matches
+                    .user_wants_live_merch(partner_id, trade_merch_id)
                     .await
                     .map_err(|e| e.to_string())?;
-                matches_created += 1;
-                notify_pair(&users, edge.user1_id, edge.user2_id).await;
-            }
-            ExistingMatchAction::Reopen => {
-                // Insert is only for None; existing is Some here.
-                let Some((match_id, status)) = existing else {
+                if !partner_wants {
                     continue;
-                };
-                let Some(reason) = rematch_reason_for(&status) else {
-                    continue;
-                };
-                let reopened = matches
-                    .reopen_terminal(match_id, &status, reason)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                if reopened {
-                    matches_created += 1;
-                    notify_pair(&users, edge.user1_id, edge.user2_id).await;
                 }
+
+                // Mutual edge found for (want.user_id, partner_id, group).
+                if ensure_match_for_pair(
+                    &matches,
+                    &users,
+                    want.user_id,
+                    partner_id,
+                    want.event_id,
+                    &want.group_name,
+                )
+                .await?
+                {
+                    matches_created += 1;
+                }
+                // One mutual edge is enough for this partner+group.
+                break;
             }
-            ExistingMatchAction::Skip => {}
         }
     }
 
     Ok(matches_created)
 }
 
+/// Insert, rematch, or skip for one rediscovered (pair, group) edge.
+///
+/// Returns `true` when a new PENDING was created or a terminal row reopened.
+async fn ensure_match_for_pair(
+    matches: &MatchRepository,
+    users: &UserRepository,
+    user_a: i32,
+    user_b: i32,
+    event_id: i32,
+    group_name: &str,
+) -> Result<bool, String> {
+    let existing = matches
+        .find_for_pair_group(user_a, user_b, event_id, group_name)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    match existing_match_action(existing.as_ref().map(|(_, s)| s.as_str())) {
+        ExistingMatchAction::Insert => {
+            matches
+                .insert_pending(user_a, user_b, event_id, group_name)
+                .await
+                .map_err(|e| e.to_string())?;
+            notify_pair(users, user_a, user_b).await;
+            Ok(true)
+        }
+        ExistingMatchAction::Reopen => {
+            let Some((match_id, status)) = existing else {
+                return Ok(false);
+            };
+            let Some(reason) = rematch_reason_for(&status) else {
+                return Ok(false);
+            };
+            let reopened = matches
+                .reopen_terminal(match_id, &status, reason)
+                .await
+                .map_err(|e| e.to_string())?;
+            if reopened {
+                notify_pair(users, user_a, user_b).await;
+            }
+            Ok(reopened)
+        }
+        ExistingMatchAction::Skip => Ok(false),
+    }
+}
+
 async fn notify_pair(users: &UserRepository, user_a: i32, user_b: i32) {
-    // Notify both users. Treat missing users as "vanished"; log load errors
-    // so infra failures are observable (#266).
+    // Best-effort push. Missing user = vanished; other load errors logged (#266).
     let load = async |user_id: i32| match users.get_by_id(user_id).await {
         Ok(u) => u,
         Err(e) => {

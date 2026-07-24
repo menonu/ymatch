@@ -72,15 +72,15 @@ Canonical narrative for **HAVE / WANT / TRADE** roles and gates:
 ## Matching strategy
 
 A **background task** in the API process (`MATCHING_INTERVAL_SECONDS`) runs
-`matching::run_matching_algorithm`:
+`matching::run_matching_algorithm`. The job is a thin nested loop; each SQL
+step is a named `MatchRepository` method:
 
-1. **Discover** distinct mutual TRADE/WANT edges via
-   `MatchRepository::discover_mutual_edges` (set-based; live merch, non-banned
-   users, non-null group — ADR 0001 / 0010).
-2. For each edge: **insert** PENDING, **reopen** REJECTED/CANCELLED (ADR 0012),
-   or **skip** active/COMPLETED — pure policy in `matching`, writes in
-   `MatchRepository`.
-3. Notify both users (best-effort push).
+1. `list_matchable_wants` — WANT rows (live merch, non-banned, non-null group).
+2. `list_users_trading_merch` — partners TRADEing that merch.
+3. `list_user_trade_merch_ids_in_group` — reciprocal TRADs in the same group.
+4. `user_wants_live_merch` — partner WANTs that reciprocal merch.
+5. `find_for_pair_group` → `insert_pending` or `reopen_terminal` (ADR 0012),
+   then best-effort notify.
 
 Only **TRADE** and **WANT** participate in matching. **HAVE** is ignored by the
 matcher (optional ownership bookkeeping — see [inventory semantics](06-runtime.md#inventory-status-semantics)).

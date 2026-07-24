@@ -78,7 +78,7 @@ HTTP handlers  →  access control + trade lifecycle (+ other services)
 
 Target layering for product paths is documented in
 [04](04-solution-strategy.md) (handlers → services → repositories; matcher
-discovery lives in `MatchRepository`).
+scan steps live as small methods on `MatchRepository`).
 
 ## Frontend components (C4 level 3)
 
