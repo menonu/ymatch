@@ -76,8 +76,8 @@ HTTP handlers  →  access control + trade lifecycle (+ other services)
                →  PostgreSQL
 ```
 
-Target layering for most product paths; admin/search/matching SQL exceptions
-noted in [04](04-solution-strategy.md).
+Target layering for most product paths; remaining admin-tx / matching SQL
+exceptions noted in [04](04-solution-strategy.md) (#497).
 
 ## Frontend components (C4 level 3)
 

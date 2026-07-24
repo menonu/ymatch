@@ -1,14 +1,12 @@
 //! Global search handler. Phase 5 of #163 splits this into:
-//! - thin handler (parse + delegate)
+//! - thin handler (parse + assemble `SearchResult`s)
 //! - [`crate::repositories::event::EventRepository::search`]
-//! - [`crate::repositories::merch::MerchandiseRepository::search_by_name`]
-//!   (a new method we add in this phase for the search use-case)
+//! - [`crate::repositories::merch::MerchandiseRepository::search`]
 
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::routes::AppState;
 use axum::{Json, extract::State};
-use sqlx::Row;
 
 #[derive(serde::Deserialize)]
 pub struct SearchQuery {
@@ -34,46 +32,22 @@ pub async fn global_search(
         });
     }
 
-    // Merchandise: query the merch table directly via the underlying pool
-    // (the search query is a thin wrapper around ILIKE; not worth a
-    // dedicated repository method). The merch.merch_name + event_name
-    // subtitle requires a JOIN to the events table.
-    let merch_rows = sqlx::query(
-        "SELECT m.id, m.name, m.group_name, m.photo_url, m.event_id, e.name as event_name
-         FROM merchandise m
-         JOIN events e ON m.event_id = e.id
-         WHERE (m.name ILIKE $1 OR m.group_name ILIKE $1)
-           AND m.is_deleted = false AND m.status = 'published'
-           AND e.status = 'published'
-         LIMIT 20",
-    )
-    .bind(&search_term)
-    .fetch_all(&state.pool)
-    .await?;
-
-    for row in merch_rows {
-        let group_name: Option<String> = row.get("group_name");
-        let event_name: String = row.get("event_name");
-        let subtitle = if let Some(gn) = group_name {
-            format!("{} > {}", event_name, gn)
+    // Merchandise
+    for hit in state.merch.search(&search_term, 20).await? {
+        let subtitle = if let Some(gn) = hit.group_name {
+            format!("{} > {}", hit.event_name, gn)
         } else {
-            event_name
+            hit.event_name
         };
         results.push(SearchResult {
             r#type: "item".to_string(),
-            id: row.get("id"),
-            title: row.get("name"),
+            id: hit.id,
+            title: hit.name,
             subtitle: Some(subtitle),
-            photo_url: row.get("photo_url"),
-            event_id: row.get("event_id"),
+            photo_url: hit.photo_url,
+            event_id: hit.event_id,
         });
     }
-
-    // The merch search query lives inline here for now; Phase 6 (or
-    // a follow-up) could promote it to a `MerchandiseRepository::search`
-    // method. We keep the direct SQL because the search has a JOIN
-    // to the events table that is unique to the search use-case.
-    let _ = state;
 
     Ok(Json(results))
 }
