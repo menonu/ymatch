@@ -4,7 +4,8 @@
 //! Phase 2 of #163 introduces [`PermissionPolicy`], which centralizes the
 //! `verify + check ban + check role + check ownership` chain that was
 //! previously duplicated across 5+ handlers. Multi-step domain transactions
-//! live here too ([`match_lifecycle`], [`group`]).
+//! live here too ([`match_lifecycle`], [`event`], [`group`]).
+pub mod event;
 pub mod group;
 pub mod match_lifecycle;
 pub mod permission_catalog;

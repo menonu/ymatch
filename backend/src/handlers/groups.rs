@@ -10,6 +10,7 @@ use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::{TransferCreatorRequest, UserIdQuery};
 use crate::routes::AppState;
+use crate::services::group::TransferCaller;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
@@ -226,7 +227,6 @@ pub async fn self_transfer_group_creator(
 
     // Ownership is re-checked under `SELECT … FOR UPDATE` inside the service
     // so concurrent transfers cannot leave multiple live `group/creator` rows.
-    use crate::services::group::TransferCaller;
     state
         .group_service
         .transfer_creator(

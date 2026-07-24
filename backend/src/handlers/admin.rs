@@ -2,6 +2,8 @@ use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_global};
 use crate::routes::AppState;
+use crate::services::event::TransferCaller as EventTransferCaller;
+use crate::services::group::TransferCaller as GroupTransferCaller;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
@@ -215,31 +217,12 @@ pub async fn transfer_event_creator(
 
     require_active_target_user(&state, payload.new_creator_id).await?;
 
-    let mut tx = state.pool.begin().await?;
-    // Use the locked creator as the role-swap source so a concurrent
-    // transfer cannot leave two live `event/creator` assignments.
-    let locked_previous = state
-        .events
-        .lock_creator_for_update(&mut *tx, event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
-
-    if locked_previous == Some(payload.new_creator_id) {
-        return Err(AppError::bad_request("User is already the event creator"));
-    }
-
-    let updated = state
-        .events
-        .set_creator(&mut *tx, event_id, payload.new_creator_id)
-        .await?;
-    if !updated {
-        return Err(AppError::not_found("Event not found"));
-    }
+    // EventService owns the row lock + creator_id + role swap so concurrent
+    // transfers cannot leave two live `event/creator` assignments (#445).
     state
-        .rbac
-        .transfer_event_creator_role(&mut tx, event_id, locked_previous, payload.new_creator_id)
+        .event_service
+        .transfer_creator(event_id, payload.new_creator_id, EventTransferCaller::Admin)
         .await?;
-    tx.commit().await?;
     Ok(StatusCode::OK)
 }
 
@@ -269,14 +252,13 @@ pub async fn transfer_group_creator(
 
     // GroupService owns the row lock + created_by + role swap so concurrent
     // transfers cannot leave two live `group/creator` assignments (#445).
-    use crate::services::group::TransferCaller;
     state
         .group_service
         .transfer_creator(
             event_id,
             &group_name,
             payload.new_creator_id,
-            TransferCaller::Admin,
+            GroupTransferCaller::Admin,
         )
         .await?;
     Ok(StatusCode::OK)
