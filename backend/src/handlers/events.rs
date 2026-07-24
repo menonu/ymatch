@@ -16,6 +16,7 @@ use crate::repositories::event_favorites::EventFavoritesRepository;
 use crate::repositories::event_views::EventViewsRepository;
 use crate::repositories::group_favorites::GroupFavoritesRepository;
 use crate::routes::AppState;
+use crate::services::event::TransferCaller;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
@@ -288,7 +289,6 @@ pub async fn self_transfer_event_creator(
 
     // Ownership is re-checked under `SELECT … FOR UPDATE` inside the service
     // so concurrent transfers cannot leave multiple live `event/creator` rows.
-    use crate::services::event::TransferCaller;
     state
         .event_service
         .transfer_creator(

@@ -87,9 +87,9 @@ impl RbacRepository {
     }
 
     /// Assign the `event/creator` role to `user_id` scoped to `event_id`
-    /// (ADR 0004 §5). Called by `events::create_event` inside the same
-    /// transaction that inserts the event row, so the creator can edit/publish
-    /// their own event (`EventEdit`) and manage its editors
+    /// (ADR 0004 §5). Called by [`crate::services::event::EventService::create`]
+    /// inside the same transaction that inserts the event row, so the creator
+    /// can edit/publish their own event (`EventEdit`) and manage its editors
     /// (`EventMemberManage`) without a separate grant step, and the event +
     /// its creator role commit atomically. The catalog also grants
     /// `event.delete` to `event/creator`, which `admin::delete_event` enforces

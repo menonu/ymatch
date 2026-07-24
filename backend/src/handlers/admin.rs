@@ -2,6 +2,7 @@ use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_global};
 use crate::routes::AppState;
+use crate::services::event::TransferCaller;
 use crate::services::rbac::{Permission, Scope};
 use axum::{
     Json,
@@ -217,7 +218,6 @@ pub async fn transfer_event_creator(
 
     // EventService owns the row lock + creator_id + role swap so concurrent
     // transfers cannot leave two live `event/creator` assignments (#445).
-    use crate::services::event::TransferCaller;
     state
         .event_service
         .transfer_creator(event_id, payload.new_creator_id, TransferCaller::Admin)
