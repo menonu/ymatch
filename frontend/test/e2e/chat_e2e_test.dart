@@ -20,6 +20,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
@@ -144,9 +145,19 @@ void main() {
     );
   });
 
-  ProviderContainer makeContainer() {
+  /// #491: `messagesProvider` requires an active caller (`?user_id=`) via
+  /// `currentUserProvider`. Without this override the provider short-circuits
+  /// to `[]` and never hits the backend (false green / missed post-send assert).
+  ProviderContainer makeContainer({int? asUserId}) {
+    final uid = asUserId ?? user1Id;
+    final user = User()
+      ..id = uid
+      ..username = 'e2e_chat_$uid';
     return ProviderContainer(
-      overrides: [apiClientProvider.overrideWith((ref) => api)],
+      overrides: [
+        apiClientProvider.overrideWith((ref) => api),
+        currentUserProvider.overrideWithValue(user),
+      ],
     );
   }
 
