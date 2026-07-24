@@ -33,9 +33,11 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
 - **Services** own multi-step rules (active/ban gate, RBAC checks, trade
   negotiation and inventory apply).
 
-**Known exceptions on `main`:** some admin and search handlers still run
-ad-hoc SQL; the background **matching job** also issues raw SQL rather than
-going through repositories. Treat those as follow-up cleanup, not the target.
+**Known exceptions on `main`:** some admin create/transfer paths still open
+transactions in handlers; the background **matching job** also issues raw SQL
+rather than going through repositories. Global search merch SQL lives in
+`MerchandiseRepository::search`. Treat remaining exceptions as follow-up
+cleanup (#497), not the target.
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
 (not a source-tree listing).
