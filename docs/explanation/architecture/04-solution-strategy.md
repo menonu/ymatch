@@ -33,11 +33,12 @@ HTTP handlers  →  access control + domain services (e.g. trade lifecycle)
 - **Services** own multi-step rules (active/ban gate, RBAC checks, trade
   negotiation and inventory apply).
 
-**Known exceptions on `main`:** the background **matching job** still issues
-raw SQL rather than going through repositories. Treat that as follow-up
-cleanup (#497), not the target. (Event create/transfer transactions live in
-`EventService`; group create/transfer in `GroupService`; global search merch
-SQL in `MerchandiseRepository::search`.)
+**Layering status:** handlers parse/gate/map; services own multi-step
+transactions (event/group ownership, match lifecycle); repositories own
+domain SQL — including matcher discovery/insert/rematch on
+[`MatchRepository`](../../../backend/src/repositories/match_.rs) and global
+search merch on [`MerchandiseRepository::search`](../../../backend/src/repositories/merch.rs).
+See #497 for the layering completion work.
 
 See [05 — Building blocks](05-building-blocks.md) for the conceptual module map
 (not a source-tree listing).
@@ -73,10 +74,13 @@ Canonical narrative for **HAVE / WANT / TRADE** roles and gates:
 A **background task** in the API process (`MATCHING_INTERVAL_SECONDS`) runs
 `matching::run_matching_algorithm`:
 
-1. Scan **WANT** rows (active merch, non-banned users, non-null group).
-2. Find partners with **TRADE** on the wanted merch.
-3. Require reciprocal **TRADE/WANT** inside the **same (event_id, group_name)**.
-4. Insert a **PENDING** match when none already covers the pair in that group.
+1. **Discover** distinct mutual TRADE/WANT edges via
+   `MatchRepository::discover_mutual_edges` (set-based; live merch, non-banned
+   users, non-null group — ADR 0001 / 0010).
+2. For each edge: **insert** PENDING, **reopen** REJECTED/CANCELLED (ADR 0012),
+   or **skip** active/COMPLETED — pure policy in `matching`, writes in
+   `MatchRepository`.
+3. Notify both users (best-effort push).
 
 Only **TRADE** and **WANT** participate in matching. **HAVE** is ignored by the
 matcher (optional ownership bookkeeping — see [inventory semantics](06-runtime.md#inventory-status-semantics)).

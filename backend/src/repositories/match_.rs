@@ -6,6 +6,8 @@
 //! - HTTP handlers (read-only paths: list, get, snapshot, items, counts)
 //! - [`crate::services::match_lifecycle::MatchLifecycleService`]
 //!   (transactional writes: offer, change_status, apply_inventory)
+//! - [`crate::matching::run_matching_algorithm`] (set-based mutual-edge
+//!   discovery, PENDING insert, ADR 0012 rematch reopen)
 //!
 //! Phase 4 of #163 fixes the N+1 problem in the previous
 //! `handlers::matches::list_matches` (1 + 4N queries for N matches) by
@@ -920,6 +922,219 @@ impl MatchRepository {
         }
         Ok(())
     }
+
+    // ---- Matcher discovery / insert / rematch (#497) ----
+
+    /// Set-based discovery of distinct mutual TRADE/WANT edges for the
+    /// periodic matcher.
+    ///
+    /// Each row is a unique `(user_a, user_b, event_id, group_name)` where the
+    /// pair currently has complementary live inventory in that group (ADR 0001
+    /// group scope, ADR 0010 qty > 0, banned users excluded, merch live +
+    /// trade-enabled). Merch locked in OFFERED/ACCEPTED for a participant is
+    /// excluded (same filter as the pre-#497 nested-loop matcher).
+    ///
+    /// Callers decide insert vs reopen via
+    /// [`crate::matching::existing_match_action`] after
+    /// [`Self::find_for_pair_group`].
+    pub async fn discover_mutual_edges(&self) -> Result<Vec<MutualMatchEdge>, AppError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT DISTINCT
+                a_want.user_id AS user_a_id,
+                b_trade.user_id AS user_b_id,
+                m_want.event_id AS event_id,
+                m_want.group_name AS group_name
+            FROM inventory a_want
+            JOIN merchandise m_want ON m_want.id = a_want.merch_id
+            JOIN users ua ON ua.id = a_want.user_id
+            -- Partner trades what A wants
+            JOIN inventory b_trade
+              ON b_trade.merch_id = a_want.merch_id
+             AND b_trade.status = 'TRADE'
+             AND b_trade.quantity > 0
+             AND b_trade.user_id <> a_want.user_id
+            JOIN merchandise m_btrade ON m_btrade.id = b_trade.merch_id
+            JOIN users ub ON ub.id = b_trade.user_id
+            -- A trades something in the same group
+            JOIN inventory a_trade
+              ON a_trade.user_id = a_want.user_id
+             AND a_trade.status = 'TRADE'
+             AND a_trade.quantity > 0
+            JOIN merchandise m_atrade
+              ON m_atrade.id = a_trade.merch_id
+             AND m_atrade.event_id = m_want.event_id
+             AND m_atrade.group_name = m_want.group_name
+             AND m_atrade.is_deleted = false
+             AND m_atrade.trade_enabled = true
+            -- Partner wants what A trades
+            JOIN inventory b_want
+              ON b_want.user_id = b_trade.user_id
+             AND b_want.merch_id = a_trade.merch_id
+             AND b_want.status = 'WANT'
+             AND b_want.quantity > 0
+            JOIN merchandise m_bwant
+              ON m_bwant.id = b_want.merch_id
+             AND m_bwant.is_deleted = false
+             AND m_bwant.trade_enabled = true
+            WHERE a_want.status = 'WANT'
+              AND a_want.quantity > 0
+              AND m_want.is_deleted = false
+              AND m_want.trade_enabled = true
+              AND m_want.group_name IS NOT NULL
+              AND m_want.group_name <> ''
+              AND ua.is_banned = false
+              AND ub.is_banned = false
+              AND m_btrade.is_deleted = false
+              AND m_btrade.trade_enabled = true
+              -- Want merch not locked in OFFERED/ACCEPTED for A
+              AND NOT EXISTS (
+                SELECT 1 FROM match_items mi
+                JOIN matches mat ON mi.match_id = mat.id
+                WHERE mi.merch_id = a_want.merch_id
+                  AND mat.status IN ('OFFERED', 'ACCEPTED')
+                  AND (mat.user1_id = a_want.user_id OR mat.user2_id = a_want.user_id)
+              )
+              -- Same merch not locked in OFFERED/ACCEPTED for B (B is trading it)
+              AND NOT EXISTS (
+                SELECT 1 FROM match_items mi
+                JOIN matches mat ON mi.match_id = mat.id
+                WHERE mi.merch_id = b_trade.merch_id
+                  AND mat.status IN ('OFFERED', 'ACCEPTED')
+                  AND (mat.user1_id = b_trade.user_id OR mat.user2_id = b_trade.user_id)
+              )
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .iter()
+            .map(|r| MutualMatchEdge {
+                user_a_id: r.get("user_a_id"),
+                user_b_id: r.get("user_b_id"),
+                event_id: r.get("event_id"),
+                group_name: r.get("group_name"),
+            })
+            .collect())
+    }
+
+    /// Existing match for an unordered pair within `(event_id, group_name)`.
+    /// Returns `(match_id, status)` if a row exists.
+    pub async fn find_for_pair_group(
+        &self,
+        user_a: i32,
+        user_b: i32,
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<Option<(i32, String)>, AppError> {
+        let row = sqlx::query(
+            "SELECT id, status FROM matches
+             WHERE event_id = $3 AND group_name = $4
+               AND ((user1_id = $1 AND user2_id = $2)
+                 OR (user1_id = $2 AND user2_id = $1))",
+        )
+        .bind(user_a)
+        .bind(user_b)
+        .bind(event_id)
+        .bind(group_name)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| (r.get("id"), r.get("status"))))
+    }
+
+    /// Insert a new PENDING match for a rediscovered mutual edge.
+    pub async fn insert_pending(
+        &self,
+        user1_id: i32,
+        user2_id: i32,
+        event_id: i32,
+        group_name: &str,
+    ) -> Result<(), AppError> {
+        sqlx::query(
+            "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name, created_at)
+             VALUES ($1, $2, 'PENDING', $3, $4, NOW())",
+        )
+        .bind(user1_id)
+        .bind(user2_id)
+        .bind(event_id)
+        .bind(group_name)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// ADR 0012: reopen a REJECTED/CANCELLED match to PENDING in one
+    /// transaction — clear legs, bump rematch annotation, insert SYSTEM
+    /// message with `reason`.
+    ///
+    /// Returns `true` if the row was still terminal and was reopened.
+    pub async fn reopen_terminal(
+        &self,
+        match_id: i32,
+        prior_status: &str,
+        reason: &str,
+    ) -> Result<bool, AppError> {
+        let mut tx = self.pool.begin().await?;
+
+        let updated = sqlx::query(
+            r#"
+            UPDATE matches
+            SET status = 'PENDING',
+                offered_by = NULL,
+                rematch_count = rematch_count + 1,
+                last_terminal_status = $2,
+                last_terminal_at = NOW()
+            WHERE id = $1
+              AND status IN ('REJECTED', 'CANCELLED')
+            RETURNING id, user1_id
+            "#,
+        )
+        .bind(match_id)
+        .bind(prior_status)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(row) = updated else {
+            tx.rollback().await?;
+            return Ok(false);
+        };
+
+        let user1_id: i32 = row.get("user1_id");
+
+        sqlx::query("DELETE FROM match_items WHERE match_id = $1")
+            .bind(match_id)
+            .execute(&mut *tx)
+            .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO messages (match_id, sender_id, content, message_type)
+            VALUES ($1, $2, $3, 'SYSTEM')
+            "#,
+        )
+        .bind(match_id)
+        .bind(user1_id)
+        .bind(reason)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(true)
+    }
+}
+
+/// Mutual complementary inventory edge for the periodic matcher (#497).
+///
+/// `user_a` is the WANT-side discoverer in the set-based query; `user_b` is
+/// the TRADE partner. Pair order is not canonicalized (insert uses these ids
+/// as user1/user2 respectively, matching pre-#497 behavior).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutualMatchEdge {
+    pub user_a_id: i32,
+    pub user_b_id: i32,
+    pub event_id: i32,
+    pub group_name: String,
 }
 
 /// Lightweight active-match row used for ADR 0010 capacity re-evaluation.
