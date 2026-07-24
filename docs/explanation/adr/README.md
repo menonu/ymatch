@@ -50,7 +50,7 @@ Other options that were seriously evaluated and why they were not chosen.
 
 ## Workflow — ADRs are append-only
 
-ADRs are **never edited in place** once their decision is made. To change or reverse a decision:
+ADRs are **never rewritten for decision meaning** once accepted. Body edits are limited to the narrow exceptions in **Stability & references** below. To change or reverse a decision:
 
 1. **Create a new ADR** with the next free number describing the new decision.
 2. In the new ADR, set **Status** to `Accepted` and add a `Supersedes:` line linking to the old one.

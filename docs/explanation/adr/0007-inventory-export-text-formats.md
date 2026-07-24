@@ -69,7 +69,7 @@ Three text formats ship initially, selected via a format chooser in the UI. The 
 
 ### Tests
 
-Following the project TDD convention, the formatting logic lives in a pure Dart function (input: inventory items + selection + format → `String`) with **unit tests under `frontend/test/`** covering: qty-1 suffix omission, qty-0 exclusion, checkbox filtering, alphabetical ordering, CSV quoting of commas/quotes, and the empty-selection edge. A widget test verifies the chooser + copy-to-clipboard UX on the group screen.
+Following the project TDD convention, the formatting logic lives in a pure Dart function (input: inventory items + selection + format → `String`) with **frontend unit tests** covering: qty-1 suffix omission, qty-0 exclusion, checkbox filtering, alphabetical ordering, CSV quoting of commas/quotes, and the empty-selection edge. A widget test verifies the chooser + copy-to-clipboard UX on the group screen.
 
 ## Consequences
 
