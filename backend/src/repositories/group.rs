@@ -269,8 +269,9 @@ impl MerchandiseGroupRepository {
     }
 
     /// Upsert a group row and ensure `group/creator` for the row's
-    /// `created_by` (#443). Prefer the handler path that uses
-    /// [`Self::create_in_tx`] + `RbacRepository::assign_group_creator` when
+    /// `created_by` (#443). Prefer
+    /// [`crate::services::group::GroupService::create`] (or
+    /// [`Self::create_in_tx`] + `RbacRepository::assign_group_creator`) when
     /// the role assignment must share an existing transaction.
     pub async fn create(&self, req: CreateGroupRequest) -> Result<MerchandiseGroup, AppError> {
         let mut tx = self.pool.begin().await?;

@@ -267,30 +267,18 @@ pub async fn transfer_group_creator(
 
     require_active_target_user(&state, payload.new_creator_id).await?;
 
-    let mut tx = state.pool.begin().await?;
-    let locked = state
-        .groups
-        .lock_for_update(&mut *tx, event_id, &group_name)
-        .await?
-        .ok_or_else(|| AppError::not_found("Group not found"))?;
-    let (group_id, locked_previous) = locked;
-
-    if locked_previous == Some(payload.new_creator_id) {
-        return Err(AppError::bad_request("User is already the group creator"));
-    }
-
-    let updated = state
-        .groups
-        .set_creator(&mut *tx, event_id, &group_name, payload.new_creator_id)
-        .await?;
-    if !updated {
-        return Err(AppError::not_found("Group not found"));
-    }
+    // GroupService owns the row lock + created_by + role swap so concurrent
+    // transfers cannot leave two live `group/creator` assignments (#445).
+    use crate::services::group::TransferCaller;
     state
-        .rbac
-        .transfer_group_creator_role(&mut tx, group_id, locked_previous, payload.new_creator_id)
+        .group_service
+        .transfer_creator(
+            event_id,
+            &group_name,
+            payload.new_creator_id,
+            TransferCaller::Admin,
+        )
         .await?;
-    tx.commit().await?;
     Ok(StatusCode::OK)
 }
 

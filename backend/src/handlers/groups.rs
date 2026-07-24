@@ -53,18 +53,10 @@ pub async fn create_event_group(
     let mut owned = payload;
     owned.user_id = user.id;
 
-    // #443: group row + group/creator role in one transaction (mirrors event
-    // creation). On upsert conflict, created_by is preserved; we still ensure
-    // a group/creator row exists for the *actual* created_by (idempotent).
-    let mut tx = state.pool.begin().await?;
-    let group = state.groups.create_in_tx(&mut tx, &owned).await?;
-    if let Some(creator_id) = group.created_by {
-        state
-            .rbac
-            .assign_group_creator(&mut tx, creator_id, group.id)
-            .await?;
-    }
-    tx.commit().await?;
+    // #443: GroupService owns group row + group/creator role in one
+    // transaction. On upsert conflict, created_by is preserved; the service
+    // still ensures a group/creator row exists for the actual created_by.
+    let group = state.group_service.create(&owned).await?;
     Ok(Json(group))
 }
 
@@ -230,35 +222,20 @@ pub async fn self_transfer_group_creator(
         return Err(AppError::bad_request("Target user is banned"));
     }
 
-    let mut tx = state.pool.begin().await?;
-    let locked = state
-        .groups
-        .lock_for_update(&mut *tx, event_id, &group_name)
-        .await?
-        .ok_or_else(|| AppError::not_found("Group not found"))?;
-    let (group_id, locked_previous) = locked;
-
-    if locked_previous != Some(user.id) {
-        return Err(AppError::forbidden(
-            "Only the group creator can transfer ownership",
-        ));
-    }
-    if locked_previous == Some(payload.new_creator_id) {
-        return Err(AppError::bad_request("User is already the group creator"));
-    }
-
-    let updated = state
-        .groups
-        .set_creator(&mut *tx, event_id, &group_name, payload.new_creator_id)
-        .await?;
-    if !updated {
-        return Err(AppError::not_found("Group not found"));
-    }
+    // Ownership is re-checked under `SELECT … FOR UPDATE` inside the service
+    // so concurrent transfers cannot leave multiple live `group/creator` rows.
+    use crate::services::group::TransferCaller;
     state
-        .rbac
-        .transfer_group_creator_role(&mut tx, group_id, locked_previous, payload.new_creator_id)
+        .group_service
+        .transfer_creator(
+            event_id,
+            &group_name,
+            payload.new_creator_id,
+            TransferCaller::SelfService {
+                expected_creator_id: user.id,
+            },
+        )
         .await?;
-    tx.commit().await?;
     Ok(StatusCode::OK)
 }
 
