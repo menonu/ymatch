@@ -12,6 +12,7 @@ import '../widgets/manage_event_members_dialog.dart';
 import 'add_merch_screen.dart';
 import 'event_detail/edit_group_dialog.dart';
 import 'event_detail/group_info_panel.dart';
+import 'event_detail/group_inventory_totals_card.dart';
 import 'event_detail/inventory_item_tiles.dart';
 import 'event_detail/merch_filters.dart';
 
@@ -659,6 +660,19 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                       );
                                     }
 
+                                    // #508: last slot is a group-level totals
+                                    // card (HAVE/WANT/TRADE sums). Omitted when
+                                    // the group list is empty (empty-state text
+                                    // above). Soft-deleted rows that still
+                                    // appear contribute their displayed qty.
+                                    final groupTotals =
+                                        GroupInventoryTotals.fromMerchIds(
+                                          items.map((m) => m.id),
+                                          inventoryLookup,
+                                        );
+                                    final itemCountWithTotals =
+                                        items.length + 1;
+
                                     if (viewMode == ViewMode.grid) {
                                       return GridView.builder(
                                         padding: const EdgeInsets.only(
@@ -674,17 +688,25 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                               mainAxisSpacing: 8,
                                               childAspectRatio: 0.6,
                                             ),
-                                        itemCount: items.length,
-                                        itemBuilder: (context, index) =>
-                                            buildGridInventoryItem(
-                                              context,
-                                              ref,
-                                              widget.eventId,
-                                              user,
-                                              items[index],
-                                              inventoryLookup,
-                                              displayMode,
-                                            ),
+                                        itemCount: itemCountWithTotals,
+                                        itemBuilder: (context, index) {
+                                          if (index == items.length) {
+                                            return GroupInventoryTotalsCard(
+                                              totals: groupTotals,
+                                              displayMode: displayMode,
+                                              compact: true,
+                                            );
+                                          }
+                                          return buildGridInventoryItem(
+                                            context,
+                                            ref,
+                                            widget.eventId,
+                                            user,
+                                            items[index],
+                                            inventoryLookup,
+                                            displayMode,
+                                          );
+                                        },
                                       );
                                     } else if (viewMode == ViewMode.list) {
                                       return ListView.builder(
@@ -692,17 +714,24 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                           top: 8,
                                           bottom: 80,
                                         ),
-                                        itemCount: items.length,
-                                        itemBuilder: (context, index) =>
-                                            buildCompactInventoryItem(
-                                              context,
-                                              ref,
-                                              widget.eventId,
-                                              user,
-                                              items[index],
-                                              inventoryLookup,
-                                              displayMode,
-                                            ),
+                                        itemCount: itemCountWithTotals,
+                                        itemBuilder: (context, index) {
+                                          if (index == items.length) {
+                                            return GroupInventoryTotalsCard(
+                                              totals: groupTotals,
+                                              displayMode: displayMode,
+                                            );
+                                          }
+                                          return buildCompactInventoryItem(
+                                            context,
+                                            ref,
+                                            widget.eventId,
+                                            user,
+                                            items[index],
+                                            inventoryLookup,
+                                            displayMode,
+                                          );
+                                        },
                                       );
                                     } else {
                                       // #203: removed ReorderableListView +
@@ -715,8 +744,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                           left: 16,
                                           right: 16,
                                         ),
-                                        itemCount: items.length,
+                                        itemCount: itemCountWithTotals,
                                         itemBuilder: (context, index) {
+                                          if (index == items.length) {
+                                            return GroupInventoryTotalsCard(
+                                              totals: groupTotals,
+                                              displayMode: displayMode,
+                                            );
+                                          }
                                           final item = items[index];
                                           return buildDetailedInventoryItem(
                                             context,

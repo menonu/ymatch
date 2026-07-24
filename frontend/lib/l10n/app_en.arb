@@ -569,6 +569,10 @@
   "@invModeAll": {
     "description": "Inventory display-mode option: show all inventory items"
   },
+  "groupInventoryTotal": "Total",
+  "@groupInventoryTotal": {
+    "description": "Label on the group-level inventory totals card (sum of HAVE/WANT/TRADE in the active group tab)"
+  },
 
   "addMerch": "Add Merch",
   "@addMerch": {

@@ -112,6 +112,60 @@ void main() {
     });
   });
 
+  group('GroupInventoryTotals (#508)', () {
+    test('sums HAVE/WANT/TRADE across multiple merch ids', () {
+      final lookup = <int, Map<String, int>>{
+        1: {'HAVE': 2, 'WANT': 1, 'TRADE': 0},
+        2: {'HAVE': 1, 'WANT': 0, 'TRADE': 3},
+        3: {'HAVE': 1, 'WANT': 4, 'TRADE': 1},
+      };
+      final t = GroupInventoryTotals.fromMerchIds([1, 2, 3], lookup);
+      expect(t.totalHave, 4);
+      expect(t.totalWant, 5);
+      expect(t.totalTrade, 4);
+    });
+
+    test('zeros when all empty or ids missing from lookup', () {
+      expect(
+        GroupInventoryTotals.fromMerchIds([1, 2], {}),
+        isA<GroupInventoryTotals>()
+            .having((t) => t.totalHave, 'have', 0)
+            .having((t) => t.totalWant, 'want', 0)
+            .having((t) => t.totalTrade, 'trade', 0),
+      );
+      final partial = GroupInventoryTotals.fromMerchIds(
+        [1, 99],
+        {
+          1: {'HAVE': 0, 'WANT': 0, 'TRADE': 0},
+        },
+      );
+      expect(partial.totalHave, 0);
+      expect(partial.totalWant, 0);
+      expect(partial.totalTrade, 0);
+    });
+
+    test('missing status keys count as zero', () {
+      final t = GroupInventoryTotals.fromMerchIds(
+        [1],
+        {
+          1: {'HAVE': 5},
+        },
+      );
+      expect(t.totalHave, 5);
+      expect(t.totalWant, 0);
+      expect(t.totalTrade, 0);
+    });
+
+    test('empty id list yields zeros', () {
+      final t = GroupInventoryTotals.fromMerchIds(const [], {
+        1: {'HAVE': 9},
+      });
+      expect(t.totalHave, 0);
+      expect(t.totalWant, 0);
+      expect(t.totalTrade, 0);
+    });
+  });
+
   group('per-event view/filter providers (#494)', () {
     test('family keys isolate state across eventIds', () {
       final container = ProviderContainer();
