@@ -64,14 +64,12 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 | `event.create` | admin, moderator | `event.create` | `events::create_event` (`POST /events`) |
 | `event.edit.any` | admin, moderator | `event.edit` (the event-scope check) | — (override; satisfies `event.edit`) |
 | `event.delete.any` | admin, moderator | `event.delete` (the event-scope check) | — (override; satisfies `event.delete` on `DELETE /admin/events/:id`) |
-| `merch.delete.any` | admin, moderator | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`); `merch::list_all_merch` (`GET /admin/merch?user_id=`) (#491) |
-
+| `merch.delete.any` | admin, moderator | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`); also gates admin catalog list `GET /admin/merch?user_id=` (#491 — intentional reuse: same staff set; no separate `*.list` yet) |
 | `merch.create.any` | admin, moderator | `merch.create` (the event-scope check) | — (override; satisfies `merch.create`) |
 | `merch.edit.any` | admin, moderator | `merch.edit` (the event-scope check) | — (override; satisfies `merch.edit`) |
 | `group.edit.any` | admin, moderator | `group.edit` (the event-scope check) | — (override; satisfies `group.edit`) |
-| `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`); `admin::list_groups` (`GET /admin/groups?user_id=`) (#491) |
-| `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`); `matches::list_all_matches` (`GET /admin/matches?user_id=`) (#491) |
-
+| `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`); also gates `GET /admin/groups?user_id=` (#491 — list reuses delete staff set) |
+| `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`); also gates `GET /admin/matches?user_id=` (#491 — list reuses delete staff set) |
 | `event.creator.transfer` | admin, moderator | `event.creator.transfer` | `admin::transfer_event_creator` (`PUT /admin/events/:id/creator`) |
 | `group.creator.transfer` | admin, moderator | `group.creator.transfer` | `admin::transfer_group_creator` (`PUT /admin/events/:id/groups/:name/creator`) |
 | `event.member.manage.any` | admin, moderator | `event.member.manage.any` | Admin members path (`GET/POST/DELETE /admin/events/:id/members…`). **Not** an override of `event.member.manage` — the public members API stays creator/editor + admin-bypass only (#432 / #442). |

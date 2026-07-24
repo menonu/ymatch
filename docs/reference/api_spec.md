@@ -70,9 +70,24 @@ User directory for member pickers and the admin users tab (#491).
     ban fields. `device_token` and `uuid` are **never** returned on this list
     (use `GET /admin/users/:id` for detail inspection).
 - **Response**: `200 OK`
+
+  Lean (non-staff):
   ```json
   [
-    { "id": 1, "username": "user123", "role": "user", "is_banned": false }
+    { "id": 1, "username": "user123" }
+  ]
+  ```
+
+  Staff (`user.read`):
+  ```json
+  [
+    {
+      "id": 1,
+      "username": "user123",
+      "role": "user",
+      "is_banned": false,
+      "created_at": "2025-07-01T00:00:00Z"
+    }
   ]
   ```
 - **Errors**: `400` if `user_id` missing; `403` if caller is banned; `404` if

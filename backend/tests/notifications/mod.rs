@@ -158,6 +158,68 @@ async fn test_messages_empty_list(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn test_messages_reject_system_type_and_overlong_content(pool: PgPool) {
+    // #491 review: client-facing content cap + SYSTEM type allowlist.
+    let u1 = login_guest(&pool, "msg-val-u1", "t").await;
+    let u2 = login_guest(&pool, "msg-val-u2", "t").await;
+    let event_row: (i32,) = sqlx::query_as(
+        "INSERT INTO events (name, creator_id) VALUES ('Msg Val Event', $1) RETURNING id",
+    )
+    .bind(u1 as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, status, event_id, group_name)
+         VALUES ($1, $2, 'PENDING', $3, 'ValGroup') RETURNING id",
+    )
+    .bind(u1 as i32)
+    .bind(u2 as i32)
+    .bind(event_row.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // SYSTEM is server-only.
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/messages", match_id),
+        &format!(
+            r#"{{"matchId": {}, "senderId": {}, "content": "nope", "messageType": "SYSTEM"}}"#,
+            match_id, u1
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Content longer than 2000 Unicode scalar values is rejected.
+    let long: String = "あ".repeat(2001);
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/messages", match_id),
+        &format!(
+            r#"{{"matchId": {}, "senderId": {}, "content": "{}"}}"#,
+            match_id, u1, long
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // Boundary: exactly 2000 is accepted.
+    let ok_len: String = "a".repeat(2000);
+    let resp = post_json(
+        &pool,
+        &format!("/api/v1/matches/{}/messages", match_id),
+        &format!(
+            r#"{{"matchId": {}, "senderId": {}, "content": "{}"}}"#,
+            match_id, u1, ok_len
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
 async fn test_notification_counts_values(pool: PgPool) {
     // Set up: 2 users, 1 event, 2 merch items ("Card A", "Card B").
     // We'll create three matches in different states and verify the

@@ -26,6 +26,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
@@ -79,9 +80,16 @@ void main() {
     adminUserId = await loginE2EAdmin(api);
   });
 
+  /// #491: admin list providers read `currentUserProvider` for `?user_id=`.
   ProviderContainer makeContainer() {
+    final admin = User()
+      ..id = adminUserId
+      ..username = 'e2e_admin';
     return ProviderContainer(
-      overrides: [apiClientProvider.overrideWith((ref) => api)],
+      overrides: [
+        apiClientProvider.overrideWith((ref) => api),
+        currentUserProvider.overrideWithValue(admin),
+      ],
     );
   }
 
@@ -266,7 +274,9 @@ void main() {
         '/api/v1/admin/merch/${ids.merchId}?user_id=$adminUserId',
       );
 
-      final allMerch = await api.get('/api/v1/admin/merch');
+      final allMerch = await api.get(
+        '/api/v1/admin/merch?user_id=$adminUserId',
+      );
       final merchList = (allMerch as List).cast<Map<String, dynamic>>();
       expect(
         merchList.any((m) => m['id'] == ids.merchId),

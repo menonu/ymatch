@@ -67,10 +67,13 @@ a backlog dump:
 
 - **Security — client-asserted `user_id`:** no JWT/session token; callers supply
   identity on each request. Adequate only while the threat model assumes a
-  trusted/low-stakes client; cryptographic authn would raise **security**.
-- **Security — unauthenticated image upload/delete:** `POST /api/v1/images/upload`
-  and `DELETE /api/v1/images/:filename` enforce content-type and 1MB size only
-  (no `user_id` / RBAC). Abuse risk on a public API surface.
+  trusted/low-stakes client; cryptographic authn would raise **security**
+  (tracked in #373).
+- **Security — image upload/delete (#491):** `POST /api/v1/images/upload` and
+  `DELETE /api/v1/images/:filename` require an **active** `user_id` query param
+  (plus content-type + 1MB size). There is still **no per-object ownership** —
+  any active caller who knows a filename can delete it; tighten when storage
+  gains an owner record.
 - Push notifications are **stubbed** (`notifications.rs` logs only) — limits
   **usability** for “notify me when matched” until a real provider lands.
 - Some operational runbooks assume maintainer familiarity with OCI free-tier

@@ -71,8 +71,9 @@ pub async fn upload_image(
 /// DELETE /api/v1/images/:filename?user_id=
 ///
 /// #491: requires an active caller. Without an ownership record any active
-/// user can still delete by filename — better than fully open; tighten with
-/// ownership when the storage model gains it.
+/// user can still delete by filename — residual risk documented in
+/// `docs/explanation/architecture/09-quality.md`; tighten when storage
+/// tracks an owner.
 pub async fn delete_image(
     State(state): State<AppState>,
     Path(filename): Path<String>,

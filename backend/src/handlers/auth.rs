@@ -99,11 +99,17 @@ pub async fn list_users(
     let caller = state.policy.verify_active(uid).await?;
 
     let all = state.users.list_all().await?;
-    let is_staff = state
+    // #491 review: do not treat Internal as "not staff" via `.is_ok()` —
+    // Forbidden means lean directory; other errors must propagate.
+    let is_staff = match state
         .rbac_service
         .check(&caller, &Scope::Global, Permission::UserRead)
         .await
-        .is_ok();
+    {
+        Ok(()) => true,
+        Err(AppError::Forbidden(_)) => false,
+        Err(e) => return Err(e),
+    };
 
     if is_staff {
         let staff_view = all
