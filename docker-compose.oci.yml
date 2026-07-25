@@ -3,14 +3,19 @@
 #
 # This single compose file is used by BOTH production and staging, each on its
 # own VM (see issue #209). The two environments are byte-identical stacks that
-# differ only by VM host and DB password:
+# differ only by VM host, DB password, and DuckDNS subdomain (issue #523):
 #   - Production: deployed via .github/workflows/deploy-oci.yml (OCI_VM_HOST)
 #   - Staging:    deployed via .github/workflows/deploy-oci-staging.yml (OCI_STAGING_VM_HOST)
 #
-# Caddy serves on 80/443 with auto-SSL via nip.io for both environments.
+# Caddy serves on 80/443 with auto-SSL:
+#   - Primary:  https://{$DOMAIN}  (FQDN from env / GitHub var OCI_DOMAIN(_STAGING))
+#   - Legacy:   https://{$PUBLIC_IP}.nip.io → 301 redirect to {$DOMAIN}
 #
 # Usage:
-#   PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc docker compose -f docker-compose.oci.yml up -d --build
+#   DOMAIN=$OCI_DOMAIN PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc \
+#     docker compose -f docker-compose.oci.yml --profile ddns up -d --build
+#
+# DuckDNS keep-alive (profile "ddns") requires DUCKDNS_TOKEN + DUCKDNS_SUBDOMAIN.
 
 services:
   # --- PostgreSQL ---
@@ -67,7 +72,7 @@ services:
     networks:
       - ymatch
 
-  # --- Caddy (ports 80/443, auto-SSL via nip.io) ---
+  # --- Caddy (ports 80/443, auto-SSL; DuckDNS primary + nip.io redirect) ---
   caddy:
     image: ghcr.io/menonu/ymatch/caddy:2-alpine
     container_name: ymatch_caddy
@@ -80,12 +85,30 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN env var (public FQDN; CI: vars.OCI_DOMAIN / OCI_DOMAIN_STAGING)}
       PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP env var}
     networks:
       - ymatch
     depends_on:
       - backend
       - frontend
+
+  # --- DuckDNS keep-alive (optional; enable with --profile ddns) ---
+  # Refreshes the A record if the public IP drifts without a terraform apply.
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: ymatch_duckdns
+    restart: unless-stopped
+    profiles: ["ddns"]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: UTC
+      # Not :?-required: compose interpolates all services even when profile is off.
+      SUBDOMAINS: ${DUCKDNS_SUBDOMAIN:-}
+      TOKEN: ${DUCKDNS_TOKEN:-}
+      UPDATE_IP: ipv4
+    # No ports / no app network needed — only outbound HTTPS to duckdns.org.
 
 networks:
   ymatch:

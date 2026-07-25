@@ -11,7 +11,7 @@ recorded as ADRs; this page is the map, not the full rationale.
 | Database | **PostgreSQL 16** | Relational integrity for inventory, matches, RBAC; mature ops story. |
 | API style | **JSON REST** + **protobuf** models | Simple HTTP for Flutter; shared schema via `proto/models.proto`. |
 | Frontend | **Flutter** (Riverpod, GoRouter) | One codebase for web (prod) and mobile targets; reactive UI state. |
-| Edge / TLS | **Caddy** + nip.io | Automatic HTTPS on Always Free VMs without a separate cert pipeline. |
+| Edge / TLS | **Caddy** + DuckDNS (+ nip.io redirect) | Stable hostname with automatic HTTPS; legacy nip.io URLs permanently redirect (issue #523). |
 | Packaging | **Docker Compose** on one VM | Matches operational capacity; identical prod/staging stacks. |
 | IaC | **Terraform** (OCI + New Relic modules) | Reproducible VMs/network; secrets via TF_VAR / gitignored tfvars. |
 

@@ -25,10 +25,11 @@ If only the application is broken but the VM is reachable, prefer a
 4. Wait for cloud-init to complete (Docker, NR agent, ports)
 5. Sync the repo to the new VM (rsync, clone, or pull)
 6. Run `oci_deploy_production.sh` with the production DB password
-7. Update GitHub Secrets:
-   - `OCI_VM_HOST` to the new public IP
+7. Update GitHub Secrets / Variables:
+   - `OCI_VM_HOST` only if it still stores the raw IP (prefer the same FQDN as repo variable `OCI_DOMAIN` once DuckDNS is live — issue #523)
    - `OCI_SSH_PRIVATE_KEY` only if the SSH key was rotated
-8. Verify the app via HTTPS and `/api/v1/system/status`
+   - DuckDNS A records update automatically via `terraform apply` (`null_resource.duckdns_*`) when `TF_VAR_duckdns_token` is set
+8. Verify the app via `https://$OCI_DOMAIN` and `/api/v1/system/status` (legacy `https://<ip>.nip.io` should 301 to `$DOMAIN`)
 
 The full procedure is in [how_to/oci_deployment.md](../how_to/oci_deployment.md).
 This document focuses on the **lessons learned** that aren't obvious
@@ -71,23 +72,31 @@ OCI does not guarantee the same public IP when an instance is
 destroyed and recreated. In the test, the IP went from
 `217.142.234.210` to `<redacted>`.
 
-**Implication**: every recreate requires updating the GitHub Secret
-`OCI_VM_HOST` before the next CI deploy. The deploy workflows will
-fail with SSH connection errors if the secret is stale.
+**Implication**: SSH targets that store a raw IP (`OCI_VM_HOST`) go
+stale on recreate. Deploy workflows fail with connection errors until
+the secret is updated.
 
-**Mitigation options** (not yet implemented):
+**Mitigations (issue #523 — DuckDNS):**
 
-- **OCI Reserved Public IP**: assign a static IP at the subnet level
-  and reattach it after recreate. Small additional cost (Always Free
-  may not cover this).
-- **Floating IP with a regional pool**: similar to above.
-- **DNS-based**: instead of storing the IP in a secret, store a
-  hostname that points to a managed DNS record. The recovery
-  procedure updates the DNS A record instead of the GitHub secret.
+- **Terraform A-record update**: `null_resource.duckdns_prod` /
+  `duckdns_staging` call `scripts/duckdns_update.sh` whenever the
+  instance public IP changes (requires `TF_VAR_duckdns_token` in
+  `terraform/oci/.env`).
+- **VM sidecar**: compose profile `ddns` runs `linuxserver/duckdns` so
+  the A record heals even without a fresh Terraform apply.
+- **Stable hostname secret**: set `OCI_VM_HOST` to the same FQDN as
+  repo variable `OCI_DOMAIN` (and staging pair) so GitHub Actions SSH
+  still works after IP churn once DNS has propagated.
+- **Legacy URLs**: Caddy still serves `https://<ip>.nip.io` and
+  permanently redirects to the DuckDNS hostname, so old bookmarks keep
+  working through the cutover.
 
-For now, the manual procedure is: after `terraform apply`, get the
-new IP from `terraform output` and run `gh secret set OCI_VM_HOST
---body "<new-ip>"`.
+**Still useful later**: OCI Reserved Public IP (true static IP; extra
+cost / free-tier nuance) as a complement to DuckDNS.
+
+If `OCI_VM_HOST` still holds a raw IP: after `terraform apply`, get
+the new IP from `terraform output` and run
+`gh secret set OCI_VM_HOST --body "<new-ip>"`.
 
 ### 2. cloud-init success/failure status is not just cosmetic
 

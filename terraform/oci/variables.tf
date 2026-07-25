@@ -118,3 +118,25 @@ variable "db_backup_user_email" {
   description = "Primary email for the least-privilege ymatch-db-backup IAM user (required by OCI Identity Domains on user create). Not used for mail delivery."
   type        = string
 }
+
+# ---------------------------------------------------
+# DuckDNS (issue #523)
+# ---------------------------------------------------
+variable "duckdns_token" {
+  description = "DuckDNS account token. Empty disables DNS updates on apply (legacy nip.io-only). Supply via TF_VAR_duckdns_token in terraform/oci/.env — never commit."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "duckdns_domain" {
+  description = "Production DuckDNS subdomain only (bare name, no zone). Non-secret; set in terraform.tfvars. Required when duckdns_token is set. Keep in sync with GitHub variable OCI_DOMAIN (first label)."
+  type        = string
+  default     = ""
+}
+
+variable "duckdns_domain_staging" {
+  description = "Staging DuckDNS subdomain only (bare name). Non-secret; set in terraform.tfvars. Required when duckdns_token is set. Keep in sync with GitHub variable OCI_DOMAIN_STAGING (first label)."
+  type        = string
+  default     = ""
+}

@@ -19,8 +19,15 @@ variable "region" {
 }
 
 variable "app_public_ip" {
-  description = "Public IP of the OCI VM running the app"
+  description = "DEPRECATED: use app_public_url. Public IP of the OCI VM (legacy nip.io synthetics). Ignored when app_public_url is set."
   type        = string
+  default     = ""
+}
+
+variable "app_public_url" {
+  description = "Public base URL for synthetic monitors (no trailing slash), e.g. https://ymatch.duckdns.org (issue #523)"
+  type        = string
+  default     = ""
 }
 
 variable "discord_webhook_url" {

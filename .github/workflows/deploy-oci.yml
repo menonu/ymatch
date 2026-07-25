@@ -74,15 +74,28 @@ jobs:
       - name: Deploy to Production
         env:
           HOST: ${{ secrets.OCI_VM_HOST }}
+          # Non-secret FQDN from repo Variables (Settings → Secrets and variables → Actions → Variables).
+          DOMAIN: ${{ vars.OCI_DOMAIN }}
+          DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
+          DB_PASSWORD: ${{ secrets.OCI_DB_PASSWORD }}
         run: |
-          ssh -i ~/.ssh/oci_key ubuntu@$HOST bash -s <<'DEPLOY_SCRIPT'
+          if [ -z "$DOMAIN" ]; then
+            echo "❌ Repository variable OCI_DOMAIN is not set (public app FQDN)."
+            exit 1
+          fi
+          if [ -z "$DUCKDNS_TOKEN" ]; then
+            echo "❌ Secret DUCKDNS_TOKEN is not set."
+            exit 1
+          fi
+          # Shell-safe remote env (printf %q) so secrets with special chars do not break.
+          REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q' \
+            "$DOMAIN" "$DUCKDNS_TOKEN" "$DB_PASSWORD")"
+          # shellcheck disable=SC2029
+          ssh -i ~/.ssh/oci_key "ubuntu@${HOST}" "env ${REMOTE_ENV} bash -s" <<'DEPLOY_SCRIPT'
           set -euo pipefail
           cd ~/ymatch
 
-          # Use the new deploy script which handles env vars safely
-          # (--env-file) and supports non-git working trees.
-          export DB_PASSWORD="${{ secrets.OCI_DB_PASSWORD }}"
-
+          # DOMAIN / DUCKDNS_TOKEN / DB_PASSWORD injected via ssh env (from vars/secrets).
           ./scripts/oci_deploy_production.sh
 
           echo "=== Running production migrations ==="
@@ -91,10 +104,16 @@ jobs:
 
       - name: Health check (Production)
         env:
-          HOST: ${{ secrets.OCI_VM_HOST }}
+          # Primary hostname from repo variable OCI_DOMAIN (issue #523). nip.io still redirects here.
+          DOMAIN: ${{ vars.OCI_DOMAIN }}
         run: |
+          if [ -z "$DOMAIN" ]; then
+            echo "❌ Repository variable OCI_DOMAIN is not set."
+            exit 1
+          fi
+          APP_URL="https://${DOMAIN}"
           for i in $(seq 1 12); do
-            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/api/v1/system/status" || true)
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/api/v1/system/status" || true)
             if [ "$STATUS" = "200" ]; then
               echo "✅ Production backend healthy (attempt $i)"
               break
@@ -103,7 +122,7 @@ jobs:
             sleep 5
           done
 
-          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/" || true)
+          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/" || true)
           if [ "$FRONTEND" = "200" ]; then
             echo "✅ Production frontend healthy"
           else

@@ -4,10 +4,11 @@
 #
 # Usage: ./scripts/oci_redeploy_backend.sh
 #
+# Required env (or prior .env): DOMAIN, DB_PASSWORD
 # Optional env:
+#   DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
-#   DB_PASSWORD      - reused from a previous deploy
 
 set -euo pipefail
 
@@ -16,19 +17,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/oci_deploy_common.sh"
 
 REPO_DIR="$HOME/ymatch"
+oci_load_domain_env "$REPO_DIR"
+oci_load_env_keys "$REPO_DIR" DB_PASSWORD
 oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 
 # Always regenerate the .env file from current env vars to ensure it's
 # consistent with this VM's deploy.
 PUBLIC_IP="$(oci_detect_public_ip)"
+export PUBLIC_IP
+oci_require_domain
 DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD env var required (or run oci_deploy_production.sh first)}"
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-oci_write_compose_env "$REPO_DIR" DB_PASSWORD PUBLIC_IP GIT_HASH
+export DB_PASSWORD GIT_HASH
+oci_write_oci_stack_env "$REPO_DIR"
 
 echo "=== Rebuilding backend ==="
-docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" build backend
-docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" up -d backend
+oci_compose "$REPO_DIR" build backend
+oci_compose "$REPO_DIR" up -d backend
 
 echo "Waiting for backend to restart..."
 sleep 5
