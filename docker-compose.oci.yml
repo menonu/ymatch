@@ -82,6 +82,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile.oci:/etc/caddy/Caddyfile:ro
+      # One-shot nip.io → DuckDNS session migration page (#527).
+      - ./caddy/migrate-session.html:/srv/migrate/index.html:ro
       - caddy_data:/data
       - caddy_config:/config
     environment:

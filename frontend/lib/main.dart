@@ -63,16 +63,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoginRoute = state.uri.path == '/login';
 
       if (!isLoggedIn && !isLoginRoute) {
-        // Preserve query parameters when redirecting to login
-        final queryParams = state.uri.queryParameters;
+        // Preserve query parameters when redirecting to login (e.g. restore_uuid #527).
+        final queryParams = Map<String, String>.from(state.uri.queryParameters);
         if (queryParams.isNotEmpty) {
           return Uri(path: '/login', queryParameters: queryParams).toString();
         }
         return '/login';
       }
       if (isLoggedIn && isLoginRoute) {
-        // Preserve query parameters when redirecting home
-        final queryParams = state.uri.queryParameters;
+        // Drop one-shot / debug identity params so they are not left in the
+        // address bar after restore (#527) or dev_user overrides (#499).
+        final queryParams = Map<String, String>.from(state.uri.queryParameters)
+          ..remove('restore_uuid')
+          ..remove('dev_user');
         if (queryParams.isNotEmpty) {
           return Uri(path: '/', queryParameters: queryParams).toString();
         }

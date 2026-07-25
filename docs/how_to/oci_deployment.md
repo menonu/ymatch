@@ -12,7 +12,7 @@ Internet → Caddy (443/80, auto-SSL)
                │     ├─ /uploads/* → Backend (static files)
                │     └─ /*         → Frontend (Nginx, port 80)
                │
-               └─ <ip>.nip.io (legacy) → 301 redirect to $DOMAIN
+               └─ <ip>.nip.io (legacy) → session migrate page (#527) → $DOMAIN
                                     ↓
                               PostgreSQL (port 5432)
 ```
@@ -24,7 +24,15 @@ This stack runs identically on each VM. Public hostnames come from **GitHub Acti
 | Production | `ymatch-arm-v2` | 2 / 12 GB | `OCI_DOMAIN` | `deploy-oci.yml` |
 | Staging | `ymatch-arm-staging` | 1 / 4 GB | `OCI_DOMAIN_STAGING` | `deploy-oci-staging.yml` |
 
-Legacy `https://<ip>.nip.io` URLs still resolve and permanently redirect to `$DOMAIN` (issue #523).
+Legacy `https://<ip>.nip.io` serves a **one-shot session migration page** (`caddy/migrate-session.html`, issue #527): it reads the guest UUID from the old origin’s `localStorage` and navigates to `https://$DOMAIN/?restore_uuid=…` so the Flutter app can call the existing restore path. Without a saved UUID it still lands on the new site welcome screen. After a soak period this can be simplified back to a permanent redirect only.
+
+### Recovering a guest session after the DuckDNS cutover
+
+| Situation | What to do |
+|-----------|------------|
+| Still have a bookmark/tab on `*.nip.io` | Open it once — the migrate page carries the guest UUID to DuckDNS automatically. |
+| Already on DuckDNS, lost session | Welcome → **Restore Existing Account** with the master-key UUID (Profile). |
+| UUID unknown, never saved | Start as a new guest (old data remains in DB but is not linked to this browser). |
 
 ## Cost Analysis (OCI Always Free Tier)
 

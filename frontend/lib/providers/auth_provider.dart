@@ -19,25 +19,57 @@ bool enableDevSessionOverrides = kDebugMode;
 @visibleForTesting
 Uri Function() currentAppUri = () => Uri.base;
 
-/// Parse a non-empty `dev_user` value from [uri] query or hash fragment.
-///
-/// Supports both `?dev_user=...` and hash-based routes (`#/?dev_user=...`).
+/// Standard UUID (8-4-4-4-12 hex) used as the guest restore key.
+final _guestUuidPattern = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+  caseSensitive: false,
+);
+
+/// True when [value] is a well-formed guest UUID restore key.
 @visibleForTesting
-String? parseDevUserFromUri(Uri uri) {
-  final fromQuery = uri.queryParameters['dev_user'];
+bool isGuestRestoreUuid(String? value) {
+  if (value == null || value.isEmpty) return false;
+  return _guestUuidPattern.hasMatch(value.trim());
+}
+
+/// Read a non-empty named query param from [uri] query or hash fragment.
+///
+/// Supports both `?name=...` and hash-based routes (`#/?name=...`).
+@visibleForTesting
+String? parseNamedQueryParamFromUri(Uri uri, String name) {
+  final fromQuery = uri.queryParameters[name];
   if (fromQuery != null && fromQuery.isNotEmpty) return fromQuery;
 
   final fragment = uri.fragment;
-  if (!fragment.contains('dev_user=')) return null;
+  if (!fragment.contains('$name=')) return null;
   try {
-    // Hash routes look like `/#/?dev_user=uuid` or `/?dev_user=uuid`.
+    // Hash routes look like `/#/?name=uuid` or `/?name=uuid`.
     final fragmentUri = Uri.parse(fragment.replaceFirst(RegExp(r'^/+'), ''));
-    final fromFragment = fragmentUri.queryParameters['dev_user'];
+    final fromFragment = fragmentUri.queryParameters[name];
     if (fromFragment != null && fromFragment.isNotEmpty) return fromFragment;
   } catch (_) {
     // Non-web / malformed fragment — ignore.
   }
   return null;
+}
+
+/// Parse a non-empty `dev_user` value from [uri] query or hash fragment.
+///
+/// Supports both `?dev_user=...` and hash-based routes (`#/?dev_user=...`).
+@visibleForTesting
+String? parseDevUserFromUri(Uri uri) =>
+    parseNamedQueryParamFromUri(uri, 'dev_user');
+
+/// Parse `restore_uuid` from [uri] for nip.io → DuckDNS session migration (#527).
+///
+/// Returns null unless the value is a valid guest UUID. Production builds honor
+/// this (unlike [parseDevUserFromUri] / debug-only overrides).
+@visibleForTesting
+String? parseRestoreUuidFromUri(Uri uri) {
+  final raw = parseNamedQueryParamFromUri(uri, 'restore_uuid');
+  if (raw == null) return null;
+  final trimmed = raw.trim();
+  return isGuestRestoreUuid(trimmed) ? trimmed : null;
 }
 
 class AuthController extends StateNotifier<AsyncValue<User?>> {
@@ -49,6 +81,18 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> checkLogin() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // One-shot nip.io → DuckDNS migration (#527): honor restore_uuid in prod.
+    // Capability is the same as "Restore Existing Account" (guest master key).
+    try {
+      final restoreUuid = parseRestoreUuidFromUri(currentAppUri());
+      if (restoreUuid != null) {
+        await restoreAccount(restoreUuid);
+        return;
+      }
+    } catch (_) {
+      // Malformed URI / non-web — fall through to normal flow.
+    }
 
     // Debug-only: multi-tab testing via `?dev_user=` / hash `dev_user=`.
     // Production builds must never auto-login from shareable URL params (#499).
