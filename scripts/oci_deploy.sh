@@ -2,15 +2,15 @@
 # Deploy ymatch to an OCI ARM instance (the full stack for whichever VM this
 # runs on — production or staging, which now use identical stacks on separate
 # VMs; see issue #209). Prefer oci_deploy_production.sh / oci_deploy_staging.sh
-# so the correct DuckDNS defaults apply (issue #523).
+# with DOMAIN set from the matching GitHub variable (issue #523).
 # Run this ON the OCI VM after SSH-ing in
 #
-# Usage: ./scripts/oci_deploy.sh <db_password> [public_ip]
+# Usage: DOMAIN=... ./scripts/oci_deploy.sh <db_password> [public_ip]
 #
 # If public_ip is not provided, it auto-detects via metadata service.
 #
-# Optional env:
-#   DOMAIN / DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN — see oci_deploy_production.sh
+# Required env (or prior .env): DOMAIN
+# Optional env: DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN — see oci_deploy_common.sh
 #   GH_TOKEN         - GitHub PAT for HTTPS git clone (avoids `gh` CLI auth)
 #   GH_SSH_KEY_PATH  - path to SSH deploy key for git clone
 
@@ -23,11 +23,10 @@ source "$SCRIPT_DIR/oci_deploy_common.sh"
 REPO_DIR="$HOME/ymatch"
 oci_load_compose_env "$REPO_DIR"
 
-DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: $0 <db_password> [public_ip]}}"
+DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: DOMAIN=... $0 <db_password> [public_ip]}}"
 PUBLIC_IP="$(oci_detect_public_ip "${2:-}")"
-DOMAIN="$(oci_resolve_domain "ymatch.duckdns.org")"
-DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-ymatch}"
-export DB_PASSWORD PUBLIC_IP DOMAIN DUCKDNS_SUBDOMAIN
+export DB_PASSWORD PUBLIC_IP
+oci_require_domain
 
 echo "=== ymatch OCI Deploy (full stack) ==="
 echo "Public IP: $PUBLIC_IP"
@@ -76,7 +75,7 @@ echo ""
 echo "=== Deployment Complete ==="
 echo "App URL:     https://${DOMAIN}"
 echo "API URL:     https://${DOMAIN}/api/v1/events"
-echo "Legacy:      https://${PUBLIC_IP}.nip.io  (redirects to DuckDNS)"
+echo "Legacy:      https://${PUBLIC_IP}.nip.io  (redirects to DOMAIN)"
 echo "SSH:         ssh ubuntu@${PUBLIC_IP}"
 echo ""
 echo "Useful commands:"

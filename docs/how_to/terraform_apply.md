@@ -55,8 +55,10 @@ cp terraform/oci/backend.hcl.example          terraform/oci/backend.hcl
 task tf:oci:init
 ```
 
-DuckDNS hostnames (`duckdns_domain` / `duckdns_domain_staging`) are
-non-secret and live in `terraform.tfvars`. The shared account token is
+DuckDNS bare subdomains (`duckdns_domain` / `duckdns_domain_staging`) are
+non-secret and live in `terraform.tfvars` (no repo defaults — set them
+explicitly). Keep them aligned with the first DNS label of GitHub Actions
+variables `OCI_DOMAIN` / `OCI_DOMAIN_STAGING`. The shared account token is
 `TF_VAR_duckdns_token` in `.env`. When the token is set, `terraform apply`
 updates production and staging A records to the current instance public
 IPs via `scripts/duckdns_update.sh`.

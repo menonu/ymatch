@@ -13,8 +13,11 @@
 #   oci_write_compose_env <dir> <vars...>  - write .env file for docker compose
 #
 # Required env (set by caller): DB_PASSWORD, PUBLIC_IP, DOMAIN, GIT_HASH
+#   DOMAIN — public FQDN (e.g. from GitHub Actions var OCI_DOMAIN / OCI_DOMAIN_STAGING,
+#            or the previous compose .env). No hardcoded hostname defaults in scripts.
 # Optional env:
-#   DUCKDNS_TOKEN / DUCKDNS_SUBDOMAIN - enable DNS keep-alive + one-shot update
+#   DUCKDNS_SUBDOMAIN   - bare DuckDNS name; default: first label of DOMAIN
+#   DUCKDNS_TOKEN       - enable DNS keep-alive + one-shot update
 #   GH_TOKEN            - GitHub PAT for HTTPS clone (preferred)
 #   GH_SSH_KEY_PATH     - path to SSH key for git clone (alternative)
 
@@ -66,10 +69,22 @@ oci_load_compose_env() {
   done < "$env_file"
 }
 
-# Resolve the public app FQDN (DuckDNS). $1 = default when DOMAIN unset.
-oci_resolve_domain() {
-  local default_domain="${1:?default domain required}"
-  echo "${DOMAIN:-$default_domain}"
+# Require DOMAIN (from env, CI var, or prior .env). Derive DUCKDNS_SUBDOMAIN
+# when unset as the first DNS label of DOMAIN (ymatch.example.org → ymatch).
+# Call after oci_load_compose_env. Exports DOMAIN and DUCKDNS_SUBDOMAIN.
+oci_require_domain() {
+  if [ -z "${DOMAIN:-}" ]; then
+    echo "ERROR: DOMAIN is required (set env DOMAIN, GitHub variable OCI_DOMAIN / OCI_DOMAIN_STAGING, or a prior .env)." >&2
+    return 1
+  fi
+  if [ -z "${DUCKDNS_SUBDOMAIN:-}" ]; then
+    DUCKDNS_SUBDOMAIN="${DOMAIN%%.*}"
+  fi
+  if [ -z "$DUCKDNS_SUBDOMAIN" ] || [ "$DUCKDNS_SUBDOMAIN" = "$DOMAIN" ]; then
+    echo "ERROR: could not derive DUCKDNS_SUBDOMAIN from DOMAIN='$DOMAIN'; set DUCKDNS_SUBDOMAIN explicitly." >&2
+    return 1
+  fi
+  export DOMAIN DUCKDNS_SUBDOMAIN
 }
 
 # True when DuckDNS keep-alive can be enabled for this deploy.

@@ -89,8 +89,8 @@ Two ping monitors run from `AP_NORTHEAST_1` (Tokyo) every 15 minutes:
 
 | Monitor | URL | Validates |
 |---------|-----|-----------|
-| ymatch API Health (OCI) | `https://ymatch.duckdns.org/api/v1/events` | JSON response |
-| ymatch Frontend (OCI) | `https://ymatch.duckdns.org/` | HTTP 200 |
+| ymatch API Health (OCI) | `https://$OCI_DOMAIN/api/v1/events` (from `app_public_url` / repo var) | JSON response |
+| ymatch Frontend (OCI) | `https://$OCI_DOMAIN/` | HTTP 200 |
 
 ### 3. Alert Policy: ymatch OCI Production
 

@@ -130,13 +130,13 @@ variable "duckdns_token" {
 }
 
 variable "duckdns_domain" {
-  description = "Production DuckDNS subdomain only (e.g. ymatch → ymatch.duckdns.org). Non-secret; set in terraform.tfvars."
+  description = "Production DuckDNS subdomain only (bare name, no zone). Non-secret; set in terraform.tfvars. Required when duckdns_token is set. Keep in sync with GitHub variable OCI_DOMAIN (first label)."
   type        = string
-  default     = "ymatch"
+  default     = ""
 }
 
 variable "duckdns_domain_staging" {
-  description = "Staging DuckDNS subdomain only (e.g. ymatch-staging → ymatch-staging.duckdns.org)."
+  description = "Staging DuckDNS subdomain only (bare name). Non-secret; set in terraform.tfvars. Required when duckdns_token is set. Keep in sync with GitHub variable OCI_DOMAIN_STAGING (first label)."
   type        = string
-  default     = "ymatch-staging"
+  default     = ""
 }

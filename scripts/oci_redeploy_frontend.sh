@@ -2,13 +2,13 @@
 # Redeploy frontend only on OCI
 # Run ON the OCI VM
 #
-# Usage: ./scripts/oci_redeploy_frontend.sh [public_ip]
+# Usage: DOMAIN=... ./scripts/oci_redeploy_frontend.sh [public_ip]
 #
+# Required env (or prior .env): DOMAIN, DB_PASSWORD
 # Optional env:
-#   DOMAIN / DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
+#   DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
-#   DB_PASSWORD      - reused from a previous deploy
 
 set -euo pipefail
 
@@ -22,9 +22,8 @@ oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 
 PUBLIC_IP="$(oci_detect_public_ip "${1:-}")"
-DOMAIN="$(oci_resolve_domain "ymatch.duckdns.org")"
-DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-ymatch}"
-export PUBLIC_IP DOMAIN DUCKDNS_SUBDOMAIN
+export PUBLIC_IP
+oci_require_domain
 export API_BASE_URL="https://${DOMAIN}"
 
 # Regenerate .env from current env vars to ensure consistency.

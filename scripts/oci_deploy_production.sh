@@ -3,14 +3,15 @@
 # Run this ON the OCI VM after SSH-ing in
 #
 # Usage:
-#   ./scripts/oci_deploy_production.sh <db_password> [public_ip]
+#   DOMAIN=... DUCKDNS_TOKEN=... ./scripts/oci_deploy_production.sh <db_password> [public_ip]
 #
 # If public_ip is not provided, it auto-detects via the OCI metadata service.
 #
+# Required env (or prior ~/ymatch/.env):
+#   DOMAIN           - primary FQDN (CI: GitHub variable OCI_DOMAIN)
 # Optional env:
-#   DOMAIN           - primary FQDN (default: ymatch.duckdns.org)
-#   DUCKDNS_SUBDOMAIN - bare subdomain for updater (default: ymatch)
-#   DUCKDNS_TOKEN    - DuckDNS account token (enables DNS update + ddns profile)
+#   DUCKDNS_SUBDOMAIN - bare subdomain (default: first label of DOMAIN)
+#   DUCKDNS_TOKEN    - DuckDNS account token (CI: secret DUCKDNS_TOKEN)
 #   GH_TOKEN         - GitHub PAT for HTTPS git clone (avoids `gh` CLI auth)
 #   GH_SSH_KEY_PATH  - path to SSH deploy key for git clone
 #   DB_PASSWORD      - alternative to first positional argument
@@ -24,11 +25,10 @@ source "$SCRIPT_DIR/oci_deploy_common.sh"
 REPO_DIR="$HOME/ymatch"
 oci_load_compose_env "$REPO_DIR"
 
-DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: $0 <db_password> [public_ip]}}"
+DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: DOMAIN=... $0 <db_password> [public_ip]}}"
 PUBLIC_IP="$(oci_detect_public_ip "${2:-}")"
-DOMAIN="$(oci_resolve_domain "ymatch.duckdns.org")"
-DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-ymatch}"
-export DB_PASSWORD PUBLIC_IP DOMAIN DUCKDNS_SUBDOMAIN
+export DB_PASSWORD PUBLIC_IP
+oci_require_domain
 
 echo "=== ymatch PRODUCTION Deploy ==="
 echo "Public IP: $PUBLIC_IP"
@@ -50,7 +50,7 @@ cd "$REPO_DIR"
 echo ""
 echo "Building and starting production containers..."
 
-# Build production frontend with correct API base URL (HTTPS via DuckDNS).
+# Build production frontend with correct API base URL (HTTPS via configured DOMAIN).
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="https://${DOMAIN}" \
   --build-arg GIT_HASH="$GIT_HASH" \
@@ -79,7 +79,7 @@ echo ""
 echo "=== Production Deployment Complete ==="
 echo "Production URL: https://${DOMAIN}"
 echo "Production API: https://${DOMAIN}/api/v1/events"
-echo "Legacy nip.io:  https://${PUBLIC_IP}.nip.io  (redirects to DuckDNS)"
+echo "Legacy nip.io:  https://${PUBLIC_IP}.nip.io  (redirects to DOMAIN)"
 echo "SSH:            ssh ubuntu@${PUBLIC_IP}"
 
 # Configure New Relic log forwarding (containers are running now)

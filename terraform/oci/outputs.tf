@@ -14,17 +14,17 @@ output "ssh_command" {
 }
 
 output "app_url" {
-  description = "Production application URL (DuckDNS when configured; legacy nip.io still redirects there)"
-  value       = "https://${var.duckdns_domain}.duckdns.org"
+  description = "Production application URL when duckdns_domain is set (legacy nip.io still redirects there)"
+  value       = var.duckdns_domain != "" ? "https://${var.duckdns_domain}.duckdns.org" : "https://${oci_core_instance.ymatch_v2.public_ip}.nip.io"
 }
 
 output "app_url_legacy_nipio" {
-  description = "Legacy production nip.io URL (Caddy permanently redirects to app_url)"
+  description = "Legacy production nip.io URL (Caddy permanently redirects to app_url when DOMAIN is configured)"
   value       = "https://${oci_core_instance.ymatch_v2.public_ip}.nip.io"
 }
 
 output "duckdns_domain" {
-  description = "Production DuckDNS subdomain (bare name)"
+  description = "Production DuckDNS subdomain (bare name; from terraform.tfvars)"
   value       = var.duckdns_domain
 }
 
@@ -56,17 +56,17 @@ output "instance_staging_id" {
 }
 
 output "staging_app_url" {
-  description = "Staging application URL (DuckDNS when configured; legacy nip.io still redirects there)"
-  value       = "https://${var.duckdns_domain_staging}.duckdns.org"
+  description = "Staging application URL when duckdns_domain_staging is set (legacy nip.io still redirects there)"
+  value       = var.duckdns_domain_staging != "" ? "https://${var.duckdns_domain_staging}.duckdns.org" : "https://${oci_core_instance.ymatch_staging.public_ip}.nip.io"
 }
 
 output "staging_app_url_legacy_nipio" {
-  description = "Legacy staging nip.io URL (Caddy permanently redirects to staging_app_url)"
+  description = "Legacy staging nip.io URL (Caddy permanently redirects to staging_app_url when DOMAIN is configured)"
   value       = "https://${oci_core_instance.ymatch_staging.public_ip}.nip.io"
 }
 
 output "duckdns_domain_staging" {
-  description = "Staging DuckDNS subdomain (bare name)"
+  description = "Staging DuckDNS subdomain (bare name; from terraform.tfvars)"
   value       = var.duckdns_domain_staging
 }
 

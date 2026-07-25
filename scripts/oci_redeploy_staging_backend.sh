@@ -5,11 +5,11 @@
 #
 # Usage: ./scripts/oci_redeploy_staging_backend.sh
 #
+# Required env (or prior .env): DOMAIN, DB_PASSWORD
 # Optional env:
-#   DOMAIN / DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
+#   DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
-#   DB_PASSWORD      - reused from a previous deploy (the staging DB password)
 
 set -euo pipefail
 
@@ -24,11 +24,11 @@ cd "$REPO_DIR"
 
 # Regenerate .env from current env vars to ensure consistency.
 PUBLIC_IP="$(oci_detect_public_ip)"
-DOMAIN="$(oci_resolve_domain "ymatch-staging.duckdns.org")"
-DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-ymatch-staging}"
+export PUBLIC_IP
+oci_require_domain
 DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD env var required (or run oci_deploy_staging.sh first)}"
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-export PUBLIC_IP DOMAIN DUCKDNS_SUBDOMAIN DB_PASSWORD GIT_HASH
+export DB_PASSWORD GIT_HASH
 oci_write_oci_stack_env "$REPO_DIR"
 
 echo "=== Rebuilding staging backend ==="

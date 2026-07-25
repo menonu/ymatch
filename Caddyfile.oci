@@ -1,6 +1,6 @@
 # Caddy reverse proxy for OCI deployment (issue #523)
 #
-# Primary site: {$DOMAIN}  e.g. ymatch.duckdns.org / ymatch-staging.duckdns.org
+# Primary site: {$DOMAIN}  — public FQDN from env / GitHub var OCI_DOMAIN(_STAGING)
 # Legacy site:  {$PUBLIC_IP}.nip.io → permanent redirect to {$DOMAIN}
 #
 # Env injected from docker-compose.oci.yml

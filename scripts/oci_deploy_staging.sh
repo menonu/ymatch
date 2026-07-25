@@ -4,17 +4,18 @@
 #
 # Staging is a byte-identical stack to production (same compose file, same
 # Caddyfile, same container names); it differs only by VM host, DB password,
-# and DuckDNS subdomain. See issues #209 and #523.
+# and DOMAIN. See issues #209 and #523.
 #
 # Usage:
-#   ./scripts/oci_deploy_staging.sh <db_password> [public_ip]
+#   DOMAIN=... DUCKDNS_TOKEN=... ./scripts/oci_deploy_staging.sh <db_password> [public_ip]
 #
 # If public_ip is not provided, it auto-detects via the OCI metadata service.
 #
+# Required env (or prior ~/ymatch/.env):
+#   DOMAIN           - primary FQDN (CI: GitHub variable OCI_DOMAIN_STAGING)
 # Optional env:
-#   DOMAIN           - primary FQDN (default: ymatch-staging.duckdns.org)
-#   DUCKDNS_SUBDOMAIN - bare subdomain for updater (default: ymatch-staging)
-#   DUCKDNS_TOKEN    - DuckDNS account token (enables DNS update + ddns profile)
+#   DUCKDNS_SUBDOMAIN - bare subdomain (default: first label of DOMAIN)
+#   DUCKDNS_TOKEN    - DuckDNS account token (CI: secret DUCKDNS_TOKEN)
 #   GH_TOKEN         - GitHub PAT for HTTPS git clone (avoids `gh` CLI auth)
 #   GH_SSH_KEY_PATH  - path to SSH deploy key for git clone
 #   DB_PASSWORD      - alternative to first positional argument
@@ -28,11 +29,10 @@ source "$SCRIPT_DIR/oci_deploy_common.sh"
 REPO_DIR="$HOME/ymatch"
 oci_load_compose_env "$REPO_DIR"
 
-DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: $0 <db_password> [public_ip]}}"
+DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: DOMAIN=... $0 <db_password> [public_ip]}}"
 PUBLIC_IP="$(oci_detect_public_ip "${2:-}")"
-DOMAIN="$(oci_resolve_domain "ymatch-staging.duckdns.org")"
-DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-ymatch-staging}"
-export DB_PASSWORD PUBLIC_IP DOMAIN DUCKDNS_SUBDOMAIN
+export DB_PASSWORD PUBLIC_IP
+oci_require_domain
 
 echo "=== ymatch STAGING Deploy ==="
 echo "Public IP: $PUBLIC_IP"
@@ -82,7 +82,7 @@ echo ""
 echo "=== Staging Deployment Complete ==="
 echo "Staging URL: https://${DOMAIN}"
 echo "Staging API: https://${DOMAIN}/api/v1/events"
-echo "Legacy nip.io: https://${PUBLIC_IP}.nip.io  (redirects to DuckDNS)"
+echo "Legacy nip.io: https://${PUBLIC_IP}.nip.io  (redirects to DOMAIN)"
 echo "SSH:         ssh ubuntu@${PUBLIC_IP}"
 
 # Configure New Relic log forwarding (containers are running now)

@@ -8,11 +8,11 @@
 #   - Staging:    deployed via .github/workflows/deploy-oci-staging.yml (OCI_STAGING_VM_HOST)
 #
 # Caddy serves on 80/443 with auto-SSL:
-#   - Primary:  https://{$DOMAIN}  (e.g. ymatch.duckdns.org)
+#   - Primary:  https://{$DOMAIN}  (FQDN from env / GitHub var OCI_DOMAIN(_STAGING))
 #   - Legacy:   https://{$PUBLIC_IP}.nip.io → 301 redirect to {$DOMAIN}
 #
 # Usage:
-#   DOMAIN=ymatch.duckdns.org PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc \
+#   DOMAIN=$OCI_DOMAIN PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc \
 #     docker compose -f docker-compose.oci.yml --profile ddns up -d --build
 #
 # DuckDNS keep-alive (profile "ddns") requires DUCKDNS_TOKEN + DUCKDNS_SUBDOMAIN.
@@ -85,7 +85,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      DOMAIN: ${DOMAIN:?Set DOMAIN env var (e.g. ymatch.duckdns.org)}
+      DOMAIN: ${DOMAIN:?Set DOMAIN env var (public FQDN; CI: vars.OCI_DOMAIN / OCI_DOMAIN_STAGING)}
       PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP env var}
     networks:
       - ymatch

@@ -16,9 +16,10 @@ account_id = 0
 # New Relic region.
 region = "US"
 
-# Public base URL for synthetic monitors (issue #523). Prefer DuckDNS.
-# No trailing slash. Legacy: set app_public_ip instead for nip.io.
-app_public_url = "https://ymatch.duckdns.org"
+# Public base URL for synthetic monitors (issue #523). Prefer the same
+# FQDN as GitHub variable OCI_DOMAIN (https://<OCI_DOMAIN>). No trailing slash.
+# Legacy: set app_public_ip instead for nip.io.
+app_public_url = "https://YOUR_PROD_FQDN"
 # app_public_ip = "203.0.113.10"  # deprecated fallback → https://IP.nip.io
 
 # OS hostname of the production host as reported by the New Relic
