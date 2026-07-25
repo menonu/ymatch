@@ -85,8 +85,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      DOMAIN: ${DOMAIN:?Set DOMAIN env var (public FQDN; CI: vars.OCI_DOMAIN / OCI_DOMAIN_STAGING)}
-      PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP env var}
+      # Quote required: YAML treats bare ":" as mapping syntax.
+      DOMAIN: "${DOMAIN:?Set DOMAIN env var from OCI_DOMAIN}"
+      PUBLIC_IP: "${PUBLIC_IP:?Set PUBLIC_IP env var}"
     networks:
       - ymatch
     depends_on:
