@@ -36,3 +36,8 @@ boot_volume_size_gb        = 50
 # distinguishable in the New Relic Infrastructure dashboard).
 nr_display_name         = "ymatch-oci-arm-v2"
 nr_display_name_staging = "ymatch-oci-arm-staging"
+
+# DuckDNS subdomains (bare names → <name>.duckdns.org). Token is a secret
+# and lives in .env as TF_VAR_duckdns_token (issue #523).
+duckdns_domain          = "ymatch"
+duckdns_domain_staging  = "ymatch-staging"

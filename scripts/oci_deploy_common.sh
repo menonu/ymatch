@@ -4,16 +4,24 @@
 #
 # Provides:
 #   oci_detect_public_ip [<ip>]      - auto-detect or pass-through
+#   oci_load_compose_env <dir>       - source prior .env without overriding set vars
+#   oci_resolve_domain <default>     - DOMAIN env or default FQDN
+#   oci_compose_profile_args         - echo --profile ddns when DuckDNS token set
+#   oci_update_duckdns               - one-shot DuckDNS A update (no-op if unset)
 #   oci_sync_repo <repo_dir>         - git pull / clone (handles non-git, GH_TOKEN, etc.)
 #   oci_get_git_hash <repo_dir>      - rev-parse or "manual"
 #   oci_write_compose_env <dir> <vars...>  - write .env file for docker compose
 #
-# Required env (set by caller): DB_PASSWORD, PUBLIC_IP, GIT_HASH
+# Required env (set by caller): DB_PASSWORD, PUBLIC_IP, DOMAIN, GIT_HASH
 # Optional env:
+#   DUCKDNS_TOKEN / DUCKDNS_SUBDOMAIN - enable DNS keep-alive + one-shot update
 #   GH_TOKEN            - GitHub PAT for HTTPS clone (preferred)
 #   GH_SSH_KEY_PATH     - path to SSH key for git clone (alternative)
 
 set -euo pipefail
+
+# Directory of this common library (stable even when sourced).
+_OCI_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Auto-detect public IP from OCI metadata service
 oci_detect_public_ip() {
@@ -28,6 +36,85 @@ oci_detect_public_ip() {
     python3 -c "import sys,json; print(json.load(sys.stdin)[0]['publicIp'])" 2>/dev/null || \
     curl -sf http://checkip.amazonaws.com || \
     { echo "ERROR: Could not auto-detect public IP. Pass it as argument." >&2; return 1; }
+}
+
+# Source an existing compose .env so redeploys keep DOMAIN / DuckDNS settings
+# when the caller did not re-export them. Does not override already-set env.
+oci_load_compose_env() {
+  local dir="${1:-$HOME/ymatch}"
+  local env_file="$dir/.env"
+  if [ ! -f "$env_file" ]; then
+    return 0
+  fi
+  # Export only keys that are currently unset/empty.
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Skip blanks and comments.
+    case "$line" in
+      ''|\#*) continue ;;
+    esac
+    local key="${line%%=*}"
+    local val="${line#*=}"
+    # Strip matching single/double quotes from shlex.quote output.
+    if [[ "$val" == \'*\' ]]; then
+      val="${val:1:-1}"
+    elif [[ "$val" == \"*\" ]]; then
+      val="${val:1:-1}"
+    fi
+    if [ -z "${!key:-}" ]; then
+      export "$key=$val"
+    fi
+  done < "$env_file"
+}
+
+# Resolve the public app FQDN (DuckDNS). $1 = default when DOMAIN unset.
+oci_resolve_domain() {
+  local default_domain="${1:?default domain required}"
+  echo "${DOMAIN:-$default_domain}"
+}
+
+# True when DuckDNS keep-alive can be enabled for this deploy.
+oci_duckdns_enabled() {
+  [ -n "${DUCKDNS_TOKEN:-}" ] && [ -n "${DUCKDNS_SUBDOMAIN:-}" ]
+}
+
+# Run docker compose against docker-compose.oci.yml with the right --profile.
+# Usage: oci_compose <repo_dir> <compose args...>
+oci_compose() {
+  local dir="${1:?repo dir required}"
+  shift
+  local profile_args=()
+  if oci_duckdns_enabled; then
+    profile_args=(--profile ddns)
+  fi
+  docker compose --env-file "$dir/.env" "${profile_args[@]}" \
+    -f "$dir/docker-compose.oci.yml" "$@"
+}
+
+# One-shot DuckDNS update using PUBLIC_IP. No-op (with notice) when unset.
+oci_update_duckdns() {
+  if ! oci_duckdns_enabled; then
+    echo "DuckDNS token/subdomain not set; skipping one-shot DNS update"
+    return 0
+  fi
+  if [ -z "${PUBLIC_IP:-}" ]; then
+    echo "PUBLIC_IP not set; skipping one-shot DNS update" >&2
+    return 0
+  fi
+  DUCKDNS_DOMAIN="$DUCKDNS_SUBDOMAIN" \
+    DUCKDNS_TOKEN="$DUCKDNS_TOKEN" \
+    DUCKDNS_IP="$PUBLIC_IP" \
+    "$_OCI_COMMON_DIR/duckdns_update.sh" \
+    || echo "⚠️  DuckDNS one-shot update failed (sidecar may still heal)"
+}
+
+# Start the standard OCI stack; include duckdns when token is present.
+oci_compose_up_stack() {
+  local dir="${1:?repo dir required}"
+  local services=(db backend frontend caddy)
+  if oci_duckdns_enabled; then
+    services+=(duckdns)
+  fi
+  oci_compose "$dir" up -d "${services[@]}"
 }
 
 # Sync the repo to the latest version.
@@ -156,4 +243,13 @@ print(f"{key}={shlex.quote(value)}")
     fi
   done
   echo "Wrote $(wc -l < "$env_file") env vars to $env_file"
+}
+
+# Standard env keys written for docker-compose.oci.yml (issue #523).
+# Call after PUBLIC_IP / DOMAIN / DUCKDNS_* are set.
+oci_write_oci_stack_env() {
+  local dir="$1"
+  oci_write_compose_env "$dir" \
+    DB_PASSWORD PUBLIC_IP DOMAIN GIT_HASH \
+    DUCKDNS_TOKEN DUCKDNS_SUBDOMAIN
 }

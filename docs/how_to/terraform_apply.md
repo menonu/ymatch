@@ -13,7 +13,7 @@ identifier in the repo**. This is the IaC privacy workflow (#284).
     region, sizing, SSH public keys, `app_public_ip`, `nr_display_name`).
   - `terraform/<module>/.env` — secrets as `TF_VAR_*` env vars
     (`api_key`, `nr_license_key`, `discord_webhook_url`, `db_password`,
-    `alert_email`, …).
+    `alert_email`, `duckdns_token`, …).
 - Secret vars are marked `sensitive = true` in `variables.tf`, so
   `terraform plan` redacts them in its output.
 
@@ -48,11 +48,18 @@ task tf:newrelic:init
 cp terraform/oci/terraform.tfvars.example terraform/oci/terraform.tfvars
 #   edit terraform.tfvars: OCIDs, region, SSH public keys, sizing, nr_display_name
 cp terraform/oci/.env.example                 terraform/oci/.env
-#   edit .env: TF_VAR_db_password, TF_VAR_nr_license_key, TF_VAR_nr_account_id, TF_VAR_alert_email
+#   edit .env: TF_VAR_db_password, TF_VAR_nr_license_key, TF_VAR_nr_account_id,
+#              TF_VAR_alert_email, TF_VAR_duckdns_token (issue #523)
 cp terraform/oci/backend.hcl.example          terraform/oci/backend.hcl
 #   edit backend.hcl: namespace (oci os ns get), region
 task tf:oci:init
 ```
+
+DuckDNS hostnames (`duckdns_domain` / `duckdns_domain_staging`) are
+non-secret and live in `terraform.tfvars`. The shared account token is
+`TF_VAR_duckdns_token` in `.env`. When the token is set, `terraform apply`
+updates production and staging A records to the current instance public
+IPs via `scripts/duckdns_update.sh`.
 
 Both `terraform.tfvars` and `.env` are gitignored (`**/.env` and the
 `terraform/*/terraform.tfvars` entries in `.gitignore`). The

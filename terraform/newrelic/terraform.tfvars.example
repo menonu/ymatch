@@ -16,10 +16,10 @@ account_id = 0
 # New Relic region.
 region = "US"
 
-# Public IP of the OCI VM the synthetic monitors ping
-# (https://<app_public_ip>.nip.io/...). Host identifier — keep out of
-# the repo; this template is a placeholder.
-app_public_ip = "203.0.113.10"
+# Public base URL for synthetic monitors (issue #523). Prefer DuckDNS.
+# No trailing slash. Legacy: set app_public_ip instead for nip.io.
+app_public_url = "https://ymatch.duckdns.org"
+# app_public_ip = "203.0.113.10"  # deprecated fallback → https://IP.nip.io
 
 # OS hostname of the production host as reported by the New Relic
 # Infrastructure agent (SystemSample / ContainerSample `hostname`

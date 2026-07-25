@@ -5,10 +5,14 @@ This guide deploys the complete ymatch stack (Flutter web frontend, Rust/Axum ba
 ## Architecture
 
 ```
-Internet → Caddy (443/80, auto-SSL via nip.io)
-               ├─ /api/*     → Backend (Rust/Axum, port 3000)
-               ├─ /uploads/* → Backend (static files)
-               └─ /*         → Frontend (Nginx, port 80)
+Internet → Caddy (443/80, auto-SSL)
+               │
+               ├─ ymatch.duckdns.org (primary)
+               │     ├─ /api/*     → Backend (Rust/Axum, port 3000)
+               │     ├─ /uploads/* → Backend (static files)
+               │     └─ /*         → Frontend (Nginx, port 80)
+               │
+               └─ <ip>.nip.io (legacy) → 301 redirect to DuckDNS
                                     ↓
                               PostgreSQL (port 5432)
 ```
@@ -17,8 +21,10 @@ This stack runs identically on each VM:
 
 | Environment | Instance | OCPUs / Memory | URL | Deploy workflow |
 |-------------|----------|----------------|-----|-----------------|
-| Production | `ymatch-arm-v2` | 2 / 12 GB | `https://<prod_ip>.nip.io` | `deploy-oci.yml` |
-| Staging | `ymatch-arm-staging` | 1 / 4 GB | `https://<staging_ip>.nip.io` | `deploy-oci-staging.yml` |
+| Production | `ymatch-arm-v2` | 2 / 12 GB | `https://ymatch.duckdns.org` | `deploy-oci.yml` |
+| Staging | `ymatch-arm-staging` | 1 / 4 GB | `https://ymatch-staging.duckdns.org` | `deploy-oci-staging.yml` |
+
+Legacy `https://<ip>.nip.io` URLs still resolve and permanently redirect to the DuckDNS hostname (issue #523).
 
 ## Cost Analysis (OCI Always Free Tier)
 
@@ -122,11 +128,14 @@ The first build takes ~10-20 minutes (compiling Rust on ARM). Subsequent rebuild
 ### Step 4: Verify
 
 ```bash
-# Backend health
-curl -s https://<PUBLIC_IP>.nip.io/api/v1/events
+# Backend health (primary DuckDNS hostname)
+curl -s https://ymatch.duckdns.org/api/v1/events
 
 # Frontend
-curl -s -o /dev/null -w "%{http_code}" https://<PUBLIC_IP>.nip.io/
+curl -s -o /dev/null -w "%{http_code}" https://ymatch.duckdns.org/
+
+# Legacy nip.io still works and should 301 → DuckDNS
+curl -sI "https://<PUBLIC_IP>.nip.io/" | head -n1
 ```
 
 ## Redeployment (After Code Changes)
@@ -197,12 +206,13 @@ CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-o
 
 | Secret | Used by | When to update |
 |--------|---------|----------------|
-| `OCI_VM_HOST` | `deploy-oci.yml`, `db-backup.yml` (production) | **Every time the production VM's public IP changes** (recreates via Terraform) |
+| `OCI_VM_HOST` | `deploy-oci.yml`, `db-backup.yml` (production) | **Every time the production VM's public IP changes** (recreates via Terraform). May be the raw IP or `ymatch.duckdns.org` once DNS is live. |
 | `OCI_SSH_PRIVATE_KEY` | `deploy-oci.yml`, `db-backup.yml` (production) | When the production SSH key pair is rotated |
 | `OCI_DB_PASSWORD` | `deploy-oci.yml` (production) | When the production database password changes |
-| `OCI_STAGING_VM_HOST` | `deploy-oci-staging.yml` (staging) | **Every time the staging VM's public IP changes** (recreates via Terraform) |
+| `OCI_STAGING_VM_HOST` | `deploy-oci-staging.yml` (staging) | **Every time the staging VM's public IP changes** (recreates via Terraform). May be IP or `ymatch-staging.duckdns.org`. |
 | `OCI_STAGING_SSH_PRIVATE_KEY` | `deploy-oci-staging.yml` (staging) | When the staging SSH key pair is rotated |
 | `OCI_STAGING_DB_PASSWORD` | `deploy-oci-staging.yml` (staging) | When the staging database password changes |
+| `DUCKDNS_TOKEN` | `deploy-oci.yml`, `deploy-oci-staging.yml` | When the DuckDNS account token is rotated (issue #523) |
 | `OCI_CLI_USER` | `db-backup.yml` | When the least-privilege `ymatch-db-backup` user changes |
 | `OCI_CLI_TENANCY` | `db-backup.yml` | When the tenancy OCID changes (rare) |
 | `OCI_CLI_FINGERPRINT` | `db-backup.yml` | When the backup user’s API key is rotated |
@@ -262,15 +272,23 @@ gh secret list
 
 ### When a VM is Recreated
 
-Terraform may assign a **different public IP** when an instance is destroyed and recreated (observed in issue #148). The new IP must be set in the matching host secret before the next CI run, otherwise workflows will fail with SSH connection errors.
+Terraform may assign a **different public IP** when an instance is destroyed and recreated (observed in issue #148).
+
+With DuckDNS (issue #523):
+
+1. `task tf:oci:apply` (or `terraform apply`) runs `null_resource.duckdns_*` and updates the A record to the new IP.
+2. The optional `linuxserver/duckdns` sidecar (compose profile `ddns`) also keeps the A record fresh after deploy.
+3. If `OCI_VM_HOST` / `OCI_STAGING_VM_HOST` still stores the **raw IP**, update it after apply. Prefer storing the DuckDNS hostname (`ymatch.duckdns.org` / `ymatch-staging.duckdns.org`) so SSH targets stay stable.
 
 ```bash
-# After terraform apply, get the new IPs
+# After terraform apply, confirm DNS + IPs
 cd terraform/oci
 terraform output instance_v2_public_ip            # production
 terraform output instance_staging_public_ip       # staging
+terraform output app_url                          # https://ymatch.duckdns.org
+dig +short ymatch.duckdns.org
 
-# Update the matching secret
+# Only needed if secrets still hold the raw IP (not the DuckDNS hostname)
 gh secret set OCI_VM_HOST --body "<redacted>"          # production
 gh secret set OCI_STAGING_VM_HOST --body "<redacted>"  # staging
 ```
@@ -313,7 +331,7 @@ ssh -i ~/.ssh/oci_ymatch_v3 ubuntu@$(terraform output -raw instance_v2_public_ip
 
 On OCI, images use **local storage** only (`UPLOAD_DIR`, volume `uploads`):
 - Stored in Docker volume `uploads`
-- Served at `https://<IP>.nip.io/uploads/<uuid>.<ext>`
+- Served at `https://ymatch.duckdns.org/uploads/<uuid>.<ext>` (staging: `ymatch-staging.duckdns.org`)
 - Caddy proxies `/uploads/*` to the backend
 
 Compose may still set `IMAGE_STORAGE=local` for clarity; other values are
@@ -326,7 +344,7 @@ ignored (Firebase/GCS image storage was removed — #458).
 | Backend | Cloud Run (serverless) | Docker on ARM VM |
 | Frontend | Firebase Hosting (CDN) | Nginx on same VM |
 | Database | Docker on e2-micro VM | Docker on same ARM VM |
-| SSL | Managed by Cloud Run/Firebase | Caddy + Let's Encrypt (nip.io) |
+| SSL | Managed by Cloud Run/Firebase | Caddy + Let's Encrypt (DuckDNS; nip.io redirects) |
 | Image Storage | GCS bucket | Local Docker volume |
 | DB backups | GCS (retired, #383) | Object Storage `ymatch-db-backups` |
 | Auto-scaling | Yes (Cloud Run) | No (single VM) |

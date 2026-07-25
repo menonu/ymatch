@@ -25,12 +25,19 @@ provider "newrelic" {
 # ---------------------------------------------------
 # Synthetic Monitors
 # ---------------------------------------------------
+locals {
+  # Prefer DuckDNS (or any) public URL; fall back to legacy nip.io from IP.
+  app_public_url = var.app_public_url != "" ? trimsuffix(var.app_public_url, "/") : (
+    var.app_public_ip != "" ? "https://${var.app_public_ip}.nip.io" : ""
+  )
+}
+
 resource "newrelic_synthetics_monitor" "api_health" {
   name             = "ymatch API Health (OCI)"
   type             = "SIMPLE"
   status           = "ENABLED"
   period           = "EVERY_15_MINUTES"
-  uri              = "https://${var.app_public_ip}.nip.io/api/v1/events"
+  uri              = "${local.app_public_url}/api/v1/events"
   locations_public = ["AP_NORTHEAST_1"]
   verify_ssl       = true
 
@@ -43,7 +50,7 @@ resource "newrelic_synthetics_monitor" "frontend" {
   type             = "SIMPLE"
   status           = "ENABLED"
   period           = "EVERY_15_MINUTES"
-  uri              = "https://${var.app_public_ip}.nip.io/"
+  uri              = "${local.app_public_url}/"
   locations_public = ["AP_NORTHEAST_1"]
   verify_ssl       = true
 

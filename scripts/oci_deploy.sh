@@ -1,7 +1,8 @@
 #!/bin/bash
 # Deploy ymatch to an OCI ARM instance (the full stack for whichever VM this
 # runs on — production or staging, which now use identical stacks on separate
-# VMs; see issue #209).
+# VMs; see issue #209). Prefer oci_deploy_production.sh / oci_deploy_staging.sh
+# so the correct DuckDNS defaults apply (issue #523).
 # Run this ON the OCI VM after SSH-ing in
 #
 # Usage: ./scripts/oci_deploy.sh <db_password> [public_ip]
@@ -9,6 +10,7 @@
 # If public_ip is not provided, it auto-detects via metadata service.
 #
 # Optional env:
+#   DOMAIN / DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN — see oci_deploy_production.sh
 #   GH_TOKEN         - GitHub PAT for HTTPS git clone (avoids `gh` CLI auth)
 #   GH_SSH_KEY_PATH  - path to SSH deploy key for git clone
 
@@ -18,20 +20,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=oci_deploy_common.sh
 source "$SCRIPT_DIR/oci_deploy_common.sh"
 
+REPO_DIR="$HOME/ymatch"
+oci_load_compose_env "$REPO_DIR"
+
 DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: $0 <db_password> [public_ip]}}"
 PUBLIC_IP="$(oci_detect_public_ip "${2:-}")"
+DOMAIN="$(oci_resolve_domain "ymatch.duckdns.org")"
+DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-ymatch}"
+export DB_PASSWORD PUBLIC_IP DOMAIN DUCKDNS_SUBDOMAIN
 
 echo "=== ymatch OCI Deploy (full stack) ==="
 echo "Public IP: $PUBLIC_IP"
-echo "App URL:   https://${PUBLIC_IP}.nip.io"
+echo "Domain:    https://${DOMAIN}"
+echo "Legacy:    https://${PUBLIC_IP}.nip.io  (→ redirect to Domain)"
 echo ""
 
-REPO_DIR="$HOME/ymatch"
 oci_sync_repo "$REPO_DIR"
 
 # Determine env vars for docker compose
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
-oci_write_compose_env "$REPO_DIR" DB_PASSWORD PUBLIC_IP GIT_HASH
+export GIT_HASH
+oci_update_duckdns
+oci_write_oci_stack_env "$REPO_DIR"
 
 cd "$REPO_DIR"
 
@@ -39,12 +49,11 @@ cd "$REPO_DIR"
 echo ""
 echo "Building and starting containers (this may take 10-20 minutes on first run)..."
 
-docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" build \
-  --build-arg API_BASE_URL="https://${PUBLIC_IP}.nip.io" \
+oci_compose "$REPO_DIR" build \
+  --build-arg API_BASE_URL="https://${DOMAIN}" \
   --build-arg GIT_HASH="$GIT_HASH"
 
-# Start services
-docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" up -d
+oci_compose "$REPO_DIR" up -d
 
 echo ""
 echo "Waiting for services to start..."
@@ -53,7 +62,7 @@ sleep 10
 # Health check
 echo ""
 echo "=== Service Status ==="
-docker compose --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.oci.yml" ps
+oci_compose "$REPO_DIR" ps
 
 echo ""
 echo "=== Health Check ==="
@@ -65,8 +74,9 @@ fi
 
 echo ""
 echo "=== Deployment Complete ==="
-echo "App URL:     https://${PUBLIC_IP}.nip.io"
-echo "API URL:     https://${PUBLIC_IP}.nip.io/api/v1/events"
+echo "App URL:     https://${DOMAIN}"
+echo "API URL:     https://${DOMAIN}/api/v1/events"
+echo "Legacy:      https://${PUBLIC_IP}.nip.io  (redirects to DuckDNS)"
 echo "SSH:         ssh ubuntu@${PUBLIC_IP}"
 echo ""
 echo "Useful commands:"

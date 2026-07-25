@@ -24,7 +24,8 @@ Source: [`diagrams/07-deployment-oci.d2`](diagrams/07-deployment-oci.d2)
 | Compose file | `docker-compose.oci.yml` | same |
 | Workflow | `deploy-oci.yml` | `deploy-oci-staging.yml` |
 | Typical size | 2 OCPU / 12 GB | 1 OCPU / 4 GB |
-| Public URL | `https://<prod_ip>.nip.io` | `https://<staging_ip>.nip.io` |
+| Public URL | `https://ymatch.duckdns.org` | `https://ymatch-staging.duckdns.org` |
+| Legacy URL | `https://<prod_ip>.nip.io` → 301 to DuckDNS | `https://<staging_ip>.nip.io` → 301 to DuckDNS |
 | Data | Production DB volume | Separate DB volume |
 
 ### Edge routing

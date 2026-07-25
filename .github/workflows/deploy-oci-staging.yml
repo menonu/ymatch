@@ -70,6 +70,9 @@ jobs:
           # and supports non-git working trees. Staging uses the same stack as
           # production; DB_PASSWORD here is the staging DB password.
           export DB_PASSWORD="${{ secrets.OCI_STAGING_DB_PASSWORD }}"
+          export DOMAIN="ymatch-staging.duckdns.org"
+          export DUCKDNS_SUBDOMAIN="ymatch-staging"
+          export DUCKDNS_TOKEN="${{ secrets.DUCKDNS_TOKEN }}"
 
           ./scripts/oci_deploy_staging.sh
 
@@ -79,10 +82,11 @@ jobs:
 
       - name: Health check (Staging)
         env:
-          HOST: ${{ secrets.OCI_STAGING_VM_HOST }}
+          # Primary DuckDNS hostname (issue #523). nip.io still redirects here.
+          APP_URL: https://ymatch-staging.duckdns.org
         run: |
           for i in $(seq 1 12); do
-            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/api/v1/system/status" || true)
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/api/v1/system/status" || true)
             if [ "$STATUS" = "200" ]; then
               echo "✅ Staging backend healthy (attempt $i)"
               break
@@ -91,7 +95,7 @@ jobs:
             sleep 5
           done
 
-          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.nip.io/" || true)
+          FRONTEND=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/" || true)
           if [ "$FRONTEND" = "200" ]; then
             echo "✅ Staging frontend healthy"
           else
