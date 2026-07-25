@@ -74,9 +74,11 @@ jobs:
             echo "❌ Secret DUCKDNS_TOKEN is not set."
             exit 1
           fi
-          ssh -i ~/.ssh/oci_key ubuntu@$HOST \
-            env DOMAIN="$DOMAIN" DUCKDNS_TOKEN="$DUCKDNS_TOKEN" DB_PASSWORD="$DB_PASSWORD" \
-            bash -s <<'DEPLOY_SCRIPT'
+          # Shell-safe remote env (printf %q) so secrets with special chars do not break.
+          REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q' \
+            "$DOMAIN" "$DUCKDNS_TOKEN" "$DB_PASSWORD")"
+          # shellcheck disable=SC2029
+          ssh -i ~/.ssh/oci_key "ubuntu@${HOST}" "env ${REMOTE_ENV} bash -s" <<'DEPLOY_SCRIPT'
           set -euo pipefail
           cd ~/ymatch
 

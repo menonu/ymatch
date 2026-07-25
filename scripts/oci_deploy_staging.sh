@@ -27,11 +27,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/oci_deploy_common.sh"
 
 REPO_DIR="$HOME/ymatch"
-oci_load_compose_env "$REPO_DIR"
 
-DB_PASSWORD="${DB_PASSWORD:-${1:?Usage: DOMAIN=... $0 <db_password> [public_ip]}}"
+# Resolve password before domain .env load so a positional arg is never
+# overridden by a sticky DB_PASSWORD from a previous deploy.
+if [ -n "${1:-}" ]; then
+  DB_PASSWORD="$1"
+fi
+DB_PASSWORD="${DB_PASSWORD:?Usage: DOMAIN=... $0 <db_password> [public_ip] (or set DB_PASSWORD)}"
 PUBLIC_IP="$(oci_detect_public_ip "${2:-}")"
 export DB_PASSWORD PUBLIC_IP
+
+oci_load_domain_env "$REPO_DIR"
 oci_require_domain
 
 echo "=== ymatch STAGING Deploy ==="

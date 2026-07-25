@@ -18,7 +18,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/oci_deploy_common.sh"
 
 REPO_DIR="$HOME/ymatch"
-oci_load_compose_env "$REPO_DIR"
+oci_load_domain_env "$REPO_DIR"
+oci_load_env_keys "$REPO_DIR" DB_PASSWORD
 oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 

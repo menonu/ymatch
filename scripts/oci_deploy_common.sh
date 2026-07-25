@@ -3,14 +3,17 @@
 # Source this file from other deploy scripts.
 #
 # Provides:
-#   oci_detect_public_ip [<ip>]      - auto-detect or pass-through
-#   oci_load_compose_env <dir>       - source prior .env without overriding set vars
-#   oci_resolve_domain <default>     - DOMAIN env or default FQDN
-#   oci_compose_profile_args         - echo --profile ddns when DuckDNS token set
-#   oci_update_duckdns               - one-shot DuckDNS A update (no-op if unset)
-#   oci_sync_repo <repo_dir>         - git pull / clone (handles non-git, GH_TOKEN, etc.)
-#   oci_get_git_hash <repo_dir>      - rev-parse or "manual"
-#   oci_write_compose_env <dir> <vars...>  - write .env file for docker compose
+#   oci_detect_public_ip [<ip>]           - auto-detect or pass-through
+#   oci_load_env_keys <dir> <keys...>     - load listed keys from prior .env if unset
+#   oci_load_domain_env <dir>             - load DOMAIN + DUCKDNS_TOKEN only (not DB_PASSWORD)
+#   oci_require_domain                    - require DOMAIN; derive/validate DUCKDNS_SUBDOMAIN
+#   oci_compose <dir> <args...>           - docker compose with optional ddns profile
+#   oci_compose_up_stack <dir>            - up db/backend/frontend/caddy[+duckdns]
+#   oci_update_duckdns                    - one-shot DuckDNS A update (hard-fail unless DUCKDNS_OPTIONAL=1)
+#   oci_sync_repo <repo_dir>              - git pull / clone (handles non-git, GH_TOKEN, etc.)
+#   oci_get_git_hash <repo_dir>           - rev-parse or "manual"
+#   oci_write_compose_env <dir> <vars...> - write .env file for docker compose
+#   oci_write_oci_stack_env <dir>         - write standard stack keys
 #
 # Required env (set by caller): DB_PASSWORD, PUBLIC_IP, DOMAIN, GIT_HASH
 #   DOMAIN — public FQDN (e.g. from GitHub Actions var OCI_DOMAIN / OCI_DOMAIN_STAGING,
@@ -18,6 +21,7 @@
 # Optional env:
 #   DUCKDNS_SUBDOMAIN   - bare DuckDNS name; default: first label of DOMAIN
 #   DUCKDNS_TOKEN       - enable DNS keep-alive + one-shot update
+#   DUCKDNS_OPTIONAL=1  - soft-fail one-shot DuckDNS update (default: hard-fail when enabled)
 #   GH_TOKEN            - GitHub PAT for HTTPS clone (preferred)
 #   GH_SSH_KEY_PATH     - path to SSH key for git clone (alternative)
 
@@ -41,49 +45,93 @@ oci_detect_public_ip() {
     { echo "ERROR: Could not auto-detect public IP. Pass it as argument." >&2; return 1; }
 }
 
-# Source an existing compose .env so redeploys keep DOMAIN / DuckDNS settings
-# when the caller did not re-export them. Does not override already-set env.
-oci_load_compose_env() {
+# Load selected keys from a prior compose .env if they are currently unset.
+# Parses values with Python shlex so round-trips match oci_write_compose_env.
+# Does not override already-set (non-empty) environment variables.
+oci_load_env_keys() {
   local dir="${1:-$HOME/ymatch}"
+  shift
   local env_file="$dir/.env"
-  if [ ! -f "$env_file" ]; then
+  if [ ! -f "$env_file" ] || [ "$#" -eq 0 ]; then
     return 0
   fi
-  # Export only keys that are currently unset/empty.
-  while IFS= read -r line || [ -n "$line" ]; do
-    # Skip blanks and comments.
-    case "$line" in
-      ''|\#*) continue ;;
-    esac
-    local key="${line%%=*}"
-    local val="${line#*=}"
-    # Strip matching single/double quotes from shlex.quote output.
-    if [[ "$val" == \'*\' ]]; then
-      val="${val:1:-1}"
-    elif [[ "$val" == \"*\" ]]; then
-      val="${val:1:-1}"
+
+  local key
+  for key in "$@"; do
+    if [ -n "${!key:-}" ]; then
+      continue
     fi
-    if [ -z "${!key:-}" ]; then
-      export "$key=$val"
+    # shellcheck disable=SC2016
+    local value
+    value="$(
+      KEY="$key" ENV_FILE="$env_file" python3 -c '
+import os, shlex
+key = os.environ["KEY"]
+path = os.environ["ENV_FILE"]
+with open(path, encoding="utf-8") as f:
+    for raw in f:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, rest = line.partition("=")
+        if k != key:
+            continue
+        # shlex.split undoes shlex.quote (including nested quote forms).
+        parts = shlex.split(rest, posix=True)
+        print(parts[0] if parts else "")
+        break
+'
+    )" || value=""
+    if [ -n "$value" ]; then
+      # Assign via nameref-safe printf -v so values can contain spaces/quotes.
+      printf -v "$key" '%s' "$value"
+      export "$key"
     fi
-  done < "$env_file"
+  done
 }
 
-# Require DOMAIN (from env, CI var, or prior .env). Derive DUCKDNS_SUBDOMAIN
-# when unset as the first DNS label of DOMAIN (ymatch.example.org → ymatch).
-# Call after oci_load_compose_env. Exports DOMAIN and DUCKDNS_SUBDOMAIN.
+# Load hostname/DNS settings only — never DB_PASSWORD (callers must resolve
+# password from positional arg / CI env so CLI password updates are not sticky).
+oci_load_domain_env() {
+  local dir="${1:-$HOME/ymatch}"
+  oci_load_env_keys "$dir" DOMAIN DUCKDNS_TOKEN
+}
+
+# Backward-compatible alias: domain keys only (not the full compose secret set).
+oci_load_compose_env() {
+  oci_load_domain_env "$@"
+}
+
+# Require DOMAIN (from env, CI var, or prior .env). Always derive
+# DUCKDNS_SUBDOMAIN from DOMAIN's first label unless the caller set
+# DUCKDNS_SUBDOMAIN *and* it matches DOMAIN (prefix). Mismatched sticky
+# subdomains from an old .env are rejected/re-derived.
+# Call after oci_load_domain_env. Exports DOMAIN and DUCKDNS_SUBDOMAIN.
 oci_require_domain() {
   if [ -z "${DOMAIN:-}" ]; then
     echo "ERROR: DOMAIN is required (set env DOMAIN, GitHub variable OCI_DOMAIN / OCI_DOMAIN_STAGING, or a prior .env)." >&2
     return 1
   fi
-  if [ -z "${DUCKDNS_SUBDOMAIN:-}" ]; then
-    DUCKDNS_SUBDOMAIN="${DOMAIN%%.*}"
-  fi
-  if [ -z "$DUCKDNS_SUBDOMAIN" ] || [ "$DUCKDNS_SUBDOMAIN" = "$DOMAIN" ]; then
-    echo "ERROR: could not derive DUCKDNS_SUBDOMAIN from DOMAIN='$DOMAIN'; set DUCKDNS_SUBDOMAIN explicitly." >&2
+
+  local derived="${DOMAIN%%.*}"
+  if [ -z "$derived" ] || [ "$derived" = "$DOMAIN" ]; then
+    echo "ERROR: DOMAIN='$DOMAIN' must be a multi-label FQDN (or set DUCKDNS_SUBDOMAIN explicitly with a matching prefix)." >&2
     return 1
   fi
+
+  if [ -n "${DUCKDNS_SUBDOMAIN:-}" ]; then
+    # Explicit subdomain must be a prefix of DOMAIN (e.g. ymatch + ymatch.duckdns.org).
+    case "$DOMAIN" in
+      "${DUCKDNS_SUBDOMAIN}".*) ;;
+      *)
+        echo "WARN: DUCKDNS_SUBDOMAIN='$DUCKDNS_SUBDOMAIN' does not match DOMAIN='$DOMAIN'; re-deriving from DOMAIN." >&2
+        DUCKDNS_SUBDOMAIN="$derived"
+        ;;
+    esac
+  else
+    DUCKDNS_SUBDOMAIN="$derived"
+  fi
+
   export DOMAIN DUCKDNS_SUBDOMAIN
 }
 
@@ -105,21 +153,28 @@ oci_compose() {
     -f "$dir/docker-compose.oci.yml" "$@"
 }
 
-# One-shot DuckDNS update using PUBLIC_IP. No-op (with notice) when unset.
+# One-shot DuckDNS update using PUBLIC_IP. No-op when token/subdomain unset.
+# Hard-fails on API error unless DUCKDNS_OPTIONAL=1.
 oci_update_duckdns() {
   if ! oci_duckdns_enabled; then
     echo "DuckDNS token/subdomain not set; skipping one-shot DNS update"
     return 0
   fi
   if [ -z "${PUBLIC_IP:-}" ]; then
-    echo "PUBLIC_IP not set; skipping one-shot DNS update" >&2
-    return 0
+    echo "ERROR: PUBLIC_IP not set; cannot update DuckDNS" >&2
+    return 1
   fi
-  DUCKDNS_DOMAIN="$DUCKDNS_SUBDOMAIN" \
+  if ! DUCKDNS_DOMAIN="$DUCKDNS_SUBDOMAIN" \
     DUCKDNS_TOKEN="$DUCKDNS_TOKEN" \
     DUCKDNS_IP="$PUBLIC_IP" \
-    "$_OCI_COMMON_DIR/duckdns_update.sh" \
-    || echo "⚠️  DuckDNS one-shot update failed (sidecar may still heal)"
+    "$_OCI_COMMON_DIR/duckdns_update.sh"; then
+    if [ "${DUCKDNS_OPTIONAL:-}" = "1" ]; then
+      echo "⚠️  DuckDNS one-shot update failed (DUCKDNS_OPTIONAL=1; continuing)" >&2
+      return 0
+    fi
+    echo "ERROR: DuckDNS one-shot update failed" >&2
+    return 1
+  fi
 }
 
 # Start the standard OCI stack; include duckdns when token is present.
