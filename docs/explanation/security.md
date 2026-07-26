@@ -118,6 +118,9 @@ Before committing anything that touches infra, scripts, or docs:
 
 ## Related
 
+- [Secret Management](secret_management.md) — operator inventory of
+  where each secret lives (local Terraform `.env`, GitHub Secrets,
+  remote state vs Vault), rotation, and bootstrap (#529 / #530).
 - [OCI Credentials Management](../how_to/oci_credentials.md) — OCI API
   key generation, rotation, and loss recovery.
 - [Development Workflow Guide](../how_to/development_workflow.md) — PR

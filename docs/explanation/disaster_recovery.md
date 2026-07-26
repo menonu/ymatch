@@ -33,7 +33,9 @@ If only the application is broken but the VM is reachable, prefer a
 
 The full procedure is in [how_to/oci_deployment.md](../how_to/oci_deployment.md).
 This document focuses on the **lessons learned** that aren't obvious
-from the deployment guide.
+from the deployment guide. Secret locations, rotation, and “lost
+`.env`” recovery are in
+[Secret Management](secret_management.md) (#530).
 
 ## End-to-End Test (June 2026)
 
