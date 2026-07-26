@@ -16,7 +16,7 @@ Epic tracking the hardening roadmap: **#529**.
 
 ## Mental model (read this first)
 
-Three stores look similar and are often confused:
+These stores look similar and are often confused:
 
 | Store | What it is | Supplies secrets as *inputs* to plan/apply? | May *contain* secrets after apply? |
 |-------|------------|-----------------------------------------------|------------------------------------|
@@ -66,15 +66,15 @@ record of what was applied; some secret material is unfortunately
 | DuckDNS account token | `TF_VAR_duckdns_token` in `terraform/oci/.env` | Secret `DUCKDNS_TOKEN` | VM compose profile `ddns` via deploy `.env` |
 | New Relic **ingest** license key | `TF_VAR_nr_license_key` (oci + newrelic `.env`) | `NEW_RELIC_LICENSE_KEY` | Historically also in instance **cloud-init `user_data`** → **state** (#305) |
 | New Relic **user** API key | `TF_VAR_api_key` in `terraform/newrelic/.env` | — | NR Terraform provider |
-| New Relic account id | `TF_VAR_nr_account_id` (oci); `account_id` in NR tfvars | `NEW_RELIC_ACCOUNT_ID` | Treat as sensitive identifier |
-| Discord alert webhook | `TF_VAR_discord_webhook_url` (newrelic `.env`) | `DISCORD_WEBHOOK_URL` | |
+| New Relic account id | `TF_VAR_nr_account_id` (oci — **declared, unused** by current OCI resources); `account_id` in NR tfvars (used) | `NEW_RELIC_ACCOUNT_ID` | Treat as sensitive identifier |
+| Discord alert webhook | `TF_VAR_discord_webhook_url` (newrelic `.env`) | `DISCORD_WEBHOOK_URL` | Also written into NR notification destination → **state** |
 | Budget alert email | `TF_VAR_alert_email` (oci `.env`) | — | OCI budget recipients |
 | DB backup user email | `TF_VAR_db_backup_user_email` | — | OCI Identity user attribute (not a password) |
 | `db_password` TF var | `TF_VAR_db_password` in oci `.env` | — | **Declared but unused** by current OCI resources; production DB passwords are **not** this var |
 | Production / staging DB passwords | — | `OCI_DB_PASSWORD` / `OCI_STAGING_DB_PASSWORD` | Injected by deploy scripts into VM compose env |
 | SSH **private** keys | `~/.ssh/…` (operator) | `OCI_SSH_PRIVATE_KEY` / `OCI_STAGING_SSH_PRIVATE_KEY` | VM `authorized_keys` has the public half only |
 | VM SSH host | — | Secrets `OCI_VM_HOST` / `OCI_STAGING_VM_HOST` | Prefer DuckDNS FQDN once verified (#526 optional) |
-| OCI API signing key (operator) | `~/.oci/*.pem` + config | — | Terraform provider + CLI; see [oci_credentials](../how_to/oci_credentials.md) |
+| OCI API signing key (operator) | PEM path + `fingerprint` / `private_key_path` in gitignored `terraform/oci/terraform.tfvars`; `~/.oci/config` for CLI + Object Storage backend | — | OCI **provider** reads tfvars, not only `~/.oci`; see [oci_credentials](../how_to/oci_credentials.md) |
 | OCI API key (db-backup user) | optional local | `OCI_CLI_*` + `OCI_CLI_KEY_CONTENT_B64` | Backup workflow only |
 
 Templates (placeholders only) live in:
@@ -91,7 +91,7 @@ Templates (placeholders only) live in:
 
 1. One-time: copy `*.example` → real `terraform.tfvars`, `.env`, `backend.hcl` (all gitignored).
 2. Fill **secrets only** in `.env` as `TF_VAR_*`; non-secrets in `terraform.tfvars`.
-3. Auth: valid `~/.oci/config` (or equivalent) for the OCI provider and the Object Storage backend.
+3. Auth: oci **tfvars** `fingerprint` + `private_key_path` for the OCI provider; `~/.oci/config` for CLI and the Object Storage backend.
 4. Run:
 
 ```bash
@@ -123,14 +123,16 @@ state and is **not** in git.
 
 ## Secrets in state (today)
 
-Known leakage path (tracked by **#305**):
+Known leakage paths (tracked by **#305** and residual NR-module exposure):
 
-- OCI instances set `metadata.user_data = base64encode(cloud-init)`.
-- Cloud-init embeds `echo "license_key: ${var.nr_license_key}"` for the
-  New Relic infrastructure agent.
-- Terraform state stores `user_data`; base64-decoding recovers the license
-  key. `sensitive = true` on the variable **only redacts plan/apply UI**,
-  not state contents.
+| Path | Module | How it lands in state |
+|------|--------|------------------------|
+| NR **ingest** license | `terraform/oci` | Instance `metadata.user_data` base64 cloud-init embeds `echo "license_key: …"` |
+| Discord webhook URL | `terraform/newrelic` | Notification destination property `url` = `var.discord_webhook_url` |
+
+`sensitive = true` on variables **only redacts plan/apply UI**, not state
+contents. Other attributes (emails, OCIDs, public keys) also appear in
+state by design; treat the whole state object as confidential.
 
 Mitigations in flight:
 
@@ -139,9 +141,10 @@ Mitigations in flight:
 | 2 | #305 | KMS/BYOK on `ymatch-tfstate`; stop baking NR key into `user_data` |
 | 3 | #531 | OCI Vault (or equivalent) as shared **input** source |
 
-Until then: treat access to the state bucket and to `~/.oci` credentials
-that can read it as **equivalent to holding the NR ingest key** (and any
-other values that have ever been written into managed resources).
+Until then: treat access to the state bucket (and credentials that can
+read it — `~/.oci` **and** the OCI provider key referenced from
+tfvars) as **equivalent to holding every secret ever written into
+managed resources** (at least NR ingest license + Discord webhook).
 
 `lifecycle { ignore_changes = [metadata, …] }` on instances means later
 license rotations in Terraform **do not** rewrite VMs automatically; old
@@ -194,7 +197,8 @@ Minimal path to run Terraform safely:
 | `TF_VAR_duckdns_token` | DuckDNS account UI; same value as GH `DUCKDNS_TOKEN` (re-set both if rotated) |
 | `TF_VAR_nr_license_key` | New Relic UI (ingest license); align GH `NEW_RELIC_LICENSE_KEY` |
 | `TF_VAR_api_key` | New Relic user API key UI |
-| `TF_VAR_nr_account_id` / NR `account_id` | NR account settings |
+| `TF_VAR_nr_account_id` | NR account settings (oci var currently unused by resources; still required by `variables.tf`) |
+| NR `account_id` (tfvars) | NR account settings |
 | `TF_VAR_discord_webhook_url` | Discord channel integrations; GH `DISCORD_WEBHOOK_URL` |
 | `TF_VAR_alert_email` | Current value is in state (`oci_budget_alert_rule`) if you can `terraform state show` |
 | `TF_VAR_db_backup_user_email` | State / OCI Identity user `ymatch-db-backup` |
@@ -212,8 +216,9 @@ Minimal path to run Terraform safely:
 | NR user API key | New Relic | `terraform/newrelic/.env` | — | Re-apply NR module |
 | Discord webhook | Discord | newrelic `.env` | `DISCORD_WEBHOOK_URL` | Re-apply NR notifications |
 | DB password | Generate new; migrate DB users | — | `OCI_*_DB_PASSWORD` | Redeploy / update compose env on VM |
-| SSH key pair | `ssh-keygen` | tfvars **public** key → instance (recreate or console) | `OCI_*_SSH_PRIVATE_KEY` | |
-| OCI API key | Console upload | `~/.oci` | `OCI_CLI_*` if backup user | |
+| SSH key pair | `ssh-keygen` | tfvars **public** key, then **console `authorized_keys` or instance recreate** (`ignore_changes` on `metadata` blocks key-only apply) | `OCI_*_SSH_PRIVATE_KEY` | |
+| OCI API key (operator) | Console upload | PEM + `fingerprint` / `private_key_path` in oci **tfvars**; `~/.oci/config` for CLI/backend | — | |
+| OCI API key (db-backup) | Console upload | optional local PEM | `OCI_CLI_*` + `OCI_CLI_KEY_CONTENT_B64` | |
 | `OCI_VM_HOST` | After IP change **or** switch to DuckDNS FQDN | — | `gh secret set` | |
 
 After any rotation that was ever committed or pasted: follow
@@ -227,10 +232,10 @@ After any rotation that was ever committed or pasted: follow
 | Scenario | Secrets angle |
 |----------|----------------|
 | VM recreated | Public IP may change; DuckDNS A record should update via Terraform `null_resource` + optional sidecar (#523 / #526). Prefer `OCI_VM_HOST` = FQDN. |
-| Lost SSH private key | New keypair; update tfvars public key + GH private key secret; see deployment guide. |
-| Lost OCI API key | [oci_credentials.md](../how_to/oci_credentials.md); cannot use Vault or state until CLI auth works. |
+| Lost SSH private key | New keypair; put public key on the VM via **console or recreate** (tfvars alone will not refresh `ssh_authorized_keys` while `ignore_changes` includes `metadata`); update GH private-key secrets; see deployment guide. |
+| Lost OCI API key | [oci_credentials.md](../how_to/oci_credentials.md); update tfvars `fingerprint` / `private_key_path` **and** `~/.oci/config`; cannot plan/apply or read state until provider + CLI auth work. |
 | Lost local `.env` | Reconstruct table above; do not invent production DB passwords from TF state. |
-| State bucket compromise | Assume secrets embedded in state are burned (#305); rotate NR license and review other attributes. |
+| State bucket compromise | Assume secrets embedded in state are burned (#305); rotate **NR ingest license** and **Discord webhook** (re-apply NR module / update GH); review other attributes and rotate anything else found. |
 | Full DR | [disaster_recovery.md](disaster_recovery.md) |
 
 ---
