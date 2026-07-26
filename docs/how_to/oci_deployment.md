@@ -208,6 +208,10 @@ docker system df
 
 ## GitHub Secrets Management
 
+> **Broader map:** local Terraform `.env`, GitHub Secrets, remote state,
+> and future Vault are different stores — see
+> [Secret Management](../explanation/secret_management.md) (#530).
+
 CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-oci-staging.yml` for staging) read several OCI-related values from GitHub Secrets. Production and staging now target **separate VMs**, so each has its own host and SSH-key secrets. You must update these whenever the underlying credential changes — most commonly when a VM is recreated and gets a new public IP.
 
 ### Secrets Reference

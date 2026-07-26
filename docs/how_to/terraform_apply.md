@@ -4,6 +4,10 @@ How to run `terraform plan` / `apply` for the `terraform/newrelic` and
 `terraform/oci` modules **without ever putting a secret or host
 identifier in the repo**. This is the IaC privacy workflow (#284).
 
+For the full secrets **inventory, rotation, recovery, and roadmap**
+(including why remote state is not a secrets manager), see
+[Secret Management](../explanation/secret_management.md) (#530 / epic #529).
+
 ## Principles
 
 - The committed `.tf` files contain **no secrets and no identifiers** —

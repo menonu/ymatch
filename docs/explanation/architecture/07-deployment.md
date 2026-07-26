@@ -43,6 +43,7 @@ Internet → Caddy :443
 |------|-----|
 | First-time / full deploy | [OCI deployment](../../how_to/oci_deployment.md) |
 | Terraform secrets | [terraform_apply](../../how_to/terraform_apply.md) |
+| Secret inventory / lifecycle | [secret_management](../secret_management.md) |
 | API keys / SSH recovery | [oci_credentials](../../how_to/oci_credentials.md) |
 | Monitoring | [monitoring_setup](../../how_to/monitoring_setup.md) |
 | VM loss / key loss lessons | [disaster_recovery](../disaster_recovery.md) |
