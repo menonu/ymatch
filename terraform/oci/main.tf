@@ -4,6 +4,11 @@ terraform {
       source  = "oracle/oci"
       version = ">= 6.0.0"
     }
+    # Used by null_resource.duckdns_* in dns.tf (#523 / #526)
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0.0"
+    }
   }
 
   # Remote state in OCI Object Storage (#302). Tenancy-specific values
