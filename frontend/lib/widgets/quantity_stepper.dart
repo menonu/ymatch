@@ -116,58 +116,62 @@ class QuantityStepper extends StatelessWidget {
             ],
           ),
         ),
-        // --- Visual layer: chips + center (taps pass through to halves) ---
-        // Chips sit inset from the frame; scaleDown only when the column is
-        // narrower than preferred chip width (3-up on small phones).
+        // --- Visual layer (IgnorePointer → taps reach half-area hits) ---
+        // Chips are pinned to the left/right edges at full preferred size.
+        // Do NOT put them in a Row with the center: that steals width and
+        // FittedBox-shrinks the chips on phone three-up layouts.
         IgnorePointer(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: dims.trackPadH,
-              vertical: dims.trackPadV,
-            ),
-            child: expand
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: _VisualChip(
-                              icon: Icons.remove,
-                              color: _decrementColor,
-                              size: dims,
-                              enabled: canDec,
-                            ),
-                          ),
+          child: expand
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned(
+                      left: dims.trackPadH,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: _VisualChip(
+                          icon: Icons.remove,
+                          color: _decrementColor,
+                          size: dims,
+                          enabled: canDec,
                         ),
                       ),
-                      _QuantityCenter(
+                    ),
+                    Positioned(
+                      right: dims.trackPadH,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: _VisualChip(
+                          icon: Icons.add,
+                          color: _incrementColor,
+                          size: dims,
+                          enabled: canInc,
+                        ),
+                      ),
+                    ),
+                    // Center label/qty on top so it stays readable.
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: dims.buttonExtent + dims.trackPadH,
+                      ),
+                      child: _QuantityCenter(
                         quantity: quantity,
                         size: dims,
                         expand: false,
                         label: hasLabel ? label : null,
                         labelColor: labelColor ?? _defaultLabelColor,
                       ),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: _VisualChip(
-                              icon: Icons.add,
-                              color: _incrementColor,
-                              size: dims,
-                              enabled: canInc,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
+                    ),
+                  ],
+                )
+              : Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: dims.trackPadH,
+                    vertical: dims.trackPadV,
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _VisualChip(
@@ -191,7 +195,7 @@ class QuantityStepper extends StatelessWidget {
                       ),
                     ],
                   ),
-          ),
+                ),
         ),
       ],
     );
@@ -243,14 +247,14 @@ class _QuantityStepperDims {
   }) {
     switch (size) {
       case QuantityStepperSize.standard:
-        // Pre hit-target-tweak sizes: height 44, chip 36, slight frame inset.
+        // Height 44; chip fills most of the track (pad 3 → max ~38).
         return const _QuantityStepperDims(
           height: 44,
           trackRadius: 4,
           trackPadH: 3,
           trackPadV: 3,
-          buttonExtent: 36,
-          iconSize: 20,
+          buttonExtent: 38,
+          iconSize: 22,
           buttonRadius: 3,
           qtyMinWidth: 48,
           qtyFontSize: 15,
@@ -263,8 +267,8 @@ class _QuantityStepperDims {
           trackRadius: 4,
           trackPadH: 2,
           trackPadV: 2,
-          buttonExtent: hasLabel ? 28 : 22,
-          iconSize: 16,
+          buttonExtent: hasLabel ? 30 : 24,
+          iconSize: 18,
           buttonRadius: 3,
           qtyMinWidth: hasLabel ? 34 : 26,
           qtyFontSize: 12,
@@ -277,8 +281,8 @@ class _QuantityStepperDims {
           trackRadius: 4,
           trackPadH: 2,
           trackPadV: 2,
-          buttonExtent: hasLabel ? 28 : 22,
-          iconSize: 16,
+          buttonExtent: hasLabel ? 30 : 24,
+          iconSize: 18,
           buttonRadius: 3,
           qtyMinWidth: hasLabel ? 32 : 24,
           qtyFontSize: 12,
