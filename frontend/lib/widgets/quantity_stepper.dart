@@ -14,17 +14,17 @@ enum QuantityStepperSize {
 
 /// Flat bordered quantity control with clear ± affordance (#538).
 ///
-/// **Visual** (does not define hit size):
-/// - White track + thin border, small inset from the frame
-/// - Compact red / green ± chips on the sides
-/// - Bare center: optional status label above quantity
+/// Visual (restored from the “outer frame + minimal inset + square corners”
+/// revision):
+/// - White track + `#DEE2E6` border, 1px inset, radius 4
+/// - ± chips size 36 / icon 20 / radius 3 (expand: chip fills its flex slot)
+/// - Center: optional status label above bare quantity
 ///
-/// **Hit targets** (larger than the chips):
-/// - Left **half** of the control → decrement (extends under 所持/数字)
-/// - Right **half** → increment
-/// This is the old half-area pattern: taps near the number still count.
+/// Hit targets (independent of chip paint):
+/// - Left half of the control → decrement (includes area under 所持/数字)
+/// - Right half → increment
 ///
-/// Set [expand] to `true` so the control fills an [Expanded] parent width.
+/// Set [expand] to `true` in constrained [Expanded] parents (detailed view).
 class QuantityStepper extends StatelessWidget {
   const QuantityStepper({
     super.key,
@@ -52,7 +52,7 @@ class QuantityStepper extends StatelessWidget {
 
   final QuantityStepperSize size;
 
-  /// When true, fill the parent width.
+  /// When true, fill the parent width (side buttons grow; type size fixed).
   final bool expand;
 
   /// Optional keys for widget tests (e.g. `stepper_inc_HAVE`).
@@ -74,6 +74,7 @@ class QuantityStepper extends StatelessWidget {
   /// Accessibility label for the increment control (defaults to English).
   final String? incrementSemanticLabel;
 
+  // Same surface language as AppTheme.cardTheme (white + #DEE2E6 border).
   static const Color _trackColor = Colors.white;
   static const Color _trackBorder = Color(0xFFDEE2E6);
   static const Color _decrementColor = Color(0xFFE25555);
@@ -88,116 +89,38 @@ class QuantityStepper extends StatelessWidget {
     final canDec = enabled && onDecrement != null;
     final canInc = enabled && onIncrement != null;
 
-    final body = Stack(
-      alignment: Alignment.center,
-      children: [
-        // --- Hit layer: full left / right halves (under the number) ---
-        Positioned.fill(
-          child: Row(
-            children: [
-              Expanded(
-                child: _HalfHitTarget(
-                  key: decrementKey,
-                  enabled: canDec,
-                  onTap: canDec ? onDecrement : null,
-                  semanticLabel: decrementSemanticLabel ?? 'Decrease quantity',
-                  align: Alignment.centerLeft,
-                ),
-              ),
-              Expanded(
-                child: _HalfHitTarget(
-                  key: incrementKey,
-                  enabled: canInc,
-                  onTap: canInc ? onIncrement : null,
-                  semanticLabel: incrementSemanticLabel ?? 'Increase quantity',
-                  align: Alignment.centerRight,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // --- Visual layer (IgnorePointer → taps reach half-area hits) ---
-        // Chips are pinned to the left/right edges at full preferred size.
-        // Do NOT put them in a Row with the center: that steals width and
-        // FittedBox-shrinks the chips on phone three-up layouts.
-        IgnorePointer(
-          child: expand
-              ? Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Positioned(
-                      left: dims.trackPadH,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: _VisualChip(
-                          icon: Icons.remove,
-                          color: _decrementColor,
-                          size: dims,
-                          enabled: canDec,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: dims.trackPadH,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: _VisualChip(
-                          icon: Icons.add,
-                          color: _incrementColor,
-                          size: dims,
-                          enabled: canInc,
-                        ),
-                      ),
-                    ),
-                    // Center label/qty on top so it stays readable.
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: dims.buttonExtent + dims.trackPadH,
-                      ),
-                      child: _QuantityCenter(
-                        quantity: quantity,
-                        size: dims,
-                        expand: false,
-                        label: hasLabel ? label : null,
-                        labelColor: labelColor ?? _defaultLabelColor,
-                      ),
-                    ),
-                  ],
-                )
-              : Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: dims.trackPadH,
-                    vertical: dims.trackPadV,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _VisualChip(
-                        icon: Icons.remove,
-                        color: _decrementColor,
-                        size: dims,
-                        enabled: canDec,
-                      ),
-                      _QuantityCenter(
-                        quantity: quantity,
-                        size: dims,
-                        expand: false,
-                        label: hasLabel ? label : null,
-                        labelColor: labelColor ?? _defaultLabelColor,
-                      ),
-                      _VisualChip(
-                        icon: Icons.add,
-                        color: _incrementColor,
-                        size: dims,
-                        enabled: canInc,
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ],
+    // Visual chips — paint only; hits come from the half-area layer below.
+    final decVisual = _StepChip(
+      icon: Icons.remove,
+      color: _decrementColor,
+      size: dims,
+      expand: expand,
+      enabled: canDec,
+    );
+    final qty = _QuantityCenter(
+      quantity: quantity,
+      size: dims,
+      expand: expand,
+      label: hasLabel ? label : null,
+      labelColor: labelColor ?? _defaultLabelColor,
+    );
+    final incVisual = _StepChip(
+      icon: Icons.add,
+      color: _incrementColor,
+      size: dims,
+      expand: expand,
+      enabled: canInc,
+    );
+
+    final visualRow = Row(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      children: expand
+          ? [
+              Expanded(flex: 2, child: decVisual),
+              Flexible(flex: 3, child: qty),
+              Expanded(flex: 2, child: incVisual),
+            ]
+          : [decVisual, qty, incVisual],
     );
 
     return Container(
@@ -208,8 +131,43 @@ class QuantityStepper extends StatelessWidget {
         borderRadius: BorderRadius.circular(dims.trackRadius),
         border: Border.all(color: _trackBorder),
       ),
+      // Minimal inset so ± chips sit nearly flush with the frame.
+      padding: EdgeInsets.symmetric(
+        horizontal: dims.trackPadH,
+        vertical: dims.trackPadV,
+      ),
       clipBehavior: Clip.antiAlias,
-      child: body,
+      child: Stack(
+        children: [
+          // Hit layer: left half / right half (under 所持/数字 as well).
+          Positioned.fill(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _HalfHitTarget(
+                    key: decrementKey,
+                    enabled: canDec,
+                    onTap: canDec ? onDecrement : null,
+                    semanticLabel:
+                        decrementSemanticLabel ?? 'Decrease quantity',
+                  ),
+                ),
+                Expanded(
+                  child: _HalfHitTarget(
+                    key: incrementKey,
+                    enabled: canInc,
+                    onTap: canInc ? onIncrement : null,
+                    semanticLabel:
+                        incrementSemanticLabel ?? 'Increase quantity',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Visual layer — same Row layout as the working 7b48bd2 revision.
+          IgnorePointer(child: visualRow),
+        ],
+      ),
     );
   }
 }
@@ -247,66 +205,64 @@ class _QuantityStepperDims {
   }) {
     switch (size) {
       case QuantityStepperSize.standard:
-        // Height 44; chip fills most of the track (pad 3 → max ~38).
+        // Restored sizes: height 44, label 9, qty 15, chip 36, pad 1, square.
         return const _QuantityStepperDims(
           height: 44,
           trackRadius: 4,
-          trackPadH: 3,
-          trackPadV: 3,
-          buttonExtent: 38,
-          iconSize: 22,
+          trackPadH: 1,
+          trackPadV: 1,
+          buttonExtent: 36,
+          iconSize: 20,
           buttonRadius: 3,
           qtyMinWidth: 48,
           qtyFontSize: 15,
           labelFontSize: 9,
-          gap: 4,
+          gap: 2,
         );
       case QuantityStepperSize.compact:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
           trackRadius: 4,
-          trackPadH: 2,
-          trackPadV: 2,
-          buttonExtent: hasLabel ? 30 : 24,
-          iconSize: 18,
+          trackPadH: 1,
+          trackPadV: 1,
+          buttonExtent: hasLabel ? 28 : 22,
+          iconSize: 16,
           buttonRadius: 3,
           qtyMinWidth: hasLabel ? 34 : 26,
           qtyFontSize: 12,
           labelFontSize: 9,
-          gap: 3,
+          gap: 2,
         );
       case QuantityStepperSize.dense:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
           trackRadius: 4,
-          trackPadH: 2,
-          trackPadV: 2,
-          buttonExtent: hasLabel ? 30 : 24,
-          iconSize: 18,
+          trackPadH: 1,
+          trackPadV: 1,
+          buttonExtent: hasLabel ? 28 : 22,
+          iconSize: 16,
           buttonRadius: 3,
           qtyMinWidth: hasLabel ? 32 : 24,
           qtyFontSize: 12,
           labelFontSize: 8,
-          gap: 2,
+          gap: 1,
         );
     }
   }
 }
 
-/// Full half of the control — transparent hit target (left or right).
+/// Transparent left/right half hit target.
 class _HalfHitTarget extends StatelessWidget {
   const _HalfHitTarget({
     super.key,
     required this.enabled,
     required this.onTap,
     required this.semanticLabel,
-    required this.align,
   });
 
   final bool enabled;
   final VoidCallback? onTap;
   final String semanticLabel;
-  final Alignment align;
 
   @override
   Widget build(BuildContext context) {
@@ -316,28 +272,26 @@ class _HalfHitTarget extends StatelessWidget {
       label: semanticLabel,
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          // Ripple fills the half; visual chips are drawn above this layer.
-          child: const SizedBox.expand(),
-        ),
+        child: InkWell(onTap: onTap, child: const SizedBox.expand()),
       ),
     );
   }
 }
 
-/// Painted ± chip only (not hit-tested — parent half handles taps).
-class _VisualChip extends StatelessWidget {
-  const _VisualChip({
+/// Painted ± chip only (not hit-tested — half layer handles taps).
+class _StepChip extends StatelessWidget {
+  const _StepChip({
     required this.icon,
     required this.color,
     required this.size,
+    required this.expand,
     required this.enabled,
   });
 
   final IconData icon;
   final Color color;
   final _QuantityStepperDims size;
+  final bool expand;
   final bool enabled;
 
   @override
@@ -350,16 +304,25 @@ class _VisualChip extends StatelessWidget {
         ? color.withValues(alpha: 0.28)
         : color.withValues(alpha: 0.12);
 
-    return Container(
-      width: size.buttonExtent,
-      height: size.buttonExtent,
-      alignment: Alignment.center,
+    final chip = Container(
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(size.buttonRadius),
         border: Border.all(color: border),
       ),
+      alignment: Alignment.center,
       child: Icon(icon, size: size.iconSize, color: iconColor),
+    );
+
+    if (expand) {
+      // Fill the Expanded flex slot (same as 7b48bd2 visual).
+      final chipH = size.height - size.trackPadV * 2;
+      return SizedBox(height: chipH, width: double.infinity, child: chip);
+    }
+    return SizedBox(
+      width: size.buttonExtent,
+      height: size.buttonExtent,
+      child: chip,
     );
   }
 }
@@ -424,18 +387,14 @@ class _QuantityCenter extends StatelessWidget {
             ),
           );
 
-    final child = Padding(
-      padding: EdgeInsets.symmetric(horizontal: size.gap),
-      child: content,
-    );
-
-    if (expand) {
-      return Expanded(child: Center(child: child));
-    }
     return Container(
-      constraints: BoxConstraints(minWidth: size.qtyMinWidth),
+      width: expand ? double.infinity : null,
+      constraints: expand
+          ? const BoxConstraints()
+          : BoxConstraints(minWidth: size.qtyMinWidth),
+      margin: EdgeInsets.symmetric(horizontal: size.gap),
       alignment: Alignment.center,
-      child: child,
+      child: content,
     );
   }
 }

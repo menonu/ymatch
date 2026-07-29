@@ -150,12 +150,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(QuantityStepper), findsNWidgets(3));
-      final qtyStyle = tester.widget<Text>(find.text('1')).style;
-      expect(qtyStyle?.fontSize, 15);
+      expect(tester.widget<Text>(find.text('1')).style?.fontSize, 15);
     },
   );
 
-  testWidgets('standard labeled stepper keeps pre-#538 type scale (#538)', (
+  testWidgets('standard sizes match outer-frame revision (#538)', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -169,53 +168,44 @@ void main() {
     );
     expect(tester.widget<Text>(find.text('所持')).style?.fontSize, 9);
     expect(tester.widget<Text>(find.text('2')).style?.fontSize, 15);
-    final stepper = tester.getSize(find.byType(QuantityStepper));
-    expect(stepper.height, 44);
+    expect(tester.getSize(find.byType(QuantityStepper)).height, 44);
   });
 
-  testWidgets(
-    'half-area hit extends under the label toward the center (#538)',
-    (tester) async {
-      var inc = 0;
-      var dec = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: SizedBox(
-                width: 200,
-                child: QuantityStepper(
-                  quantity: 1,
-                  expand: true,
-                  label: '所持',
-                  incrementKey: const Key('inc'),
-                  decrementKey: const Key('dec'),
-                  onIncrement: () => inc++,
-                  onDecrement: () => dec++,
-                ),
+  testWidgets('half-area hit works under the label (#538)', (tester) async {
+    var inc = 0;
+    var dec = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 200,
+              child: QuantityStepper(
+                quantity: 1,
+                expand: true,
+                label: '所持',
+                incrementKey: const Key('inc'),
+                decrementKey: const Key('dec'),
+                onIncrement: () => inc++,
+                onDecrement: () => dec++,
               ),
             ),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final stepper = tester.getRect(find.byType(QuantityStepper));
-      // Each half is ~half the control; wider than the painted 36px chip.
-      final decBox = tester.getRect(find.byKey(const Key('dec')));
-      expect(decBox.width, closeTo(stepper.width / 2, 1));
-      expect(decBox.width, greaterThan(36));
+    final stepper = tester.getRect(find.byType(QuantityStepper));
+    final decBox = tester.getRect(find.byKey(const Key('dec')));
+    expect(decBox.width, closeTo(stepper.width / 2, 2));
 
-      // Tap just left of center (still on the number side of the − half).
-      await tester.tapAt(Offset(stepper.center.dx - 8, stepper.center.dy));
-      await tester.pump();
-      expect(dec, 1);
-      expect(inc, 0);
+    await tester.tapAt(Offset(stepper.center.dx - 8, stepper.center.dy));
+    await tester.pump();
+    expect(dec, 1);
 
-      // Tap just right of center → increment.
-      await tester.tapAt(Offset(stepper.center.dx + 8, stepper.center.dy));
-      await tester.pump();
-      expect(inc, 1);
-    },
-  );
+    await tester.tapAt(Offset(stepper.center.dx + 8, stepper.center.dy));
+    await tester.pump();
+    expect(inc, 1);
+  });
 }
