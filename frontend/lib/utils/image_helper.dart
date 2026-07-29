@@ -186,3 +186,97 @@ Widget buildImage(
     errorBuilder: (context, error, stackTrace) => defaultError,
   );
 }
+
+/// Opens a full-screen dismissible image viewer with pinch/pan zoom (#540).
+///
+/// No-ops when [url] is null or empty so placeholder thumbs stay inert and
+/// never open an empty dialog.
+void showZoomedImage(BuildContext context, String? url) {
+  if (url == null || url.isEmpty) return;
+
+  final l10n = AppLocalizations.of(context);
+
+  showDialog<void>(
+    context: context,
+    // Real modal barrier around the image-sized dialog — tapping the dark
+    // area outside the picture dismisses (barrierDismissible). Do not wrap
+    // the route in a full-screen hit target or InteractiveViewer expands to
+    // the viewport and steals those taps.
+    barrierDismissible: true,
+    barrierColor: Colors.black87,
+    builder: (ctx) {
+      return Dialog(
+        key: const Key('zoomed_image_viewer'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: SafeArea(
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // Sized by the image (unbounded tight path from Dialog), not the
+              // full screen — so the modal barrier remains tappable outside.
+              InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 5,
+                child: buildImage(url, fit: BoxFit.contain),
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Material(
+                  color: Colors.black45,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: IconButton(
+                    key: const Key('zoomed_image_close'),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    tooltip: l10n?.close ?? 'Close',
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// Wraps a merch (or similar) thumbnail so a tap opens [showZoomedImage] (#540).
+///
+/// When [photoUrl] is null/empty the child is still shown but taps are ignored,
+/// matching placeholder thumbnails that have nothing useful to enlarge.
+class ZoomableImage extends StatelessWidget {
+  const ZoomableImage({
+    super.key,
+    required this.photoUrl,
+    required this.child,
+    this.semanticLabel,
+  });
+
+  final String? photoUrl;
+  final Widget child;
+
+  /// Optional accessibility label (e.g. [AppLocalizations.viewFullImage]).
+  final String? semanticLabel;
+
+  bool get _hasPhoto => photoUrl != null && photoUrl!.isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final thumb = GestureDetector(
+      // Opaque so the whole thumbnail rect is tappable even if the image
+      // letterboxes (BoxFit.contain) and leaves transparent padding.
+      behavior: HitTestBehavior.opaque,
+      onTap: _hasPhoto ? () => showZoomedImage(context, photoUrl) : null,
+      child: child,
+    );
+    // Only expose a button/label when a photo is present so assistive tech
+    // does not announce "View full image" on inert placeholders.
+    if (!_hasPhoto) return thumb;
+    return Semantics(button: true, label: semanticLabel, child: thumb);
+  }
+}

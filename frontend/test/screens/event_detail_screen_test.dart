@@ -34,12 +34,21 @@ User _user() => User()
   ..id = 1
   ..username = 'me';
 
-Merchandise _merch({required int creatorId}) => Merchandise()
-  ..id = 10
-  ..eventId = 5
-  ..name = 'TestPen42'
-  ..groupName = 'Pens'
-  ..creatorId = creatorId;
+/// 1×1 transparent PNG data URI — avoids network Image.network in widget tests.
+const _testPngDataUri =
+    'data:image/png;base64,'
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+Merchandise _merch({required int creatorId, String? photoUrl}) {
+  final m = Merchandise()
+    ..id = 10
+    ..eventId = 5
+    ..name = 'TestPen42'
+    ..groupName = 'Pens'
+    ..creatorId = creatorId;
+  if (photoUrl != null) m.photoUrl = photoUrl;
+  return m;
+}
 
 MerchandiseGroup _testGroup({
   required String name,
@@ -204,6 +213,97 @@ void main() {
       expect(find.text('Delete'), findsNothing);
     },
   );
+
+  // --- Thumbnail zoom (#540) ---
+
+  testWidgets(
+    'tap merch thumbnail opens zoom viewer; close dismisses it (#540)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(5).overrideWith(
+              (ref) async => [_merch(creatorId: 1, photoUrl: _testPngDataUri)],
+            ),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final thumb = find.byKey(const Key('merch_thumbnail_10'));
+      expect(thumb, findsOneWidget);
+
+      await tester.tap(thumb);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('zoomed_image_viewer')), findsOneWidget);
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('zoomed_image_close')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('zoomed_image_viewer')), findsNothing);
+      // Long-press edit path must still be available after dismiss.
+      expect(find.text('TestPen42'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tap merch thumbnail without photo does not open zoom viewer (#540)',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final thumb = find.byKey(const Key('merch_thumbnail_10'));
+      expect(thumb, findsOneWidget);
+
+      await tester.tap(thumb);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('zoomed_image_viewer')), findsNothing);
+    },
+  );
+
+  testWidgets('tap merch thumbnail in grid view opens zoom viewer (#540)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => _emptyGetClient()),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith(
+            (ref) async => [_merch(creatorId: 1, photoUrl: _testPngDataUri)],
+          ),
+          viewModeProvider(5).overrideWith((ref) => ViewMode.grid),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final thumb = find.byKey(const Key('merch_thumbnail_10'));
+    expect(thumb, findsOneWidget);
+
+    await tester.tap(thumb);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('zoomed_image_viewer')), findsOneWidget);
+  });
 
   testWidgets(
     'EventDetailScreen AppBar help icon opens the how-to guide sheet (#336)',

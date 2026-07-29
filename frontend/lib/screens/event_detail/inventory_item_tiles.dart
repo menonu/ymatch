@@ -58,10 +58,17 @@ Widget buildGridInventoryItem(
               aspectRatio: 1,
               child: Stack(
                 children: [
+                  // #540: tap the image area to open a zoomed preview.
+                  // Counters live below this stack, so quantity +/- are unaffected.
                   Positioned.fill(
-                    child: buildImage(
-                      item.hasPhotoUrl() ? item.photoUrl : null,
-                      fit: BoxFit.contain,
+                    child: ZoomableImage(
+                      key: Key('merch_thumbnail_${item.id}'),
+                      photoUrl: item.hasPhotoUrl() ? item.photoUrl : null,
+                      semanticLabel: l10n.viewFullImage,
+                      child: buildImage(
+                        item.hasPhotoUrl() ? item.photoUrl : null,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   if (isDeleted)
@@ -74,10 +81,12 @@ Widget buildGridInventoryItem(
                     Positioned(
                       top: 2,
                       right: 2,
-                      child: Icon(
-                        Icons.edit_note,
-                        size: 14,
-                        color: Colors.blue[400],
+                      child: IgnorePointer(
+                        child: Icon(
+                          Icons.edit_note,
+                          size: 14,
+                          color: Colors.blue[400],
+                        ),
                       ),
                     ),
                 ],
@@ -258,12 +267,18 @@ Widget buildCompactInventoryItem(
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: buildImage(
-                item.hasPhotoUrl() ? item.photoUrl : null,
-                width: 28,
-                height: 28,
+            // #540: tap thumbnail to zoom (compact 28×28 is hard to read).
+            ZoomableImage(
+              key: Key('merch_thumbnail_${item.id}'),
+              photoUrl: item.hasPhotoUrl() ? item.photoUrl : null,
+              semanticLabel: l10n.viewFullImage,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: buildImage(
+                  item.hasPhotoUrl() ? item.photoUrl : null,
+                  width: 28,
+                  height: 28,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -427,16 +442,22 @@ Widget buildDetailedInventoryItem(
               // image is no longer a drag handle. Long-press on the
               // card (handled by the outer GestureDetector) is now the
               // only way to trigger the owner's edit/delete menu.
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: buildImage(
-                    item.hasPhotoUrl() ? item.photoUrl : null,
+              // #540: tap the thumbnail to open a zoomed preview.
+              ZoomableImage(
+                key: Key('merch_thumbnail_${item.id}'),
+                photoUrl: item.hasPhotoUrl() ? item.photoUrl : null,
+                semanticLabel: l10n.viewFullImage,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
                     width: 72,
                     height: 72,
-                    fit: BoxFit.contain,
+                    child: buildImage(
+                      item.hasPhotoUrl() ? item.photoUrl : null,
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),

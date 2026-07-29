@@ -85,6 +85,7 @@ BottomNavBar
   - **Detailed View**: `ReorderableListView` with image, name, owner icon, stepper counters
   - **Grid View**: 3-column `GridView` with image, name, compact +/- counters
   - **Compact List**: `ListView` with thumbnail, name, inline counters
+  - **Tap merch photo** (all layouts): opens dismissible full-size zoom viewer with pinch/pan (#540); no-op when item has no photo
 - **Bottom-left controls** (icon-only, safe-area aware; **group-scope only**):
   - Group info (everyone) — toggles description panel (#128)
   - Edit Group — group creator or `canEditGroup` (#425)

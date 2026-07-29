@@ -1097,5 +1097,14 @@
   "mapSearchFailed": "Place search failed. Try again.",
   "@mapSearchFailed": {
     "description": "Snackbar when place search request fails (#448)"
+  },
+
+  "close": "Close",
+  "@close": {
+    "description": "Generic Close button / tooltip label"
+  },
+  "viewFullImage": "View full image",
+  "@viewFullImage": {
+    "description": "Semantics / tooltip on a merch thumbnail that opens the zoom viewer (#540)"
   }
 }
