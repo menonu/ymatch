@@ -176,9 +176,10 @@ used throughout this document.
 
 | Identifier | Parent Screen | Description |
 |-----------|---------------|-------------|
-| `StepperCounter` | `EventDetailScreen` | Tap-to-increment/decrement (Detailed view) |
-| `GridCounter` | `EventDetailScreen` | Compact +/- counter (Grid view) |
-| `CompactCounter` | `EventDetailScreen` | Inline label+number counter (List view) |
+| `QuantityStepper` | `EventDetailScreen`, `TradeOfferDialog` | Shared pill control: light track, red −, white qty box, green + (#538); sizes `standard` / `compact` / `dense` |
+| `StepperCounter` | `EventDetailScreen` | Label + `QuantityStepper` (Detailed view HAVE/WANT/TRADE) |
+| `GridCounter` | `EventDetailScreen` | Label + dense `QuantityStepper` (Grid view) |
+| `CompactCounter` | `EventDetailScreen` | Label + compact `QuantityStepper` (List view) |
 
 ## Buttons
 

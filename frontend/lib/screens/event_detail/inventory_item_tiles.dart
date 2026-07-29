@@ -9,6 +9,7 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_helper.dart';
+import '../../widgets/quantity_stepper.dart';
 import 'edit_merch_dialog.dart';
 import 'merch_filters.dart';
 
@@ -157,60 +158,28 @@ Widget _buildGridCounter(
         top: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
       ),
     ),
+    padding: const EdgeInsets.fromLTRB(2, 3, 2, 4),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 8,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            color: color,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-                child: Container(
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Icon(
-                    Icons.remove,
-                    size: 12,
-                    color: enabled && qty > 0 ? color : Colors.grey,
-                  ),
-                ),
-              ),
-            ),
-            Text(
-              '$qty',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: qty > 0 ? color : Colors.grey,
-              ),
-            ),
-            Expanded(
-              child: InkWell(
-                onTap: enabled ? () => onUpdate(qty + 1) : null,
-                child: Container(
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Icon(
-                    Icons.add,
-                    size: 12,
-                    color: enabled ? color : Colors.grey,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: QuantityStepper(
+            quantity: qty,
+            size: QuantityStepperSize.dense,
+            enabled: enabled,
+            onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+            onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+          ),
         ),
       ],
     ),
@@ -338,48 +307,26 @@ Widget _buildCompactCounter(
   void Function(int)? onUpdate,
 ) {
   final enabled = onUpdate != null;
-  return Container(
-    height: 26,
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.05),
-      borderRadius: BorderRadius.circular(4),
-      border: Border.all(color: color.withValues(alpha: 0.2)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Icon(
-              Icons.remove,
-              size: 12,
-              color: enabled && qty > 0 ? color : Colors.grey[400],
-            ),
-          ),
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: qty > 0 ? color : Colors.grey[500],
         ),
-        Text(
-          '$label$qty',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        InkWell(
-          onTap: enabled ? () => onUpdate(qty + 1) : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Icon(
-              Icons.add,
-              size: 12,
-              color: enabled ? color : Colors.grey[400],
-            ),
-          ),
-        ),
-      ],
-    ),
+      ),
+      const SizedBox(width: 3),
+      QuantityStepper(
+        quantity: qty,
+        size: QuantityStepperSize.compact,
+        enabled: enabled,
+        onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+        onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+      ),
+    ],
   );
 }
 
@@ -676,105 +623,35 @@ Widget _buildStepper({
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
-  return Container(
-    height: 44,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(6),
-      border: Border.all(color: color.withValues(alpha: 0.3)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Stack(
-      children: [
-        // Tap areas: left = decrease, right = increase
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-            Expanded(
-              child: GestureDetector(
-                key: Key('stepper_inc_$label'),
-                behavior: HitTestBehavior.opaque,
-                onTap: enabled ? () => onUpdate(qty + 1) : null,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-          ],
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        displayLabel,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: qty > 0 ? color : Colors.grey[500],
         ),
-        // −/+ hint icons centered on left/right edges.
-        // IgnorePointer so taps on the glyphs reach the half-area
-        // GestureDetectors below (#408) — same as the center label.
-        Positioned(
-          left: 2,
-          top: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Center(
-              child: Text(
-                '−',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: enabled && qty > 0
-                      ? color.withValues(alpha: 0.5)
-                      : Colors.grey.withValues(alpha: 0.3),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+      ),
+      const SizedBox(height: 4),
+      // #538: pill stepper with red − / white qty box / green + so the
+      // controls read as tappable (replaces faint half-area glyphs).
+      Align(
+        alignment: Alignment.center,
+        child: QuantityStepper(
+          quantity: qty,
+          size: QuantityStepperSize.standard,
+          enabled: enabled,
+          incrementKey: Key('stepper_inc_$label'),
+          decrementKey: Key('stepper_dec_$label'),
+          onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+          onIncrement: enabled ? () => onUpdate(qty + 1) : null,
         ),
-        Positioned(
-          right: 3,
-          top: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Center(
-              child: Text(
-                '+',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: enabled
-                      ? color.withValues(alpha: 0.5)
-                      : Colors.grey.withValues(alpha: 0.3),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Centered label + quantity (non-interactive, taps pass through)
-        Center(
-          child: IgnorePointer(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  displayLabel,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: qty > 0 ? color : Colors.grey[500],
-                  ),
-                ),
-                Text(
-                  '$qty',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
-                    color: qty > 0 ? color : Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 
