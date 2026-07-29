@@ -248,8 +248,8 @@ void main() {
           ),
         );
 
-        // Event stays on the header; combined label is gone.
-        expect(find.text('TokyoFest'), findsOneWidget);
+        // Event stays on the header with a fixed prefix; combined label is gone.
+        expect(find.text('Event: TokyoFest'), findsOneWidget);
         expect(find.text('TokyoFest: Booster Boxes'), findsNothing);
         // Same group label on give and receive (#534).
         expect(find.text('Booster Boxes'), findsNWidgets(2));

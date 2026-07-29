@@ -399,8 +399,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Event remains on the card header (position unchanged).
-      expect(find.text('TokyoFest'), findsOneWidget);
+      // Event remains on the card header with a fixed prefix.
+      expect(find.text('Event: TokyoFest'), findsOneWidget);
       // Combined event:group label is gone.
       expect(find.text('TokyoFest: BoosterBox'), findsNothing);
       // Group name appears once on give and once on receive (#534).
@@ -430,7 +430,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('TokyoFest'), findsOneWidget);
+      expect(find.text('Event: TokyoFest'), findsOneWidget);
       expect(find.text('Booster Boxes'), findsNWidgets(2));
       expect(find.text('BoosterBox'), findsNothing);
       expect(find.text('TokyoFest: Booster Boxes'), findsNothing);

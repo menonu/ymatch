@@ -591,6 +591,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String matchEventLabel(String event) {
+    return 'Event: $event';
+  }
+
+  @override
   String sendOfferItems(int count) {
     return 'Send Offer ($count items)';
   }

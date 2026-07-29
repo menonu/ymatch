@@ -1166,6 +1166,12 @@ abstract class AppLocalizations {
   /// **'Qty: {count}'**
   String qtyLabel(int count);
 
+  /// Match card header: event name with a fixed prefix (#534)
+  ///
+  /// In en, this message translates to:
+  /// **'Event: {event}'**
+  String matchEventLabel(String event);
+
   /// Submit button on the offer dialog with the selected item count
   ///
   /// In en, this message translates to:

@@ -110,7 +110,8 @@ class TradeMatchCard extends StatelessWidget {
                           if (match.hasEventName()) ...[
                             const SizedBox(height: 2),
                             Text(
-                              match.eventName,
+                              // #534: "Event: {name}" / "イベント : {name}"
+                              l10n.matchEventLabel(match.eventName),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
