@@ -103,4 +103,44 @@ void main() {
     expect(find.text('2'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
   });
+
+  testWidgets(
+    'three standard steppers in narrow columns do not overflow (#538)',
+    (tester) async {
+      // Simulate detailed-view three-up columns on a ~360dp phone content width.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 200,
+              child: Row(
+                children: List.generate(3, (i) {
+                  return Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('L$i'),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: QuantityStepper(
+                            quantity: i + 1,
+                            size: QuantityStepperSize.standard,
+                            onDecrement: () {},
+                            onIncrement: () {},
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(QuantityStepper), findsNWidgets(3));
+    },
+  );
 }

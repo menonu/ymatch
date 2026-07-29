@@ -260,38 +260,52 @@ Widget buildCompactInventoryItem(
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
               ),
-            if (showHave)
-              _buildCompactCounter(
-                context,
-                l10n.haveShort,
-                haveQty,
-                AppTheme.haveColor,
-                isDeleted
-                    ? null
-                    : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+            // #538: scale counters as a group so three pill steppers fit
+            // narrow phone rows without overflow.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showHave)
+                      _buildCompactCounter(
+                        context,
+                        l10n.haveShort,
+                        haveQty,
+                        AppTheme.haveColor,
+                        isDeleted
+                            ? null
+                            : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                      ),
+                    if (showHave && (showWant || showTrade))
+                      const SizedBox(width: 4),
+                    if (showWant)
+                      _buildCompactCounter(
+                        context,
+                        l10n.wantShort,
+                        wantQty,
+                        AppTheme.wantColor,
+                        isDeleted
+                            ? null
+                            : (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                      ),
+                    if (showWant && showTrade) const SizedBox(width: 4),
+                    if (showTrade)
+                      _buildCompactCounter(
+                        context,
+                        l10n.tradeShort,
+                        tradeQty,
+                        AppTheme.tradeColor,
+                        isDeleted
+                            ? null
+                            : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                      ),
+                  ],
+                ),
               ),
-            if (showHave && (showWant || showTrade)) const SizedBox(width: 4),
-            if (showWant)
-              _buildCompactCounter(
-                context,
-                l10n.wantShort,
-                wantQty,
-                AppTheme.wantColor,
-                isDeleted
-                    ? null
-                    : (q) => _updateInv(ref, user, item.id, 'WANT', q),
-              ),
-            if (showWant && showTrade) const SizedBox(width: 4),
-            if (showTrade)
-              _buildCompactCounter(
-                context,
-                l10n.tradeShort,
-                tradeQty,
-                AppTheme.tradeColor,
-                isDeleted
-                    ? null
-                    : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-              ),
+            ),
           ],
         ),
       ),
@@ -637,18 +651,21 @@ Widget _buildStepper({
         ),
       ),
       const SizedBox(height: 4),
-      // #538: pill stepper with red − / white qty box / green + so the
-      // controls read as tappable (replaces faint half-area glyphs).
+      // #538: pill stepper with red − / white qty box / green +.
+      // FittedBox keeps three-up columns from overflowing on ~360dp phones.
       Align(
         alignment: Alignment.center,
-        child: QuantityStepper(
-          quantity: qty,
-          size: QuantityStepperSize.standard,
-          enabled: enabled,
-          incrementKey: Key('stepper_inc_$label'),
-          decrementKey: Key('stepper_dec_$label'),
-          onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-          onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: QuantityStepper(
+            quantity: qty,
+            size: QuantityStepperSize.standard,
+            enabled: enabled,
+            incrementKey: Key('stepper_inc_$label'),
+            decrementKey: Key('stepper_dec_$label'),
+            onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+            onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+          ),
         ),
       ),
     ],

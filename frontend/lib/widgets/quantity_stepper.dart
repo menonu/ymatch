@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Density variants for [QuantityStepper].
 enum QuantityStepperSize {
-  /// Detailed inventory cards and offer dialog.
+  /// Default pill used when space allows (detailed inventory when scaled).
   standard,
 
-  /// Compact list rows.
+  /// Compact list rows and match offer dialog.
   compact,
 
   /// Grid cells (tightest).
@@ -16,6 +16,9 @@ enum QuantityStepperSize {
 ///
 /// Layout matches the product reference:
 /// light gray rounded track · red decrement · white qty box · green increment.
+///
+/// Intrinsic width is fixed per [size]; callers on tight layouts should wrap
+/// with [FittedBox] (`BoxFit.scaleDown`) so three-up columns do not overflow.
 class QuantityStepper extends StatelessWidget {
   const QuantityStepper({
     super.key,
@@ -26,6 +29,8 @@ class QuantityStepper extends StatelessWidget {
     this.decrementKey,
     this.incrementKey,
     this.enabled = true,
+    this.decrementSemanticLabel,
+    this.incrementSemanticLabel,
   });
 
   final int quantity;
@@ -44,6 +49,12 @@ class QuantityStepper extends StatelessWidget {
 
   /// Master enable; when false both sides are inert (deleted items).
   final bool enabled;
+
+  /// Accessibility label for the decrement control (defaults to English).
+  final String? decrementSemanticLabel;
+
+  /// Accessibility label for the increment control (defaults to English).
+  final String? incrementSemanticLabel;
 
   static const Color _trackColor = Color(0xFFF0F1F3);
   static const Color _decrementColor = Color(0xFFE25555);
@@ -73,7 +84,7 @@ class QuantityStepper extends StatelessWidget {
             size: dims,
             enabled: canDec,
             onTap: canDec ? onDecrement : null,
-            semanticLabel: 'Decrease quantity',
+            semanticLabel: decrementSemanticLabel ?? 'Decrease quantity',
           ),
           _QuantityBox(quantity: quantity, size: dims),
           _StepButton(
@@ -83,7 +94,7 @@ class QuantityStepper extends StatelessWidget {
             size: dims,
             enabled: canInc,
             onTap: canInc ? onIncrement : null,
-            semanticLabel: 'Increase quantity',
+            semanticLabel: incrementSemanticLabel ?? 'Increase quantity',
           ),
         ],
       ),
@@ -119,42 +130,43 @@ class _QuantityStepperDims {
   static _QuantityStepperDims forSize(QuantityStepperSize size) {
     switch (size) {
       case QuantityStepperSize.standard:
+        // Sized to stay readable when FittedBox-scaled into three-up columns.
         return const _QuantityStepperDims(
-          height: 36,
-          trackRadius: 18,
-          trackPadH: 4,
-          buttonExtent: 32,
+          height: 34,
+          trackRadius: 17,
+          trackPadH: 3,
+          buttonExtent: 30,
           iconSize: 18,
-          qtyMinWidth: 40,
-          qtyHeight: 28,
+          qtyMinWidth: 36,
+          qtyHeight: 26,
           qtyRadius: 8,
-          qtyFontSize: 15,
+          qtyFontSize: 14,
           gap: 2,
         );
       case QuantityStepperSize.compact:
         return const _QuantityStepperDims(
-          height: 28,
-          trackRadius: 14,
+          height: 26,
+          trackRadius: 13,
           trackPadH: 2,
-          buttonExtent: 26,
+          buttonExtent: 24,
           iconSize: 14,
-          qtyMinWidth: 28,
-          qtyHeight: 22,
+          qtyMinWidth: 24,
+          qtyHeight: 20,
           qtyRadius: 6,
           qtyFontSize: 12,
           gap: 1,
         );
       case QuantityStepperSize.dense:
         return const _QuantityStepperDims(
-          height: 24,
-          trackRadius: 12,
+          height: 22,
+          trackRadius: 11,
           trackPadH: 1,
-          buttonExtent: 22,
+          buttonExtent: 20,
           iconSize: 12,
-          qtyMinWidth: 22,
-          qtyHeight: 18,
+          qtyMinWidth: 20,
+          qtyHeight: 16,
           qtyRadius: 5,
-          qtyFontSize: 11,
+          qtyFontSize: 10,
           gap: 0,
         );
     }
