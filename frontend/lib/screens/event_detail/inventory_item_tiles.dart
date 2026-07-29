@@ -474,11 +474,13 @@ Widget buildDetailedInventoryItem(
                       ],
                     ),
                     const SizedBox(height: 8),
+                    // #538: stepper:gap was 5:1; gap reduced by ~1/3 → 15:2
+                    // so 所持/求/譲 outer frames sit slightly closer.
                     Row(
                       children: [
                         if (showHave)
                           Expanded(
-                            flex: 5,
+                            flex: 15,
                             child: _buildStepper(
                               label: 'HAVE',
                               displayLabel: l10n.have,
@@ -496,10 +498,10 @@ Widget buildDetailedInventoryItem(
                             ),
                           ),
                         if (showHave && (showWant || showTrade))
-                          const Spacer(flex: 1),
+                          const Spacer(flex: 2),
                         if (showWant)
                           Expanded(
-                            flex: 5,
+                            flex: 15,
                             child: _buildStepper(
                               label: 'WANT',
                               displayLabel: l10n.want,
@@ -516,10 +518,10 @@ Widget buildDetailedInventoryItem(
                                     ),
                             ),
                           ),
-                        if (showWant && showTrade) const Spacer(flex: 1),
+                        if (showWant && showTrade) const Spacer(flex: 2),
                         if (showTrade)
                           Expanded(
-                            flex: 5,
+                            flex: 15,
                             child: _buildStepper(
                               label: 'TRADE',
                               displayLabel: l10n.trade,
