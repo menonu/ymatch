@@ -101,6 +101,10 @@ message TradeMatch {
   optional string last_terminal_status = 16;
   // ADR 0012: when the latest rematch left the terminal status (RFC3339).
   optional string last_terminal_at = 17;
+  // #535: peer TEXT/LOCATION messages not yet read by the listing caller.
+  // Zero when unknown (e.g. admin list_all) or fully read. Marked read when
+  // the caller lists messages for this match.
+  int32 unread_message_count = 18;
 }
 
 message MatchItem {

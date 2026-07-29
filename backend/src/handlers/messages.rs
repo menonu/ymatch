@@ -47,6 +47,12 @@ pub async fn list_messages(
     let caller = require_active_query_user(&state, query.user_id).await?;
     require_match_participant(&state, match_id, caller.id).await?;
     let items = state.messages.list_for_match(match_id).await?;
+    // #535: opening the thread marks peer messages as read for this caller
+    // so match-card / nav unread badges clear after they have been seen.
+    state
+        .matches
+        .mark_messages_read(match_id, caller.id)
+        .await?;
     Ok(Json(items))
 }
 

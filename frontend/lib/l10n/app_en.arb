@@ -512,6 +512,16 @@
   "@messageAction": {
     "description": "Button label on a match card to open the chat thread"
   },
+  "messageActionWithUnread": "Message({count})",
+  "@messageActionWithUnread": {
+    "description": "Match card Message button when there are unread peer messages (#535)",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "openInMaps": "Open in Maps",
   "@openInMaps": {
     "description": "Link label for opening a map URL"

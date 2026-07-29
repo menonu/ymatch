@@ -903,6 +903,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     $core.int? rematchCount,
     $core.String? lastTerminalStatus,
     $core.String? lastTerminalAt,
+    $core.int? unreadMessageCount,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -923,6 +924,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (lastTerminalStatus != null)
       result.lastTerminalStatus = lastTerminalStatus;
     if (lastTerminalAt != null) result.lastTerminalAt = lastTerminalAt;
+    if (unreadMessageCount != null)
+      result.unreadMessageCount = unreadMessageCount;
     return result;
   }
 
@@ -959,6 +962,7 @@ class TradeMatch extends $pb.GeneratedMessage {
     ..aI(15, _omitFieldNames ? '' : 'rematchCount')
     ..aOS(16, _omitFieldNames ? '' : 'lastTerminalStatus')
     ..aOS(17, _omitFieldNames ? '' : 'lastTerminalAt')
+    ..aI(18, _omitFieldNames ? '' : 'unreadMessageCount')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1119,6 +1123,18 @@ class TradeMatch extends $pb.GeneratedMessage {
   $core.bool hasLastTerminalAt() => $_has(16);
   @$pb.TagNumber(17)
   void clearLastTerminalAt() => $_clearField(17);
+
+  /// #535: peer TEXT/LOCATION messages not yet read by the listing caller.
+  /// Zero when unknown (e.g. admin list_all) or fully read. Marked read when
+  /// the caller lists messages for this match.
+  @$pb.TagNumber(18)
+  $core.int get unreadMessageCount => $_getIZ(17);
+  @$pb.TagNumber(18)
+  set unreadMessageCount($core.int value) => $_setSignedInt32(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasUnreadMessageCount() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearUnreadMessageCount() => $_clearField(18);
 }
 
 class MatchItem extends $pb.GeneratedMessage {

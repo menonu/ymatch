@@ -412,6 +412,45 @@ async fn test_notification_counts_values(pool: PgPool) {
     assert_eq!(json_i64(&body, "unreadMessages"), 1);
     assert_eq!(json_i64(&body, "total"), 1);
 
+    // #535: a second unread peer message raises unreadMessages but not total —
+    // the nav badge treats "any unread" as +1 only.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/api/v1/matches/{}/messages", match_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"matchId": {}, "senderId": {}, "content": "hi again", "messageType": "TEXT"}}"#,
+                    match_id, u2
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(json_i64(&body, "unreadMessages"), 2);
+    assert_eq!(
+        json_i64(&body, "total"),
+        1,
+        "nav total must stay +1 for any non-zero unread message count"
+    );
+
     // Query counts for u2 (the non-offerer): pending=0, offers_in=1 (u2 sees
     // u1's offer as an incoming offer), unread=0 (u2 sent the message; doesn't
     // count as unread for themselves)
@@ -434,12 +473,70 @@ async fn test_notification_counts_values(pool: PgPool) {
     assert_eq!(json_i64(&body, "unreadMessages"), 0);
     assert_eq!(json_i64(&body, "total"), 1);
 
-    // ---- u1 marks their matches_read_at = NOW; unread should drop to 0 ----
-    let _ = sqlx::query("UPDATE users SET matches_read_at = NOW() WHERE id = $1")
-        .bind(u1)
-        .execute(&pool)
+    // ---- #535: list_for_user surfaces per-match unreadMessageCount ----
+    // SYSTEM lifecycle rows must not inflate the unread count (issue notes).
+    sqlx::query(
+        "INSERT INTO messages (match_id, sender_id, content, message_type)
+         VALUES ($1, $2, 'INVENTORY_CAPACITY', 'SYSTEM')",
+    )
+    .bind(match_id)
+    .bind(u2 as i32)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let listed = list_user_matches(&pool, u1 as i64).await;
+    let listed_match = listed
+        .iter()
+        .find(|m| m["id"].as_i64() == Some(match_id as i64))
+        .expect("match listed for u1");
+    assert_eq!(
+        listed_match["unreadMessageCount"].as_i64().unwrap_or(0),
+        2,
+        "u1 should see 2 unread peer messages (SYSTEM excluded)"
+    );
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        json_i64(&body, "unreadMessages"),
+        2,
+        "global unread also excludes SYSTEM"
+    );
+    assert_eq!(
+        json_i64(&body, "total"),
+        1,
+        "nav total still +1 with multiple unread messages"
+    );
+
+    // Opening the chat (list messages) stamps the per-match watermark;
+    // global and per-match unread should both drop to 0.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!(
+                    "/api/v1/matches/{}/messages?user_id={}",
+                    match_id, u1
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -456,6 +553,17 @@ async fn test_notification_counts_values(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(json_i64(&body, "unreadMessages"), 0);
     assert_eq!(json_i64(&body, "total"), 0); // all zeros for u1 now
+
+    let listed = list_user_matches(&pool, u1 as i64).await;
+    let listed_match = listed
+        .iter()
+        .find(|m| m["id"].as_i64() == Some(match_id as i64))
+        .expect("match listed for u1 after read");
+    assert_eq!(
+        listed_match["unreadMessageCount"].as_i64().unwrap_or(0),
+        0,
+        "opening chat clears per-match unread"
+    );
 
     // ---- Transition OFFERED -> ACCEPTED: counts should change again ----
     // Note: the offer's "offeree" is u2; for ACCEPTED, the user_id in

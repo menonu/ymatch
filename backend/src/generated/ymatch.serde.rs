@@ -4559,6 +4559,9 @@ impl serde::Serialize for TradeMatch {
         if self.last_terminal_at.is_some() {
             len += 1;
         }
+        if self.unread_message_count != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.TradeMatch", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -4611,6 +4614,9 @@ impl serde::Serialize for TradeMatch {
         if let Some(v) = self.last_terminal_at.as_ref() {
             struct_ser.serialize_field("lastTerminalAt", v)?;
         }
+        if self.unread_message_count != 0 {
+            struct_ser.serialize_field("unreadMessageCount", &self.unread_message_count)?;
+        }
         struct_ser.end()
     }
 }
@@ -4653,6 +4659,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             "lastTerminalStatus",
             "last_terminal_at",
             "lastTerminalAt",
+            "unread_message_count",
+            "unreadMessageCount",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4674,6 +4682,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             RematchCount,
             LastTerminalStatus,
             LastTerminalAt,
+            UnreadMessageCount,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4712,6 +4721,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             "rematchCount" | "rematch_count" => Ok(GeneratedField::RematchCount),
                             "lastTerminalStatus" | "last_terminal_status" => Ok(GeneratedField::LastTerminalStatus),
                             "lastTerminalAt" | "last_terminal_at" => Ok(GeneratedField::LastTerminalAt),
+                            "unreadMessageCount" | "unread_message_count" => Ok(GeneratedField::UnreadMessageCount),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4748,6 +4758,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                 let mut rematch_count__ = None;
                 let mut last_terminal_status__ = None;
                 let mut last_terminal_at__ = None;
+                let mut unread_message_count__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -4862,6 +4873,14 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             }
                             last_terminal_at__ = map_.next_value()?;
                         }
+                        GeneratedField::UnreadMessageCount => {
+                            if unread_message_count__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("unreadMessageCount"));
+                            }
+                            unread_message_count__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
                     }
                 }
                 Ok(TradeMatch {
@@ -4882,6 +4901,7 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                     rematch_count: rematch_count__.unwrap_or_default(),
                     last_terminal_status: last_terminal_status__,
                     last_terminal_at: last_terminal_at__,
+                    unread_message_count: unread_message_count__.unwrap_or_default(),
                 })
             }
         }

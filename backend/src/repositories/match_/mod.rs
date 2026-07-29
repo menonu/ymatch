@@ -11,10 +11,10 @@
 //!
 //! Phase 4 of #163 fixes the N+1 problem in the previous
 //! `handlers::matches::list_matches` (1 + 4N queries for N matches) by
-//! replacing it with [`MatchRepository::list_for_user`], which runs **4
+//! replacing it with [`MatchRepository::list_for_user`], which runs **5
 //! queries total**: matches + other_user via JOIN, haves batched,
-//! wants batched, match_items batched. The in-memory join happens
-//! inside the repository.
+//! wants batched, match_items batched, unread message counts batched
+//! (#535). The in-memory join happens inside the repository.
 //!
 //! ## Transactional writes (Phase B-9 of #191)
 //!
@@ -188,5 +188,7 @@ fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
         rematch_count: row.get("rematch_count"),
         last_terminal_status: row.get("last_terminal_status"),
         last_terminal_at: to_rfc3339(row.get("last_terminal_at")),
+        // #535: only list_for_user fills this; admin list_all stays 0.
+        unread_message_count: 0,
     }
 }

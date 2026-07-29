@@ -23,6 +23,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   Timer? _pollingTimer;
 
+  /// #535: list messages stamps the server read watermark; refresh match /
+  /// notification badges once so the card clears when the user returns.
+  bool _refreshedUnreadBadges = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +37,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // notifier for little gain.
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       ref.invalidate(messagesProvider(widget.matchId));
+    });
+  }
+
+  void _maybeRefreshUnreadBadges(User user) {
+    if (_refreshedUnreadBadges) return;
+    _refreshedUnreadBadges = true;
+    // Defer past the current build; GET messages already marked read.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(matchesProvider(user.id));
+      ref.invalidate(notificationCountsProvider(user.id));
     });
   }
 
@@ -64,6 +79,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final messagesAsync = ref.watch(messagesProvider(widget.matchId));
     final l10n = AppLocalizations.of(context)!;
+
+    // #535: after the thread loads (server mark-as-read), refresh badges once.
+    if (messagesAsync.hasValue) {
+      _maybeRefreshUnreadBadges(user);
+    }
 
     // Single owner for chat-send error SnackBars (#245).
     ref.listen<AsyncValue<void>>(chatControllerProvider, (previous, next) {

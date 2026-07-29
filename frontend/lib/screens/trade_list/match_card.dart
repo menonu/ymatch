@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/format_local_datetime.dart';
 import '../../utils/group_display.dart';
+import '../../widgets/matches_nav_icon.dart';
 import 'match_balance.dart';
 import 'match_card_actions.dart';
 import 'match_items.dart';
@@ -44,6 +45,9 @@ class TradeMatchCard extends StatelessWidget {
     final createdAtLabel = match.hasCreatedAt()
         ? formatLocalDateTime(match.createdAt)
         : null;
+    // #535: per-match unread peer message count from list_for_user.
+    final unread = match.unreadMessageCount;
+    final hasUnread = unread > 0;
     // #534 / #466: group label for the give/receive item rows (same value on
     // both sides by ADR 0001; shown twice for UI balance).
     final itemGroupLabel = match.hasGroupName()
@@ -135,6 +139,8 @@ class TradeMatchCard extends StatelessWidget {
                     // #314: the Message affordance is shown on every tab,
                     // including completed matches (chat remains open after a
                     // trade is done, same as while trading).
+                    // #535: unread peer messages → "Message(N)" / "メッセージ(N)"
+                    // in purple (same as the nav message badge color).
                     FilledButton.tonal(
                       onPressed: onOpenChat,
                       style: FilledButton.styleFrom(
@@ -144,8 +150,18 @@ class TradeMatchCard extends StatelessWidget {
                         ),
                         minimumSize: const Size(0, 36),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: hasUnread
+                            ? MatchesNavIcon.messageBadgeColor
+                            : null,
                       ),
-                      child: Text(l10n.messageAction),
+                      child: Text(
+                        hasUnread
+                            ? l10n.messageActionWithUnread(unread)
+                            : l10n.messageAction,
+                        style: hasUnread
+                            ? const TextStyle(fontWeight: FontWeight.w600)
+                            : null,
+                      ),
                     ),
                   ],
                 ),
