@@ -159,18 +159,17 @@ Widget _buildGridCounter(
       ),
     ),
     padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: QuantityStepper(
-        quantity: qty,
-        size: QuantityStepperSize.dense,
-        enabled: enabled,
-        // Label sits inside the white qty box above the number (#538).
-        label: label,
-        labelColor: qty > 0 ? color : Colors.grey[500],
-        onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-        onIncrement: enabled ? () => onUpdate(qty + 1) : null,
-      ),
+    // expand fills the grid cell width so icons/type stay full size.
+    child: QuantityStepper(
+      quantity: qty,
+      size: QuantityStepperSize.dense,
+      expand: true,
+      enabled: enabled,
+      // Label sits inside the white qty box above the number (#538).
+      label: label,
+      labelColor: qty > 0 ? color : Colors.grey[500],
+      onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+      onIncrement: enabled ? () => onUpdate(qty + 1) : null,
     ),
   );
 }
@@ -615,25 +614,20 @@ Widget _buildStepper({
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
-  // #538: pill stepper with red − / white qty box / green +.
-  // Status label (所持/求/譲) is drawn inside the white box above the qty.
-  // FittedBox keeps three-up columns from overflowing on ~360dp phones.
-  return Align(
-    alignment: Alignment.center,
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: QuantityStepper(
-        quantity: qty,
-        size: QuantityStepperSize.standard,
-        enabled: enabled,
-        label: displayLabel,
-        labelColor: qty > 0 ? color : Colors.grey[500],
-        incrementKey: Key('stepper_inc_$label'),
-        decrementKey: Key('stepper_dec_$label'),
-        onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-        onIncrement: enabled ? () => onUpdate(qty + 1) : null,
-      ),
-    ),
+  // #538: pill UI (red − / white qty+label / green +) at pre-#538 type
+  // scale (height 44, label 9, qty 15). expand:true fills the Expanded
+  // column like the old half-area steppers — no FittedBox shrink.
+  return QuantityStepper(
+    quantity: qty,
+    size: QuantityStepperSize.standard,
+    expand: true,
+    enabled: enabled,
+    label: displayLabel,
+    labelColor: qty > 0 ? color : Colors.grey[500],
+    incrementKey: Key('stepper_inc_$label'),
+    decrementKey: Key('stepper_dec_$label'),
+    onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+    onIncrement: enabled ? () => onUpdate(qty + 1) : null,
   );
 }
 

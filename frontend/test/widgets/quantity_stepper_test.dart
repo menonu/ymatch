@@ -126,9 +126,9 @@ void main() {
   });
 
   testWidgets(
-    'three standard steppers in narrow columns do not overflow (#538)',
+    'three expanded standard steppers fill narrow columns without overflow (#538)',
     (tester) async {
-      // Simulate detailed-view three-up columns on a ~360dp phone content width.
+      // Detailed-view three-up columns: expand fills width at full type size.
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -137,20 +137,13 @@ void main() {
               child: Row(
                 children: List.generate(3, (i) {
                   return Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('L$i'),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: QuantityStepper(
-                            quantity: i + 1,
-                            size: QuantityStepperSize.standard,
-                            onDecrement: () {},
-                            onIncrement: () {},
-                          ),
-                        ),
-                      ],
+                    child: QuantityStepper(
+                      quantity: i + 1,
+                      size: QuantityStepperSize.standard,
+                      expand: true,
+                      label: 'L$i',
+                      onDecrement: () {},
+                      onIncrement: () {},
                     ),
                   );
                 }),
@@ -162,6 +155,28 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(QuantityStepper), findsNWidgets(3));
+      // Type scale must not be shrunk: qty uses 15 (standard dims).
+      final qtyStyle = tester.widget<Text>(find.text('1')).style;
+      expect(qtyStyle?.fontSize, 15);
     },
   );
+
+  testWidgets('standard labeled stepper keeps pre-#538 type scale (#538)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      wrap(
+        const QuantityStepper(
+          quantity: 2,
+          label: '所持',
+          size: QuantityStepperSize.standard,
+        ),
+      ),
+    );
+    expect(tester.widget<Text>(find.text('所持')).style?.fontSize, 9);
+    expect(tester.widget<Text>(find.text('2')).style?.fontSize, 15);
+    // Track height matches the old detailed Container (44).
+    final stepper = tester.getSize(find.byType(QuantityStepper));
+    expect(stepper.height, 44);
+  });
 }
