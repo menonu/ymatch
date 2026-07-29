@@ -398,7 +398,11 @@ impl MatchRepository {
         let offers_in: i64 = row.get("offers_in");
         let accepted: i64 = row.get("accepted");
         let unread: i64 = row.get("unread");
-        let total = pending + offers_in + accepted + unread;
+        // #535: nav badge treats "any unread messages" as a single unit (+1),
+        // not the raw message count. Per-card Message(N) still uses the full
+        // per-match unread via list_for_user.
+        let unread_badge: i64 = if unread > 0 { 1 } else { 0 };
+        let total = pending + offers_in + accepted + unread_badge;
         Ok(NotificationCounts {
             pending_matches: pending as i32,
             offers_in: offers_in as i32,

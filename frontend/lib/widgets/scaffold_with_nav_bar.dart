@@ -20,7 +20,17 @@ class ScaffoldWithNavBar extends ConsumerWidget {
     final notifAsync = user != null
         ? ref.watch(notificationCountsProvider(user.id))
         : null;
-    final badgeCount = notifAsync?.whenOrNull(data: (c) => c.total) ?? 0;
+    // #535: match lifecycle counts sum 1:1; unread messages contribute at most
+    // +1 on the tab icon (full Message(N) stays on each match card).
+    final badgeCount =
+        notifAsync?.whenOrNull(
+          data: (c) =>
+              c.pendingMatches +
+              c.offersIn +
+              c.accepted +
+              (c.unreadMessages > 0 ? 1 : 0),
+        ) ??
+        0;
     final l10n = AppLocalizations.of(context)!;
 
     final destinations = <NavigationDestination>[
