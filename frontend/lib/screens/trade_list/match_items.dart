@@ -7,9 +7,14 @@ import '../../utils/image_helper.dart';
 
 /// Potential HAVE/WANT chips before a concrete offer is selected.
 class MatchPotentialItems extends StatelessWidget {
-  const MatchPotentialItems({super.key, required this.match});
+  const MatchPotentialItems({super.key, required this.match, this.groupLabel});
 
   final TradeMatch match;
+
+  /// Cosmetic group label shown once on the left of each give/receive row
+  /// (#534). Same value on both sides by ADR 0001; null when the match has
+  /// no group name.
+  final String? groupLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +32,13 @@ class MatchPotentialItems extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          MatchItemChips(items: match.userHaves, color: AppTheme.tradeColor),
+          MatchExchangeRow(
+            groupLabel: groupLabel,
+            child: MatchItemChips(
+              items: match.userHaves,
+              color: AppTheme.tradeColor,
+            ),
+          ),
         ],
         if (match.userWants.isNotEmpty) ...[
           const SizedBox(height: 6),
@@ -40,7 +51,13 @@ class MatchPotentialItems extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          MatchItemChips(items: match.userWants, color: AppTheme.wantColor),
+          MatchExchangeRow(
+            groupLabel: groupLabel,
+            child: MatchItemChips(
+              items: match.userWants,
+              color: AppTheme.wantColor,
+            ),
+          ),
         ],
       ],
     );
@@ -86,10 +103,16 @@ class MatchSelectedItems extends StatelessWidget {
     super.key,
     required this.userId,
     required this.match,
+    this.groupLabel,
   });
 
   final int userId;
   final TradeMatch match;
+
+  /// Cosmetic group label shown once on the left of each give/receive row
+  /// (#534). Same value on both sides by ADR 0001; null when the match has
+  /// no group name.
+  final String? groupLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -114,8 +137,15 @@ class MatchSelectedItems extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          ...gives.map(
-            (i) => MatchItemRow(item: i, color: AppTheme.tradeColor),
+          MatchExchangeRow(
+            groupLabel: groupLabel,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final i in gives)
+                  MatchItemRow(item: i, color: AppTheme.tradeColor),
+              ],
+            ),
           ),
         ],
         if (receives.isNotEmpty) ...[
@@ -129,10 +159,55 @@ class MatchSelectedItems extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          ...receives.map(
-            (i) => MatchItemRow(item: i, color: AppTheme.wantColor),
+          MatchExchangeRow(
+            groupLabel: groupLabel,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final i in receives)
+                  MatchItemRow(item: i, color: AppTheme.wantColor),
+              ],
+            ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Layout helper: optional group name on the left of an exchange-items body
+/// (#534). Used once per give section and once per receive section.
+class MatchExchangeRow extends StatelessWidget {
+  const MatchExchangeRow({super.key, required this.child, this.groupLabel});
+
+  final Widget child;
+  final String? groupLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = groupLabel;
+    if (label == null || label.isEmpty) return child;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2, right: 8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 96),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        Expanded(child: child),
       ],
     );
   }

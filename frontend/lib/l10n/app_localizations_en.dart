@@ -596,8 +596,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String matchGroupLabel(String event, String group) {
-    return '$event: $group';
+  String matchEventLabel(String event) {
+    return 'Event: $event';
   }
 
   @override

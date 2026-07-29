@@ -48,6 +48,14 @@ class TradeMatchCard extends StatelessWidget {
     // #535: per-match unread peer message count from list_for_user.
     final unread = match.unreadMessageCount;
     final hasUnread = unread > 0;
+    // #534 / #466: group label for the give/receive item rows (same value on
+    // both sides by ADR 0001; shown twice for UI balance).
+    final itemGroupLabel = match.hasGroupName()
+        ? groupLabel(
+            match.groupName,
+            match.hasGroupDisplayName() ? match.groupDisplayName : null,
+          )
+        : null;
 
     final cancelled = match.status == 'CANCELLED';
     return Opacity(
@@ -98,23 +106,16 @@ class TradeMatchCard extends StatelessWidget {
                             const SizedBox(height: 2),
                             PriorHistoryAnnotation(match: match),
                           ],
-                          // #322 / ADR 0001: a match is scoped to one item group,
-                          // so show `event:group` once on the card instead of per
-                          // item. Both fields are NOT NULL on a real match; guard
-                          // so synthetic/test matches without them render nothing.
-                          if (match.hasGroupName() && match.hasEventName()) ...[
+                          // #322 / ADR 0001 / #534: event name stays on the card
+                          // header (position unchanged). Group name is shown on
+                          // the give/receive item rows instead — see match_items.
+                          // Real matches always have eventName; guard so
+                          // synthetic/test matches without it render nothing.
+                          if (match.hasEventName()) ...[
                             const SizedBox(height: 2),
                             Text(
-                              // #466: cosmetic group_display_name when set.
-                              l10n.matchGroupLabel(
-                                match.eventName,
-                                groupLabel(
-                                  match.groupName,
-                                  match.hasGroupDisplayName()
-                                      ? match.groupDisplayName
-                                      : null,
-                                ),
-                              ),
+                              // #534: "Event: {name}" / "イベント : {name}"
+                              l10n.matchEventLabel(match.eventName),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -168,11 +169,15 @@ class TradeMatchCard extends StatelessWidget {
                 // Items section
                 if (match.selectedItems.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  MatchSelectedItems(userId: user.id, match: match),
+                  MatchSelectedItems(
+                    userId: user.id,
+                    match: match,
+                    groupLabel: itemGroupLabel,
+                  ),
                 ] else if (match.userHaves.isNotEmpty ||
                     match.userWants.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  MatchPotentialItems(match: match),
+                  MatchPotentialItems(match: match, groupLabel: itemGroupLabel),
                 ],
 
                 // Balance indicator on an open proposal (#297)
