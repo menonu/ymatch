@@ -1172,6 +1172,18 @@ abstract class AppLocalizations {
   /// **'Qty: {count}'**
   String qtyLabel(int count);
 
+  /// Semantics label for inventory quantity stepper − control (#538)
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease quantity'**
+  String get decreaseQuantity;
+
+  /// Semantics label for inventory quantity stepper + control (#538)
+  ///
+  /// In en, this message translates to:
+  /// **'Increase quantity'**
+  String get increaseQuantity;
+
   /// Match card header: event name with a fixed prefix (#534)
   ///
   /// In en, this message translates to:

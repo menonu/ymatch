@@ -591,6 +591,12 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get decreaseQuantity => '数量を減らす';
+
+  @override
+  String get increaseQuantity => '数量を増やす';
+
+  @override
   String matchEventLabel(String event) {
     return 'イベント : $event';
   }

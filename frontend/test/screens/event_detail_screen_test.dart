@@ -856,13 +856,11 @@ void main() {
     expect(resolveInitialGroupTabIndex([], 'B'), 0);
   });
 
-  // --- Inventory stepper −/+ glyph hit targets (#408) ---
-  // Decorative − / + Text sits above the half-area GestureDetectors. Without
-  // IgnorePointer, taps on those glyphs are absorbed and never reach the
-  // detectors. These tests tap the glyph Text widgets themselves.
+  // --- Inventory stepper +/− hit targets (#408 / #538) ---
+  // Pill QuantityStepper exposes explicit increment/decrement keys.
 
   testWidgets(
-    'tapping the decorative + glyph on the detailed stepper increments inventory (#408)',
+    'tapping the detailed stepper + control increments inventory (#408/#538)',
     (tester) async {
       final inventoryPosts = <Map<String, dynamic>>[];
       final config = ConfigService()
@@ -904,19 +902,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Detailed view shows three steppers (HAVE / WANT / TRADE), each with a +
-      // hint glyph. Tap at the first (+) center — the HAVE stepper. Use
-      // tapAt so the hit lands on the glyph position even when the Text is
-      // IgnorePointer (the bug is that hits at that offset must reach the
-      // half-area GestureDetector beneath).
-      expect(find.text('+'), findsNWidgets(3));
-      await tester.tapAt(tester.getCenter(find.text('+').first));
+      expect(find.byKey(const Key('stepper_inc_HAVE')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('stepper_inc_HAVE')));
       await tester.pumpAndSettle();
 
       expect(
         inventoryPosts,
         isNotEmpty,
-        reason: 'tap on + glyph must reach the increase GestureDetector',
+        reason: 'tap on + control must POST inventory update',
       );
       expect(inventoryPosts.first['status'], 'HAVE');
       expect(inventoryPosts.first['quantity'], 1);
@@ -925,7 +918,7 @@ void main() {
   );
 
   testWidgets(
-    'tapping the decorative − glyph on the detailed stepper decrements inventory (#408)',
+    'tapping the detailed stepper − control decrements inventory (#408/#538)',
     (tester) async {
       final inventoryPosts = <Map<String, dynamic>>[];
       final config = ConfigService()
@@ -984,15 +977,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Unicode minus (U+2212), not ASCII hyphen — matches _buildStepper.
-      expect(find.text('−'), findsNWidgets(3));
-      await tester.tapAt(tester.getCenter(find.text('−').first));
+      expect(find.byKey(const Key('stepper_dec_HAVE')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('stepper_dec_HAVE')));
       await tester.pumpAndSettle();
 
       expect(
         inventoryPosts,
         isNotEmpty,
-        reason: 'tap on − glyph must reach the decrease GestureDetector',
+        reason: 'tap on − control must POST inventory update',
       );
       expect(inventoryPosts.first['status'], 'HAVE');
       expect(inventoryPosts.first['quantity'], 0);
@@ -1257,8 +1249,9 @@ void main() {
     expect(find.byKey(const Key('stepper_inc_TRADE')), findsOneWidget);
     expect(find.byKey(const Key('stepper_inc_HAVE')), findsNothing);
     expect(find.byKey(const Key('stepper_inc_WANT')), findsNothing);
-    expect(find.text('+'), findsOneWidget);
-    expect(find.text('−'), findsOneWidget);
+    expect(find.byKey(const Key('stepper_dec_TRADE')), findsOneWidget);
+    expect(find.byKey(const Key('stepper_dec_HAVE')), findsNothing);
+    expect(find.byKey(const Key('stepper_dec_WANT')), findsNothing);
   });
 
   // --- Group inventory totals card (#508) ---

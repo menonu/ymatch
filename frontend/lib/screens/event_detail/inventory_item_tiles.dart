@@ -9,6 +9,7 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_helper.dart';
+import '../../widgets/quantity_stepper.dart';
 import 'edit_merch_dialog.dart';
 import 'merch_filters.dart';
 
@@ -470,12 +471,15 @@ Widget buildDetailedInventoryItem(
                       ],
                     ),
                     const SizedBox(height: 8),
+                    // #538: stepper:gap was 5:1; gap reduced by ~1/3 → 15:2
+                    // so 所持/求/譲 outer frames sit slightly closer.
                     Row(
                       children: [
                         if (showHave)
                           Expanded(
-                            flex: 5,
+                            flex: 15,
                             child: _buildStepper(
+                              context: context,
                               label: 'HAVE',
                               displayLabel: l10n.have,
                               color: AppTheme.haveColor,
@@ -492,11 +496,12 @@ Widget buildDetailedInventoryItem(
                             ),
                           ),
                         if (showHave && (showWant || showTrade))
-                          const Spacer(flex: 1),
+                          const Spacer(flex: 2),
                         if (showWant)
                           Expanded(
-                            flex: 5,
+                            flex: 15,
                             child: _buildStepper(
+                              context: context,
                               label: 'WANT',
                               displayLabel: l10n.want,
                               color: AppTheme.wantColor,
@@ -512,11 +517,12 @@ Widget buildDetailedInventoryItem(
                                     ),
                             ),
                           ),
-                        if (showWant && showTrade) const Spacer(flex: 1),
+                        if (showWant && showTrade) const Spacer(flex: 2),
                         if (showTrade)
                           Expanded(
-                            flex: 5,
+                            flex: 15,
                             child: _buildStepper(
+                              context: context,
                               label: 'TRADE',
                               displayLabel: l10n.trade,
                               color: AppTheme.tradeColor,
@@ -669,6 +675,7 @@ void _confirmDeleteMerch(
 }
 
 Widget _buildStepper({
+  required BuildContext context,
   required String label,
   required String displayLabel,
   required Color color,
@@ -676,105 +683,21 @@ Widget _buildStepper({
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
-  return Container(
-    height: 44,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(6),
-      border: Border.all(color: color.withValues(alpha: 0.3)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Stack(
-      children: [
-        // Tap areas: left = decrease, right = increase
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-            Expanded(
-              child: GestureDetector(
-                key: Key('stepper_inc_$label'),
-                behavior: HitTestBehavior.opaque,
-                onTap: enabled ? () => onUpdate(qty + 1) : null,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-          ],
-        ),
-        // −/+ hint icons centered on left/right edges.
-        // IgnorePointer so taps on the glyphs reach the half-area
-        // GestureDetectors below (#408) — same as the center label.
-        Positioned(
-          left: 2,
-          top: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Center(
-              child: Text(
-                '−',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: enabled && qty > 0
-                      ? color.withValues(alpha: 0.5)
-                      : Colors.grey.withValues(alpha: 0.3),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          right: 3,
-          top: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Center(
-              child: Text(
-                '+',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: enabled
-                      ? color.withValues(alpha: 0.5)
-                      : Colors.grey.withValues(alpha: 0.3),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Centered label + quantity (non-interactive, taps pass through)
-        Center(
-          child: IgnorePointer(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  displayLabel,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: qty > 0 ? color : Colors.grey[500],
-                  ),
-                ),
-                Text(
-                  '$qty',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
-                    color: qty > 0 ? color : Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
+  final l10n = AppLocalizations.of(context)!;
+  // #538: detailed-view only — flat framed control, tinted ± chips, bare
+  // label+qty, half-area hits. expand:true fills the column.
+  return QuantityStepper(
+    quantity: qty,
+    expand: true,
+    enabled: enabled,
+    label: displayLabel,
+    labelColor: qty > 0 ? color : Colors.grey[500],
+    incrementKey: Key('stepper_inc_$label'),
+    decrementKey: Key('stepper_dec_$label'),
+    decrementSemanticLabel: l10n.decreaseQuantity,
+    incrementSemanticLabel: l10n.increaseQuantity,
+    onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+    onIncrement: enabled ? () => onUpdate(qty + 1) : null,
   );
 }
 

@@ -596,6 +596,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get decreaseQuantity => 'Decrease quantity';
+
+  @override
+  String get increaseQuantity => 'Increase quantity';
+
+  @override
   String matchEventLabel(String event) {
     return 'Event: $event';
   }
