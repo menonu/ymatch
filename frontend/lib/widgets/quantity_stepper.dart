@@ -12,13 +12,11 @@ enum QuantityStepperSize {
   dense,
 }
 
-/// Flat white quantity control with clear ± affordance (#538).
+/// Borderless quantity control with clear ± affordance (#538).
 ///
-/// Layout matches the app's minimalist Material surface language
-/// (cards use elevation 0 + subtle border — no floating shadow):
-/// - White track + thin border ([AppTheme] card style)
+/// No outer track/frame — sits directly on the parent surface:
 /// - Light red / green rounded chips for − / +
-/// - Center: optional status label above bare quantity (no qty box)
+/// - Center: optional status label above bare quantity
 ///
 /// Set [expand] to `true` in constrained [Expanded] parents (detailed view)
 /// so the control fills column width at full type size.
@@ -71,9 +69,6 @@ class QuantityStepper extends StatelessWidget {
   /// Accessibility label for the increment control (defaults to English).
   final String? incrementSemanticLabel;
 
-  // Same surface language as AppTheme.cardTheme (white + #DEE2E6 border).
-  static const Color _trackColor = Colors.white;
-  static const Color _trackBorder = Color(0xFFDEE2E6);
   static const Color _decrementColor = Color(0xFFE25555);
   static const Color _incrementColor = Color(0xFF2EAF6A);
   static const Color _defaultLabelColor = Color(0xFF6C757D);
@@ -114,31 +109,10 @@ class QuantityStepper extends StatelessWidget {
       semanticLabel: incrementSemanticLabel ?? 'Increase quantity',
     );
 
-    return Container(
+    // No outer track/frame — only ± chips and bare center content.
+    return SizedBox(
       height: dims.height,
       width: expand ? double.infinity : null,
-      decoration: BoxDecoration(
-        color: _trackColor,
-        borderRadius: BorderRadius.circular(dims.trackRadius),
-        border: Border.all(color: const Color(0xFFE8EAED)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 1,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: dims.trackPadH,
-        vertical: dims.trackPadV,
-      ),
-      clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
         children: expand
@@ -359,9 +333,8 @@ class _StepButton extends StatelessWidget {
     );
 
     if (expand) {
-      // Fill the Expanded slot; chip height fits inside track padding.
-      final chipH = size.height - size.trackPadV * 2;
-      return SizedBox(height: chipH, width: double.infinity, child: chip);
+      // Fill the Expanded slot at full control height (no outer track pad).
+      return SizedBox(height: size.height, width: double.infinity, child: chip);
     }
     return SizedBox(
       width: size.buttonExtent,
