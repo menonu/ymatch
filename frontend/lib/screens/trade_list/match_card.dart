@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/format_local_datetime.dart';
 import '../../utils/group_display.dart';
+import '../../widgets/matches_nav_icon.dart';
 import 'match_balance.dart';
 import 'match_card_actions.dart';
 import 'match_items.dart';
@@ -138,7 +139,7 @@ class TradeMatchCard extends StatelessWidget {
                     // including completed matches (chat remains open after a
                     // trade is done, same as while trading).
                     // #535: unread peer messages → "Message(N)" / "メッセージ(N)"
-                    // in red so the badge is visible without opening chat.
+                    // in purple (same as the nav message badge color).
                     FilledButton.tonal(
                       onPressed: onOpenChat,
                       style: FilledButton.styleFrom(
@@ -148,9 +149,9 @@ class TradeMatchCard extends StatelessWidget {
                         ),
                         minimumSize: const Size(0, 36),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        // #535: red label when unread; button foreground alone
-                        // is enough (no separate TextStyle.color).
-                        foregroundColor: hasUnread ? Colors.red : null,
+                        foregroundColor: hasUnread
+                            ? MatchesNavIcon.messageBadgeColor
+                            : null,
                       ),
                       child: Text(
                         hasUnread

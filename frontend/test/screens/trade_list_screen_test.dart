@@ -6,6 +6,7 @@ import 'package:frontend/models/models.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/trade_list_screen.dart';
 import 'package:frontend/utils/format_local_datetime.dart';
+import 'package:frontend/widgets/matches_nav_icon.dart';
 
 /// Wraps [child] with the localization delegates so screens that call
 /// `AppLocalizations.of(context)` resolve strings in widget tests.
@@ -266,8 +267,8 @@ void main() {
     expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
   });
 
-  // #535: per-match unread count on the Message button (red when N > 0).
-  testWidgets('match card shows Message(N) in red when unread > 0 (#535)', (
+  // #535: per-match unread count on the Message button (purple when N > 0).
+  testWidgets('match card shows Message(N) in purple when unread > 0 (#535)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -296,11 +297,11 @@ void main() {
       ),
     );
     final fg = button.style?.foregroundColor?.resolve({});
-    expect(fg, Colors.red);
+    expect(fg, MatchesNavIcon.messageBadgeColor);
   });
 
   testWidgets(
-    'match card shows メッセージ(N) in red under ja when unread > 0 (#535)',
+    'match card shows メッセージ(N) in purple under ja when unread > 0 (#535)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -333,7 +334,7 @@ void main() {
         ),
       );
       final fg = button.style?.foregroundColor?.resolve({});
-      expect(fg, Colors.red);
+      expect(fg, MatchesNavIcon.messageBadgeColor);
     },
   );
 
