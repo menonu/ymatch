@@ -247,5 +247,8 @@
   "mapLocationServiceDisabled": "この端末の位置情報サービスがオフです。",
   "mapLocationUnavailable": "現在地を取得できませんでした。",
   "mapSearchNoResults": "該当する場所が見つかりませんでした。",
-  "mapSearchFailed": "場所の検索に失敗しました。もう一度お試しください。"
+  "mapSearchFailed": "場所の検索に失敗しました。もう一度お試しください。",
+
+  "close": "閉じる",
+  "viewFullImage": "画像を拡大表示"
 }

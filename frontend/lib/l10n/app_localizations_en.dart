@@ -779,4 +779,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapSearchFailed => 'Place search failed. Try again.';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get viewFullImage => 'View full image';
 }

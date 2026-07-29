@@ -768,4 +768,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mapSearchFailed => '場所の検索に失敗しました。もう一度お試しください。';
+
+  @override
+  String get close => '閉じる';
+
+  @override
+  String get viewFullImage => '画像を拡大表示';
 }

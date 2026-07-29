@@ -122,9 +122,10 @@ used throughout this document.
 | Identifier | Parent Screen | Description |
 |-----------|---------------|-------------|
 | `EventCard` | `HomeScreen` | Event icon, name, DRAFT badge, stats, favorite toggle |
-| `MerchDetailedCard` | `EventDetailScreen` | Reorderable card with image, name, stepper counters |
-| `MerchGridCard` | `EventDetailScreen` | 3-column grid cell with image, name, compact counters |
-| `MerchCompactRow` | `EventDetailScreen` | Inline row with thumbnail, name, counters |
+| `MerchDetailedCard` | `EventDetailScreen` | Card with image, name, stepper counters; tap image to zoom (#540) |
+| `MerchGridCard` | `EventDetailScreen` | 3-column grid cell with image, name, compact counters; tap image to zoom (#540) |
+| `MerchCompactRow` | `EventDetailScreen` | Inline row with thumbnail, name, counters; tap thumbnail to zoom (#540) |
+| `ZoomableImage` / `showZoomedImage` | Merch list (shared) | Tap thumbnail → dismissible dialog with `InteractiveViewer` pinch/pan zoom (#540) |
 | `MatchCard` | `TradeListScreen` | User avatar, status chip, local match datetime (#476), item chips, action buttons |
 | `ProfileCard` | `ProfileScreen` | Avatar, editable username, UUID section |
 | `InstructionsCard` | `ProfileScreen` | 3-step "How to Trade" guide |

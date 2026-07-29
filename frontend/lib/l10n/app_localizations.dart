@@ -1507,6 +1507,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Place search failed. Try again.'**
   String get mapSearchFailed;
+
+  /// Generic Close button / tooltip label
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// Semantics / tooltip on a merch thumbnail that opens the zoom viewer (#540)
+  ///
+  /// In en, this message translates to:
+  /// **'View full image'**
+  String get viewFullImage;
 }
 
 class _AppLocalizationsDelegate
