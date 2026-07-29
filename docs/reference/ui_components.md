@@ -176,10 +176,10 @@ used throughout this document.
 
 | Identifier | Parent Screen | Description |
 |-----------|---------------|-------------|
-| `QuantityStepper` | `EventDetailScreen` (detailed view only) | Flat white + border: red-tinted −, bare qty (+ status label), green-tinted +, half-area hits (#538) |
+| `QuantityStepper` | `EventDetailScreen` (detailed view only) | Flat white + border: red/green ± chips, bare qty (+ status label), half-area hits (#538) |
 | `StepperCounter` | `EventDetailScreen` | Detailed HAVE/WANT/TRADE via `QuantityStepper` |
-| `GridCounter` | `EventDetailScreen` | Compact +/- counter (Grid view; unchanged from main) |
-| `CompactCounter` | `EventDetailScreen` | Inline label+number counter (List view; unchanged from main) |
+| `GridCounter` | `EventDetailScreen` | Compact +/- counter (Grid view) |
+| `CompactCounter` | `EventDetailScreen` | Inline label+number counter (List view) |
 
 ## Buttons
 

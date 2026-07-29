@@ -1,30 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Density variants for [QuantityStepper].
+import '../theme/app_theme.dart';
+
+/// Flat bordered quantity control for detailed inventory steppers (#538).
 ///
-/// Only [standard] is used in production (#538 is detailed-view only;
-/// grid/compact keep their main-branch counters).
-enum QuantityStepperSize {
-  /// Detailed inventory cards — height 44, label 9, qty 15.
-  standard,
-
-  /// Unused in app UI (kept for widget tests / possible future reuse).
-  compact,
-
-  /// Unused in app UI (kept for widget tests / possible future reuse).
-  dense,
-}
-
-/// Flat bordered quantity control with clear ± affordance (#538).
-///
-/// Visual (restored from the “outer frame + minimal inset + square corners”
-/// revision):
-/// - White track + `#DEE2E6` border, 1px inset, radius 4
+/// Visual:
+/// - White track + card border, 1px inset, radius 4
 /// - ± chips size 36 / icon 20 / radius 3 (expand: chip fills its flex slot)
-/// - Center: optional status label above bare quantity
+/// - Center: optional status label above bare quantity (no qty box)
 ///
 /// Hit targets (independent of chip paint):
-/// - Left half of the control → decrement (includes area under 所持/数字)
+/// - Left half → decrement (includes area under 所持/数字)
 /// - Right half → increment
 ///
 /// Set [expand] to `true` in constrained [Expanded] parents (detailed view).
@@ -34,7 +20,6 @@ class QuantityStepper extends StatelessWidget {
     required this.quantity,
     this.onDecrement,
     this.onIncrement,
-    this.size = QuantityStepperSize.standard,
     this.expand = false,
     this.decrementKey,
     this.incrementKey,
@@ -53,9 +38,7 @@ class QuantityStepper extends StatelessWidget {
   /// When null, the increment control is disabled (e.g. at max qty).
   final VoidCallback? onIncrement;
 
-  final QuantityStepperSize size;
-
-  /// When true, fill the parent width (side buttons grow; type size fixed).
+  /// When true, fill the parent width (side chips fill flex slots).
   final bool expand;
 
   /// Optional keys for widget tests (e.g. `stepper_inc_HAVE`).
@@ -68,49 +51,51 @@ class QuantityStepper extends StatelessWidget {
   /// Optional status label shown above the number (e.g. 所持 / 求 / 譲).
   final String? label;
 
-  /// Color for [label]; defaults to muted gray when null.
+  /// Color for [label]; defaults to [AppTheme.textSecondaryColor].
   final Color? labelColor;
 
-  /// Accessibility label for the decrement control (defaults to English).
+  /// Accessibility label for the decrement control.
   final String? decrementSemanticLabel;
 
-  /// Accessibility label for the increment control (defaults to English).
+  /// Accessibility label for the increment control.
   final String? incrementSemanticLabel;
 
-  // Same surface language as AppTheme.cardTheme (white + #DEE2E6 border).
-  static const Color _trackColor = Colors.white;
-  static const Color _trackBorder = Color(0xFFDEE2E6);
   static const Color _decrementColor = Color(0xFFE25555);
   static const Color _incrementColor = Color(0xFF2EAF6A);
-  static const Color _defaultLabelColor = Color(0xFF6C757D);
-  static const Color _qtyColor = Color(0xFF212529);
+
+  // Layout metrics (detailed view / pre-#538 type scale).
+  static const double _height = 44;
+  static const double _trackRadius = 4;
+  static const double _trackPad = 1;
+  static const double _buttonExtent = 36;
+  static const double _iconSize = 20;
+  static const double _buttonRadius = 3;
+  static const double _qtyMinWidth = 48;
+  static const double _qtyFontSize = 15;
+  static const double _labelFontSize = 9;
+  static const double _gap = 2;
 
   @override
   Widget build(BuildContext context) {
     final hasLabel = label != null && label!.isNotEmpty;
-    final dims = _QuantityStepperDims.forSize(size, hasLabel: hasLabel);
     final canDec = enabled && onDecrement != null;
     final canInc = enabled && onIncrement != null;
 
-    // Visual chips — paint only; hits come from the half-area layer below.
     final decVisual = _StepChip(
       icon: Icons.remove,
       color: _decrementColor,
-      size: dims,
       expand: expand,
       enabled: canDec,
     );
     final qty = _QuantityCenter(
       quantity: quantity,
-      size: dims,
       expand: expand,
       label: hasLabel ? label : null,
-      labelColor: labelColor ?? _defaultLabelColor,
+      labelColor: labelColor ?? AppTheme.textSecondaryColor,
     );
     final incVisual = _StepChip(
       icon: Icons.add,
       color: _incrementColor,
-      size: dims,
       expand: expand,
       enabled: canInc,
     );
@@ -127,22 +112,17 @@ class QuantityStepper extends StatelessWidget {
     );
 
     return Container(
-      height: dims.height,
+      height: _height,
       width: expand ? double.infinity : null,
       decoration: BoxDecoration(
-        color: _trackColor,
-        borderRadius: BorderRadius.circular(dims.trackRadius),
-        border: Border.all(color: _trackBorder),
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(_trackRadius),
+        border: Border.all(color: const Color(0xFFDEE2E6)),
       ),
-      // Minimal inset so ± chips sit nearly flush with the frame.
-      padding: EdgeInsets.symmetric(
-        horizontal: dims.trackPadH,
-        vertical: dims.trackPadV,
-      ),
+      padding: const EdgeInsets.all(_trackPad),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // Hit layer: left half / right half (under 所持/数字 as well).
           Positioned.fill(
             child: Row(
               children: [
@@ -167,90 +147,10 @@ class QuantityStepper extends StatelessWidget {
               ],
             ),
           ),
-          // Visual layer — same Row layout as the working 7b48bd2 revision.
           IgnorePointer(child: visualRow),
         ],
       ),
     );
-  }
-}
-
-class _QuantityStepperDims {
-  const _QuantityStepperDims({
-    required this.height,
-    required this.trackRadius,
-    required this.trackPadH,
-    required this.trackPadV,
-    required this.buttonExtent,
-    required this.iconSize,
-    required this.buttonRadius,
-    required this.qtyMinWidth,
-    required this.qtyFontSize,
-    required this.labelFontSize,
-    required this.gap,
-  });
-
-  final double height;
-  final double trackRadius;
-  final double trackPadH;
-  final double trackPadV;
-  final double buttonExtent;
-  final double iconSize;
-  final double buttonRadius;
-  final double qtyMinWidth;
-  final double qtyFontSize;
-  final double labelFontSize;
-  final double gap;
-
-  static _QuantityStepperDims forSize(
-    QuantityStepperSize size, {
-    required bool hasLabel,
-  }) {
-    switch (size) {
-      case QuantityStepperSize.standard:
-        // Restored sizes: height 44, label 9, qty 15, chip 36, pad 1, square.
-        return const _QuantityStepperDims(
-          height: 44,
-          trackRadius: 4,
-          trackPadH: 1,
-          trackPadV: 1,
-          buttonExtent: 36,
-          iconSize: 20,
-          buttonRadius: 3,
-          qtyMinWidth: 48,
-          qtyFontSize: 15,
-          labelFontSize: 9,
-          gap: 2,
-        );
-      case QuantityStepperSize.compact:
-        return _QuantityStepperDims(
-          height: hasLabel ? 36 : 28,
-          trackRadius: 4,
-          trackPadH: 1,
-          trackPadV: 1,
-          buttonExtent: hasLabel ? 28 : 22,
-          iconSize: 16,
-          buttonRadius: 3,
-          qtyMinWidth: hasLabel ? 34 : 26,
-          qtyFontSize: 12,
-          labelFontSize: 9,
-          gap: 2,
-        );
-      case QuantityStepperSize.dense:
-        return _QuantityStepperDims(
-          height: hasLabel ? 36 : 28,
-          trackRadius: 4,
-          trackPadH: 1,
-          trackPadV: 1,
-          buttonExtent: hasLabel ? 28 : 22,
-          iconSize: 16,
-          buttonRadius: 3,
-          qtyMinWidth: hasLabel ? 32 : 24,
-          qtyFontSize: 12,
-          labelFontSize: 8,
-          gap: 1,
-        );
-    }
   }
 }
 
@@ -286,14 +186,12 @@ class _StepChip extends StatelessWidget {
   const _StepChip({
     required this.icon,
     required this.color,
-    required this.size,
     required this.expand,
     required this.enabled,
   });
 
   final IconData icon;
   final Color color;
-  final _QuantityStepperDims size;
   final bool expand;
   final bool enabled;
 
@@ -310,21 +208,20 @@ class _StepChip extends StatelessWidget {
     final chip = Container(
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(size.buttonRadius),
+        borderRadius: BorderRadius.circular(QuantityStepper._buttonRadius),
         border: Border.all(color: border),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, size: size.iconSize, color: iconColor),
+      child: Icon(icon, size: QuantityStepper._iconSize, color: iconColor),
     );
 
     if (expand) {
-      // Fill the Expanded flex slot (same as 7b48bd2 visual).
-      final chipH = size.height - size.trackPadV * 2;
+      final chipH = QuantityStepper._height - QuantityStepper._trackPad * 2;
       return SizedBox(height: chipH, width: double.infinity, child: chip);
     }
     return SizedBox(
-      width: size.buttonExtent,
-      height: size.buttonExtent,
+      width: QuantityStepper._buttonExtent,
+      height: QuantityStepper._buttonExtent,
       child: chip,
     );
   }
@@ -334,14 +231,12 @@ class _StepChip extends StatelessWidget {
 class _QuantityCenter extends StatelessWidget {
   const _QuantityCenter({
     required this.quantity,
-    required this.size,
     required this.expand,
     this.label,
     this.labelColor,
   });
 
   final int quantity;
-  final _QuantityStepperDims size;
   final bool expand;
   final String? label;
   final Color? labelColor;
@@ -360,7 +255,7 @@ class _QuantityCenter extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: size.labelFontSize,
+                  fontSize: QuantityStepper._labelFontSize,
                   fontWeight: FontWeight.w800,
                   height: 1.0,
                   color: labelColor,
@@ -370,11 +265,11 @@ class _QuantityCenter extends StatelessWidget {
               Text(
                 '$quantity',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: size.qtyFontSize,
+                style: const TextStyle(
+                  fontSize: QuantityStepper._qtyFontSize,
                   fontWeight: FontWeight.bold,
                   height: 1.1,
-                  color: QuantityStepper._qtyColor,
+                  color: AppTheme.textPrimaryColor,
                 ),
               ),
             ],
@@ -382,11 +277,11 @@ class _QuantityCenter extends StatelessWidget {
         : Text(
             '$quantity',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: size.qtyFontSize,
+            style: const TextStyle(
+              fontSize: QuantityStepper._qtyFontSize,
               fontWeight: FontWeight.bold,
               height: 1.1,
-              color: QuantityStepper._qtyColor,
+              color: AppTheme.textPrimaryColor,
             ),
           );
 
@@ -394,8 +289,8 @@ class _QuantityCenter extends StatelessWidget {
       width: expand ? double.infinity : null,
       constraints: expand
           ? const BoxConstraints()
-          : BoxConstraints(minWidth: size.qtyMinWidth),
-      margin: EdgeInsets.symmetric(horizontal: size.gap),
+          : const BoxConstraints(minWidth: QuantityStepper._qtyMinWidth),
+      margin: const EdgeInsets.symmetric(horizontal: QuantityStepper._gap),
       alignment: Alignment.center,
       child: content,
     );

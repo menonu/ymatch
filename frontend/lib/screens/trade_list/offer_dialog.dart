@@ -286,7 +286,6 @@ class _OfferLegRow extends StatelessWidget {
               ],
             ),
           ),
-          // Offer-dialog qty controls unchanged from main (#538 = detailed only).
           IconButton(
             icon: const Icon(Icons.remove, size: 18),
             visualDensity: VisualDensity.compact,

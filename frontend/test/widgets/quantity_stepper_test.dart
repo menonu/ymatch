@@ -103,26 +103,8 @@ void main() {
     expect(labelTop, lessThan(qtyTop));
   });
 
-  testWidgets('dense/compact sizes still mount (#538)', (tester) async {
-    await tester.pumpWidget(
-      wrap(
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            QuantityStepper(quantity: 1, size: QuantityStepperSize.dense),
-            QuantityStepper(quantity: 2, size: QuantityStepperSize.compact),
-            QuantityStepper(quantity: 3, size: QuantityStepperSize.standard),
-          ],
-        ),
-      ),
-    );
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget);
-  });
-
   testWidgets(
-    'three expanded standard steppers fill narrow columns without overflow (#538)',
+    'three expanded steppers fill narrow columns without overflow (#538)',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -134,7 +116,6 @@ void main() {
                   return Expanded(
                     child: QuantityStepper(
                       quantity: i + 1,
-                      size: QuantityStepperSize.standard,
                       expand: true,
                       label: 'L$i',
                       onDecrement: () {},
@@ -154,17 +135,11 @@ void main() {
     },
   );
 
-  testWidgets('standard sizes match outer-frame revision (#538)', (
+  testWidgets('standard sizes match detailed-view metrics (#538)', (
     tester,
   ) async {
     await tester.pumpWidget(
-      wrap(
-        const QuantityStepper(
-          quantity: 2,
-          label: '所持',
-          size: QuantityStepperSize.standard,
-        ),
-      ),
+      wrap(const QuantityStepper(quantity: 2, label: '所持')),
     );
     expect(tester.widget<Text>(find.text('所持')).style?.fontSize, 9);
     expect(tester.widget<Text>(find.text('2')).style?.fontSize, 15);

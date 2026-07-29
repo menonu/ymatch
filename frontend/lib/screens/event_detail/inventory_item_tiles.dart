@@ -150,7 +150,6 @@ Widget _buildGridCounter(
   Color color,
   void Function(int)? onUpdate,
 ) {
-  // Unchanged from main (#538 only restyles detailed view steppers).
   final enabled = onUpdate != null;
   return Container(
     decoration: BoxDecoration(
@@ -293,7 +292,6 @@ Widget buildCompactInventoryItem(
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
               ),
-            // Compact counters unchanged from main (#538 = detailed only).
             if (showHave)
               _buildCompactCounter(
                 context,
@@ -340,7 +338,6 @@ Widget _buildCompactCounter(
   Color color,
   void Function(int)? onUpdate,
 ) {
-  // Unchanged from main (#538 only restyles detailed view steppers).
   final enabled = onUpdate != null;
   return Container(
     height: 26,
@@ -482,6 +479,7 @@ Widget buildDetailedInventoryItem(
                           Expanded(
                             flex: 15,
                             child: _buildStepper(
+                              context: context,
                               label: 'HAVE',
                               displayLabel: l10n.have,
                               color: AppTheme.haveColor,
@@ -503,6 +501,7 @@ Widget buildDetailedInventoryItem(
                           Expanded(
                             flex: 15,
                             child: _buildStepper(
+                              context: context,
                               label: 'WANT',
                               displayLabel: l10n.want,
                               color: AppTheme.wantColor,
@@ -523,6 +522,7 @@ Widget buildDetailedInventoryItem(
                           Expanded(
                             flex: 15,
                             child: _buildStepper(
+                              context: context,
                               label: 'TRADE',
                               displayLabel: l10n.trade,
                               color: AppTheme.tradeColor,
@@ -675,6 +675,7 @@ void _confirmDeleteMerch(
 }
 
 Widget _buildStepper({
+  required BuildContext context,
   required String label,
   required String displayLabel,
   required Color color,
@@ -682,17 +683,19 @@ Widget _buildStepper({
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
-  // #538: raised white track, tinted ± chips, bare qty with status label
-  // above (height 44, label 9, qty 15). expand:true fills the column.
+  final l10n = AppLocalizations.of(context)!;
+  // #538: detailed-view only — flat framed control, tinted ± chips, bare
+  // label+qty, half-area hits. expand:true fills the column.
   return QuantityStepper(
     quantity: qty,
-    size: QuantityStepperSize.standard,
     expand: true,
     enabled: enabled,
     label: displayLabel,
     labelColor: qty > 0 ? color : Colors.grey[500],
     incrementKey: Key('stepper_inc_$label'),
     decrementKey: Key('stepper_dec_$label'),
+    decrementSemanticLabel: l10n.decreaseQuantity,
+    incrementSemanticLabel: l10n.increaseQuantity,
     onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
     onIncrement: enabled ? () => onUpdate(qty + 1) : null,
   );

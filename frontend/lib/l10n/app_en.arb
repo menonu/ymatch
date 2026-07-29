@@ -829,6 +829,14 @@
       "count": {"type": "int"}
     }
   },
+  "decreaseQuantity": "Decrease quantity",
+  "@decreaseQuantity": {
+    "description": "Semantics label for inventory quantity stepper − control (#538)"
+  },
+  "increaseQuantity": "Increase quantity",
+  "@increaseQuantity": {
+    "description": "Semantics label for inventory quantity stepper + control (#538)"
+  },
   "matchEventLabel": "Event: {event}",
   "@matchEventLabel": {
     "description": "Match card header: event name with a fixed prefix (#534)",
