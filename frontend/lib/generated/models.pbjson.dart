@@ -559,6 +559,13 @@ const TradeMatch$json = {
       '10': 'lastTerminalAt',
       '17': true
     },
+    {
+      '1': 'unread_message_count',
+      '3': 18,
+      '4': 1,
+      '5': 5,
+      '10': 'unreadMessageCount'
+    },
   ],
   '8': [
     {'1': '_created_at'},
@@ -586,10 +593,11 @@ final $typed_data.Uint8List tradeMatchDescriptor = $convert.base64Decode(
     'V2ZW50TmFtZYgBARIxChJncm91cF9kaXNwbGF5X25hbWUYDiABKAlIBVIQZ3JvdXBEaXNwbGF5'
     'TmFtZYgBARIjCg1yZW1hdGNoX2NvdW50GA8gASgFUgxyZW1hdGNoQ291bnQSNQoUbGFzdF90ZX'
     'JtaW5hbF9zdGF0dXMYECABKAlIBlISbGFzdFRlcm1pbmFsU3RhdHVziAEBEi0KEGxhc3RfdGVy'
-    'bWluYWxfYXQYESABKAlIB1IObGFzdFRlcm1pbmFsQXSIAQFCDQoLX2NyZWF0ZWRfYXRCDQoLX2'
-    '90aGVyX3VzZXJCDQoLX29mZmVyZWRfYnlCDQoLX2dyb3VwX25hbWVCDQoLX2V2ZW50X25hbWVC'
-    'FQoTX2dyb3VwX2Rpc3BsYXlfbmFtZUIXChVfbGFzdF90ZXJtaW5hbF9zdGF0dXNCEwoRX2xhc3'
-    'RfdGVybWluYWxfYXQ=');
+    'bWluYWxfYXQYESABKAlIB1IObGFzdFRlcm1pbmFsQXSIAQESMAoUdW5yZWFkX21lc3NhZ2VfY2'
+    '91bnQYEiABKAVSEnVucmVhZE1lc3NhZ2VDb3VudEINCgtfY3JlYXRlZF9hdEINCgtfb3RoZXJf'
+    'dXNlckINCgtfb2ZmZXJlZF9ieUINCgtfZ3JvdXBfbmFtZUINCgtfZXZlbnRfbmFtZUIVChNfZ3'
+    'JvdXBfZGlzcGxheV9uYW1lQhcKFV9sYXN0X3Rlcm1pbmFsX3N0YXR1c0ITChFfbGFzdF90ZXJt'
+    'aW5hbF9hdA==');
 
 @$core.Deprecated('Use matchItemDescriptor instead')
 const MatchItem$json = {

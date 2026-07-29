@@ -211,6 +211,32 @@ impl MatchRepository {
         Ok(affected > 0)
     }
 
+    /// #535: stamp the caller's per-match chat read watermark to NOW().
+    ///
+    /// Only updates the column for the participant (`user1` or `user2`).
+    /// No-op rows (unknown match or non-participant) return `Ok` — the
+    /// message list handler already gates membership before calling this.
+    pub async fn mark_messages_read(&self, match_id: i32, user_id: i32) -> Result<(), AppError> {
+        sqlx::query(
+            r#"UPDATE matches SET
+                   user1_messages_read_at = CASE
+                     WHEN user1_id = $2 THEN NOW()
+                     ELSE user1_messages_read_at
+                   END,
+                   user2_messages_read_at = CASE
+                     WHEN user2_id = $2 THEN NOW()
+                     ELSE user2_messages_read_at
+                   END
+               WHERE id = $1
+                 AND (user1_id = $2 OR user2_id = $2)"#,
+        )
+        .bind(match_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// Set the per-user inventory-applied timestamp. `is_user1` picks
     /// which column to write.
     ///

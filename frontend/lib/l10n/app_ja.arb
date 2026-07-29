@@ -111,6 +111,7 @@
   "noMessagesYet": "まだメッセージがありません。挨拶してみましょう！",
   "typeMessage": "メッセージを入力...",
   "messageAction": "メッセージ",
+  "messageActionWithUnread": "メッセージ({count})",
   "openInMaps": "マップで開く",
   "openLink": "リンクを開く",
 

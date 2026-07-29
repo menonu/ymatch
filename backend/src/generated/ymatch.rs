@@ -186,6 +186,11 @@ pub struct TradeMatch {
     /// ADR 0012: when the latest rematch left the terminal status (RFC3339).
     #[prost(string, optional, tag = "17")]
     pub last_terminal_at: ::core::option::Option<::prost::alloc::string::String>,
+    /// #535: peer TEXT/LOCATION messages not yet read by the listing caller.
+    /// Zero when unknown (e.g. admin list_all) or fully read. Marked read when
+    /// the caller lists messages for this match.
+    #[prost(int32, tag = "18")]
+    pub unread_message_count: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

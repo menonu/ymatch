@@ -31,6 +31,16 @@ TradeMatch _pendingMatch() => TradeMatch()
   ..userHaves.add(_item(10, 'Give Pen', 3, 1))
   ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
+// #535: pending match with a non-zero unread peer message count.
+TradeMatch _pendingMatchWithUnread(int unread) => TradeMatch()
+  ..id = 100
+  ..user1Id = 1
+  ..user2Id = 2
+  ..status = 'PENDING'
+  ..unreadMessageCount = unread
+  ..userHaves.add(_item(10, 'Give Pen', 3, 1))
+  ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
+
 TradeMatch _rematchedPending({
   required String lastTerminal,
   int rematchCount = 1,
@@ -255,6 +265,65 @@ void main() {
     expect(find.text('メッセージ'), findsOneWidget);
     expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
   });
+
+  // #535: per-match unread count on the Message button (red when N > 0).
+  testWidgets('match card shows Message(N) in red when unread > 0 (#535)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(
+            1,
+          ).overrideWith((ref) async => [_pendingMatchWithUnread(2)]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: _localized(const TradeListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Message(2)'), findsOneWidget);
+    expect(find.text('Message'), findsNothing);
+
+    final text = tester.widget<Text>(find.text('Message(2)'));
+    expect(text.style?.color, Colors.red);
+  });
+
+  testWidgets(
+    'match card shows メッセージ(N) in red under ja when unread > 0 (#535)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(
+              1,
+            ).overrideWith((ref) async => [_pendingMatchWithUnread(2)]),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const TradeListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('メッセージ(2)'), findsOneWidget);
+      expect(find.text('メッセージ'), findsNothing);
+
+      final text = tester.widget<Text>(find.text('メッセージ(2)'));
+      expect(text.style?.color, Colors.red);
+    },
+  );
 
   // #314: a completed match stays conversable — the Message button and card
   // tap remain available on the Done tab, just like on the other tabs.

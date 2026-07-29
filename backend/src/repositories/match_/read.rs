@@ -25,7 +25,7 @@ impl MatchRepository {
     /// List matches for a user with all related data pre-loaded. This is
     /// the N+1 fix — see the module-level docs.
     pub async fn list_for_user(&self, user_id: i32) -> Result<Vec<TradeMatch>, AppError> {
-        // Query 1 of 4: matches joined to the "other user" (the participant
+        // Query 1 of 5: matches joined to the "other user" (the participant
         // who is not the requesting user). The CASE picks u.id and
         // u.username without a subquery — single round trip.
         // ADR 0001 / #348: a match is scoped to one (event_id, group_name)
@@ -144,6 +144,42 @@ impl MatchRepository {
             .bind(&match_ids)
             .fetch_all(&self.pool)
             .await?;
+
+        // Query 5 (#535): per-match unread peer messages for the caller.
+        // Unread = non-SYSTEM messages from someone other than the caller
+        // created after that caller's per-match read watermark (NULL = never
+        // read → count from epoch).
+        let unread_sql = r#"
+            SELECT msg.match_id, COUNT(*)::bigint AS unread
+            FROM messages msg
+            JOIN matches m ON m.id = msg.match_id
+            WHERE msg.match_id = ANY($1)
+              AND msg.sender_id <> $2
+              AND COALESCE(msg.message_type, 'TEXT') <> 'SYSTEM'
+              AND msg.created_at > COALESCE(
+                    CASE
+                      WHEN m.user1_id = $2 THEN m.user1_messages_read_at
+                      WHEN m.user2_id = $2 THEN m.user2_messages_read_at
+                      ELSE NULL
+                    END,
+                    '1970-01-01'::timestamptz
+                  )
+            GROUP BY msg.match_id
+        "#;
+        let unread_rows = sqlx::query(unread_sql)
+            .bind(&match_ids)
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?;
+        let unread_by_match: HashMap<i32, i32> = unread_rows
+            .iter()
+            .map(|r| {
+                (
+                    r.get::<i32, _>("match_id"),
+                    r.get::<i64, _>("unread") as i32,
+                )
+            })
+            .collect();
 
         // ADR 0001 / #348: key candidate items by `(peer, event_id,
         // group_name)` so a match only receives the items that belong to its
@@ -264,6 +300,8 @@ impl MatchRepository {
                 row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
                     .is_some()
             };
+            // #535: default 0 when the match has no unread peer messages.
+            m.unread_message_count = unread_by_match.get(&m.id).copied().unwrap_or(0);
             out.push(m);
         }
         Ok(out)
@@ -322,6 +360,11 @@ impl MatchRepository {
 
     /// Notification counts (pending / offers_in / accepted / unread) for a
     /// user.
+    ///
+    /// #535: `unread_messages` uses per-match read watermarks
+    /// (`user1_messages_read_at` / `user2_messages_read_at`), not the legacy
+    /// global `users.matches_read_at`. SYSTEM lifecycle rows are excluded so
+    /// the badge matches the per-card `unread_message_count`.
     pub async fn notification_counts(&self, user_id: i32) -> Result<NotificationCounts, AppError> {
         let row = sqlx::query(
             r#"SELECT
@@ -337,8 +380,12 @@ impl MatchRepository {
                     WHERE (m.user1_id = $1 OR m.user2_id = $1)
                       AND m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
                       AND msg.sender_id != $1
+                      AND COALESCE(msg.message_type, 'TEXT') <> 'SYSTEM'
                       AND msg.created_at > COALESCE(
-                        (SELECT matches_read_at FROM users WHERE id = $1),
+                        CASE
+                          WHEN m.user1_id = $1 THEN m.user1_messages_read_at
+                          ELSE m.user2_messages_read_at
+                        END,
                         '1970-01-01'::timestamptz
                       )) AS unread
                "#,

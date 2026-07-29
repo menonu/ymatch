@@ -44,6 +44,9 @@ class TradeMatchCard extends StatelessWidget {
     final createdAtLabel = match.hasCreatedAt()
         ? formatLocalDateTime(match.createdAt)
         : null;
+    // #535: per-match unread peer message count from list_for_user.
+    final unread = match.unreadMessageCount;
+    final hasUnread = unread > 0;
 
     final cancelled = match.status == 'CANCELLED';
     return Opacity(
@@ -134,6 +137,8 @@ class TradeMatchCard extends StatelessWidget {
                     // #314: the Message affordance is shown on every tab,
                     // including completed matches (chat remains open after a
                     // trade is done, same as while trading).
+                    // #535: unread peer messages → "Message(N)" / "メッセージ(N)"
+                    // in red so the badge is visible without opening chat.
                     FilledButton.tonal(
                       onPressed: onOpenChat,
                       style: FilledButton.styleFrom(
@@ -143,8 +148,19 @@ class TradeMatchCard extends StatelessWidget {
                         ),
                         minimumSize: const Size(0, 36),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: hasUnread ? Colors.red : null,
                       ),
-                      child: Text(l10n.messageAction),
+                      child: Text(
+                        hasUnread
+                            ? l10n.messageActionWithUnread(unread)
+                            : l10n.messageAction,
+                        style: hasUnread
+                            ? const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w600,
+                              )
+                            : null,
+                      ),
                     ),
                   ],
                 ),

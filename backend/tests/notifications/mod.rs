@@ -434,12 +434,35 @@ async fn test_notification_counts_values(pool: PgPool) {
     assert_eq!(json_i64(&body, "unreadMessages"), 0);
     assert_eq!(json_i64(&body, "total"), 1);
 
-    // ---- u1 marks their matches_read_at = NOW; unread should drop to 0 ----
-    let _ = sqlx::query("UPDATE users SET matches_read_at = NOW() WHERE id = $1")
-        .bind(u1)
-        .execute(&pool)
+    // ---- #535: list_for_user surfaces per-match unreadMessageCount ----
+    let listed = list_user_matches(&pool, u1 as i64).await;
+    let listed_match = listed
+        .iter()
+        .find(|m| m["id"].as_i64() == Some(match_id as i64))
+        .expect("match listed for u1");
+    assert_eq!(
+        listed_match["unreadMessageCount"].as_i64().unwrap_or(0),
+        1,
+        "u1 should see 1 unread peer message on the match card"
+    );
+
+    // Opening the chat (list messages) stamps the per-match watermark;
+    // global and per-match unread should both drop to 0.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!(
+                    "/api/v1/matches/{}/messages?user_id={}",
+                    match_id, u1
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
@@ -456,6 +479,17 @@ async fn test_notification_counts_values(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(json_i64(&body, "unreadMessages"), 0);
     assert_eq!(json_i64(&body, "total"), 0); // all zeros for u1 now
+
+    let listed = list_user_matches(&pool, u1 as i64).await;
+    let listed_match = listed
+        .iter()
+        .find(|m| m["id"].as_i64() == Some(match_id as i64))
+        .expect("match listed for u1 after read");
+    assert_eq!(
+        listed_match["unreadMessageCount"].as_i64().unwrap_or(0),
+        0,
+        "opening chat clears per-match unread"
+    );
 
     // ---- Transition OFFERED -> ACCEPTED: counts should change again ----
     // Note: the offer's "offeree" is u2; for ACCEPTED, the user_id in

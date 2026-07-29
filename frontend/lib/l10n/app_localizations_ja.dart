@@ -352,6 +352,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get messageAction => 'メッセージ';
 
   @override
+  String messageActionWithUnread(int count) {
+    return 'メッセージ($count)';
+  }
+
+  @override
   String get openInMaps => 'マップで開く';
 
   @override

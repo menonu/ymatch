@@ -716,6 +716,12 @@ abstract class AppLocalizations {
   /// **'Message'**
   String get messageAction;
 
+  /// Match card Message button when there are unread peer messages (#535)
+  ///
+  /// In en, this message translates to:
+  /// **'Message({count})'**
+  String messageActionWithUnread(int count);
+
   /// Link label for opening a map URL
   ///
   /// In en, this message translates to:
