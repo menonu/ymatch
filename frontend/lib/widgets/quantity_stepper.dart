@@ -176,14 +176,15 @@ class _QuantityStepperDims {
       case QuantityStepperSize.standard:
         // Match pre-#538 detailed stepper: height 44, label 9, qty 15.
         // trackPad 1px keeps ± chips nearly flush with the outer frame.
+        // Radii stay tight (card-like 4) for a squarer look.
         return const _QuantityStepperDims(
           height: 44,
-          trackRadius: 8,
+          trackRadius: 4,
           trackPadH: 1,
           trackPadV: 1,
           buttonExtent: 36,
           iconSize: 20,
-          buttonRadius: 6,
+          buttonRadius: 3,
           qtyMinWidth: 48,
           qtyFontSize: 15,
           labelFontSize: 9,
@@ -192,12 +193,12 @@ class _QuantityStepperDims {
       case QuantityStepperSize.compact:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
-          trackRadius: 6,
+          trackRadius: 4,
           trackPadH: 1,
           trackPadV: 1,
           buttonExtent: hasLabel ? 28 : 22,
           iconSize: 16,
-          buttonRadius: 5,
+          buttonRadius: 3,
           qtyMinWidth: hasLabel ? 34 : 26,
           qtyFontSize: 12,
           labelFontSize: 9,
@@ -206,12 +207,12 @@ class _QuantityStepperDims {
       case QuantityStepperSize.dense:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
-          trackRadius: 6,
+          trackRadius: 4,
           trackPadH: 1,
           trackPadV: 1,
           buttonExtent: hasLabel ? 28 : 22,
           iconSize: 16,
-          buttonRadius: 5,
+          buttonRadius: 3,
           qtyMinWidth: hasLabel ? 32 : 24,
           qtyFontSize: 12,
           labelFontSize: 8,
