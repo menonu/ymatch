@@ -86,6 +86,27 @@ void main() {
     expect(called, isFalse);
   });
 
+  testWidgets('label renders inside the qty box above the number (#538)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      wrap(
+        const QuantityStepper(
+          quantity: 5,
+          label: '所持',
+          labelColor: Colors.indigo,
+        ),
+      ),
+    );
+    expect(find.text('所持'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget);
+    // Label and quantity share the same white qty box (one Material ancestor
+    // chain); both must be present — visual stacking is label-above-qty.
+    final labelTop = tester.getTopLeft(find.text('所持')).dy;
+    final qtyTop = tester.getTopLeft(find.text('5')).dy;
+    expect(labelTop, lessThan(qtyTop));
+  });
+
   testWidgets('dense/compact sizes still mount (#538)', (tester) async {
     await tester.pumpWidget(
       wrap(

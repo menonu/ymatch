@@ -17,6 +17,9 @@ enum QuantityStepperSize {
 /// Layout matches the product reference:
 /// light gray rounded track · red decrement · white qty box · green increment.
 ///
+/// When [label] is set, it is drawn **inside** the white qty box above the
+/// number (e.g. 所持 / 求 / 譲).
+///
 /// Intrinsic width is fixed per [size]; callers on tight layouts should wrap
 /// with [FittedBox] (`BoxFit.scaleDown`) so three-up columns do not overflow.
 class QuantityStepper extends StatelessWidget {
@@ -29,6 +32,8 @@ class QuantityStepper extends StatelessWidget {
     this.decrementKey,
     this.incrementKey,
     this.enabled = true,
+    this.label,
+    this.labelColor,
     this.decrementSemanticLabel,
     this.incrementSemanticLabel,
   });
@@ -50,6 +55,13 @@ class QuantityStepper extends StatelessWidget {
   /// Master enable; when false both sides are inert (deleted items).
   final bool enabled;
 
+  /// Optional status label shown inside the qty box above the number
+  /// (e.g. 所持 / 求 / 譲).
+  final String? label;
+
+  /// Color for [label]; defaults to muted gray when null.
+  final Color? labelColor;
+
   /// Accessibility label for the decrement control (defaults to English).
   final String? decrementSemanticLabel;
 
@@ -60,10 +72,12 @@ class QuantityStepper extends StatelessWidget {
   static const Color _decrementColor = Color(0xFFE25555);
   static const Color _incrementColor = Color(0xFF2EAF6A);
   static const Color _qtyBoxBorder = Color(0xFFE4E6EA);
+  static const Color _defaultLabelColor = Color(0xFF6C757D);
 
   @override
   Widget build(BuildContext context) {
-    final dims = _QuantityStepperDims.forSize(size);
+    final hasLabel = label != null && label!.isNotEmpty;
+    final dims = _QuantityStepperDims.forSize(size, hasLabel: hasLabel);
     final canDec = enabled && onDecrement != null;
     final canInc = enabled && onIncrement != null;
 
@@ -86,7 +100,12 @@ class QuantityStepper extends StatelessWidget {
             onTap: canDec ? onDecrement : null,
             semanticLabel: decrementSemanticLabel ?? 'Decrease quantity',
           ),
-          _QuantityBox(quantity: quantity, size: dims),
+          _QuantityBox(
+            quantity: quantity,
+            size: dims,
+            label: hasLabel ? label : null,
+            labelColor: labelColor ?? _defaultLabelColor,
+          ),
           _StepButton(
             key: incrementKey,
             icon: Icons.add,
@@ -113,6 +132,7 @@ class _QuantityStepperDims {
     required this.qtyHeight,
     required this.qtyRadius,
     required this.qtyFontSize,
+    required this.labelFontSize,
     required this.gap,
   });
 
@@ -125,48 +145,55 @@ class _QuantityStepperDims {
   final double qtyHeight;
   final double qtyRadius;
   final double qtyFontSize;
+  final double labelFontSize;
   final double gap;
 
-  static _QuantityStepperDims forSize(QuantityStepperSize size) {
+  static _QuantityStepperDims forSize(
+    QuantityStepperSize size, {
+    required bool hasLabel,
+  }) {
     switch (size) {
       case QuantityStepperSize.standard:
-        // Sized to stay readable when FittedBox-scaled into three-up columns.
-        return const _QuantityStepperDims(
-          height: 34,
-          trackRadius: 17,
+        // Taller when a status label sits inside the white box.
+        return _QuantityStepperDims(
+          height: hasLabel ? 44 : 34,
+          trackRadius: hasLabel ? 12 : 17,
           trackPadH: 3,
-          buttonExtent: 30,
+          buttonExtent: hasLabel ? 36 : 30,
           iconSize: 18,
-          qtyMinWidth: 36,
-          qtyHeight: 26,
+          qtyMinWidth: hasLabel ? 44 : 36,
+          qtyHeight: hasLabel ? 36 : 26,
           qtyRadius: 8,
           qtyFontSize: 14,
+          labelFontSize: 9,
           gap: 2,
         );
       case QuantityStepperSize.compact:
-        return const _QuantityStepperDims(
-          height: 26,
-          trackRadius: 13,
+        return _QuantityStepperDims(
+          height: hasLabel ? 34 : 26,
+          trackRadius: hasLabel ? 10 : 13,
           trackPadH: 2,
-          buttonExtent: 24,
+          buttonExtent: hasLabel ? 30 : 24,
           iconSize: 14,
-          qtyMinWidth: 24,
-          qtyHeight: 20,
+          qtyMinWidth: hasLabel ? 32 : 24,
+          qtyHeight: hasLabel ? 28 : 20,
           qtyRadius: 6,
           qtyFontSize: 12,
+          labelFontSize: 8,
           gap: 1,
         );
       case QuantityStepperSize.dense:
-        return const _QuantityStepperDims(
-          height: 22,
-          trackRadius: 11,
+        return _QuantityStepperDims(
+          height: hasLabel ? 30 : 22,
+          trackRadius: hasLabel ? 8 : 11,
           trackPadH: 1,
-          buttonExtent: 20,
+          buttonExtent: hasLabel ? 26 : 20,
           iconSize: 12,
-          qtyMinWidth: 20,
-          qtyHeight: 16,
+          qtyMinWidth: hasLabel ? 28 : 20,
+          qtyHeight: hasLabel ? 24 : 16,
           qtyRadius: 5,
           qtyFontSize: 10,
+          labelFontSize: 7,
           gap: 0,
         );
     }
@@ -174,18 +201,26 @@ class _QuantityStepperDims {
 }
 
 class _QuantityBox extends StatelessWidget {
-  const _QuantityBox({required this.quantity, required this.size});
+  const _QuantityBox({
+    required this.quantity,
+    required this.size,
+    this.label,
+    this.labelColor,
+  });
 
   final int quantity;
   final _QuantityStepperDims size;
+  final String? label;
+  final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
+    final hasLabel = label != null && label!.isNotEmpty;
     return Container(
       constraints: BoxConstraints(minWidth: size.qtyMinWidth),
       height: size.qtyHeight,
       margin: EdgeInsets.symmetric(horizontal: size.gap),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: hasLabel ? 2 : 0),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.white,
@@ -199,16 +234,46 @@ class _QuantityBox extends StatelessWidget {
           ),
         ],
       ),
-      child: Text(
-        '$quantity',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: size.qtyFontSize,
-          fontWeight: FontWeight.w700,
-          height: 1.1,
-          color: const Color(0xFF212529),
-        ),
-      ),
+      child: hasLabel
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label!,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: size.labelFontSize,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                    color: labelColor,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '$quantity',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: size.qtyFontSize,
+                    fontWeight: FontWeight.w700,
+                    height: 1.05,
+                    color: const Color(0xFF212529),
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: size.qtyFontSize,
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+                color: const Color(0xFF212529),
+              ),
+            ),
     );
   }
 }

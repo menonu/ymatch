@@ -158,30 +158,19 @@ Widget _buildGridCounter(
         top: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
       ),
     ),
-    padding: const EdgeInsets.fromLTRB(2, 3, 2, 4),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 8,
-            color: color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: QuantityStepper(
-            quantity: qty,
-            size: QuantityStepperSize.dense,
-            enabled: enabled,
-            onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-            onIncrement: enabled ? () => onUpdate(qty + 1) : null,
-          ),
-        ),
-      ],
+    padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: QuantityStepper(
+        quantity: qty,
+        size: QuantityStepperSize.dense,
+        enabled: enabled,
+        // Label sits inside the white qty box above the number (#538).
+        label: label,
+        labelColor: qty > 0 ? color : Colors.grey[500],
+        onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+        onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+      ),
     ),
   );
 }
@@ -321,26 +310,15 @@ Widget _buildCompactCounter(
   void Function(int)? onUpdate,
 ) {
   final enabled = onUpdate != null;
-  return Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: qty > 0 ? color : Colors.grey[500],
-        ),
-      ),
-      const SizedBox(width: 3),
-      QuantityStepper(
-        quantity: qty,
-        size: QuantityStepperSize.compact,
-        enabled: enabled,
-        onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-        onIncrement: enabled ? () => onUpdate(qty + 1) : null,
-      ),
-    ],
+  return QuantityStepper(
+    quantity: qty,
+    size: QuantityStepperSize.compact,
+    enabled: enabled,
+    // Label sits inside the white qty box above the number (#538).
+    label: label,
+    labelColor: qty > 0 ? color : Colors.grey[500],
+    onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+    onIncrement: enabled ? () => onUpdate(qty + 1) : null,
   );
 }
 
@@ -637,38 +615,25 @@ Widget _buildStepper({
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        displayLabel,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: qty > 0 ? color : Colors.grey[500],
-        ),
+  // #538: pill stepper with red − / white qty box / green +.
+  // Status label (所持/求/譲) is drawn inside the white box above the qty.
+  // FittedBox keeps three-up columns from overflowing on ~360dp phones.
+  return Align(
+    alignment: Alignment.center,
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: QuantityStepper(
+        quantity: qty,
+        size: QuantityStepperSize.standard,
+        enabled: enabled,
+        label: displayLabel,
+        labelColor: qty > 0 ? color : Colors.grey[500],
+        incrementKey: Key('stepper_inc_$label'),
+        decrementKey: Key('stepper_dec_$label'),
+        onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+        onIncrement: enabled ? () => onUpdate(qty + 1) : null,
       ),
-      const SizedBox(height: 4),
-      // #538: pill stepper with red − / white qty box / green +.
-      // FittedBox keeps three-up columns from overflowing on ~360dp phones.
-      Align(
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: QuantityStepper(
-            quantity: qty,
-            size: QuantityStepperSize.standard,
-            enabled: enabled,
-            incrementKey: Key('stepper_inc_$label'),
-            decrementKey: Key('stepper_dec_$label'),
-            onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-            onIncrement: enabled ? () => onUpdate(qty + 1) : null,
-          ),
-        ),
-      ),
-    ],
+    ),
   );
 }
 
