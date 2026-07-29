@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
+import 'matches_nav_icon.dart';
 
 class ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -16,21 +17,18 @@ class ScaffoldWithNavBar extends ConsumerWidget {
         user != null && (user.role == 'admin' || user.role == 'moderator');
     final backendHealth = ref.watch(backendHealthProvider);
 
-    // Notification counts for badge
+    // #535: split match lifecycle (red count, top-right) from unread chat
+    // (purple chat marker, bottom-right). Full Message(N) stays on cards.
     final notifAsync = user != null
         ? ref.watch(notificationCountsProvider(user.id))
         : null;
-    // #535: match lifecycle counts sum 1:1; unread messages contribute at most
-    // +1 on the tab icon (full Message(N) stays on each match card).
-    final badgeCount =
+    final matchBadgeCount =
         notifAsync?.whenOrNull(
-          data: (c) =>
-              c.pendingMatches +
-              c.offersIn +
-              c.accepted +
-              (c.unreadMessages > 0 ? 1 : 0),
+          data: (c) => c.pendingMatches + c.offersIn + c.accepted,
         ) ??
         0;
+    final hasUnreadMessages =
+        notifAsync?.whenOrNull(data: (c) => c.unreadMessages > 0) ?? false;
     final l10n = AppLocalizations.of(context)!;
 
     final destinations = <NavigationDestination>[
@@ -40,18 +38,16 @@ class ScaffoldWithNavBar extends ConsumerWidget {
         label: l10n.navItems,
       ),
       NavigationDestination(
-        icon: badgeCount > 0
-            ? Badge(
-                label: Text('$badgeCount'),
-                child: const Icon(Icons.swap_horiz_outlined),
-              )
-            : const Icon(Icons.swap_horiz_outlined),
-        selectedIcon: badgeCount > 0
-            ? Badge(
-                label: Text('$badgeCount'),
-                child: const Icon(Icons.swap_horiz),
-              )
-            : const Icon(Icons.swap_horiz),
+        icon: MatchesNavIcon(
+          icon: Icons.swap_horiz_outlined,
+          matchCount: matchBadgeCount,
+          hasUnreadMessages: hasUnreadMessages,
+        ),
+        selectedIcon: MatchesNavIcon(
+          icon: Icons.swap_horiz,
+          matchCount: matchBadgeCount,
+          hasUnreadMessages: hasUnreadMessages,
+        ),
         label: l10n.navMatches,
       ),
       NavigationDestination(
