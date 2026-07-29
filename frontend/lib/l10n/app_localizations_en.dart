@@ -591,11 +591,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String matchGroupLabel(String event, String group) {
-    return '$event: $group';
-  }
-
-  @override
   String sendOfferItems(int count) {
     return 'Send Offer ($count items)';
   }

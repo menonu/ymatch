@@ -110,7 +110,7 @@ BottomNavBar
   - **Offer In**: Received offers — Reject / Accept buttons
   - **Active**: Accepted trades — Mark Complete button
   - **Done**: Completed trades — "Update Inventory" button
-- **Match Card**: User avatar, username, status chip, `event:group` label, **local match datetime** (`created_at`, latest-first within each tab; #476), chat/message action, selected items (Give/Receive), potential items
+- **Match Card**: User avatar, username, status chip, **event name** on the header (same position as before), **local match datetime** (`created_at`, latest-first within each tab; #476), chat/message action, selected items (Give/Receive) with the **group name on the left of each give/receive row** (shown twice; #534 / #466 display name when set), potential items
 
 ### ChatScreen
 

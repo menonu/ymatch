@@ -829,14 +829,6 @@
       "count": {"type": "int"}
     }
   },
-  "matchGroupLabel": "{event}: {group}",
-  "@matchGroupLabel": {
-    "description": "Legacy combined event:group string (#322). Match cards no longer use this after #534 (event on header, group on give/receive rows). Kept for any remaining callers.",
-    "placeholders": {
-      "event": {"type": "String"},
-      "group": {"type": "String"}
-    }
-  },
   "sendOfferItems": "Send Offer ({count} items)",
   "@sendOfferItems": {
     "description": "Submit button on the offer dialog with the selected item count",
