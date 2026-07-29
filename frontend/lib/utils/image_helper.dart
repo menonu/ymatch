@@ -205,36 +205,38 @@ void showZoomedImage(BuildContext context, String? url) {
         key: const Key('zoomed_image_viewer'),
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(12),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Constrain the interactive area so the image scales within the
-            // dialog rather than expanding unboundedly.
-            SizedBox(
-              width: MediaQuery.sizeOf(ctx).width,
-              height: MediaQuery.sizeOf(ctx).height,
-              child: InteractiveViewer(
-                minScale: 0.8,
-                maxScale: 5,
-                child: Center(child: buildImage(url, fit: BoxFit.contain)),
-              ),
-            ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Material(
-                color: Colors.black45,
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: IconButton(
-                  key: const Key('zoomed_image_close'),
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  tooltip: l10n?.close ?? 'Close',
-                  onPressed: () => Navigator.of(ctx).pop(),
+        child: SafeArea(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Constrain the interactive area so the image scales within the
+              // dialog rather than expanding unboundedly.
+              SizedBox(
+                width: MediaQuery.sizeOf(ctx).width,
+                height: MediaQuery.sizeOf(ctx).height,
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 5,
+                  child: Center(child: buildImage(url, fit: BoxFit.contain)),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Material(
+                  color: Colors.black45,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: IconButton(
+                    key: const Key('zoomed_image_close'),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    tooltip: l10n?.close ?? 'Close',
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     },
@@ -263,16 +265,16 @@ class ZoomableImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: _hasPhoto,
-      label: semanticLabel,
-      child: GestureDetector(
-        // Opaque so the whole thumbnail rect is tappable even if the image
-        // letterboxes (BoxFit.contain) and leaves transparent padding.
-        behavior: HitTestBehavior.opaque,
-        onTap: _hasPhoto ? () => showZoomedImage(context, photoUrl) : null,
-        child: child,
-      ),
+    final thumb = GestureDetector(
+      // Opaque so the whole thumbnail rect is tappable even if the image
+      // letterboxes (BoxFit.contain) and leaves transparent padding.
+      behavior: HitTestBehavior.opaque,
+      onTap: _hasPhoto ? () => showZoomedImage(context, photoUrl) : null,
+      child: child,
     );
+    // Only expose a button/label when a photo is present so assistive tech
+    // does not announce "View full image" on inert placeholders.
+    if (!_hasPhoto) return thumb;
+    return Semantics(button: true, label: semanticLabel, child: thumb);
   }
 }
