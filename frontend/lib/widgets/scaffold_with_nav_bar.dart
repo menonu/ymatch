@@ -18,7 +18,7 @@ class ScaffoldWithNavBar extends ConsumerWidget {
     final backendHealth = ref.watch(backendHealthProvider);
 
     // #535: split match lifecycle (red count, top-right) from unread chat
-    // (purple chat marker, bottom-right). Full Message(N) stays on cards.
+    // (purple count, bottom-right). Per-card Message(N) is unchanged.
     final notifAsync = user != null
         ? ref.watch(notificationCountsProvider(user.id))
         : null;
@@ -27,8 +27,8 @@ class ScaffoldWithNavBar extends ConsumerWidget {
           data: (c) => c.pendingMatches + c.offersIn + c.accepted,
         ) ??
         0;
-    final hasUnreadMessages =
-        notifAsync?.whenOrNull(data: (c) => c.unreadMessages > 0) ?? false;
+    final unreadMessageCount =
+        notifAsync?.whenOrNull(data: (c) => c.unreadMessages) ?? 0;
     final l10n = AppLocalizations.of(context)!;
 
     final destinations = <NavigationDestination>[
@@ -41,12 +41,12 @@ class ScaffoldWithNavBar extends ConsumerWidget {
         icon: MatchesNavIcon(
           icon: Icons.swap_horiz_outlined,
           matchCount: matchBadgeCount,
-          hasUnreadMessages: hasUnreadMessages,
+          unreadMessageCount: unreadMessageCount,
         ),
         selectedIcon: MatchesNavIcon(
           icon: Icons.swap_horiz,
           matchCount: matchBadgeCount,
-          hasUnreadMessages: hasUnreadMessages,
+          unreadMessageCount: unreadMessageCount,
         ),
         label: l10n.navMatches,
       ),

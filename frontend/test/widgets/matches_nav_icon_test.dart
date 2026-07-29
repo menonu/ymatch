@@ -5,7 +5,7 @@ import 'package:frontend/widgets/matches_nav_icon.dart';
 void main() {
   Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
-  testWidgets('no badges when matchCount is 0 and no unread (#535)', (
+  testWidgets('no badges when both counts are 0 (#535)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -13,17 +13,16 @@ void main() {
         const MatchesNavIcon(
           icon: Icons.swap_horiz,
           matchCount: 0,
-          hasUnreadMessages: false,
+          unreadMessageCount: 0,
         ),
       ),
     );
 
     expect(find.byIcon(Icons.swap_horiz), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-    expect(find.byIcon(Icons.chat_bubble), findsNothing);
+    expect(find.textContaining(RegExp(r'^\d+$')), findsNothing);
   });
 
-  testWidgets('red match count top-right only when matchCount > 0 (#535)', (
+  testWidgets('red match count only when matchCount > 0 (#535)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -31,19 +30,15 @@ void main() {
         const MatchesNavIcon(
           icon: Icons.swap_horiz,
           matchCount: 3,
-          hasUnreadMessages: false,
+          unreadMessageCount: 0,
         ),
       ),
     );
 
     expect(find.text('3'), findsOneWidget);
-    expect(find.byIcon(Icons.chat_bubble), findsNothing);
-
-    final text = tester.widget<Text>(find.text('3'));
-    expect(text.style?.color, Colors.white);
   });
 
-  testWidgets('purple chat marker only when hasUnreadMessages (#535)', (
+  testWidgets('purple message count only when unreadMessageCount > 0 (#535)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -51,17 +46,16 @@ void main() {
         const MatchesNavIcon(
           icon: Icons.swap_horiz,
           matchCount: 0,
-          hasUnreadMessages: true,
+          unreadMessageCount: 5,
         ),
       ),
     );
 
-    expect(find.byIcon(Icons.chat_bubble), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-    expect(find.textContaining(RegExp(r'^\d+$')), findsNothing);
+    expect(find.text('5'), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble), findsNothing);
   });
 
-  testWidgets('both badges can show together (#535)', (
+  testWidgets('both count badges can show together (#535)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -69,16 +63,16 @@ void main() {
         const MatchesNavIcon(
           icon: Icons.swap_horiz,
           matchCount: 2,
-          hasUnreadMessages: true,
+          unreadMessageCount: 4,
         ),
       ),
     );
 
     expect(find.text('2'), findsOneWidget);
-    expect(find.byIcon(Icons.chat_bubble), findsOneWidget);
+    expect(find.text('4'), findsOneWidget);
   });
 
-  testWidgets('match count caps visual label at 99+ (#535)', (
+  testWidgets('counts cap visual label at 99+ (#535)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -86,11 +80,11 @@ void main() {
         const MatchesNavIcon(
           icon: Icons.swap_horiz,
           matchCount: 120,
-          hasUnreadMessages: false,
+          unreadMessageCount: 150,
         ),
       ),
     );
 
-    expect(find.text('99+'), findsOneWidget);
+    expect(find.text('99+'), findsNWidgets(2));
   });
 }

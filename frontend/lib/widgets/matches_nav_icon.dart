@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Bottom-nav Matches icon with two independent affordances (#535):
+/// Bottom-nav Matches icon with two independent count badges (#535):
 ///
-/// - **Top-right red count** — sum of pending / offers-in / accepted matches.
-/// - **Bottom-right purple chat icon** — any unread peer messages (presence
-///   only; full Message(N) lives on each match card).
+/// - **Top-right red** — sum of pending / offers-in / accepted matches.
+/// - **Bottom-right purple** — unread peer message count (same total as
+///   the API `unreadMessages` field; per-card Message(N) is separate).
 ///
 /// Presentation only; counts arrive from [notificationCountsProvider].
 class MatchesNavIcon extends StatelessWidget {
@@ -12,7 +12,7 @@ class MatchesNavIcon extends StatelessWidget {
     super.key,
     required this.icon,
     required this.matchCount,
-    required this.hasUnreadMessages,
+    required this.unreadMessageCount,
   });
 
   final IconData icon;
@@ -20,10 +20,10 @@ class MatchesNavIcon extends StatelessWidget {
   /// Lifecycle match notifications (pending + offers in + accepted).
   final int matchCount;
 
-  /// True when the user has any unread peer chat messages.
-  final bool hasUnreadMessages;
+  /// Unread peer chat messages across active matches.
+  final int unreadMessageCount;
 
-  /// Purple used for the message presence marker (distinct from red count).
+  /// Purple used for the message count badge (distinct from red match count).
   static const Color messageBadgeColor = Color(0xFF7B1FA2); // purple.shade700
 
   @override
@@ -37,23 +37,27 @@ class MatchesNavIcon extends StatelessWidget {
           Positioned(
             right: -10,
             top: -6,
-            child: _MatchCountBadge(count: matchCount),
+            child: _CountBadge(count: matchCount, color: Colors.red),
           ),
-        if (hasUnreadMessages)
-          const Positioned(
-            right: -8,
+        if (unreadMessageCount > 0)
+          Positioned(
+            right: -10,
             bottom: -6,
-            child: _MessagePresenceBadge(),
+            child: _CountBadge(
+              count: unreadMessageCount,
+              color: messageBadgeColor,
+            ),
           ),
       ],
     );
   }
 }
 
-class _MatchCountBadge extends StatelessWidget {
-  const _MatchCountBadge({required this.count});
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, required this.color});
 
   final int count;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +66,7 @@ class _MatchCountBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       decoration: BoxDecoration(
-        color: Colors.red,
+        color: color,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white, width: 1),
       ),
@@ -76,25 +80,6 @@ class _MatchCountBadge extends StatelessWidget {
           height: 1.1,
         ),
       ),
-    );
-  }
-}
-
-/// Compact purple chat marker — not a count (nav treats messages as +1).
-class _MessagePresenceBadge extends StatelessWidget {
-  const _MessagePresenceBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 14,
-      height: 14,
-      decoration: BoxDecoration(
-        color: MatchesNavIcon.messageBadgeColor,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1),
-      ),
-      child: const Icon(Icons.chat_bubble, size: 8, color: Colors.white),
     );
   }
 }
