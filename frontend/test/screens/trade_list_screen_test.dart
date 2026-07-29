@@ -289,8 +289,14 @@ void main() {
     expect(find.text('Message(2)'), findsOneWidget);
     expect(find.text('Message'), findsNothing);
 
-    final text = tester.widget<Text>(find.text('Message(2)'));
-    expect(text.style?.color, Colors.red);
+    final button = tester.widget<FilledButton>(
+      find.ancestor(
+        of: find.text('Message(2)'),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    final fg = button.style?.foregroundColor?.resolve({});
+    expect(fg, Colors.red);
   });
 
   testWidgets(
@@ -320,8 +326,14 @@ void main() {
       expect(find.text('メッセージ(2)'), findsOneWidget);
       expect(find.text('メッセージ'), findsNothing);
 
-      final text = tester.widget<Text>(find.text('メッセージ(2)'));
-      expect(text.style?.color, Colors.red);
+      final button = tester.widget<FilledButton>(
+        find.ancestor(
+          of: find.text('メッセージ(2)'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      final fg = button.style?.foregroundColor?.resolve({});
+      expect(fg, Colors.red);
     },
   );
 

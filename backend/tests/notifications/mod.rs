@@ -435,6 +435,17 @@ async fn test_notification_counts_values(pool: PgPool) {
     assert_eq!(json_i64(&body, "total"), 1);
 
     // ---- #535: list_for_user surfaces per-match unreadMessageCount ----
+    // SYSTEM lifecycle rows must not inflate the unread count (issue notes).
+    sqlx::query(
+        "INSERT INTO messages (match_id, sender_id, content, message_type)
+         VALUES ($1, $2, 'INVENTORY_CAPACITY', 'SYSTEM')",
+    )
+    .bind(match_id)
+    .bind(u2 as i32)
+    .execute(&pool)
+    .await
+    .unwrap();
+
     let listed = list_user_matches(&pool, u1 as i64).await;
     let listed_match = listed
         .iter()
@@ -443,7 +454,26 @@ async fn test_notification_counts_values(pool: PgPool) {
     assert_eq!(
         listed_match["unreadMessageCount"].as_i64().unwrap_or(0),
         1,
-        "u1 should see 1 unread peer message on the match card"
+        "u1 should see 1 unread peer message (SYSTEM excluded)"
+    );
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(&format!("/api/v1/matches/user/{}/counts", u1))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(
+        json_i64(&body, "unreadMessages"),
+        1,
+        "global unread also excludes SYSTEM"
     );
 
     // Opening the chat (list messages) stamps the per-match watermark;

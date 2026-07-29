@@ -148,6 +148,8 @@ class TradeMatchCard extends StatelessWidget {
                         ),
                         minimumSize: const Size(0, 36),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        // #535: red label when unread; button foreground alone
+                        // is enough (no separate TextStyle.color).
                         foregroundColor: hasUnread ? Colors.red : null,
                       ),
                       child: Text(
@@ -155,10 +157,7 @@ class TradeMatchCard extends StatelessWidget {
                             ? l10n.messageActionWithUnread(unread)
                             : l10n.messageAction,
                         style: hasUnread
-                            ? const TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.w600,
-                              )
+                            ? const TextStyle(fontWeight: FontWeight.w600)
                             : null,
                       ),
                     ),
