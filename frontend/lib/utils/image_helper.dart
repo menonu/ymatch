@@ -201,42 +201,57 @@ void showZoomedImage(BuildContext context, String? url) {
     barrierDismissible: true,
     barrierColor: Colors.black87,
     builder: (ctx) {
-      return Dialog(
+      // Full-screen transparent material so the dialog itself fills the route.
+      // A backdrop GestureDetector dismisses on tap *outside* the image; the
+      // InteractiveViewer is sized to the image (not the screen) so empty
+      // letterbox space hits the backdrop instead of swallowing the tap.
+      return Material(
         key: const Key('zoomed_image_viewer'),
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(12),
-        child: SafeArea(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Constrain the interactive area so the image scales within the
-              // dialog rather than expanding unboundedly.
-              SizedBox(
-                width: MediaQuery.sizeOf(ctx).width,
-                height: MediaQuery.sizeOf(ctx).height,
-                child: InteractiveViewer(
-                  minScale: 0.8,
-                  maxScale: 5,
-                  child: Center(child: buildImage(url, fit: BoxFit.contain)),
-                ),
-              ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Material(
-                  color: Colors.black45,
-                  shape: const CircleBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: IconButton(
-                    key: const Key('zoomed_image_close'),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    tooltip: l10n?.close ?? 'Close',
-                    onPressed: () => Navigator.of(ctx).pop(),
+        type: MaterialType.transparency,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Tap outside the picture → close (#540 follow-up).
+            GestureDetector(
+              key: const Key('zoomed_image_backdrop'),
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(ctx).pop(),
+              child: const SizedBox.expand(),
+            ),
+            SafeArea(
+              child: Stack(
+                children: [
+                  Center(
+                    // Absorb taps on the image itself so they don't bubble to
+                    // the backdrop and dismiss while the user is inspecting.
+                    child: GestureDetector(
+                      onTap: () {},
+                      child: InteractiveViewer(
+                        minScale: 0.8,
+                        maxScale: 5,
+                        child: buildImage(url, fit: BoxFit.contain),
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Material(
+                      color: Colors.black45,
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: IconButton(
+                        key: const Key('zoomed_image_close'),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        tooltip: l10n?.close ?? 'Close',
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     },

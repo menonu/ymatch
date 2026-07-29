@@ -62,6 +62,31 @@ void main() {
       expect(find.byKey(const Key('zoomed_image_viewer')), findsNothing);
     });
 
+    testWidgets('tap outside the picture dismisses the zoom viewer', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _localized(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showZoomedImage(context, _transparentPngDataUri),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('zoomed_image_viewer')), findsOneWidget);
+
+      // Tap the full-screen backdrop (not the image / close button).
+      await tester.tap(find.byKey(const Key('zoomed_image_backdrop')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('zoomed_image_viewer')), findsNothing);
+    });
+
     testWidgets('no-ops for null or empty URL (no dialog)', (tester) async {
       await tester.pumpWidget(
         _localized(
