@@ -174,15 +174,15 @@ class _QuantityStepperDims {
   }) {
     switch (size) {
       case QuantityStepperSize.standard:
-        // Match pre-#538 detailed stepper: height 44, label 9, qty 15.
-        // trackPad 1px keeps ± chips nearly flush with the outer frame.
-        // Radii stay tight (card-like 4) for a squarer look.
+        // Type scale matches pre-#538 (label 9 / qty 15). Height 48 meets
+        // Material min touch height; painted ± chip stays smaller (32).
+        // trackPad 1px keeps chips nearly flush with the outer frame.
         return const _QuantityStepperDims(
-          height: 44,
+          height: 48,
           trackRadius: 4,
           trackPadH: 1,
           trackPadV: 1,
-          buttonExtent: 36,
+          buttonExtent: 32,
           iconSize: 20,
           buttonRadius: 3,
           qtyMinWidth: 48,
@@ -294,7 +294,12 @@ class _QuantityCenter extends StatelessWidget {
   }
 }
 
-/// ± chip with a light tinted fill of [color] (red / green).
+/// ± control: large transparent hit target + smaller visual chip (#538).
+///
+/// On phones the expanded column can be ~20–30dp wide — too narrow if the
+/// painted chip alone is the hit target. The [InkWell] fills the full slot
+/// (or at least [kMinInteractiveDimension] when not expanded); only the
+/// centered square is drawn as the red/green chip.
 class _StepButton extends StatelessWidget {
   const _StepButton({
     super.key,
@@ -315,6 +320,9 @@ class _StepButton extends StatelessWidget {
   final VoidCallback? onTap;
   final String semanticLabel;
 
+  /// Material minimum touch target (48dp).
+  static const double _minTouch = kMinInteractiveDimension;
+
   @override
   Widget build(BuildContext context) {
     final iconColor = enabled ? color : color.withValues(alpha: 0.28);
@@ -325,38 +333,45 @@ class _StepButton extends StatelessWidget {
         ? color.withValues(alpha: 0.28)
         : color.withValues(alpha: 0.12);
 
-    final chip = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(size.buttonRadius),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: BorderRadius.circular(size.buttonRadius),
-            border: Border.all(color: border),
-          ),
-          child: Semantics(
-            button: true,
-            enabled: enabled,
-            label: semanticLabel,
-            child: Center(
-              child: Icon(icon, size: size.iconSize, color: iconColor),
-            ),
-          ),
+    // Visual only — fixed square; does not define hit size.
+    final visualChip = IgnorePointer(
+      child: Container(
+        width: size.buttonExtent,
+        height: size.buttonExtent,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(size.buttonRadius),
+          border: Border.all(color: border),
+        ),
+        child: Icon(icon, size: size.iconSize, color: iconColor),
+      ),
+    );
+
+    final hitChild = Semantics(
+      button: true,
+      enabled: enabled,
+      label: semanticLabel,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          // Soft ripple over the whole hit area (not only the small chip).
+          borderRadius: BorderRadius.circular(size.buttonRadius),
+          child: Center(child: visualChip),
         ),
       ),
     );
 
     if (expand) {
-      // Fill the Expanded slot; chip height = track minus minimal pad.
-      final chipH = size.height - size.trackPadV * 2;
-      return SizedBox(height: chipH, width: double.infinity, child: chip);
+      // Full Expanded width × track height: big hit, small centered chip.
+      final hitH = size.height - size.trackPadV * 2;
+      return SizedBox(height: hitH, width: double.infinity, child: hitChild);
     }
-    return SizedBox(
-      width: size.buttonExtent,
-      height: size.buttonExtent,
-      child: chip,
-    );
+
+    // Intrinsic mode: grow hit box to Material minimum without enlarging
+    // the painted chip (helps offer-dialog / compact rows).
+    final hit = size.buttonExtent < _minTouch ? _minTouch : size.buttonExtent;
+    return SizedBox(width: hit, height: hit, child: hitChild);
   }
 }

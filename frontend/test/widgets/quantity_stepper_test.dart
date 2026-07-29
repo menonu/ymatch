@@ -171,8 +171,43 @@ void main() {
     );
     expect(tester.widget<Text>(find.text('所持')).style?.fontSize, 9);
     expect(tester.widget<Text>(find.text('2')).style?.fontSize, 15);
-    // Track height matches the old detailed Container (44).
+    // Height meets Material min touch (48).
     final stepper = tester.getSize(find.byType(QuantityStepper));
-    expect(stepper.height, 44);
+    expect(stepper.height, 48);
+  });
+
+  testWidgets('expanded ± hit target is wider than the painted chip (#538)', (
+    tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 180,
+            child: QuantityStepper(
+              quantity: 1,
+              expand: true,
+              label: '所持',
+              incrementKey: const Key('inc'),
+              onIncrement: () => taps++,
+              onDecrement: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Painted chip is buttonExtent (32); hit area fills the Expanded side.
+    final inc = find.byKey(const Key('inc'));
+    final hitSize = tester.getSize(inc);
+    expect(hitSize.width, greaterThan(32));
+
+    // Tap near the outer edge of the hit box (outside the 32px chip).
+    final box = tester.getRect(inc);
+    await tester.tapAt(Offset(box.right - 4, box.center.dy));
+    await tester.pump();
+    expect(taps, 1);
   });
 }
