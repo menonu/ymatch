@@ -225,5 +225,36 @@ void main() {
         expect(find.text('Waiting for response...'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'shows event on header and group twice on give/receive rows (#534)',
+      (WidgetTester tester) async {
+        final match = _offeredMatch(balanced: true)
+          ..eventName = 'TokyoFest'
+          ..groupName = 'BoosterBox'
+          ..groupDisplayName = 'Booster Boxes';
+
+        await tester.pumpWidget(
+          _localized(
+            TradeMatchCard(
+              user: _user(),
+              match: match,
+              tab: TradeTab.offerOut,
+              onOpenChat: () {},
+              onUpdateStatus: (_) {},
+              onMakeOffer: () {},
+              onApplyInventory: () {},
+            ),
+          ),
+        );
+
+        // Event stays on the header with a fixed prefix; combined label is gone.
+        expect(find.text('Event: TokyoFest'), findsOneWidget);
+        expect(find.text('TokyoFest: Booster Boxes'), findsNothing);
+        // Same group label on give and receive (#534).
+        expect(find.text('Booster Boxes'), findsNWidgets(2));
+        expect(find.text('BoosterBox'), findsNothing);
+      },
+    );
   });
 }

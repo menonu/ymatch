@@ -370,8 +370,8 @@ void main() {
     },
   );
 
-  // #322 / ADR 0001: a match is scoped to one item group, so the card shows
-  // `event:group` once on the header; items render as plain `Name ×qty`.
+  // #322 / ADR 0001 / #534: event stays on the header; group name is shown
+  // once on the left of each give/receive exchange row (twice total).
   TradeMatch _groupMatch() => TradeMatch()
     ..id = 101
     ..user1Id = 1
@@ -383,7 +383,7 @@ void main() {
     ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
   testWidgets(
-    'match card shows event:group on the header and plain item chips (#322)',
+    'match card shows event on header and group left of give/receive (#534)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -399,8 +399,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Card-level context label.
-      expect(find.text('TokyoFest: BoosterBox'), findsOneWidget);
+      // Event remains on the card header with a fixed prefix.
+      expect(find.text('Event: TokyoFest'), findsOneWidget);
+      // Combined event:group label is gone.
+      expect(find.text('TokyoFest: BoosterBox'), findsNothing);
+      // Group name appears once on give and once on receive (#534).
+      expect(find.text('BoosterBox'), findsNWidgets(2));
       // Items are plain — no per-item `·` suffix.
       expect(find.text('Give Pen ×3'), findsOneWidget);
       expect(find.text('Recv Notebook ×2'), findsOneWidget);
@@ -408,61 +412,36 @@ void main() {
     },
   );
 
-  testWidgets('match card prefers groupDisplayName over groupName (#466)', (
-    WidgetTester tester,
-  ) async {
-    final match = _groupMatch()..groupDisplayName = 'Booster Boxes';
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authProvider.overrideWith((ref) => MockAuthController(_user())),
-          matchesProvider(1).overrideWith((ref) async => [match]),
-          notificationCountsProvider(
-            1,
-          ).overrideWith((ref) async => NotificationCounts()),
-        ],
-        child: _localized(const TradeListScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('TokyoFest: Booster Boxes'), findsOneWidget);
-    expect(find.text('TokyoFest: BoosterBox'), findsNothing);
-  });
-
-  testWidgets('match card shows localized event：group under ja (#322)', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authProvider.overrideWith((ref) => MockAuthController(_user())),
-          matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
-          notificationCountsProvider(
-            1,
-          ).overrideWith((ref) async => NotificationCounts()),
-        ],
-        child: MaterialApp(
-          locale: const Locale('ja'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const TradeListScreen(),
+  testWidgets(
+    'match card prefers groupDisplayName over groupName on item rows (#466 / #534)',
+    (WidgetTester tester) async {
+      final match = _groupMatch()..groupDisplayName = 'Booster Boxes';
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            matchesProvider(1).overrideWith((ref) async => [match]),
+            notificationCountsProvider(
+              1,
+            ).overrideWith((ref) async => NotificationCounts()),
+          ],
+          child: _localized(const TradeListScreen()),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    // Fullwidth colon under ja.
-    expect(find.text('TokyoFest：BoosterBox'), findsOneWidget);
-  });
+      expect(find.text('Event: TokyoFest'), findsOneWidget);
+      expect(find.text('Booster Boxes'), findsNWidgets(2));
+      expect(find.text('BoosterBox'), findsNothing);
+      expect(find.text('TokyoFest: Booster Boxes'), findsNothing);
+    },
+  );
 
   testWidgets(
-    'match card guard: a group without an event renders no label (#322)',
+    'match card guard: no event name renders no event header (#322 / #534)',
     (WidgetTester tester) async {
-      // hasGroupName() && hasEventName() guard: a group-only match (no event)
-      // must NOT render the label, so the group name is not shown standalone.
-      // Asserting on the specific group name (not a `: ` substring) keeps this
-      // robust against future l10n strings that happen to contain a colon.
+      // Event header is gated on hasEventName(); group still shows on the
+      // give/receive rows when groupName is present (#534).
       final match = TradeMatch()
         ..id = 104
         ..user1Id = 1
@@ -484,9 +463,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // No `event:group` label and no standalone group name.
-      expect(find.textContaining('BoosterBox'), findsNothing);
-      // Items still render plainly.
+      // Only give side has items → group label once; no event header.
+      expect(find.text('BoosterBox'), findsOneWidget);
       expect(find.text('Give Pen ×3'), findsOneWidget);
     },
   );

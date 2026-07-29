@@ -1166,11 +1166,11 @@ abstract class AppLocalizations {
   /// **'Qty: {count}'**
   String qtyLabel(int count);
 
-  /// The match's single event:group context, shown once on the match card header (#322, ADR 0001). Both are always present on a real match.
+  /// Match card header: event name with a fixed prefix (#534)
   ///
   /// In en, this message translates to:
-  /// **'{event}: {group}'**
-  String matchGroupLabel(String event, String group);
+  /// **'Event: {event}'**
+  String matchEventLabel(String event);
 
   /// Submit button on the offer dialog with the selected item count
   ///
