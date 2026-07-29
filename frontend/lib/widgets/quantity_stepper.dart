@@ -12,11 +12,12 @@ enum QuantityStepperSize {
   dense,
 }
 
-/// Raised white quantity control with clear ± affordance (#538).
+/// Flat white quantity control with clear ± affordance (#538).
 ///
-/// Layout:
-/// - White elevated track (soft shadow)
-/// - Red-tinted rounded chip for decrement, green-tinted for increment
+/// Layout matches the app's minimalist Material surface language
+/// (cards use elevation 0 + subtle border — no floating shadow):
+/// - White track + thin border ([AppTheme] card style)
+/// - Light red / green rounded chips for − / +
 /// - Center: optional status label above bare quantity (no qty box)
 ///
 /// Set [expand] to `true` in constrained [Expanded] parents (detailed view)
@@ -70,7 +71,9 @@ class QuantityStepper extends StatelessWidget {
   /// Accessibility label for the increment control (defaults to English).
   final String? incrementSemanticLabel;
 
+  // Same surface language as AppTheme.cardTheme (white + #DEE2E6 border).
   static const Color _trackColor = Colors.white;
+  static const Color _trackBorder = Color(0xFFDEE2E6);
   static const Color _decrementColor = Color(0xFFE25555);
   static const Color _incrementColor = Color(0xFF2EAF6A);
   static const Color _defaultLabelColor = Color(0xFF6C757D);
