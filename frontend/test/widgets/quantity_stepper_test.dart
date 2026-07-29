@@ -124,7 +124,6 @@ void main() {
   testWidgets(
     'three expanded standard steppers fill narrow columns without overflow (#538)',
     (tester) async {
-      // Detailed-view three-up columns: expand fills width at full type size.
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -151,7 +150,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(QuantityStepper), findsNWidgets(3));
-      // Type scale must not be shrunk: qty uses 15 (standard dims).
       final qtyStyle = tester.widget<Text>(find.text('1')).style;
       expect(qtyStyle?.fontSize, 15);
     },
@@ -171,43 +169,53 @@ void main() {
     );
     expect(tester.widget<Text>(find.text('所持')).style?.fontSize, 9);
     expect(tester.widget<Text>(find.text('2')).style?.fontSize, 15);
-    // Height meets Material min touch (48).
     final stepper = tester.getSize(find.byType(QuantityStepper));
-    expect(stepper.height, 48);
+    expect(stepper.height, 44);
   });
 
-  testWidgets('expanded ± hit target is wider than the painted chip (#538)', (
-    tester,
-  ) async {
-    var taps = 0;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 180,
-            child: QuantityStepper(
-              quantity: 1,
-              expand: true,
-              label: '所持',
-              incrementKey: const Key('inc'),
-              onIncrement: () => taps++,
-              onDecrement: () {},
+  testWidgets(
+    'half-area hit extends under the label toward the center (#538)',
+    (tester) async {
+      var inc = 0;
+      var dec = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 200,
+                child: QuantityStepper(
+                  quantity: 1,
+                  expand: true,
+                  label: '所持',
+                  incrementKey: const Key('inc'),
+                  decrementKey: const Key('dec'),
+                  onIncrement: () => inc++,
+                  onDecrement: () => dec++,
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    // Painted chip is buttonExtent (32); hit area fills the Expanded side.
-    final inc = find.byKey(const Key('inc'));
-    final hitSize = tester.getSize(inc);
-    expect(hitSize.width, greaterThan(32));
+      final stepper = tester.getRect(find.byType(QuantityStepper));
+      // Each half is ~half the control; wider than the painted 36px chip.
+      final decBox = tester.getRect(find.byKey(const Key('dec')));
+      expect(decBox.width, closeTo(stepper.width / 2, 1));
+      expect(decBox.width, greaterThan(36));
 
-    // Tap near the outer edge of the hit box (outside the 32px chip).
-    final box = tester.getRect(inc);
-    await tester.tapAt(Offset(box.right - 4, box.center.dy));
-    await tester.pump();
-    expect(taps, 1);
-  });
+      // Tap just left of center (still on the number side of the − half).
+      await tester.tapAt(Offset(stepper.center.dx - 8, stepper.center.dy));
+      await tester.pump();
+      expect(dec, 1);
+      expect(inc, 0);
+
+      // Tap just right of center → increment.
+      await tester.tapAt(Offset(stepper.center.dx + 8, stepper.center.dy));
+      await tester.pump();
+      expect(inc, 1);
+    },
+  );
 }
