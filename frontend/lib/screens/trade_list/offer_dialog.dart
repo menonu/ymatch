@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/quantity_stepper.dart';
 import 'match_balance.dart';
 
 /// Opens the make/counter-offer dialog for [match].
@@ -287,13 +286,24 @@ class _OfferLegRow extends StatelessWidget {
               ],
             ),
           ),
-          // #538: shared pill stepper (red − / white qty / green +).
-          QuantityStepper(
-            quantity: qty,
-            size: QuantityStepperSize.compact,
-            enabled: selected,
-            onDecrement: selected && qty > 1 ? () => onQty(qty - 1) : null,
-            onIncrement: selected && qty < item.quantity
+          // Offer-dialog qty controls unchanged from main (#538 = detailed only).
+          IconButton(
+            icon: const Icon(Icons.remove, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: selected && qty > 1 ? () => onQty(qty - 1) : null,
+          ),
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$qty',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: selected && qty < item.quantity
                 ? () => onQty(qty + 1)
                 : null,
           ),

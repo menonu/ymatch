@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 /// Density variants for [QuantityStepper].
+///
+/// Only [standard] is used in production (#538 is detailed-view only;
+/// grid/compact keep their main-branch counters).
 enum QuantityStepperSize {
-  /// Detailed inventory cards — matches pre-#538 type scale (label 9 / qty 15).
+  /// Detailed inventory cards — height 44, label 9, qty 15.
   standard,
 
-  /// Compact list rows and match offer dialog.
+  /// Unused in app UI (kept for widget tests / possible future reuse).
   compact,
 
-  /// Grid cells (tightest).
+  /// Unused in app UI (kept for widget tests / possible future reuse).
   dense,
 }
 

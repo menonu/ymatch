@@ -150,6 +150,7 @@ Widget _buildGridCounter(
   Color color,
   void Function(int)? onUpdate,
 ) {
+  // Unchanged from main (#538 only restyles detailed view steppers).
   final enabled = onUpdate != null;
   return Container(
     decoration: BoxDecoration(
@@ -158,18 +159,62 @@ Widget _buildGridCounter(
         top: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
       ),
     ),
-    padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
-    // expand fills the grid cell width so icons/type stay full size.
-    child: QuantityStepper(
-      quantity: qty,
-      size: QuantityStepperSize.dense,
-      expand: true,
-      enabled: enabled,
-      // Label sits inside the white qty box above the number (#538).
-      label: label,
-      labelColor: qty > 0 ? color : Colors.grey[500],
-      onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-      onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 8,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Icon(
+                    Icons.remove,
+                    size: 12,
+                    color: enabled && qty > 0 ? color : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              '$qty',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: qty > 0 ? color : Colors.grey,
+              ),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: enabled ? () => onUpdate(qty + 1) : null,
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Icon(
+                    Icons.add,
+                    size: 12,
+                    color: enabled ? color : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     ),
   );
 }
@@ -248,52 +293,39 @@ Widget buildCompactInventoryItem(
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(Icons.edit_note, size: 14, color: Colors.blue[400]),
               ),
-            // #538: scale counters as a group so three pill steppers fit
-            // narrow phone rows without overflow.
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (showHave)
-                      _buildCompactCounter(
-                        context,
-                        l10n.haveShort,
-                        haveQty,
-                        AppTheme.haveColor,
-                        isDeleted
-                            ? null
-                            : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
-                      ),
-                    if (showHave && (showWant || showTrade))
-                      const SizedBox(width: 4),
-                    if (showWant)
-                      _buildCompactCounter(
-                        context,
-                        l10n.wantShort,
-                        wantQty,
-                        AppTheme.wantColor,
-                        isDeleted
-                            ? null
-                            : (q) => _updateInv(ref, user, item.id, 'WANT', q),
-                      ),
-                    if (showWant && showTrade) const SizedBox(width: 4),
-                    if (showTrade)
-                      _buildCompactCounter(
-                        context,
-                        l10n.tradeShort,
-                        tradeQty,
-                        AppTheme.tradeColor,
-                        isDeleted
-                            ? null
-                            : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
-                      ),
-                  ],
-                ),
+            // Compact counters unchanged from main (#538 = detailed only).
+            if (showHave)
+              _buildCompactCounter(
+                context,
+                l10n.haveShort,
+                haveQty,
+                AppTheme.haveColor,
+                isDeleted
+                    ? null
+                    : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
               ),
-            ),
+            if (showHave && (showWant || showTrade)) const SizedBox(width: 4),
+            if (showWant)
+              _buildCompactCounter(
+                context,
+                l10n.wantShort,
+                wantQty,
+                AppTheme.wantColor,
+                isDeleted
+                    ? null
+                    : (q) => _updateInv(ref, user, item.id, 'WANT', q),
+              ),
+            if (showWant && showTrade) const SizedBox(width: 4),
+            if (showTrade)
+              _buildCompactCounter(
+                context,
+                l10n.tradeShort,
+                tradeQty,
+                AppTheme.tradeColor,
+                isDeleted
+                    ? null
+                    : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+              ),
           ],
         ),
       ),
@@ -308,16 +340,50 @@ Widget _buildCompactCounter(
   Color color,
   void Function(int)? onUpdate,
 ) {
+  // Unchanged from main (#538 only restyles detailed view steppers).
   final enabled = onUpdate != null;
-  return QuantityStepper(
-    quantity: qty,
-    size: QuantityStepperSize.compact,
-    enabled: enabled,
-    // Label sits inside the white qty box above the number (#538).
-    label: label,
-    labelColor: qty > 0 ? color : Colors.grey[500],
-    onDecrement: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
-    onIncrement: enabled ? () => onUpdate(qty + 1) : null,
+  return Container(
+    height: 26,
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: color.withValues(alpha: 0.2)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: enabled && qty > 0 ? () => onUpdate(qty - 1) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Icon(
+              Icons.remove,
+              size: 12,
+              color: enabled && qty > 0 ? color : Colors.grey[400],
+            ),
+          ),
+        ),
+        Text(
+          '$label$qty',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        InkWell(
+          onTap: enabled ? () => onUpdate(qty + 1) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Icon(
+              Icons.add,
+              size: 12,
+              color: enabled ? color : Colors.grey[400],
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
