@@ -176,10 +176,10 @@ used throughout this document.
 
 | Identifier | Parent Screen | Description |
 |-----------|---------------|-------------|
-| `QuantityStepper` | `EventDetailScreen`, `TradeOfferDialog` | Shared pill control: light track, red −, white qty box, green + (#538); sizes `standard` / `compact` / `dense` |
-| `StepperCounter` | `EventDetailScreen` | Label + `QuantityStepper` (Detailed view HAVE/WANT/TRADE) |
-| `GridCounter` | `EventDetailScreen` | Label + dense `QuantityStepper` (Grid view) |
-| `CompactCounter` | `EventDetailScreen` | Label + compact `QuantityStepper` (List view) |
+| `QuantityStepper` | `EventDetailScreen`, `TradeOfferDialog` | Raised white control: red-tinted − chip, bare qty (+ optional status label above), green-tinted + chip (#538); sizes `standard` / `compact` / `dense` |
+| `StepperCounter` | `EventDetailScreen` | Label-in-center + `QuantityStepper` (Detailed view HAVE/WANT/TRADE) |
+| `GridCounter` | `EventDetailScreen` | Dense `QuantityStepper` (Grid view) |
+| `CompactCounter` | `EventDetailScreen` | Compact `QuantityStepper` (List view) |
 
 ## Buttons
 

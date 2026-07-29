@@ -12,14 +12,15 @@ enum QuantityStepperSize {
   dense,
 }
 
-/// Pill-style quantity control with clear ± affordance (#538).
+/// Raised white quantity control with clear ± affordance (#538).
 ///
-/// Layout: light gray track · red decrement · white qty box · green increment.
-/// When [label] is set, it is drawn **inside** the white box above the number.
+/// Layout:
+/// - White elevated track (soft shadow)
+/// - Red-tinted rounded chip for decrement, green-tinted for increment
+/// - Center: optional status label above bare quantity (no qty box)
 ///
 /// Set [expand] to `true` in constrained [Expanded] parents (detailed view)
-/// so the control fills column width at full type size — same as the old
-/// half-area steppers — instead of shrinking via [FittedBox].
+/// so the control fills column width at full type size.
 class QuantityStepper extends StatelessWidget {
   const QuantityStepper({
     super.key,
@@ -57,8 +58,7 @@ class QuantityStepper extends StatelessWidget {
   /// Master enable; when false both sides are inert (deleted items).
   final bool enabled;
 
-  /// Optional status label shown inside the qty box above the number
-  /// (e.g. 所持 / 求 / 譲).
+  /// Optional status label shown above the number (e.g. 所持 / 求 / 譲).
   final String? label;
 
   /// Color for [label]; defaults to muted gray when null.
@@ -70,11 +70,11 @@ class QuantityStepper extends StatelessWidget {
   /// Accessibility label for the increment control (defaults to English).
   final String? incrementSemanticLabel;
 
-  static const Color _trackColor = Color(0xFFF0F1F3);
+  static const Color _trackColor = Colors.white;
   static const Color _decrementColor = Color(0xFFE25555);
   static const Color _incrementColor = Color(0xFF2EAF6A);
-  static const Color _qtyBoxBorder = Color(0xFFE4E6EA);
   static const Color _defaultLabelColor = Color(0xFF6C757D);
+  static const Color _qtyColor = Color(0xFF212529);
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +93,7 @@ class QuantityStepper extends StatelessWidget {
       onTap: canDec ? onDecrement : null,
       semanticLabel: decrementSemanticLabel ?? 'Decrease quantity',
     );
-    final qtyBox = _QuantityBox(
+    final qty = _QuantityCenter(
       quantity: quantity,
       size: dims,
       expand: expand,
@@ -117,21 +117,34 @@ class QuantityStepper extends StatelessWidget {
       decoration: BoxDecoration(
         color: _trackColor,
         borderRadius: BorderRadius.circular(dims.trackRadius),
+        border: Border.all(color: const Color(0xFFE8EAED)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-      padding: EdgeInsets.symmetric(horizontal: dims.trackPadH),
-      // Clip so dense three-up columns never paint outside the pill.
+      padding: EdgeInsets.symmetric(
+        horizontal: dims.trackPadH,
+        vertical: dims.trackPadV,
+      ),
       clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
         children: expand
-            // Side buttons + qty share width flexibly (old steppers filled
-            // the column; type size stays fixed, layout width adapts).
             ? [
                 Expanded(flex: 2, child: dec),
-                Flexible(flex: 3, child: qtyBox),
+                Flexible(flex: 3, child: qty),
                 Expanded(flex: 2, child: inc),
               ]
-            : [dec, qtyBox, inc],
+            : [dec, qty, inc],
       ),
     );
   }
@@ -142,11 +155,11 @@ class _QuantityStepperDims {
     required this.height,
     required this.trackRadius,
     required this.trackPadH,
+    required this.trackPadV,
     required this.buttonExtent,
     required this.iconSize,
+    required this.buttonRadius,
     required this.qtyMinWidth,
-    required this.qtyHeight,
-    required this.qtyRadius,
     required this.qtyFontSize,
     required this.labelFontSize,
     required this.gap,
@@ -155,11 +168,11 @@ class _QuantityStepperDims {
   final double height;
   final double trackRadius;
   final double trackPadH;
+  final double trackPadV;
   final double buttonExtent;
   final double iconSize;
+  final double buttonRadius;
   final double qtyMinWidth;
-  final double qtyHeight;
-  final double qtyRadius;
   final double qtyFontSize;
   final double labelFontSize;
   final double gap;
@@ -171,55 +184,54 @@ class _QuantityStepperDims {
     switch (size) {
       case QuantityStepperSize.standard:
         // Match pre-#538 detailed stepper: height 44, label 9, qty 15.
-        return _QuantityStepperDims(
+        return const _QuantityStepperDims(
           height: 44,
-          trackRadius: 8,
-          trackPadH: 2,
-          buttonExtent: 40,
-          iconSize: 22,
-          qtyMinWidth: hasLabel ? 52 : 40,
-          qtyHeight: hasLabel ? 38 : 32,
-          qtyRadius: 8,
+          trackRadius: 10,
+          trackPadH: 4,
+          trackPadV: 4,
+          buttonExtent: 36,
+          iconSize: 20,
+          buttonRadius: 8,
+          qtyMinWidth: 48,
           qtyFontSize: 15,
           labelFontSize: 9,
-          gap: 2,
+          gap: 4,
         );
       case QuantityStepperSize.compact:
-        // Pre-#538 compact row was height 26 with 11–12pt type; keep that
-        // when unlabeled, slightly taller when label stacks above qty.
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
           trackRadius: 8,
-          trackPadH: 2,
-          buttonExtent: hasLabel ? 32 : 28,
+          trackPadH: 3,
+          trackPadV: 3,
+          buttonExtent: hasLabel ? 28 : 22,
           iconSize: 16,
-          qtyMinWidth: hasLabel ? 36 : 28,
-          qtyHeight: hasLabel ? 30 : 22,
-          qtyRadius: 6,
+          buttonRadius: 6,
+          qtyMinWidth: hasLabel ? 34 : 26,
           qtyFontSize: 12,
           labelFontSize: 9,
-          gap: 1,
+          gap: 3,
         );
       case QuantityStepperSize.dense:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
           trackRadius: 8,
-          trackPadH: 1,
-          buttonExtent: hasLabel ? 30 : 26,
+          trackPadH: 2,
+          trackPadV: 2,
+          buttonExtent: hasLabel ? 28 : 22,
           iconSize: 16,
-          qtyMinWidth: hasLabel ? 34 : 26,
-          qtyHeight: hasLabel ? 30 : 22,
-          qtyRadius: 6,
+          buttonRadius: 6,
+          qtyMinWidth: hasLabel ? 32 : 24,
           qtyFontSize: 12,
           labelFontSize: 8,
-          gap: 1,
+          gap: 2,
         );
     }
   }
 }
 
-class _QuantityBox extends StatelessWidget {
-  const _QuantityBox({
+/// Bare center: optional label above quantity — no border / box.
+class _QuantityCenter extends StatelessWidget {
+  const _QuantityCenter({
     required this.quantity,
     required this.size,
     required this.expand,
@@ -261,7 +273,7 @@ class _QuantityBox extends StatelessWidget {
                   fontSize: size.qtyFontSize,
                   fontWeight: FontWeight.bold,
                   height: 1.1,
-                  color: const Color(0xFF212529),
+                  color: QuantityStepper._qtyColor,
                 ),
               ),
             ],
@@ -273,37 +285,23 @@ class _QuantityBox extends StatelessWidget {
               fontSize: size.qtyFontSize,
               fontWeight: FontWeight.bold,
               height: 1.1,
-              color: const Color(0xFF212529),
+              color: QuantityStepper._qtyColor,
             ),
           );
 
     return Container(
-      // When expanded, fill the Flexible slot; otherwise use fixed min width.
       width: expand ? double.infinity : null,
       constraints: expand
-          ? BoxConstraints(minHeight: size.qtyHeight)
+          ? const BoxConstraints()
           : BoxConstraints(minWidth: size.qtyMinWidth),
-      height: size.qtyHeight,
       margin: EdgeInsets.symmetric(horizontal: size.gap),
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: hasLabel ? 2 : 0),
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(size.qtyRadius),
-        border: Border.all(color: QuantityStepper._qtyBoxBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
       child: content,
     );
   }
 }
 
+/// ± chip with a light tinted fill of [color] (red / green).
 class _StepButton extends StatelessWidget {
   const _StepButton({
     super.key,
@@ -327,34 +325,45 @@ class _StepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconColor = enabled ? color : color.withValues(alpha: 0.28);
-    final child = Material(
+    final fill = enabled
+        ? color.withValues(alpha: 0.12)
+        : color.withValues(alpha: 0.05);
+    final border = enabled
+        ? color.withValues(alpha: 0.28)
+        : color.withValues(alpha: 0.12);
+
+    final chip = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(size.trackRadius),
-        child: Semantics(
-          button: true,
-          enabled: enabled,
-          label: semanticLabel,
-          child: Center(
-            child: Icon(icon, size: size.iconSize, color: iconColor),
+        borderRadius: BorderRadius.circular(size.buttonRadius),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(size.buttonRadius),
+            border: Border.all(color: border),
+          ),
+          child: Semantics(
+            button: true,
+            enabled: enabled,
+            label: semanticLabel,
+            child: Center(
+              child: Icon(icon, size: size.iconSize, color: iconColor),
+            ),
           ),
         ),
       ),
     );
 
     if (expand) {
-      // Fill the Expanded parent for a large hit target (old half-area style).
-      return SizedBox(
-        height: size.height,
-        width: double.infinity,
-        child: child,
-      );
+      // Fill the Expanded slot; chip height fits inside track padding.
+      final chipH = size.height - size.trackPadV * 2;
+      return SizedBox(height: chipH, width: double.infinity, child: chip);
     }
     return SizedBox(
       width: size.buttonExtent,
       height: size.buttonExtent,
-      child: child,
+      child: chip,
     );
   }
 }

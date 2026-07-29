@@ -614,9 +614,8 @@ Widget _buildStepper({
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
-  // #538: pill UI (red − / white qty+label / green +) at pre-#538 type
-  // scale (height 44, label 9, qty 15). expand:true fills the Expanded
-  // column like the old half-area steppers — no FittedBox shrink.
+  // #538: raised white track, tinted ± chips, bare qty with status label
+  // above (height 44, label 9, qty 15). expand:true fills the column.
   return QuantityStepper(
     quantity: qty,
     size: QuantityStepperSize.standard,
