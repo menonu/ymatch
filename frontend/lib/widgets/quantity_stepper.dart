@@ -12,9 +12,10 @@ enum QuantityStepperSize {
   dense,
 }
 
-/// Borderless quantity control with clear ± affordance (#538).
+/// Flat bordered quantity control with clear ± affordance (#538).
 ///
-/// No outer track/frame — sits directly on the parent surface:
+/// - White track + thin border (card-style, no elevation)
+/// - Minimal inset between the frame and ± chips
 /// - Light red / green rounded chips for − / +
 /// - Center: optional status label above bare quantity
 ///
@@ -69,6 +70,9 @@ class QuantityStepper extends StatelessWidget {
   /// Accessibility label for the increment control (defaults to English).
   final String? incrementSemanticLabel;
 
+  // Same surface language as AppTheme.cardTheme (white + #DEE2E6 border).
+  static const Color _trackColor = Colors.white;
+  static const Color _trackBorder = Color(0xFFDEE2E6);
   static const Color _decrementColor = Color(0xFFE25555);
   static const Color _incrementColor = Color(0xFF2EAF6A);
   static const Color _defaultLabelColor = Color(0xFF6C757D);
@@ -109,10 +113,20 @@ class QuantityStepper extends StatelessWidget {
       semanticLabel: incrementSemanticLabel ?? 'Increase quantity',
     );
 
-    // No outer track/frame — only ± chips and bare center content.
-    return SizedBox(
+    return Container(
       height: dims.height,
       width: expand ? double.infinity : null,
+      decoration: BoxDecoration(
+        color: _trackColor,
+        borderRadius: BorderRadius.circular(dims.trackRadius),
+        border: Border.all(color: _trackBorder),
+      ),
+      // Minimal inset so ± chips sit nearly flush with the frame.
+      padding: EdgeInsets.symmetric(
+        horizontal: dims.trackPadH,
+        vertical: dims.trackPadV,
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
         children: expand
@@ -161,46 +175,47 @@ class _QuantityStepperDims {
     switch (size) {
       case QuantityStepperSize.standard:
         // Match pre-#538 detailed stepper: height 44, label 9, qty 15.
+        // trackPad 1px keeps ± chips nearly flush with the outer frame.
         return const _QuantityStepperDims(
           height: 44,
-          trackRadius: 10,
-          trackPadH: 4,
-          trackPadV: 4,
+          trackRadius: 8,
+          trackPadH: 1,
+          trackPadV: 1,
           buttonExtent: 36,
           iconSize: 20,
-          buttonRadius: 8,
+          buttonRadius: 6,
           qtyMinWidth: 48,
           qtyFontSize: 15,
           labelFontSize: 9,
-          gap: 4,
+          gap: 2,
         );
       case QuantityStepperSize.compact:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
-          trackRadius: 8,
-          trackPadH: 3,
-          trackPadV: 3,
+          trackRadius: 6,
+          trackPadH: 1,
+          trackPadV: 1,
           buttonExtent: hasLabel ? 28 : 22,
           iconSize: 16,
-          buttonRadius: 6,
+          buttonRadius: 5,
           qtyMinWidth: hasLabel ? 34 : 26,
           qtyFontSize: 12,
           labelFontSize: 9,
-          gap: 3,
+          gap: 2,
         );
       case QuantityStepperSize.dense:
         return _QuantityStepperDims(
           height: hasLabel ? 36 : 28,
-          trackRadius: 8,
-          trackPadH: 2,
-          trackPadV: 2,
+          trackRadius: 6,
+          trackPadH: 1,
+          trackPadV: 1,
           buttonExtent: hasLabel ? 28 : 22,
           iconSize: 16,
-          buttonRadius: 6,
+          buttonRadius: 5,
           qtyMinWidth: hasLabel ? 32 : 24,
           qtyFontSize: 12,
           labelFontSize: 8,
-          gap: 2,
+          gap: 1,
         );
     }
   }
@@ -333,8 +348,9 @@ class _StepButton extends StatelessWidget {
     );
 
     if (expand) {
-      // Fill the Expanded slot at full control height (no outer track pad).
-      return SizedBox(height: size.height, width: double.infinity, child: chip);
+      // Fill the Expanded slot; chip height = track minus minimal pad.
+      final chipH = size.height - size.trackPadV * 2;
+      return SizedBox(height: chipH, width: double.infinity, child: chip);
     }
     return SizedBox(
       width: size.buttonExtent,

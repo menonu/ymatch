@@ -176,7 +176,7 @@ used throughout this document.
 
 | Identifier | Parent Screen | Description |
 |-----------|---------------|-------------|
-| `QuantityStepper` | `EventDetailScreen`, `TradeOfferDialog` | No outer frame: red-tinted − chip, bare qty (+ optional status label above), green-tinted + chip (#538); sizes `standard` / `compact` / `dense` |
+| `QuantityStepper` | `EventDetailScreen`, `TradeOfferDialog` | Flat white + border (minimal inset to ± chips): red-tinted −, bare qty (+ optional status label), green-tinted + (#538); sizes `standard` / `compact` / `dense` |
 | `StepperCounter` | `EventDetailScreen` | Label-in-center + `QuantityStepper` (Detailed view HAVE/WANT/TRADE) |
 | `GridCounter` | `EventDetailScreen` | Dense `QuantityStepper` (Grid view) |
 | `CompactCounter` | `EventDetailScreen` | Compact `QuantityStepper` (List view) |
