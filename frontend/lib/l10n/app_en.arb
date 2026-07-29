@@ -831,7 +831,7 @@
   },
   "matchGroupLabel": "{event}: {group}",
   "@matchGroupLabel": {
-    "description": "The match's single event:group context, shown once on the match card header (#322, ADR 0001). Both are always present on a real match.",
+    "description": "Legacy combined event:group string (#322). Match cards no longer use this after #534 (event on header, group on give/receive rows). Kept for any remaining callers.",
     "placeholders": {
       "event": {"type": "String"},
       "group": {"type": "String"}
