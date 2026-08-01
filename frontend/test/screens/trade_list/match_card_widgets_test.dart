@@ -247,7 +247,7 @@ void main() {
     );
 
     testWidgets(
-      'shows event on header and group twice on give/receive rows (#534)',
+      'shows event on header; group chip right of give/receive titles (#534)',
       (WidgetTester tester) async {
         final match = _offeredMatch(balanced: true)
           ..eventName = 'TokyoFest'
@@ -271,9 +271,19 @@ void main() {
         // Event stays on the header with a fixed prefix; combined label is gone.
         expect(find.text('Event: TokyoFest'), findsOneWidget);
         expect(find.text('TokyoFest: Booster Boxes'), findsNothing);
-        // Same group label on give and receive (#534).
+        // Same group chip on give and receive section titles (#534).
         expect(find.text('Booster Boxes'), findsNWidgets(2));
         expect(find.text('BoosterBox'), findsNothing);
+        final groupChips = find.byKey(
+          const Key('match_group_chip_Booster Boxes'),
+        );
+        expect(groupChips, findsNWidgets(2));
+
+        // Group chip sits to the right of the section title, not left of items.
+        final giveTitle = tester.getTopLeft(find.text('Give:'));
+        final groupChip = tester.getTopLeft(groupChips.first);
+        expect(groupChip.dx, greaterThan(giveTitle.dx));
+        expect((groupChip.dy - giveTitle.dy).abs(), lessThan(8));
       },
     );
 

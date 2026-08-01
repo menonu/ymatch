@@ -48,8 +48,8 @@ class TradeMatchCard extends StatelessWidget {
     // #535: per-match unread peer message count from list_for_user.
     final unread = match.unreadMessageCount;
     final hasUnread = unread > 0;
-    // #534 / #466: group label for the give/receive item rows (same value on
-    // both sides by ADR 0001; shown twice for UI balance).
+    // #534 / #466: group label chip next to give/receive section titles
+    // (same value on both sides by ADR 0001; shown twice for UI balance).
     final itemGroupLabel = match.hasGroupName()
         ? groupLabel(
             match.groupName,

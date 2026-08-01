@@ -11,9 +11,9 @@ class MatchPotentialItems extends StatelessWidget {
 
   final TradeMatch match;
 
-  /// Cosmetic group label shown once on the left of each give/receive row
-  /// (#534). Same value on both sides by ADR 0001; null when the match has
-  /// no group name.
+  /// Cosmetic group label shown to the right of each give/receive section
+  /// title (#534 / #542). Same value on both sides by ADR 0001; null when the
+  /// match has no group name.
   final String? groupLabel;
 
   @override
@@ -23,40 +23,20 @@ class MatchPotentialItems extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (match.userHaves.isNotEmpty) ...[
-          Text(
-            l10n.youGive,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          MatchSectionTitle(title: l10n.youGive, groupLabel: groupLabel),
           const SizedBox(height: 4),
-          MatchExchangeRow(
-            groupLabel: groupLabel,
-            child: MatchInventoryItemList(
-              items: match.userHaves,
-              color: AppTheme.tradeColor,
-            ),
+          MatchInventoryItemList(
+            items: match.userHaves,
+            color: AppTheme.tradeColor,
           ),
         ],
         if (match.userWants.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(
-            l10n.youReceive,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          MatchSectionTitle(title: l10n.youReceive, groupLabel: groupLabel),
           const SizedBox(height: 4),
-          MatchExchangeRow(
-            groupLabel: groupLabel,
-            child: MatchInventoryItemList(
-              items: match.userWants,
-              color: AppTheme.wantColor,
-            ),
+          MatchInventoryItemList(
+            items: match.userWants,
+            color: AppTheme.wantColor,
           ),
         ],
       ],
@@ -105,9 +85,9 @@ class MatchSelectedItems extends StatelessWidget {
   final int userId;
   final TradeMatch match;
 
-  /// Cosmetic group label shown once on the left of each give/receive row
-  /// (#534). Same value on both sides by ADR 0001; null when the match has
-  /// no group name.
+  /// Cosmetic group label shown to the right of each give/receive section
+  /// title (#534 / #542). Same value on both sides by ADR 0001; null when the
+  /// match has no group name.
   final String? groupLabel;
 
   @override
@@ -124,58 +104,38 @@ class MatchSelectedItems extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (gives.isNotEmpty) ...[
-          Text(
-            l10n.giveLabel,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          MatchSectionTitle(title: l10n.giveLabel, groupLabel: groupLabel),
           const SizedBox(height: 4),
-          MatchExchangeRow(
-            groupLabel: groupLabel,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final i in gives)
-                  MatchMerchLine(
-                    merchId: i.merchId,
-                    merchName: i.merchName,
-                    quantity: i.quantity,
-                    color: AppTheme.tradeColor,
-                    photoUrl: i.hasPhotoUrl() ? i.photoUrl : null,
-                  ),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final i in gives)
+                MatchMerchLine(
+                  merchId: i.merchId,
+                  merchName: i.merchName,
+                  quantity: i.quantity,
+                  color: AppTheme.tradeColor,
+                  photoUrl: i.hasPhotoUrl() ? i.photoUrl : null,
+                ),
+            ],
           ),
         ],
         if (receives.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(
-            l10n.receiveLabel,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          MatchSectionTitle(title: l10n.receiveLabel, groupLabel: groupLabel),
           const SizedBox(height: 4),
-          MatchExchangeRow(
-            groupLabel: groupLabel,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final i in receives)
-                  MatchMerchLine(
-                    merchId: i.merchId,
-                    merchName: i.merchName,
-                    quantity: i.quantity,
-                    color: AppTheme.wantColor,
-                    photoUrl: i.hasPhotoUrl() ? i.photoUrl : null,
-                  ),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final i in receives)
+                MatchMerchLine(
+                  merchId: i.merchId,
+                  merchName: i.merchName,
+                  quantity: i.quantity,
+                  color: AppTheme.wantColor,
+                  photoUrl: i.hasPhotoUrl() ? i.photoUrl : null,
+                ),
+            ],
           ),
         ],
       ],
@@ -183,40 +143,65 @@ class MatchSelectedItems extends StatelessWidget {
   }
 }
 
-/// Layout helper: optional group name on the left of an exchange-items body
-/// (#534). Used once per give section and once per receive section.
-class MatchExchangeRow extends StatelessWidget {
-  const MatchExchangeRow({super.key, required this.child, this.groupLabel});
+/// Section header: "You give:" / "あなたが渡すもの:" with optional group chip
+/// immediately to the right (#534 layout update).
+class MatchSectionTitle extends StatelessWidget {
+  const MatchSectionTitle({super.key, required this.title, this.groupLabel});
 
-  final Widget child;
+  final String title;
   final String? groupLabel;
 
   @override
   Widget build(BuildContext context) {
     final label = groupLabel;
-    if (label == null || label.isEmpty) return child;
-
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2, right: 8),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 96),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+        Flexible(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        Expanded(child: child),
+        if (label != null && label.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          Flexible(child: MatchGroupChip(label: label)),
+        ],
       ],
+    );
+  }
+}
+
+/// Rounded bordered pill for the match group name next to section titles.
+class MatchGroupChip extends StatelessWidget {
+  const MatchGroupChip({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: Key('match_group_chip_$label'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.grey.shade400),
+        color: Colors.grey.shade50,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: Colors.grey[800],
+          fontWeight: FontWeight.w600,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -254,7 +239,7 @@ class MatchMerchLine extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // #540 / #542: same size as detailed inventory tile; tap to zoom.
+          // #540 / #542: thumbnail; tap to zoom when a photo exists.
           ZoomableImage(
             key: Key('match_merch_thumbnail_$merchId'),
             photoUrl: url,
