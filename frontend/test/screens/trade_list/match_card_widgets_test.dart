@@ -5,7 +5,13 @@ import 'package:frontend/models/models.dart';
 import 'package:frontend/screens/trade_list/match_balance.dart';
 import 'package:frontend/screens/trade_list/match_card.dart';
 import 'package:frontend/screens/trade_list/match_status_chrome.dart';
+import 'package:frontend/screens/trade_list/match_items.dart';
 import 'package:frontend/screens/trade_list/trade_tab.dart';
+
+/// 1×1 transparent PNG data URI — avoids network Image.network in widget tests.
+const _testPngDataUri =
+    'data:image/png;base64,'
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 Widget _localized(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -18,24 +24,38 @@ User _user() => User()
   ..username = 'alice'
   ..role = 'user';
 
-InventoryItem _item(int merchId, String name, int qty, int userId) =>
-    InventoryItem()
-      ..merchId = merchId
-      ..merchName = name
-      ..quantity = qty
-      ..userId = userId
-      ..status = 'HAVE';
+InventoryItem _item(
+  int merchId,
+  String name,
+  int qty,
+  int userId, {
+  String? photoUrl,
+}) {
+  final item = InventoryItem()
+    ..merchId = merchId
+    ..merchName = name
+    ..quantity = qty
+    ..userId = userId
+    ..status = 'HAVE';
+  if (photoUrl != null) item.photoUrl = photoUrl;
+  return item;
+}
 
 MatchItem _leg({
   required int merchId,
   required String name,
   required int qty,
   required int giverId,
-}) => MatchItem()
-  ..merchId = merchId
-  ..merchName = name
-  ..quantity = qty
-  ..giverUserId = giverId;
+  String? photoUrl,
+}) {
+  final item = MatchItem()
+    ..merchId = merchId
+    ..merchName = name
+    ..quantity = qty
+    ..giverUserId = giverId;
+  if (photoUrl != null) item.photoUrl = photoUrl;
+  return item;
+}
 
 TradeMatch _offeredMatch({required bool balanced}) {
   final match = TradeMatch()
@@ -227,7 +247,7 @@ void main() {
     );
 
     testWidgets(
-      'shows event on header and group twice on give/receive rows (#534)',
+      'shows event on header; group chip right of give/receive titles (#534)',
       (WidgetTester tester) async {
         final match = _offeredMatch(balanced: true)
           ..eventName = 'TokyoFest'
@@ -251,9 +271,178 @@ void main() {
         // Event stays on the header with a fixed prefix; combined label is gone.
         expect(find.text('Event: TokyoFest'), findsOneWidget);
         expect(find.text('TokyoFest: Booster Boxes'), findsNothing);
-        // Same group label on give and receive (#534).
+        // Same group chip on give and receive section titles (#534).
         expect(find.text('Booster Boxes'), findsNWidgets(2));
         expect(find.text('BoosterBox'), findsNothing);
+        final groupChips = find.byKey(
+          const Key('match_group_chip_Booster Boxes'),
+        );
+        expect(groupChips, findsNWidgets(2));
+
+        // Group chip sits to the right of the section title, not left of items.
+        final giveTitle = tester.getTopLeft(find.text('Give:'));
+        final groupChip = tester.getTopLeft(groupChips.first);
+        expect(groupChip.dx, greaterThan(giveTitle.dx));
+        expect((groupChip.dy - giveTitle.dy).abs(), lessThan(8));
+      },
+    );
+
+    testWidgets(
+      'potential items show thumbnails and stack one item per row (#542)',
+      (WidgetTester tester) async {
+        final match = TradeMatch()
+          ..id = 100
+          ..user1Id = 1
+          ..user2Id = 2
+          ..status = 'PENDING'
+          ..otherUser = (User()
+            ..id = 2
+            ..username = 'bob')
+          ..userHaves.add(
+            _item(10, 'Give Pen', 3, 1, photoUrl: _testPngDataUri),
+          )
+          ..userHaves.add(
+            _item(11, 'Give Sticker', 1, 1, photoUrl: _testPngDataUri),
+          )
+          ..userWants.add(
+            _item(20, 'Recv Notebook', 2, 2, photoUrl: _testPngDataUri),
+          );
+
+        await tester.pumpWidget(
+          _localized(
+            TradeMatchCard(
+              user: _user(),
+              match: match,
+              tab: TradeTab.match_,
+              onOpenChat: () {},
+              onUpdateStatus: (_) {},
+              onMakeOffer: () {},
+              onApplyInventory: () {},
+            ),
+          ),
+        );
+
+        // Thumbnails keyed by merch id (#542).
+        final penThumb = find.byKey(const Key('match_merch_thumbnail_10'));
+        final stickerThumb = find.byKey(const Key('match_merch_thumbnail_11'));
+        final notebookThumb = find.byKey(const Key('match_merch_thumbnail_20'));
+        expect(penThumb, findsOneWidget);
+        expect(stickerThumb, findsOneWidget);
+        expect(notebookThumb, findsOneWidget);
+
+        // Same size as detailed inventory item tiles.
+        final thumbSize = tester.getSize(penThumb);
+        expect(thumbSize.width, kMatchMerchThumbnailSize);
+        expect(thumbSize.height, kMatchMerchThumbnailSize);
+
+        // One item per row: same-section items must not share a horizontal
+        // band (sticker below pen, not beside it).
+        final penY = tester.getTopLeft(find.text('Give Pen ×3')).dy;
+        final stickerY = tester.getTopLeft(find.text('Give Sticker ×1')).dy;
+        expect(stickerY, greaterThan(penY + 8));
+
+        // Zoom on tap when photo is present (#540 parity).
+        await tester.tap(penThumb);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('zoomed_image_viewer')), findsOneWidget);
+      },
+    );
+
+    testWidgets('selected legs show thumbnails one item per row (#542)', (
+      WidgetTester tester,
+    ) async {
+      final match = TradeMatch()
+        ..id = 50
+        ..user1Id = 1
+        ..user2Id = 2
+        ..status = 'OFFERED'
+        ..offeredBy = 1
+        ..otherUser = (User()
+          ..id = 2
+          ..username = 'bob');
+      match.selectedItems.add(
+        _leg(
+          merchId: 10,
+          name: 'Give Pen',
+          qty: 2,
+          giverId: 1,
+          photoUrl: _testPngDataUri,
+        ),
+      );
+      match.selectedItems.add(
+        _leg(
+          merchId: 11,
+          name: 'Give Sticker',
+          qty: 1,
+          giverId: 1,
+          photoUrl: _testPngDataUri,
+        ),
+      );
+      match.selectedItems.add(
+        _leg(
+          merchId: 20,
+          name: 'Recv Notebook',
+          qty: 2,
+          giverId: 2,
+          photoUrl: _testPngDataUri,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _localized(
+          TradeMatchCard(
+            user: _user(),
+            match: match,
+            tab: TradeTab.offerOut,
+            onOpenChat: () {},
+            onUpdateStatus: (_) {},
+            onMakeOffer: () {},
+            onApplyInventory: () {},
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('match_merch_thumbnail_10')), findsOneWidget);
+      expect(find.byKey(const Key('match_merch_thumbnail_11')), findsOneWidget);
+      expect(find.byKey(const Key('match_merch_thumbnail_20')), findsOneWidget);
+
+      final penY = tester.getTopLeft(find.text('Give Pen ×2')).dy;
+      final stickerY = tester.getTopLeft(find.text('Give Sticker ×1')).dy;
+      expect(stickerY, greaterThan(penY + 8));
+    });
+
+    testWidgets(
+      'potential item without photo shows inert placeholder thumbnail (#542)',
+      (WidgetTester tester) async {
+        final match = TradeMatch()
+          ..id = 100
+          ..user1Id = 1
+          ..user2Id = 2
+          ..status = 'PENDING'
+          ..otherUser = (User()
+            ..id = 2
+            ..username = 'bob')
+          ..userHaves.add(_item(10, 'Give Pen', 3, 1));
+
+        await tester.pumpWidget(
+          _localized(
+            TradeMatchCard(
+              user: _user(),
+              match: match,
+              tab: TradeTab.match_,
+              onOpenChat: () {},
+              onUpdateStatus: (_) {},
+              onMakeOffer: () {},
+              onApplyInventory: () {},
+            ),
+          ),
+        );
+
+        final thumb = find.byKey(const Key('match_merch_thumbnail_10'));
+        expect(thumb, findsOneWidget);
+        await tester.tap(thumb);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('zoomed_image_viewer')), findsNothing);
       },
     );
   });

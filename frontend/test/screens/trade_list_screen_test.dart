@@ -452,8 +452,8 @@ void main() {
     },
   );
 
-  // #322 / ADR 0001 / #534: event stays on the header; group name is shown
-  // once on the left of each give/receive exchange row (twice total).
+  // #322 / ADR 0001 / #534: event stays on the header; group name chip is
+  // shown to the right of each give/receive section title (twice total).
   TradeMatch _groupMatch() => TradeMatch()
     ..id = 101
     ..user1Id = 1
@@ -465,7 +465,7 @@ void main() {
     ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
 
   testWidgets(
-    'match card shows event on header and group left of give/receive (#534)',
+    'match card shows event on header and group chip by give/receive (#534)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -670,6 +670,10 @@ void main() {
   testWidgets(
     'match list within a tab is ordered latest created_at first (#476)',
     (WidgetTester tester) async {
+      // Cards with 48px thumbs are taller — ensure the list fits on-screen.
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       // Deliberately reverse chronological input order.
       final older = _matchWithUser(
         id: 10,
