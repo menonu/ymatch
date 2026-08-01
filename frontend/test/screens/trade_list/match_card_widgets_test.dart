@@ -4,9 +4,9 @@ import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/screens/trade_list/match_balance.dart';
 import 'package:frontend/screens/trade_list/match_card.dart';
-import 'package:frontend/screens/trade_list/match_items.dart';
 import 'package:frontend/screens/trade_list/match_status_chrome.dart';
 import 'package:frontend/screens/trade_list/trade_tab.dart';
+import 'package:frontend/utils/image_helper.dart';
 
 /// 1×1 transparent PNG data URI — avoids network Image.network in widget tests.
 const _testPngDataUri =
@@ -320,10 +320,10 @@ void main() {
         expect(stickerThumb, findsOneWidget);
         expect(notebookThumb, findsOneWidget);
 
-        // Same size as detailed inventory item tiles (72×72).
+        // Same size as detailed inventory item tiles.
         final thumbSize = tester.getSize(penThumb);
-        expect(thumbSize.width, kMatchMerchThumbnailSize);
-        expect(thumbSize.height, kMatchMerchThumbnailSize);
+        expect(thumbSize.width, kMerchThumbnailSizeDetailed);
+        expect(thumbSize.height, kMerchThumbnailSizeDetailed);
 
         // One item per row: same-section items must not share a horizontal
         // band (sticker below pen, not beside it).
