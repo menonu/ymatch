@@ -221,9 +221,8 @@ class MatchExchangeRow extends StatelessWidget {
   }
 }
 
-/// Thumbnail edge length for match item rows — same as the event-detail
-/// detailed inventory tile (72×72). Match-card only; do not change item list.
-const double kMatchMerchThumbnailSize = 72;
+/// Thumbnail edge length for match item rows. Match-card only.
+const double kMatchMerchThumbnailSize = 48;
 
 /// One merch line on a match card: thumbnail + "Name ×qty" (#542).
 ///
