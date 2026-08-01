@@ -221,6 +221,11 @@ class MatchExchangeRow extends StatelessWidget {
   }
 }
 
+/// Thumbnail size on match item rows — matches the event detail **detailed**
+/// inventory item tile (`buildDetailedInventoryItem`, 72×72) so merch photos
+/// read at the same scale as the default item list (#542).
+const double kMatchMerchThumbnailSize = 72;
+
 /// One merch line on a match card: thumbnail + "Name ×qty" (#542).
 ///
 /// Shared by potential inventory candidates and selected offer legs so both
@@ -245,30 +250,32 @@ class MatchMerchLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final url = photoUrl;
+    const size = kMatchMerchThumbnailSize;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // #540 / #542: compact 28×28 thumb; tap to zoom when a photo exists.
+          // #540 / #542: same 72×72 as detailed item list; tap to zoom.
           ZoomableImage(
             key: Key('match_merch_thumbnail_$merchId'),
             photoUrl: url,
             semanticLabel: l10n.viewFullImage,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: size,
+                height: size,
                 child: buildImage(
                   url,
-                  width: 28,
-                  height: 28,
+                  width: size,
+                  height: size,
                   fit: BoxFit.contain,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               '$merchName ×$quantity',
