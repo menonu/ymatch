@@ -267,7 +267,7 @@ Widget buildCompactInventoryItem(
         ),
         child: Row(
           children: [
-            // #540: tap thumbnail to zoom (compact size is hard to read).
+            // #540: tap thumbnail to zoom (compact 28×28 is hard to read).
             ZoomableImage(
               key: Key('merch_thumbnail_${item.id}'),
               photoUrl: item.hasPhotoUrl() ? item.photoUrl : null,
@@ -276,8 +276,8 @@ Widget buildCompactInventoryItem(
                 borderRadius: BorderRadius.circular(3),
                 child: buildImage(
                   item.hasPhotoUrl() ? item.photoUrl : null,
-                  width: kMerchThumbnailSizeCompact,
-                  height: kMerchThumbnailSizeCompact,
+                  width: 28,
+                  height: 28,
                 ),
               ),
             ),
@@ -450,12 +450,12 @@ Widget buildDetailedInventoryItem(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: SizedBox(
-                    width: kMerchThumbnailSizeDetailed,
-                    height: kMerchThumbnailSizeDetailed,
+                    width: 72,
+                    height: 72,
                     child: buildImage(
                       item.hasPhotoUrl() ? item.photoUrl : null,
-                      width: kMerchThumbnailSizeDetailed,
-                      height: kMerchThumbnailSizeDetailed,
+                      width: 72,
+                      height: 72,
                       fit: BoxFit.contain,
                     ),
                   ),

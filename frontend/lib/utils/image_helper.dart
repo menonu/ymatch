@@ -4,14 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../l10n/app_localizations.dart';
 
-/// Merch thumbnail edge length for the **detailed** inventory item row
-/// (`buildDetailedInventoryItem`) and match-card item lines (`MatchMerchLine`).
-/// Keep these UIs in lockstep so match cards match the default item list (#542).
-const double kMerchThumbnailSizeDetailed = 72;
-
-/// Compact list-view merch thumbnail (`buildCompactInventoryItem`).
-const double kMerchThumbnailSizeCompact = 28;
-
 /// Result of [pickMerchImage]: the raw image bytes, the file name, and a
 /// base64 data-URI preview URL.
 class PickedImage {
