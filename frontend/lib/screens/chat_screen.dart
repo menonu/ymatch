@@ -58,10 +58,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  // #245: thin wrapper — body shape, invalidation, and error state live
-  // on ChatController. Errors surface via ref.listen in build().
-  // #498: catch rethrown failures so await outcome is reliable without
-  // uncaught async errors (snackbars still come from the listen).
+  // #245: thin wrapper — body shape + invalidation live on ChatController.
+  // #498: error feedback is driven by the returned Future so
+  // generation-discarded concurrent failures still surface a SnackBar.
   Future<void> _sendMessage(User currentUser) async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -72,8 +71,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await ref
           .read(chatControllerProvider.notifier)
           .sendMessage(widget.matchId, currentUser.id, text);
-    } catch (_) {
-      // SnackBar via ref.listen on chatControllerProvider.
+    } catch (e) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.failedToSend(e.toString()))));
     }
   }
 
@@ -91,13 +94,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _maybeRefreshUnreadBadges(user);
     }
 
-    // Single owner for chat-send error SnackBars (#245).
-    ref.listen<AsyncValue<void>>(chatControllerProvider, (previous, next) {
-      if (!next.hasError) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.failedToSend(next.error.toString()))),
-      );
-    });
+    // #498: send-error SnackBars come from the Future catch in _sendMessage
+    // (not ref.listen on the shared slot) so concurrent discarded failures
+    // still surface feedback.
 
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.white),

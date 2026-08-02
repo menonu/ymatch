@@ -78,17 +78,25 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     return _filterMatches(matches, tab, userId).length;
   }
 
-  // #241: thin wrappers — body shape, invalidation, and error state live
-  // on MatchController. Errors surface via ref.listen in build().
-  // #498: catch rethrown failures so await outcome is reliable without
-  // uncaught async errors (snackbars still come from the listen).
+  // #241: thin wrappers — body shape + invalidation live on MatchController.
+  // #498: error/success feedback is driven by the returned Future so
+  // generation-discarded concurrent failures still surface a SnackBar
+  // (the shared AsyncValue slot is intentionally lossy for non-latest ops).
+  void _showMatchError(Object e) {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.errorPrefix(e.toString()))));
+  }
+
   Future<void> _updateStatus(int userId, int matchId, String newStatus) async {
     try {
       await ref
           .read(matchControllerProvider.notifier)
           .updateStatus(userId, matchId, newStatus);
-    } catch (_) {
-      // SnackBar via ref.listen on matchControllerProvider.
+    } catch (e) {
+      _showMatchError(e);
     }
   }
 
@@ -101,8 +109,8 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
       await ref
           .read(matchControllerProvider.notifier)
           .submitOffer(userId, matchId, items);
-    } catch (_) {
-      // SnackBar via ref.listen on matchControllerProvider.
+    } catch (e) {
+      _showMatchError(e);
     }
   }
 
@@ -150,7 +158,6 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     );
     if (confirmed != true || !mounted) return;
 
-    // #498: detect success from the Future (not the shared hasError slot).
     try {
       await ref
           .read(matchControllerProvider.notifier)
@@ -164,8 +171,8 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           context,
         ).showSnackBar(SnackBar(content: Text(l10n.inventoryUpdatedSnack)));
       }
-    } catch (_) {
-      // SnackBar via ref.listen on matchControllerProvider.
+    } catch (e) {
+      _showMatchError(e);
     }
   }
 
@@ -179,13 +186,9 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     final matchesAsync = ref.watch(matchesProvider(user.id));
     final l10n = AppLocalizations.of(context)!;
 
-    // Single owner for match-mutation error SnackBars (#241).
-    ref.listen<AsyncValue<void>>(matchControllerProvider, (previous, next) {
-      if (!next.hasError) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.errorPrefix(next.error.toString()))),
-      );
-    });
+    // #498: mutation error SnackBars come from the Future catch paths above
+    // (not ref.listen on the shared slot) so concurrent discarded failures
+    // still surface feedback.
 
     return Scaffold(
       appBar: AppBar(
