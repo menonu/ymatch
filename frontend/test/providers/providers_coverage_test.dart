@@ -12,6 +12,7 @@
 // (package:http/testing.dart), a ProviderContainer with apiClientProvider
 // overridden, no ProviderScope. No new dev-dependencies.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1372,7 +1373,7 @@ void main() {
       expect(body['skipHaveDecrement'], isTrue);
     });
 
-    test('mutation failure sets error state (no rethrow)', () async {
+    test('mutation failure sets error state and rethrows (#498)', () async {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'POST' &&
@@ -1387,13 +1388,62 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // Completes without throwing — screen listens on state for SnackBars.
-      await container
-          .read(matchControllerProvider.notifier)
-          .updateStatus(7, 9, 'ACCEPTED');
+      // #498: Future rejects so callers detect outcome without racing the
+      // shared AsyncValue slot; state still holds error for ref.listen.
+      await expectLater(
+        container
+            .read(matchControllerProvider.notifier)
+            .updateStatus(7, 9, 'ACCEPTED'),
+        throwsA(isA<Exception>()),
+      );
 
       expect(container.read(matchControllerProvider).hasError, isTrue);
     });
+
+    test(
+      'concurrent mutations: late failure does not clobber later success (#498)',
+      () async {
+        final statusStarted = Completer<void>();
+        final releaseStatus = Completer<void>();
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/matches/9/status') {
+              statusStarted.complete();
+              await releaseStatus.future;
+              return http.Response('slow fail', 422);
+            }
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/matches/9/offer') {
+              return _okEmpty();
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        final controller = container.read(matchControllerProvider.notifier);
+
+        // Start a slow-failing status update, then a fast successful offer.
+        final slow = controller.updateStatus(7, 9, 'ACCEPTED');
+        await statusStarted.future;
+
+        final item = OfferItem()
+          ..merchId = 1
+          ..giverUserId = 7
+          ..quantity = 1;
+        await controller.submitOffer(7, 9, [item]);
+        expect(container.read(matchControllerProvider).hasError, isFalse);
+
+        releaseStatus.complete();
+        await expectLater(slow, throwsA(isA<Exception>()));
+        // Late failure must not overwrite the later success on the shared slot.
+        expect(container.read(matchControllerProvider).hasError, isFalse);
+      },
+    );
   });
 
   // ---- ChatController / messagesProvider (#245) ----
@@ -1460,7 +1510,7 @@ void main() {
     );
 
     test(
-      'sendMessage failure sets error state (no rethrow, no invalidate)',
+      'sendMessage failure sets error, rethrows, and does not invalidate (#498)',
       () async {
         var getCount = 0;
         final api = _apiWith(
@@ -1491,10 +1541,13 @@ void main() {
         await container.read(messagesProvider(9).future);
         expect(getCount, 1);
 
-        // Completes without throwing — screen listens on state for SnackBars.
-        await container
-            .read(chatControllerProvider.notifier)
-            .sendMessage(9, 7, 'hello');
+        // #498: Future rejects; state still holds error for ref.listen.
+        await expectLater(
+          container
+              .read(chatControllerProvider.notifier)
+              .sendMessage(9, 7, 'hello'),
+          throwsA(isA<Exception>()),
+        );
 
         expect(container.read(chatControllerProvider).hasError, isTrue);
         // Failure path must not invalidate.
@@ -1539,7 +1592,7 @@ void main() {
     });
   });
 
-  // ---- searchProvider / searchQueryProvider ----
+  // ---- searchProvider / searchQueryProvider / debounce (#498) ----
 
   group('searchProvider', () {
     test('returns an empty list when the query is blank', () async {
@@ -1553,29 +1606,62 @@ void main() {
       expect(results, isEmpty);
     });
 
-    test('fetches results for a non-blank query', () async {
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'GET' &&
-              request.url.path == '/api/v1/search' &&
-              request.url.query == 'q=card') {
-            return _ok([
-              {'type': 'item', 'id': 1, 'title': 'Card A', 'event_id': 5},
-            ]);
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
+    test(
+      'fetches results for a non-blank query after debounce (#498)',
+      () async {
+        var searchHits = 0;
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'GET' &&
+                request.url.path == '/api/v1/search' &&
+                request.url.query == 'q=card') {
+              searchHits++;
+              return _ok([
+                {'type': 'item', 'id': 1, 'title': 'Card A', 'event_id': 5},
+              ]);
+            }
+            return _okEmpty();
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        // Keep debounced provider alive so the listen + timer run.
+        final sub = container.listen(debouncedSearchQueryProvider, (_, __) {});
+        addTearDown(sub.close);
+
+        // Rapid intermediate keystrokes must not hit the API.
+        container.read(searchQueryProvider.notifier).state = 'c';
+        container.read(searchQueryProvider.notifier).state = 'ca';
+        container.read(searchQueryProvider.notifier).state = 'card';
+        expect(container.read(debouncedSearchQueryProvider), isEmpty);
+        expect(searchHits, 0);
+
+        await Future<void>.delayed(
+          searchDebounceDuration + const Duration(milliseconds: 50),
+        );
+        expect(container.read(debouncedSearchQueryProvider), 'card');
+
+        final results = await container.read(searchProvider.future);
+        expect(results.length, 1);
+        expect(results.first.title, 'Card A');
+        expect(searchHits, 1);
+      },
+    );
+
+    test('clearing the query updates debounced value immediately (#498)', () {
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      // searchProvider watches searchQueryProvider.
+      final sub = container.listen(debouncedSearchQueryProvider, (_, __) {});
+      addTearDown(sub.close);
+
       container.read(searchQueryProvider.notifier).state = 'card';
-      final results = await container.read(searchProvider.future);
-      expect(results.length, 1);
-      expect(results.first.title, 'Card A');
+      // Force-apply without waiting by scheduling empty immediately.
+      container.read(searchQueryProvider.notifier).state = '';
+      expect(container.read(debouncedSearchQueryProvider), isEmpty);
     });
   });
 

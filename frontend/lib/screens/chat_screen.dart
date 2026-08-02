@@ -60,15 +60,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   // #245: thin wrapper — body shape, invalidation, and error state live
   // on ChatController. Errors surface via ref.listen in build().
+  // #498: catch rethrown failures so await outcome is reliable without
+  // uncaught async errors (snackbars still come from the listen).
   Future<void> _sendMessage(User currentUser) async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
     _messageController.clear();
 
-    await ref
-        .read(chatControllerProvider.notifier)
-        .sendMessage(widget.matchId, currentUser.id, text);
+    try {
+      await ref
+          .read(chatControllerProvider.notifier)
+          .sendMessage(widget.matchId, currentUser.id, text);
+    } catch (_) {
+      // SnackBar via ref.listen on chatControllerProvider.
+    }
   }
 
   @override

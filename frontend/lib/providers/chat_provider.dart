@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api_client.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
+import 'mutation_controller.dart';
 
 // --- Chat ---
 
@@ -26,17 +27,20 @@ final messagesProvider = FutureProvider.family.autoDispose<List<Message>, int>((
 ///
 /// #245: centralizes `SendMessageRequest` body construction (proto type),
 /// `messagesProvider` invalidation, and loading/error state so the screen
-/// can `ref.listen` instead of try/catch + SnackBar + invalidate at the
-/// call site. Polling stays on the screen — see comment there.
-class ChatController extends StateNotifier<AsyncValue<void>> {
+/// can `ref.listen` for SnackBars. Polling stays on the screen.
+///
+/// #498: failures rethrow so callers detect outcome from the [Future];
+/// concurrent sends use [ConcurrentMutationMixin] so they cannot clobber
+/// each other's success/error on the shared slot.
+class ChatController extends StateNotifier<AsyncValue<void>>
+    with ConcurrentMutationMixin {
   final ApiClient client;
   final Ref ref;
 
   ChatController(this.client, this.ref) : super(const AsyncValue.data(null));
 
-  Future<void> sendMessage(int matchId, int senderId, String content) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> sendMessage(int matchId, int senderId, String content) {
+    return runMutation(() async {
       final payload = SendMessageRequest()
         ..matchId = matchId
         ..senderId = senderId
@@ -46,10 +50,7 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
         payload.toProto3Json() as Map<String, dynamic>,
       );
       ref.invalidate(messagesProvider(matchId));
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    });
   }
 }
 

@@ -741,12 +741,20 @@ class _AdminItemsTab extends ConsumerWidget {
                   );
                   if (confirm == true) {
                     // #496: route through AdminController (no direct apiClient).
+                    // #498: never send user_id=0 — early-return when unauthenticated.
                     try {
                       final user = ref.read(currentUserProvider);
-                      final userId = user?.id ?? 0;
+                      if (user == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Not signed in')),
+                          );
+                        }
+                        return;
+                      }
                       await ref
                           .read(adminControllerProvider.notifier)
-                          .deleteMerch(item.id, userId);
+                          .deleteMerch(item.id, user.id);
                       ref.invalidate(adminMerchProvider);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -830,12 +838,20 @@ class _AdminMatchesTab extends ConsumerWidget {
                       );
                       if (confirm == true) {
                         // #496: route through AdminController (no direct apiClient).
+                        // #498: never send user_id=0 — early-return when unauthenticated.
                         try {
                           final user = ref.read(currentUserProvider);
-                          final userId = user?.id ?? 0;
+                          if (user == null) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Not signed in')),
+                              );
+                            }
+                            return;
+                          }
                           await ref
                               .read(adminControllerProvider.notifier)
-                              .deleteMatch(match.id, userId);
+                              .deleteMatch(match.id, user.id);
                           ref.invalidate(adminMatchesProvider);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

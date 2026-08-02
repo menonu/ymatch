@@ -80,16 +80,30 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
 
   // #241: thin wrappers — body shape, invalidation, and error state live
   // on MatchController. Errors surface via ref.listen in build().
-  Future<void> _updateStatus(int userId, int matchId, String newStatus) {
-    return ref
-        .read(matchControllerProvider.notifier)
-        .updateStatus(userId, matchId, newStatus);
+  // #498: catch rethrown failures so await outcome is reliable without
+  // uncaught async errors (snackbars still come from the listen).
+  Future<void> _updateStatus(int userId, int matchId, String newStatus) async {
+    try {
+      await ref
+          .read(matchControllerProvider.notifier)
+          .updateStatus(userId, matchId, newStatus);
+    } catch (_) {
+      // SnackBar via ref.listen on matchControllerProvider.
+    }
   }
 
-  Future<void> _submitOffer(int userId, int matchId, List<OfferItem> items) {
-    return ref
-        .read(matchControllerProvider.notifier)
-        .submitOffer(userId, matchId, items);
+  Future<void> _submitOffer(
+    int userId,
+    int matchId,
+    List<OfferItem> items,
+  ) async {
+    try {
+      await ref
+          .read(matchControllerProvider.notifier)
+          .submitOffer(userId, matchId, items);
+    } catch (_) {
+      // SnackBar via ref.listen on matchControllerProvider.
+    }
   }
 
   Future<void> _applyInventory(int userId, int matchId) async {
@@ -136,14 +150,22 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
     );
     if (confirmed != true || !mounted) return;
 
-    await ref
-        .read(matchControllerProvider.notifier)
-        .applyInventory(userId, matchId, skipHaveDecrement: skipHaveDecrement);
-    // Success snackbar only; failures are handled by the controller listen.
-    if (mounted && !ref.read(matchControllerProvider).hasError) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.inventoryUpdatedSnack)));
+    // #498: detect success from the Future (not the shared hasError slot).
+    try {
+      await ref
+          .read(matchControllerProvider.notifier)
+          .applyInventory(
+            userId,
+            matchId,
+            skipHaveDecrement: skipHaveDecrement,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.inventoryUpdatedSnack)));
+      }
+    } catch (_) {
+      // SnackBar via ref.listen on matchControllerProvider.
     }
   }
 

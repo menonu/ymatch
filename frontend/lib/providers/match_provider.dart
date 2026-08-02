@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api_client.dart';
 import '../models/models.dart';
+import 'mutation_controller.dart';
 
 // --- Matches ---
 final matchesProvider = FutureProvider.family<List<TradeMatch>, int>((
@@ -26,8 +27,13 @@ final notificationCountsProvider =
 /// #241: centralizes request body construction (proto types),
 /// `matchesProvider` + `notificationCountsProvider` invalidation, and
 /// loading/error state so screens can `ref.listen` instead of duplicating
-/// try/catch + SnackBar + invalidate at each call site.
-class MatchController extends StateNotifier<AsyncValue<void>> {
+/// SnackBar logic at each call site.
+///
+/// #498: failures rethrow so callers detect outcome from the [Future];
+/// concurrent mutations use [ConcurrentMutationMixin] so they cannot
+/// clobber each other's success/error on the shared slot.
+class MatchController extends StateNotifier<AsyncValue<void>>
+    with ConcurrentMutationMixin {
   final ApiClient client;
   final Ref ref;
 
@@ -38,13 +44,8 @@ class MatchController extends StateNotifier<AsyncValue<void>> {
     ref.invalidate(notificationCountsProvider(userId));
   }
 
-  Future<void> submitOffer(
-    int userId,
-    int matchId,
-    List<OfferItem> items,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> submitOffer(int userId, int matchId, List<OfferItem> items) {
+    return runMutation(() async {
       final payload = OfferTradeRequest()
         ..userId = userId
         ..items.addAll(items);
@@ -53,15 +54,11 @@ class MatchController extends StateNotifier<AsyncValue<void>> {
         payload.toProto3Json() as Map<String, dynamic>,
       );
       _invalidateMatchLists(userId);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    });
   }
 
-  Future<void> updateStatus(int userId, int matchId, String status) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> updateStatus(int userId, int matchId, String status) {
+    return runMutation(() async {
       final payload = UpdateMatchStatusRequest()
         ..status = status
         ..userId = userId;
@@ -70,10 +67,7 @@ class MatchController extends StateNotifier<AsyncValue<void>> {
         payload.toProto3Json() as Map<String, dynamic>,
       );
       _invalidateMatchLists(userId);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    });
   }
 
   /// Apply completed-trade inventory for [userId] on [matchId].
@@ -85,9 +79,8 @@ class MatchController extends StateNotifier<AsyncValue<void>> {
     int userId,
     int matchId, {
     bool skipHaveDecrement = false,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
+  }) {
+    return runMutation(() async {
       final payload = ApplyInventoryRequest()
         ..userId = userId
         ..skipHaveDecrement = skipHaveDecrement;
@@ -96,10 +89,7 @@ class MatchController extends StateNotifier<AsyncValue<void>> {
         payload.toProto3Json() as Map<String, dynamic>,
       );
       _invalidateMatchLists(userId);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    });
   }
 }
 

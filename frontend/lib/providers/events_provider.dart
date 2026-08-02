@@ -4,6 +4,7 @@ import '../services/api_client.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
 import 'member_models.dart';
+import 'mutation_controller.dart';
 
 // --- Events ---
 final eventsProvider = FutureProvider<List<Event>>((ref) async {
@@ -48,13 +49,16 @@ final favoriteGroupsProvider = FutureProvider<List<FavoriteGroup>>((ref) async {
       .toList();
 });
 
-class EventsController extends StateNotifier<AsyncValue<void>> {
+/// Event mutations. Shared-slot methods use [ConcurrentMutationMixin] (#498).
+/// Fire-and-forget toggles intentionally skip the slot (#239).
+class EventsController extends StateNotifier<AsyncValue<void>>
+    with ConcurrentMutationMixin {
   final ApiClient client;
   EventsController(this.client) : super(const AsyncValue.data(null));
 
-  Future<void> addEvent(String name, int creatorId, {String? status}) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> addEvent(String name, int creatorId, {String? status}) {
+    // #266: rethrow so callers (dialogs) can surface a SnackBar.
+    return runMutation(() async {
       final payload = CreateEventRequest()
         ..name = name
         ..creatorId = creatorId;
@@ -63,13 +67,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
         '/api/v1/events',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so callers (dialogs) can surface a SnackBar instead of
-      // closing as if the create succeeded.
-      rethrow;
-    }
+    });
   }
 
   Future<void> toggleFavorite(int eventId, int userId, bool isFavorite) async {
@@ -127,9 +125,9 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> updateEvent(int eventId, int userId, String name) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> updateEvent(int eventId, int userId, String name) {
+    // #266: rethrow so the edit dialog can surface a failure SnackBar.
+    return runMutation(() async {
       final payload = UpdateEventRequest()
         ..userId = userId
         ..name = name;
@@ -137,24 +135,14 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
         '/api/v1/events/$eventId',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the edit dialog can surface a failure SnackBar.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> deleteEventByCreator(int eventId, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> deleteEventByCreator(int eventId, int userId) {
+    // #266: rethrow so the delete confirm dialog can surface a failure SnackBar.
+    return runMutation(() async {
       await client.delete('/api/v1/admin/events/$eventId?user_id=$userId');
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the delete confirm dialog can surface a failure SnackBar.
-      rethrow;
-    }
+    });
   }
 
   /// List event members via the public path (#442). Requires event.member.manage.
@@ -172,58 +160,31 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Assign event editor via the public path (#442).
-  Future<void> assignEventEditor(
-    int eventId,
-    int targetUserId,
-    int userId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> assignEventEditor(int eventId, int targetUserId, int userId) {
+    return runMutation(() async {
       await client.post(
         '/api/v1/events/$eventId/members/$targetUserId?user_id=$userId',
         {},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Revoke event editor via the public path (#442). Never removes creator.
-  Future<void> revokeEventEditor(
-    int eventId,
-    int targetUserId,
-    int userId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> revokeEventEditor(int eventId, int targetUserId, int userId) {
+    return runMutation(() async {
       await client.delete(
         '/api/v1/events/$eventId/members/$targetUserId?user_id=$userId',
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Self-service event creator transfer (`PUT /events/:id/creator`, #442).
-  Future<void> transferEventCreator(
-    int eventId,
-    int userId,
-    int newCreatorId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> transferEventCreator(int eventId, int userId, int newCreatorId) {
+    return runMutation(() async {
       await client.put('/api/v1/events/$eventId/creator?user_id=$userId', {
         'newCreatorId': newCreatorId,
       });
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// List group members via the public path (#443). Requires group.member.manage.
@@ -248,19 +209,14 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     String groupName,
     int targetUserId,
     int userId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       final encoded = Uri.encodeComponent(groupName);
       await client.post(
         '/api/v1/events/$eventId/groups/$encoded/members/$targetUserId?user_id=$userId',
         {},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Revoke group editor via the public path (#443). Never removes creator.
@@ -269,18 +225,13 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     String groupName,
     int targetUserId,
     int userId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       final encoded = Uri.encodeComponent(groupName);
       await client.delete(
         '/api/v1/events/$eventId/groups/$encoded/members/$targetUserId?user_id=$userId',
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Self-service group creator transfer
@@ -290,24 +241,19 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
     String groupName,
     int userId,
     int newCreatorId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       final encoded = Uri.encodeComponent(groupName);
       await client.put(
         '/api/v1/events/$eventId/groups/$encoded/creator?user_id=$userId',
         {'newCreatorId': newCreatorId},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
-  Future<void> generateDebugData(int creatorId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> generateDebugData(int creatorId) {
+    // #266: rethrow so the debug tab does not show success on failure.
+    return runMutation(() async {
       // 1. Create a debug event
       final eventPayload = CreateEventRequest()
         ..name =
@@ -350,13 +296,7 @@ class EventsController extends StateNotifier<AsyncValue<void>> {
         }
       }
       await Future.wait(futures);
-
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the debug tab does not show a success SnackBar on failure.
-      rethrow;
-    }
+    });
   }
 }
 
