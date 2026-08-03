@@ -482,6 +482,54 @@ abstract class AppLocalizations {
   /// **'Log Out'**
   String get logOut;
 
+  /// App settings screen title and Profile entry label (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// Language preference section title (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingsLanguage;
+
+  /// Theme preference section title (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// Follow device/browser setting option (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsSystem;
+
+  /// English language option label (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEnglish;
+
+  /// Japanese language option label; kept in native script (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'日本語'**
+  String get settingsLanguageJapanese;
+
+  /// Light theme option label (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// Dark theme option label (#545)
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsThemeDark;
+
   /// Footer showing frontend and backend revision hashes
   ///
   /// In en, this message translates to:

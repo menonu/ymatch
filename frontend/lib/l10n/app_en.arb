@@ -305,6 +305,40 @@
   "@logOut": {
     "description": "Log out button label"
   },
+
+  "settings": "Settings",
+  "@settings": {
+    "description": "App settings screen title and Profile entry label (#545)"
+  },
+  "settingsLanguage": "Language",
+  "@settingsLanguage": {
+    "description": "Language preference section title (#545)"
+  },
+  "settingsTheme": "Theme",
+  "@settingsTheme": {
+    "description": "Theme preference section title (#545)"
+  },
+  "settingsSystem": "System",
+  "@settingsSystem": {
+    "description": "Follow device/browser setting option (#545)"
+  },
+  "settingsLanguageEnglish": "English",
+  "@settingsLanguageEnglish": {
+    "description": "English language option label (#545)"
+  },
+  "settingsLanguageJapanese": "日本語",
+  "@settingsLanguageJapanese": {
+    "description": "Japanese language option label; kept in native script (#545)"
+  },
+  "settingsThemeLight": "Light",
+  "@settingsThemeLight": {
+    "description": "Light theme option label (#545)"
+  },
+  "settingsThemeDark": "Dark",
+  "@settingsThemeDark": {
+    "description": "Dark theme option label (#545)"
+  },
+
   "revisionInfo": "frontend: {frontend}  /  backend: {backend}",
   "@revisionInfo": {
     "description": "Footer showing frontend and backend revision hashes",

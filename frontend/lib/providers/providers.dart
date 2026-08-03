@@ -8,6 +8,7 @@ library;
 export 'member_models.dart';
 export 'system_provider.dart';
 export 'auth_provider.dart';
+export 'app_settings_provider.dart';
 export 'events_provider.dart';
 export 'merch_provider.dart';
 export 'groups_provider.dart';

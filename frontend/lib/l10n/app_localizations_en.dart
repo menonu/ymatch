@@ -220,6 +220,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logOut => 'Log Out';
 
   @override
+  String get settings => 'Settings';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsSystem => 'System';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsLanguageJapanese => '日本語';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
   String revisionInfo(String frontend, String backend) {
     return 'frontend: $frontend  /  backend: $backend';
   }

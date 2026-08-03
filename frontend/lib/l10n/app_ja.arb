@@ -70,6 +70,15 @@
   "tradeStep2": "+ と - を使って、交換したいアイテムの数を入力します。求 / 譲の数に応じて、アイテムグループ内で交換のマッチングが行われます。",
   "tradeStep3": "マッチを開き、取引したい相手を確認します。",
   "logOut": "ログアウト",
+
+  "settings": "設定",
+  "settingsLanguage": "言語",
+  "settingsTheme": "テーマ",
+  "settingsSystem": "システム",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageJapanese": "日本語",
+  "settingsThemeLight": "ライト",
+  "settingsThemeDark": "ダーク",
   "revisionInfo": "フロントエンド: {frontend}  /  バックエンド: {backend}",
 
   "selectImageSource": "画像の選択元",

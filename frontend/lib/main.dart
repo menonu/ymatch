@@ -6,6 +6,7 @@ import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/trade_list_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
@@ -23,8 +24,20 @@ class CustomScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
-void main() {
-  runApp(const ProviderScope(child: MyApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Preload prefs so the first frame respects stored language/theme (#545).
+  final initialSettings = await AppSettings.load();
+  runApp(
+    ProviderScope(
+      overrides: [
+        appSettingsProvider.overrideWith(
+          (ref) => AppSettingsController(initial: initialSettings),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -144,6 +157,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'settings',
+                    builder: (context, state) => const SettingsScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -169,10 +188,15 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final settings = ref.watch(appSettingsProvider);
 
     return MaterialApp.router(
       title: 'ymatch',
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: settings.theme.themeMode,
+      // null locale = follow device/browser; EN/JA override when set (#545).
+      locale: settings.language.locale,
       scrollBehavior: CustomScrollBehavior(),
       routerConfig: router,
       debugShowCheckedModeBanner: false,

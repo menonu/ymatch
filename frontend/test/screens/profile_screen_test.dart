@@ -313,4 +313,22 @@ void main() {
 
     expect(auth.logoutCalls, 1);
   });
+
+  testWidgets('Profile exposes Settings entry (#545)', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+  });
 }
