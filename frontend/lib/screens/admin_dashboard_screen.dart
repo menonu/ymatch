@@ -196,8 +196,20 @@ class _AdminUsersTab extends ConsumerWidget {
                 ),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
-                    final adminId = currentUser?.id ?? 0;
-                    final admin = ref.read(adminControllerProvider.notifier);
+                    // #498: never send user_id=0 — require a signed-in admin.
+                    final admin = currentUser;
+                    if (admin == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Not signed in')),
+                        );
+                      }
+                      return;
+                    }
+                    final adminId = admin.id;
+                    final adminCtrl = ref.read(
+                      adminControllerProvider.notifier,
+                    );
                     Future<void> runAdminAction(
                       Future<void> Function() action,
                       String successLabel,
@@ -233,25 +245,33 @@ class _AdminUsersTab extends ConsumerWidget {
                           'Enter reason (optional)',
                         );
                         await runAdminAction(
-                          () => admin.banUser(user.id, adminId, reason: reason),
+                          () => adminCtrl.banUser(
+                            user.id,
+                            adminId,
+                            reason: reason,
+                          ),
                           'User banned',
                         );
                         break;
                       case 'unban':
                         await runAdminAction(
-                          () => admin.unbanUser(user.id, adminId),
+                          () => adminCtrl.unbanUser(user.id, adminId),
                           'User unbanned',
                         );
                         break;
                       case 'role_admin':
                         await runAdminAction(
-                          () => admin.updateUserRole(user.id, adminId, 'admin'),
+                          () => adminCtrl.updateUserRole(
+                            user.id,
+                            adminId,
+                            'admin',
+                          ),
                           'Role updated to admin',
                         );
                         break;
                       case 'role_moderator':
                         await runAdminAction(
-                          () => admin.updateUserRole(
+                          () => adminCtrl.updateUserRole(
                             user.id,
                             adminId,
                             'moderator',
@@ -261,7 +281,11 @@ class _AdminUsersTab extends ConsumerWidget {
                         break;
                       case 'role_user':
                         await runAdminAction(
-                          () => admin.updateUserRole(user.id, adminId, 'user'),
+                          () => adminCtrl.updateUserRole(
+                            user.id,
+                            adminId,
+                            'user',
+                          ),
                           'Role updated to user',
                         );
                         break;
@@ -404,7 +428,17 @@ class _AdminEventsTab extends ConsumerWidget {
                 ),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
-                    final adminId = currentUser?.id ?? 0;
+                    // #498: never send user_id=0 — require a signed-in admin.
+                    final adminUser = currentUser;
+                    if (adminUser == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Not signed in')),
+                        );
+                      }
+                      return;
+                    }
+                    final adminId = adminUser.id;
                     final admin = ref.read(adminControllerProvider.notifier);
                     Future<void> runAction(
                       Future<void> Function() action,
@@ -554,7 +588,17 @@ class _AdminGroupsTab extends ConsumerWidget {
                 ),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
-                    final adminId = currentUser?.id ?? 0;
+                    // #498: never send user_id=0 — require a signed-in admin.
+                    final adminUser = currentUser;
+                    if (adminUser == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Not signed in')),
+                        );
+                      }
+                      return;
+                    }
+                    final adminId = adminUser.id;
                     final admin = ref.read(adminControllerProvider.notifier);
                     Future<void> runAction(
                       Future<void> Function() action,
@@ -741,12 +785,20 @@ class _AdminItemsTab extends ConsumerWidget {
                   );
                   if (confirm == true) {
                     // #496: route through AdminController (no direct apiClient).
+                    // #498: never send user_id=0 — early-return when unauthenticated.
                     try {
                       final user = ref.read(currentUserProvider);
-                      final userId = user?.id ?? 0;
+                      if (user == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Not signed in')),
+                          );
+                        }
+                        return;
+                      }
                       await ref
                           .read(adminControllerProvider.notifier)
-                          .deleteMerch(item.id, userId);
+                          .deleteMerch(item.id, user.id);
                       ref.invalidate(adminMerchProvider);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -830,12 +882,20 @@ class _AdminMatchesTab extends ConsumerWidget {
                       );
                       if (confirm == true) {
                         // #496: route through AdminController (no direct apiClient).
+                        // #498: never send user_id=0 — early-return when unauthenticated.
                         try {
                           final user = ref.read(currentUserProvider);
-                          final userId = user?.id ?? 0;
+                          if (user == null) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Not signed in')),
+                              );
+                            }
+                            return;
+                          }
                           await ref
                               .read(adminControllerProvider.notifier)
-                              .deleteMatch(match.id, userId);
+                              .deleteMatch(match.id, user.id);
                           ref.invalidate(adminMatchesProvider);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

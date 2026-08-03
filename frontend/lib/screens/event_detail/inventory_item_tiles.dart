@@ -116,7 +116,14 @@ Widget buildGridInventoryItem(
                       AppTheme.haveColor,
                       isDeleted
                           ? null
-                          : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                          : (q) => _updateInv(
+                              context,
+                              ref,
+                              user,
+                              item.id,
+                              'HAVE',
+                              q,
+                            ),
                     ),
                   ),
                 if (showWant)
@@ -128,7 +135,14 @@ Widget buildGridInventoryItem(
                       AppTheme.wantColor,
                       isDeleted
                           ? null
-                          : (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                          : (q) => _updateInv(
+                              context,
+                              ref,
+                              user,
+                              item.id,
+                              'WANT',
+                              q,
+                            ),
                     ),
                   ),
                 if (showTrade)
@@ -140,7 +154,14 @@ Widget buildGridInventoryItem(
                       AppTheme.tradeColor,
                       isDeleted
                           ? null
-                          : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                          : (q) => _updateInv(
+                              context,
+                              ref,
+                              user,
+                              item.id,
+                              'TRADE',
+                              q,
+                            ),
                     ),
                   ),
               ],
@@ -315,7 +336,7 @@ Widget buildCompactInventoryItem(
                 AppTheme.haveColor,
                 isDeleted
                     ? null
-                    : (q) => _updateInv(ref, user, item.id, 'HAVE', q),
+                    : (q) => _updateInv(context, ref, user, item.id, 'HAVE', q),
               ),
             if (showHave && (showWant || showTrade)) const SizedBox(width: 4),
             if (showWant)
@@ -326,7 +347,7 @@ Widget buildCompactInventoryItem(
                 AppTheme.wantColor,
                 isDeleted
                     ? null
-                    : (q) => _updateInv(ref, user, item.id, 'WANT', q),
+                    : (q) => _updateInv(context, ref, user, item.id, 'WANT', q),
               ),
             if (showWant && showTrade) const SizedBox(width: 4),
             if (showTrade)
@@ -337,7 +358,8 @@ Widget buildCompactInventoryItem(
                 AppTheme.tradeColor,
                 isDeleted
                     ? null
-                    : (q) => _updateInv(ref, user, item.id, 'TRADE', q),
+                    : (q) =>
+                          _updateInv(context, ref, user, item.id, 'TRADE', q),
               ),
           ],
         ),
@@ -508,6 +530,7 @@ Widget buildDetailedInventoryItem(
                               onUpdate: isDeleted
                                   ? null
                                   : (q) => _updateInv(
+                                      context,
                                       ref,
                                       user,
                                       item.id,
@@ -530,6 +553,7 @@ Widget buildDetailedInventoryItem(
                               onUpdate: isDeleted
                                   ? null
                                   : (q) => _updateInv(
+                                      context,
                                       ref,
                                       user,
                                       item.id,
@@ -551,6 +575,7 @@ Widget buildDetailedInventoryItem(
                               onUpdate: isDeleted
                                   ? null
                                   : (q) => _updateInv(
+                                      context,
                                       ref,
                                       user,
                                       item.id,
@@ -573,6 +598,7 @@ Widget buildDetailedInventoryItem(
 }
 
 Future<void> _updateInv(
+  BuildContext context,
   WidgetRef ref,
   User? user,
   int merchId,
@@ -582,14 +608,19 @@ Future<void> _updateInv(
   if (user != null) {
     // updateItem rethrows on failure (#239); the optimistic state is
     // rolled back inside the notifier, so the UI reverts on its own.
-    // Swallow here so the +/- steppers don't surface an uncaught
-    // async error; the rollback is the user-visible signal.
+    // #498: also show a short error snackbar after rollback so the user
+    // knows the step did not stick (not only that the number bounced).
     try {
       await ref
           .read(inventoryProvider(user.id).notifier)
           .updateItem(merchId, status, qty);
-    } catch (_) {
-      // Optimistic rollback already handled by the notifier.
+    } catch (e) {
+      if (context.mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.errorPrefix(e.toString()))));
+      }
     }
   }
 }

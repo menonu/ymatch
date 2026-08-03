@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api_client.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
+import 'mutation_controller.dart';
 
 // --- Merchandise (Family provider by event_id) ---
 final merchProvider = FutureProvider.family<List<Merchandise>, int>((
@@ -78,7 +79,12 @@ final usersDirectoryProvider = FutureProvider<List<User>>((ref) async {
   return (json as List).map((e) => User()..mergeFromProto3Json(e)).toList();
 });
 
-class MerchController extends StateNotifier<AsyncValue<void>> {
+/// Merch create/update/delete mutations (#227 / #299 / #266).
+///
+/// #498: concurrent mutations use [ConcurrentMutationMixin]; failures always
+/// rethrow so callers detect outcome from the returned [Future].
+class MerchController extends StateNotifier<AsyncValue<void>>
+    with ConcurrentMutationMixin {
   final ApiClient client;
   MerchController(this.client) : super(const AsyncValue.data(null));
 
@@ -89,9 +95,10 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
     String? groupName,
     int? creatorId,
     String? status,
-  ]) async {
-    state = const AsyncValue.loading();
-    try {
+  ]) {
+    // #227: rethrow (via runMutation) so the caller can show a real error
+    // message instead of a misleading "Added successfully" SnackBar on 422.
+    return runMutation(() async {
       final payload = CreateMerchRequest()
         ..name = name
         ..photoUrl = photoUrl;
@@ -105,14 +112,7 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
         '/api/v1/events/$eventId/merch',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #227: rethrow so the caller can show a real error message.
-      // Without this, the add_merch_screen shows a misleading
-      // "Added successfully" SnackBar on 422.
-      rethrow;
-    }
+    });
   }
 
   Future<void> updateMerch(
@@ -122,9 +122,9 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
     String? name,
     String? photoUrl,
     String? groupName,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
+  }) {
+    // #299: rethrow so the edit dialog can surface backend errors.
+    return runMutation(() async {
       final payload = UpdateMerchRequest()..userId = userId;
       if (name != null) payload.name = name;
       if (photoUrl != null) payload.photoUrl = photoUrl;
@@ -133,32 +133,16 @@ class MerchController extends StateNotifier<AsyncValue<void>> {
         '/api/v1/events/$eventId/merch/$merchId',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #299: rethrow so the caller (e.g. the edit-name dialog) can surface
-      // the backend error (such as a duplicate-name 400) instead of
-      // silently swallowing it and closing the dialog as if it succeeded.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> deleteMerchByCreator(
-    int eventId,
-    int merchId,
-    int userId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> deleteMerchByCreator(int eventId, int merchId, int userId) {
+    // #266: rethrow so the delete dialog can surface a failure SnackBar.
+    return runMutation(() async {
       await client.delete(
         '/api/v1/events/$eventId/merch/$merchId?user_id=$userId',
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the delete dialog can surface a failure SnackBar.
-      rethrow;
-    }
+    });
   }
 }
 

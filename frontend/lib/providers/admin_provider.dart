@@ -3,6 +3,7 @@ import '../services/api_client.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
 import 'member_models.dart';
+import 'mutation_controller.dart';
 
 // --- Admin ---
 class AdminGroup {
@@ -99,7 +100,10 @@ final adminUsersProvider = FutureProvider<List<User>>((ref) async {
   return (json as List).map((e) => User()..mergeFromProto3Json(e)).toList();
 });
 
-class AdminController extends StateNotifier<AsyncValue<void>> {
+/// Admin mutations. Failures rethrow (#266); concurrent calls are generation-
+/// gated via [ConcurrentMutationMixin] (#498).
+class AdminController extends StateNotifier<AsyncValue<void>>
+    with ConcurrentMutationMixin {
   final ApiClient client;
   AdminController(this.client) : super(const AsyncValue.data(null));
 
@@ -108,9 +112,8 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     int adminUserId, {
     String? reason,
     String? bannedUntil,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
+  }) {
+    return runMutation(() async {
       final payload = BanUserRequest();
       if (reason != null) payload.reason = reason;
       if (bannedUntil != null) payload.bannedUntil = bannedUntil;
@@ -118,133 +121,77 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
         '/api/v1/admin/users/$targetUserId/ban?user_id=$adminUserId',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the admin UI can show failure feedback.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> unbanUser(int targetUserId, int adminUserId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> unbanUser(int targetUserId, int adminUserId) {
+    return runMutation(() async {
       await client.post(
         '/api/v1/admin/users/$targetUserId/unban?user_id=$adminUserId',
         {},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the admin UI can show failure feedback.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> updateUserRole(
-    int targetUserId,
-    int adminUserId,
-    String role,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> updateUserRole(int targetUserId, int adminUserId, String role) {
+    return runMutation(() async {
       final payload = UpdateUserRoleRequest()..role = role;
       await client.post(
         '/api/v1/admin/users/$targetUserId/role?user_id=$adminUserId',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266: rethrow so the admin UI can show failure feedback.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> publishEvent(int eventId, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> publishEvent(int eventId, int userId) {
+    return runMutation(() async {
       final payload = UserActionRequest()..userId = userId;
       await client.post(
         '/api/v1/events/$eventId/publish',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> publishMerch(int eventId, int merchId, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> publishMerch(int eventId, int merchId, int userId) {
+    return runMutation(() async {
       final payload = UserActionRequest()..userId = userId;
       await client.post(
         '/api/v1/events/$eventId/merch/$merchId/publish',
         payload.toProto3Json() as Map<String, dynamic>,
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> deleteEvent(int eventId, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> deleteEvent(int eventId, int userId) {
+    return runMutation(() async {
       await client.delete('/api/v1/admin/events/$eventId?user_id=$userId');
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> deleteMerch(int merchId, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> deleteMerch(int merchId, int userId) {
+    return runMutation(() async {
       await client.delete('/api/v1/admin/merch/$merchId?user_id=$userId');
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
-      rethrow;
-    }
+    });
   }
 
-  Future<void> deleteMatch(int matchId, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> deleteMatch(int matchId, int userId) {
+    return runMutation(() async {
       await client.delete('/api/v1/admin/matches/$matchId?user_id=$userId');
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      // #266 / pr-review: rethrow for consistent mutation failure surfacing.
-      rethrow;
-    }
+    });
   }
 
   /// Soft-remove an item group (`DELETE /admin/events/:id/groups/:name`) (#496).
   ///
   /// Group name is URL-encoded so keys with `/` and other reserved characters
   /// round-trip correctly (same encoding as [transferGroupCreator]).
-  Future<void> deleteGroup(int eventId, String groupName, int userId) async {
-    state = const AsyncValue.loading();
-    try {
+  Future<void> deleteGroup(int eventId, String groupName, int userId) {
+    return runMutation(() async {
       final encoded = Uri.encodeComponent(groupName);
       await client.delete(
         '/api/v1/admin/events/$eventId/groups/$encoded?user_id=$userId',
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Transfer event ownership (`PUT /admin/events/:id/creator`) (#432).
@@ -252,18 +199,13 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     int eventId,
     int adminUserId,
     int newCreatorId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       await client.put(
         '/api/v1/admin/events/$eventId/creator?user_id=$adminUserId',
         {'newCreatorId': newCreatorId},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Transfer group ownership (`PUT /admin/events/:id/groups/:name/creator`) (#432).
@@ -272,19 +214,14 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     String groupName,
     int adminUserId,
     int newCreatorId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       final encoded = Uri.encodeComponent(groupName);
       await client.put(
         '/api/v1/admin/events/$eventId/groups/$encoded/creator?user_id=$adminUserId',
         {'newCreatorId': newCreatorId},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// List event members via admin path (#432).
@@ -306,18 +243,13 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     int eventId,
     int targetUserId,
     int adminUserId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       await client.post(
         '/api/v1/admin/events/$eventId/members/$targetUserId?user_id=$adminUserId',
         {},
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 
   /// Revoke event editor via admin path (#432). Never removes creator role.
@@ -325,17 +257,12 @@ class AdminController extends StateNotifier<AsyncValue<void>> {
     int eventId,
     int targetUserId,
     int adminUserId,
-  ) async {
-    state = const AsyncValue.loading();
-    try {
+  ) {
+    return runMutation(() async {
       await client.delete(
         '/api/v1/admin/events/$eventId/members/$targetUserId?user_id=$adminUserId',
       );
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    });
   }
 }
 
