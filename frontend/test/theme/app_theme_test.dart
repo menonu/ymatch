@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/theme/app_theme.dart';
 
@@ -59,6 +60,15 @@ void main() {
               'whitespace — this breaks CSS generic-family resolution',
         );
       }
+    });
+  });
+
+  group('AppTheme darkTheme (#545)', () {
+    test('darkTheme is dark brightness and keeps NotoSansJP', () {
+      final theme = AppTheme.darkTheme;
+      expect(theme.brightness, Brightness.dark);
+      expect(theme.textTheme.bodyLarge?.fontFamily, 'NotoSansJP');
+      expect(theme.colorScheme.brightness, Brightness.dark);
     });
   });
 }
