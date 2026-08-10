@@ -31,7 +31,8 @@ BottomNavBar
 │   └── ChatScreen (messaging per match)
 │       └── MapPickerScreen (location selection)
 ├── Profile Tab
-│   └── ProfileScreen
+│   ├── ProfileScreen
+│   └── SettingsScreen (language + theme prefs, #545)
 └── Admin Tab (conditional)
     └── AdminDashboardScreen
 ```
@@ -132,8 +133,16 @@ BottomNavBar
 
 - **Profile Card**: Avatar, editable username (inline), UUID with copy button, warning text
 - **Instructions Card**: 3-step "How to Trade" guide
+- **Settings entry** (#545): list tile → `SettingsScreen` (`/profile/settings`)
 - **Logout Button**: Red themed
 - **Revision Info**: Frontend/backend git hashes
+
+### SettingsScreen (#545)
+
+- Opened from Profile; client-only prefs via `SharedPreferences` (no backend sync)
+- **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale
+- **Theme**: System / Light / Dark (`SegmentedButton`) — System follows platform brightness; light/dark use `AppTheme.lightTheme` / `AppTheme.darkTheme`
+- Defaults for both: **System** (matches pre-#545 behavior for new users)
 
 ### AdminDashboardScreen
 

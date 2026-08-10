@@ -219,6 +219,30 @@ class AppLocalizationsJa extends AppLocalizations {
   String get logOut => 'ログアウト';
 
   @override
+  String get settings => '設定';
+
+  @override
+  String get settingsLanguage => '言語';
+
+  @override
+  String get settingsTheme => 'テーマ';
+
+  @override
+  String get settingsSystem => 'システム';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsLanguageJapanese => '日本語';
+
+  @override
+  String get settingsThemeLight => 'ライト';
+
+  @override
+  String get settingsThemeDark => 'ダーク';
+
+  @override
   String revisionInfo(String frontend, String backend) {
     return 'フロントエンド: $frontend  /  バックエンド: $backend';
   }

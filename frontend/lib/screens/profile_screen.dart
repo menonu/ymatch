@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../widgets/how_to_trade.dart';
@@ -222,6 +223,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: const Padding(
                 padding: EdgeInsets.all(24.0),
                 child: HowToTradeContent(),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // App Settings entry (#545)
+            Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: const Icon(Icons.settings_outlined),
+                title: Text(l10n.settings),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/profile/settings'),
               ),
             ),
 
