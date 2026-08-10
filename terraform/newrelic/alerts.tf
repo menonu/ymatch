@@ -142,7 +142,7 @@ resource "newrelic_nrql_alert_condition" "backup_missing" {
   account_id = var.account_id
   policy_id  = newrelic_alert_policy.oci_production.id
   type       = "static"
-  name       = "Database Backup Missing (>26h)"
+  name       = "Database Backup Missing (>48h)"
   enabled    = true
 
   violation_time_limit_seconds = 86400
@@ -151,7 +151,9 @@ resource "newrelic_nrql_alert_condition" "backup_missing" {
     query = "SELECT count(*) FROM DatabaseBackup WHERE status = 'success'"
   }
 
-  # Alert fires when no successful backup event is received for 26 hours
+  # Alert fires when no successful backup event is received for 48 hours.
+  # Window is intentionally wider than 24h so GitHub Actions schedule delay
+  # (often 1–6h late) does not open a false signal-loss violation (#547).
   critical {
     operator              = "equals"
     threshold             = 0
@@ -159,7 +161,7 @@ resource "newrelic_nrql_alert_condition" "backup_missing" {
     threshold_occurrences = "ALL"
   }
 
-  expiration_duration            = 93600
+  expiration_duration            = 172800
   open_violation_on_expiration   = true
   close_violations_on_expiration = false
 }

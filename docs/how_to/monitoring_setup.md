@@ -102,7 +102,7 @@ Two ping monitors run from `AP_NORTHEAST_1` (Tokyo) every 15 minutes:
 | Docker Container Not Running | < 4 containers | 5 min |
 | Synthetic Monitor Failure | ≥ 1 failure | 15 min |
 | Database Backup Failed | Any failure event | Immediate |
-| Database Backup Missing | No success event for 26h | Signal loss |
+| Database Backup Missing | No success event for 48h | Signal loss |
 
 **Notification**: Discord webhook via GitHub Actions relay (see [Discord Alert Relayer](#discord-alert-relayer) below) → `#alerts` channel
 
