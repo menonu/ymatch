@@ -116,3 +116,4 @@ Migrations, issue numbers, and API routes (`POST /api/v1/...`) are fine when the
 | [0012](0012-rematch-after-reject-or-cancel.md) | Rematch After Reject or Cancel (Reopen PENDING with Prior-History Annotation) | Accepted | 2026-07-18 |
 | [0013](0013-group-scope-rbac.md) | Group-Scoped RBAC (`scope_type = 'group'`) | Accepted | 2026-07-21 |
 | [0014](0014-fail-closed-inventory-apply.md) | Fail-Closed TRADE Capacity (HAVE Optional) | Accepted | 2026-07-22 |
+| [0015](0015-web-push-vapid-auto-match.md) | Background Auto-Match Alerts via Web Push + VAPID | Accepted | 2026-08-10 |

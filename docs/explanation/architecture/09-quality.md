@@ -74,8 +74,11 @@ a backlog dump:
   (plus content-type + 1MB size). There is still **no per-object ownership** —
   any active caller who knows a filename can delete it; tighten when storage
   gains an owner record.
-- Push notifications are **stubbed** (`notifications.rs` logs only) — limits
-  **usability** for “notify me when matched” until a real provider lands.
+- Background match push is **decided** ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md):
+  Web Push + VAPID) but **not fully implemented** yet — the send path is still a
+  safe log/no-op until subscription storage, sender, and Flutter web service
+  worker land ([#179](https://github.com/menonu/ymatch/issues/179)). Limits
+  **usability** for closed-tab “notify me when matched” until that work ships.
 - Some operational runbooks assume maintainer familiarity with OCI free-tier
   quotas (see disaster recovery lessons) — **availability** / ops friction.
 

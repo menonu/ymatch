@@ -28,11 +28,13 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 - Guest and account auth, RBAC
 - Admin/moderator surfaces
 - Image upload serving (local volume in OCI)
+- Background auto-match alerts via **Web Push + VAPID** (web/PWA clients; see [ADR 0015](../adr/0015-web-push-vapid-auto-match.md)) — implementation tracked in [#179](https://github.com/menonu/ymatch/issues/179); sender remains a safe no-op until VAPID + client subscription land
 
 ### Out of scope (external or not productized)
 
 - Physical logistics of the meetup
-- Production push providers (FCM/APNs) — notification module logs only
+- Native mobile push (FCM / APNs) and non-web clients for match alerts
+- In-app notification center, email, or SMS match alerts
 - Third-party payment rails
 - Multi-region active-active failover
 
@@ -43,6 +45,7 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 | Browser ↔ API | HTTPS JSON REST | Base path `/api/v1`; see [API spec](../../reference/api_spec.md). |
 | Browser ↔ images | HTTPS | `/uploads/*` via API static files (`UPLOAD_DIR`). |
 | API ↔ Postgres | TCP SQL | Connection string from env (`DATABASE_URL`). |
+| API → browser push services | Web Push (HTTPS) | Planned ([#179](https://github.com/menonu/ymatch/issues/179)); no-op until VAPID + client subscriptions. VAPID-authenticated, best-effort after match create/reopen ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)). |
 | CI ↔ VM | SSH + Docker | GitHub Actions deploy workflows. |
 | Ops ↔ OCI | OCI API / Terraform | Infra and Object Storage; secrets never in git. |
 
