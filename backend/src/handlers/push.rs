@@ -44,8 +44,13 @@ pub async fn upsert_push_subscription(
 ) -> Result<Json<Value>, AppError> {
     let user = require_active_query_user(&state, query.user_id).await?;
     let endpoint = require_nonempty(body.endpoint.as_deref(), "endpoint")?;
-    let p256dh = require_nonempty(body.keys.p256dh.as_deref(), "keys.p256dh")?;
-    let auth = require_nonempty(body.keys.auth.as_deref(), "keys.auth")?;
+    require_https_endpoint(endpoint)?;
+    let keys = body
+        .keys
+        .as_ref()
+        .ok_or_else(|| AppError::bad_request("keys is required"))?;
+    let p256dh = require_nonempty(keys.p256dh.as_deref(), "keys.p256dh")?;
+    let auth = require_nonempty(keys.auth.as_deref(), "keys.auth")?;
 
     let sub = state
         .push_subscriptions
@@ -76,6 +81,8 @@ pub async fn delete_push_subscription(
 ) -> Result<Json<Value>, AppError> {
     let user = require_active_query_user(&state, query.user_id).await?;
     let endpoint = require_nonempty(body.endpoint.as_deref(), "endpoint")?;
+    // Delete still accepts the stored URL as-is; scheme check only on upsert
+    // so we never persist non-https endpoints for the future send path.
 
     let deleted = state
         .push_subscriptions
@@ -92,6 +99,21 @@ fn require_nonempty<'a>(value: Option<&'a str>, field: &str) -> Result<&'a str, 
     }
 }
 
+/// Reject non-HTTPS endpoints so the later Web Push send path cannot be used
+/// as a stored-SSRF primitive against internal HTTP hosts.
+fn require_https_endpoint(endpoint: &str) -> Result<(), AppError> {
+    let ok = endpoint
+        .parse::<axum::http::Uri>()
+        .ok()
+        .and_then(|u| u.scheme().map(|s| s.as_str() == "https"))
+        .unwrap_or(false);
+    if ok {
+        Ok(())
+    } else {
+        Err(AppError::bad_request("endpoint must be an https URL"))
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VapidPublicKeyResponse {
@@ -102,7 +124,7 @@ pub struct VapidPublicKeyResponse {
 #[serde(rename_all = "camelCase")]
 pub struct UpsertPushSubscriptionRequest {
     pub endpoint: Option<String>,
-    pub keys: PushSubscriptionKeys,
+    pub keys: Option<PushSubscriptionKeys>,
     pub user_agent: Option<String>,
 }
 

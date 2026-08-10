@@ -168,4 +168,39 @@ async fn upsert_rejects_missing_keys(pool: PgPool) {
     )
     .await;
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/push/subscriptions?user_id={user_id}"),
+        r#"{"endpoint": "https://push.example/x"}"#,
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "omitted keys object must be 400, not 422"
+    );
+}
+
+#[sqlx::test]
+async fn upsert_rejects_non_https_endpoint(pool: PgPool) {
+    let user_id = login_guest(&pool, "push-http-ep", "tok").await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/push/subscriptions?user_id={user_id}"),
+        r#"{
+            "endpoint": "http://push.example/insecure",
+            "keys": { "p256dh": "k", "auth": "a" }
+        }"#,
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM push_subscriptions WHERE user_id = $1")
+            .bind(user_id as i32)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 0, "non-https endpoints must not be stored");
 }

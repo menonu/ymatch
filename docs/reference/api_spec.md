@@ -904,7 +904,8 @@ keys and reassigns ownership to the caller (multi-device friendly).
   ```json
   { "id": 1, "userId": 2, "endpoint": "https://push.example/..." }
   ```
-- **Errors**: `400` missing/empty fields or `user_id`; `403` banned; `404` unknown caller.
+- **Errors**: `400` missing/empty fields, missing `keys`, non-`https` `endpoint`, or
+  missing `user_id`; `403` banned; `404` unknown caller.
 
 ### DELETE /api/v1/push/subscriptions?user_id=
 
