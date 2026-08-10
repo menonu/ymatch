@@ -862,6 +862,68 @@ Backend health check.
 
 ---
 
+## 10. Web Push subscriptions (ADR 0015 / #179)
+
+Background auto-match alerts use **Web Push + VAPID**. These endpoints store
+browser `PushSubscription` material and expose the VAPID **public** key.
+Delivery after match create/reopen is a separate implementation step; without
+`VAPID_PUBLIC_KEY` the public-key route returns 404 and matching still works.
+
+### GET /api/v1/push/vapid-public-key
+
+Application-server VAPID public key for `pushManager.subscribe`.
+
+- **Auth**: none (the key is public by design).
+- **Response**: `200 OK`
+  ```json
+  { "publicKey": "<url-safe-base64>" }
+  ```
+- **Error**: `404` when `VAPID_PUBLIC_KEY` is unset (push disabled).
+
+### PUT /api/v1/push/subscriptions?user_id=
+
+Upsert the caller's browser subscription. Same `endpoint` re-subscribe updates
+keys and reassigns ownership to the caller (multi-device friendly).
+
+- **Query Parameters**:
+  | Param     | Type | Description                       |
+  |-----------|------|-----------------------------------|
+  | `user_id` | int  | Required. Active caller identity. |
+- **Request Body** (browser subscription shape):
+  ```json
+  {
+    "endpoint": "https://push.example/...",
+    "keys": {
+      "p256dh": "<client-public-key>",
+      "auth": "<auth-secret>"
+    },
+    "userAgent": "optional"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  { "id": 1, "userId": 2, "endpoint": "https://push.example/..." }
+  ```
+- **Errors**: `400` missing/empty fields or `user_id`; `403` banned; `404` unknown caller.
+
+### DELETE /api/v1/push/subscriptions?user_id=
+
+Remove the caller's subscription for the given endpoint. Owner-scoped and
+idempotent.
+
+- **Query Parameters**: same `user_id` as PUT.
+- **Request Body**:
+  ```json
+  { "endpoint": "https://push.example/..." }
+  ```
+- **Response**: `200 OK`
+  ```json
+  { "deleted": true }
+  ```
+  (`deleted` is `false` when no matching row for this user/endpoint.)
+
+---
+
 ## Permission Summary
 
 | Role        | Capabilities                                                                     |
