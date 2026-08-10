@@ -72,9 +72,10 @@ void main() {
         'app_settings_theme': 'dark',
       });
       final settings = await AppSettings.load();
-      expect(settings.language, AppLanguagePreference.english);
-      // Theme is no longer part of AppSettings.
-      expect(settings, isA<AppSettings>());
+      expect(
+        settings,
+        const AppSettings(language: AppLanguagePreference.english),
+      );
     });
   });
 

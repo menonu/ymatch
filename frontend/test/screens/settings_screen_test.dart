@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/l10n/app_localizations.dart';
+import 'package:frontend/main.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/settings_screen.dart';
 import 'package:frontend/theme/app_theme.dart';
@@ -115,22 +116,34 @@ void main() {
     expect(languageButton.selected, {AppLanguagePreference.english});
   });
 
-  testWidgets('MaterialApp stays in light mode regardless of system', (
+  testWidgets('MyApp forces ThemeMode.light even when platform is dark (#553)', (
     tester,
   ) async {
+    tester.binding.platformDispatcher.platformBrightnessTestValue =
+        Brightness.dark;
+    addTearDown(
+      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+
     await tester.pumpWidget(
-      _app(
+      ProviderScope(
         overrides: [
           appSettingsProvider.overrideWith(
             (ref) => AppSettingsController(initial: AppSettings.defaults),
           ),
         ],
-        child: const SettingsScreen(),
+        child: const MyApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    // One frame is enough to build MaterialApp; avoid pumpAndSettle (auth
+    // checkLogin / redirects may keep scheduling frames).
+    await tester.pump();
 
     final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(materialApp.themeMode, ThemeMode.light);
+    expect(
+      tester.binding.platformDispatcher.platformBrightness,
+      Brightness.dark,
+    );
   });
 }
