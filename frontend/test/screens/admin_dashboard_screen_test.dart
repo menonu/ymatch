@@ -811,7 +811,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Access denied. Admin or moderator role required.'),
+      find.text('Access denied. Admin, moderator, or editor role required.'),
       findsOneWidget,
     );
     expect(find.text('System'), findsNothing);
@@ -835,7 +835,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Access denied. Admin or moderator role required.'),
+      find.text('Access denied. Admin, moderator, or editor role required.'),
       findsOneWidget,
     );
   });
