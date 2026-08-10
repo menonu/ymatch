@@ -1,7 +1,9 @@
-/// Client-side app preferences (language + theme) for #545.
+/// Client-side app preferences (language) for #545.
 ///
-/// Stored only in [SharedPreferences] — no backend sync. Defaults follow the
-/// device/browser (System) so new users keep current behavior.
+/// Theme preference was temporarily removed (#553) due to dark-mode contrast
+/// issues; `AppTheme.darkTheme` remains for a future re-introduction. Stored
+/// only in [SharedPreferences] — no backend sync. Language defaults follow the
+/// device/browser (System).
 library;
 
 import 'package:flutter/material.dart';
@@ -9,7 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _kLanguageKey = 'app_settings_language';
-const _kThemeKey = 'app_settings_theme';
 
 /// In-app language override. [system] leaves locale resolution to the device.
 enum AppLanguagePreference {
@@ -44,78 +45,35 @@ enum AppLanguagePreference {
   };
 }
 
-/// In-app theme override. [system] follows platform brightness.
-enum AppThemePreference {
-  system,
-  light,
-  dark;
-
-  static AppThemePreference fromStorage(String? value) {
-    switch (value) {
-      case 'light':
-        return AppThemePreference.light;
-      case 'dark':
-        return AppThemePreference.dark;
-      case 'system':
-      case null:
-      default:
-        return AppThemePreference.system;
-    }
-  }
-
-  String get storageValue => switch (this) {
-    AppThemePreference.system => 'system',
-    AppThemePreference.light => 'light',
-    AppThemePreference.dark => 'dark',
-  };
-
-  ThemeMode get themeMode => switch (this) {
-    AppThemePreference.system => ThemeMode.system,
-    AppThemePreference.light => ThemeMode.light,
-    AppThemePreference.dark => ThemeMode.dark,
-  };
-}
-
 @immutable
 class AppSettings {
-  const AppSettings({
-    this.language = AppLanguagePreference.system,
-    this.theme = AppThemePreference.system,
-  });
+  const AppSettings({this.language = AppLanguagePreference.system});
 
   static const defaults = AppSettings();
 
   final AppLanguagePreference language;
-  final AppThemePreference theme;
 
-  AppSettings copyWith({
-    AppLanguagePreference? language,
-    AppThemePreference? theme,
-  }) {
-    return AppSettings(
-      language: language ?? this.language,
-      theme: theme ?? this.theme,
-    );
+  AppSettings copyWith({AppLanguagePreference? language}) {
+    return AppSettings(language: language ?? this.language);
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is AppSettings &&
-          language == other.language &&
-          theme == other.theme;
+      other is AppSettings && language == other.language;
 
   @override
-  int get hashCode => Object.hash(language, theme);
+  int get hashCode => language.hashCode;
 
   /// Load persisted preferences (or [defaults] when unset / invalid).
+  ///
+  /// Legacy `app_settings_theme` keys (from #545) are ignored (#553).
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     return AppSettings(
       language: AppLanguagePreference.fromStorage(
         prefs.getString(_kLanguageKey),
       ),
-      theme: AppThemePreference.fromStorage(prefs.getString(_kThemeKey)),
     );
   }
 }
@@ -129,13 +87,6 @@ class AppSettingsController extends StateNotifier<AppSettings> {
     state = state.copyWith(language: language);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kLanguageKey, language.storageValue);
-  }
-
-  Future<void> setTheme(AppThemePreference theme) async {
-    if (state.theme == theme) return;
-    state = state.copyWith(theme: theme);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kThemeKey, theme.storageValue);
   }
 }
 

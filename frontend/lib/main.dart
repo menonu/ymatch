@@ -26,7 +26,8 @@ class CustomScrollBehavior extends MaterialScrollBehavior {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Preload prefs so the first frame respects stored language/theme (#545).
+  // Preload prefs so the first frame respects stored language (#545).
+  // Theme is forced light for all users until dark-mode contrast is fixed (#553).
   final initialSettings = await AppSettings.load();
   runApp(
     ProviderScope(
@@ -193,8 +194,8 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'ymatch',
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: settings.theme.themeMode,
+      // Force light for all users; dark theme prefs deferred (#553).
+      themeMode: ThemeMode.light,
       // null locale = follow device/browser; EN/JA override when set (#545).
       locale: settings.language.locale,
       scrollBehavior: CustomScrollBehavior(),
