@@ -52,7 +52,7 @@ behavior is precise.
 | FR-04 | The system **matches** complementary TRADE/WANT pairs within the same group. |
 | FR-05 | Matched users **negotiate** a balanced multi-leg trade, then mark complete and apply inventory. |
 | FR-06 | Matched users can **message** and share location to coordinate physical exchange. |
-| FR-07 | Platform roles (user / moderator / admin) and event roles (creator / editor) gate privileged actions via **RBAC** ([ADR 0004](../adr/0004-rbac-permission-model.md)). |
+| FR-07 | Platform roles (user / editor / moderator / admin) and event roles (creator / editor) gate privileged actions via **RBAC** ([ADR 0004](../adr/0004-rbac-permission-model.md), [ADR 0016](../adr/0016-global-editor-role.md)). |
 
 ### Quality attributes (summary)
 

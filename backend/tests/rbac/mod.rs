@@ -13,12 +13,23 @@ async fn test_rbac_event_create_requires_moderator_or_admin(pool: PgPool) {
     .await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 
-    // Moderator can.
-    grant_global_role(&pool, plain, "moderator").await;
+    // #551: global editor can create events (content role).
+    grant_global_role(&pool, plain, "editor").await;
     let resp = post_json(
         &pool,
         "/api/v1/events",
-        &format!(r#"{{"name": "Mod Event", "creatorId": {}}}"#, plain),
+        &format!(r#"{{"name": "Editor Event", "creatorId": {}}}"#, plain),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Moderator can.
+    let mod_user = login_guest(&pool, "rbac-create-mod", "t").await;
+    grant_global_role(&pool, mod_user, "moderator").await;
+    let resp = post_json(
+        &pool,
+        "/api/v1/events",
+        &format!(r#"{{"name": "Mod Event", "creatorId": {}}}"#, mod_user),
     )
     .await;
     assert_eq!(resp.status(), StatusCode::OK);
@@ -1003,5 +1014,359 @@ async fn test_rbac_delete_match_permission(pool: PgPool) {
     assert!(
         !row_exists(&pool, match_id2).await,
         "admin should have deleted the match"
+    );
+}
+
+/// #551: global `editor` can create & manage events and edit/remove any
+/// event/merch/group, but cannot ban, manage roles, delete matches, or
+/// use staff transfer / admin members paths.
+#[sqlx::test]
+async fn test_rbac_global_editor_content_powers_and_boundaries(pool: PgPool) {
+    // Event owned by someone else (moderator creates, then we demote them so
+    // they are not competing as staff on later checks).
+    let (owner_id, event_id) =
+        create_test_user_and_event(pool.clone(), "geditor-owner", "GEditor Target").await;
+    grant_global_role(&pool, owner_id, "user").await;
+
+    let editor = login_guest(&pool, "geditor-actor", "t").await;
+    grant_global_role(&pool, editor, "editor").await;
+
+    // --- can: create events ---
+    let resp = post_json(
+        &pool,
+        "/api/v1/events",
+        &format!(r#"{{"name": "GEditor Created", "creatorId": {}}}"#, editor),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must create events"
+    );
+
+    // --- can: edit any event (event.edit.any) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId": {}, "name": "GEditor Renamed"}}"#,
+                    editor
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must edit any event"
+    );
+
+    // --- can: create merch on another's event (merch.create.any) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/merch", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"name":"GEditor Merch","groupName":"G","creatorId":{}}}"#,
+                    editor
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must create merch on any event"
+    );
+    let merch: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    let merch_id = merch["id"].as_i64().unwrap();
+
+    // --- can: edit that merch (merch.edit.any) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}/merch/{}", event_id, merch_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"userId":{},"photoUrl":"https://geditor-updated"}}"#,
+                    editor
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must edit any merch"
+    );
+
+    // Seed a group on the event (creator still has merch.create via event role).
+    // Owner was demoted to user but retains event/creator from creation.
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/events/{}/groups", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId":{},"userId":{},"groupName":"GEditorGroup","description":"orig"}}"#,
+                    event_id, owner_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "seed group for editor tests");
+
+    // --- can: edit any group (group.edit.any) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/events/{}/groups/GEditorGroup", event_id))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"eventId":{},"userId":{},"groupName":"GEditorGroup","description":"edited by geditor"}}"#,
+                    event_id, editor
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must edit any group"
+    );
+
+    // --- can: delete merch via admin path (merch.delete.any) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/merch/{}?user_id={}",
+                    merch_id, editor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must delete any merch"
+    );
+
+    // --- can: delete group via admin path (group.delete) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}/groups/GEditorGroup?user_id={}",
+                    event_id, editor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must delete any group"
+    );
+
+    // --- can: delete any event (event.delete.any) ---
+    // Use a separate empty event: admin merch delete is soft-delete, and
+    // merchandise.event_id has no ON DELETE CASCADE, so hard-deleting an
+    // event that still has merch rows returns 400 (FK 23503).
+    let (_empty_owner, empty_event) =
+        create_test_user_and_event(pool.clone(), "geditor-empty-owner", "GEditor Empty").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/events/{}?user_id={}",
+                    empty_event, editor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "global editor must delete any event"
+    );
+
+    // --- cannot: ban ---
+    let target = login_guest(&pool, "geditor-ban-target", "t").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/ban?user_id={}",
+                    target, editor
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"reason":"nope"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "global editor must not ban"
+    );
+
+    // --- cannot: change roles ---
+    let admin = login_guest(&pool, "geditor-role-admin", "t").await;
+    grant_global_role(&pool, admin, "admin").await;
+    // Sanity: admin can set editor role via API.
+    let promote_target = login_guest(&pool, "geditor-promote-target", "t").await;
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    promote_target, admin
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "editor"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "admin must be able to grant global editor"
+    );
+    assert_eq!(global_role_of(&pool, promote_target).await, "editor");
+
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/admin/users/{}/role?user_id={}",
+                    target, editor
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"role": "moderator"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "global editor must not change roles"
+    );
+
+    // --- cannot: delete matches ---
+    let (m_owner, m_event) =
+        create_test_user_and_event(pool.clone(), "geditor-match-owner", "Match Boundary").await;
+    let other = login_guest(&pool, "geditor-match-other", "t").await;
+    let match_id: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, 'G', 'PENDING') RETURNING id",
+    )
+    .bind(m_owner as i32)
+    .bind(other as i32)
+    .bind(m_event as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!(
+                    "/api/v1/admin/matches/{}?user_id={}",
+                    match_id, editor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "global editor must not delete matches"
+    );
+
+    // --- cannot: transfer event creator (admin path) ---
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!(
+                    "/api/v1/admin/events/{}/creator?user_id={}",
+                    m_event, editor
+                ))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"newCreatorId":{}}}"#, other)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "global editor must not transfer event creator"
+    );
+
+    // --- cannot: admin event members path ---
+    let app = backend::routes::create_router(pool, test_storage());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/v1/admin/events/{}/members?user_id={}",
+                    m_event, editor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "global editor must not use admin members path"
     );
 }

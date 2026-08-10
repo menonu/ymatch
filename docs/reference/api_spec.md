@@ -715,9 +715,9 @@ Update a user's role.
   ```json
   { "role": "moderator" }
   ```
-- **Allowed values**: `user`, `moderator`, `admin`
+- **Allowed values**: `user`, `editor`, `moderator`, `admin` (#551)
 - **Response**: `200 OK`
-- **Permissions**: **Admin only** (moderators cannot change roles).
+- **Permissions**: **Admin only** (moderators/editors cannot change roles).
 
 ### PUT /api/v1/admin/events/:id/creator
 
@@ -866,8 +866,9 @@ Backend health check.
 
 | Role        | Capabilities                                                                     |
 |-------------|----------------------------------------------------------------------------------|
-| `user`      | Create events/merch, manage own inventory, trade, message.                       |
-| `moderator` | All user abilities + delete any event/merch/match via admin endpoints.           |
-| `admin`     | All moderator abilities + manage user roles and bans.                            |
+| `user`      | Manage own inventory, trade, message.                                            |
+| `editor`    | + Create & manage events; edit/remove any event/merch/group (#551).              |
+| `moderator` | + Ban/unban users, delete matches, creator transfers.                            |
+| `admin`     | + Manage user roles; full system access.                                         |
 
 Banned users receive `403 Forbidden` on login and are blocked from creating events.

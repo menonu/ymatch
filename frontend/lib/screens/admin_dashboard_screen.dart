@@ -13,13 +13,20 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final isAdminOrMod =
-        user != null && (user.role == 'admin' || user.role == 'moderator');
+    // #551: editor may access content tabs; ban/role/matches stay staff-gated
+    // by backend permissions (and role-change UI is admin-only below).
+    final isStaff =
+        user != null &&
+        (user.role == 'admin' ||
+            user.role == 'moderator' ||
+            user.role == 'editor');
 
-    if (!isAdminOrMod) {
+    if (!isStaff) {
       return const Scaffold(
         body: Center(
-          child: Text('Access denied. Admin or moderator role required.'),
+          child: Text(
+            'Access denied. Admin, moderator, or editor role required.',
+          ),
         ),
       );
     }
@@ -164,6 +171,12 @@ class _AdminUsersTab extends ConsumerWidget {
               final user = users[index];
               final isBanned = user.hasIsBanned() && user.isBanned;
               final role = user.hasRole() ? user.role : 'user';
+              final callerIsAdmin =
+                  currentUser != null && currentUser.role == 'admin';
+              final callerCanBan =
+                  currentUser != null &&
+                  (currentUser.role == 'admin' ||
+                      currentUser.role == 'moderator');
 
               return ListTile(
                 leading: CircleAvatar(
@@ -173,6 +186,8 @@ class _AdminUsersTab extends ConsumerWidget {
                       ? Colors.purple[100]
                       : role == 'moderator'
                       ? Colors.blue[100]
+                      : role == 'editor'
+                      ? Colors.teal[100]
                       : Colors.grey[200],
                   child: Icon(
                     isBanned
@@ -181,6 +196,8 @@ class _AdminUsersTab extends ConsumerWidget {
                         ? Icons.admin_panel_settings
                         : role == 'moderator'
                         ? Icons.shield
+                        : role == 'editor'
+                        ? Icons.edit
                         : Icons.person,
                     color: isBanned ? Colors.red : null,
                   ),
@@ -279,6 +296,16 @@ class _AdminUsersTab extends ConsumerWidget {
                           'Role updated to moderator',
                         );
                         break;
+                      case 'role_editor':
+                        await runAdminAction(
+                          () => adminCtrl.updateUserRole(
+                            user.id,
+                            adminId,
+                            'editor',
+                          ),
+                          'Role updated to editor',
+                        );
+                        break;
                       case 'role_user':
                         await runAdminAction(
                           () => adminCtrl.updateUserRole(
@@ -292,29 +319,35 @@ class _AdminUsersTab extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    if (!isBanned)
+                    if (callerCanBan && !isBanned)
                       const PopupMenuItem(
                         value: 'ban',
                         child: Text('🚫 Ban User'),
                       ),
-                    if (isBanned)
+                    if (callerCanBan && isBanned)
                       const PopupMenuItem(
                         value: 'unban',
                         child: Text('✅ Unban User'),
                       ),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem(
-                      value: 'role_admin',
-                      child: Text('👑 Set Admin'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'role_moderator',
-                      child: Text('🛡️ Set Moderator'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'role_user',
-                      child: Text('👤 Set User'),
-                    ),
+                    if (callerIsAdmin) ...[
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'role_admin',
+                        child: Text('👑 Set Admin'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'role_moderator',
+                        child: Text('🛡️ Set Moderator'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'role_editor',
+                        child: Text('✏️ Set Editor'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'role_user',
+                        child: Text('👤 Set User'),
+                      ),
+                    ],
                   ],
                 ),
               );

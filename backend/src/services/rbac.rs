@@ -57,23 +57,23 @@ pub enum Permission {
     UserUnban,
     /// Change a user's global role. Granted to admin.
     UserRoleManage,
-    /// Create a new event. Granted to admin + moderator (not user).
+    /// Create a new event. Granted to admin + moderator + editor (not user).
     EventCreate,
-    /// Edit any event (global override of `EventEdit`). Admin + moderator.
+    /// Edit any event (global override of `EventEdit`). Admin + moderator + editor.
     EventEditAny,
-    /// Delete any event (global override of `EventDelete`). Admin + moderator.
+    /// Delete any event (global override of `EventDelete`). Admin + moderator + editor.
     EventDeleteAny,
-    /// Delete any merch (global override of `MerchDelete`). Admin + moderator.
+    /// Delete any merch (global override of `MerchDelete`). Admin + moderator + editor.
     MerchDeleteAny,
     /// Create merch in any event (global override of `MerchCreate`).
-    /// Moderator + admin.
+    /// Admin + moderator + editor.
     MerchCreateAny,
-    /// Edit any merch (global override of `MerchEdit`). Admin + moderator.
+    /// Edit any merch (global override of `MerchEdit`). Admin + moderator + editor.
     MerchEditAny,
     /// Edit any group in any event (global override of `GroupEdit`).
-    /// Admin + moderator.
+    /// Admin + moderator + editor.
     GroupEditAny,
-    /// Remove any group in any event. Admin + moderator.
+    /// Remove any group in any event. Admin + moderator + editor.
     GroupDelete,
     /// Delete a match (global moderation action). Admin + moderator.
     /// Has no `*.any` form — it is itself the global-scope permission.
@@ -338,9 +338,10 @@ mod tests {
     const MODERATOR: i32 = 2;
     const USER: i32 = 3;
     const CREATOR: i32 = 4;
-    const EDITOR: i32 = 5;
+    const EDITOR: i32 = 5; // event-scoped editor
     const GROUP_CREATOR: i32 = 6;
     const GROUP_EDITOR: i32 = 7;
+    const GLOBAL_EDITOR: i32 = 8; // #551 global/editor
 
     fn set(names: &[&str]) -> HashSet<String> {
         names.iter().map(|s| s.to_string()).collect()
@@ -393,6 +394,20 @@ mod tests {
             ]),
         );
         perms_by_role.insert(USER, HashSet::new());
+        // #551: global editor — content create/edit/remove without moderation.
+        perms_by_role.insert(
+            GLOBAL_EDITOR,
+            set(&[
+                "event.create",
+                "event.edit.any",
+                "event.delete.any",
+                "merch.delete.any",
+                "merch.create.any",
+                "merch.edit.any",
+                "group.edit.any",
+                "group.delete",
+            ]),
+        );
         perms_by_role.insert(
             CREATOR,
             set(&[
@@ -605,6 +620,40 @@ mod tests {
         ok(&[MODERATOR], Permission::EventCreate);
         denied(&[MODERATOR], Permission::UserRoleManage);
         denied(&[MODERATOR], Permission::SystemKillSwitch);
+    }
+
+    // --- global editor (#551) ---
+
+    #[test]
+    fn global_editor_can_create_and_manage_content() {
+        ok(&[GLOBAL_EDITOR], Permission::EventCreate);
+        ok(&[GLOBAL_EDITOR], Permission::EventEditAny);
+        ok(&[GLOBAL_EDITOR], Permission::EventDeleteAny);
+        ok(&[GLOBAL_EDITOR], Permission::MerchCreateAny);
+        ok(&[GLOBAL_EDITOR], Permission::MerchEditAny);
+        ok(&[GLOBAL_EDITOR], Permission::MerchDeleteAny);
+        ok(&[GLOBAL_EDITOR], Permission::GroupEditAny);
+        ok(&[GLOBAL_EDITOR], Permission::GroupDelete);
+        // *.any overrides satisfy event-scope checks.
+        ok(&[GLOBAL_EDITOR], Permission::EventEdit);
+        ok(&[GLOBAL_EDITOR], Permission::EventDelete);
+        ok(&[GLOBAL_EDITOR], Permission::MerchCreate);
+        ok(&[GLOBAL_EDITOR], Permission::MerchEdit);
+        ok(&[GLOBAL_EDITOR], Permission::MerchDelete);
+        ok(&[GLOBAL_EDITOR], Permission::GroupEdit);
+    }
+
+    #[test]
+    fn global_editor_cannot_moderate_users_or_matches() {
+        denied(&[GLOBAL_EDITOR], Permission::UserRead);
+        denied(&[GLOBAL_EDITOR], Permission::UserBan);
+        denied(&[GLOBAL_EDITOR], Permission::UserUnban);
+        denied(&[GLOBAL_EDITOR], Permission::UserRoleManage);
+        denied(&[GLOBAL_EDITOR], Permission::MatchDelete);
+        denied(&[GLOBAL_EDITOR], Permission::EventCreatorTransfer);
+        denied(&[GLOBAL_EDITOR], Permission::GroupCreatorTransfer);
+        denied(&[GLOBAL_EDITOR], Permission::EventMemberManageAny);
+        denied(&[GLOBAL_EDITOR], Permission::SystemKillSwitch);
     }
 
     // --- event creator ---

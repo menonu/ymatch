@@ -214,7 +214,7 @@ impl UserRepository {
         let Some(role_id) = role_id else {
             tx.rollback().await?;
             return Err(AppError::bad_request(format!(
-                "Invalid role: {role}. Must be one of: user, moderator, admin"
+                "Invalid role: {role}. Must be one of: user, editor, moderator, admin"
             )));
         };
         // Detect a non-existent user with an explicit existence check. The
@@ -330,10 +330,11 @@ impl UserRepository {
 /// is now **derived** from `user_roles` at read time via the correlated
 /// subquery below, aliased as `role` so [`user_from_row`] is unchanged. The
 /// derivation reads the user's single global role (`scope_type='global'`,
-/// `scope_id IS NULL`) with precedence `admin > moderator > user`, and falls
-/// back to `'user'` (via `COALESCE`) for a guest with no global assignment —
-/// preserving the old `DEFAULT 'user'` column semantics. `user_roles(user_id)`
-/// is indexed (`idx_user_roles_user`), so this is one indexed lookup per fetch.
+/// `scope_id IS NULL`) with precedence `admin > moderator > editor > user`
+/// (#551), and falls back to `'user'` (via `COALESCE`) for a guest with no
+/// global assignment — preserving the old `DEFAULT 'user'` column semantics.
+/// `user_roles(user_id)` is indexed (`idx_user_roles_user`), so this is one
+/// indexed lookup per fetch.
 const USER_COLUMNS: &str = concat!(
     "id, username, uuid, device_token, created_at, ",
     "COALESCE((",
@@ -341,7 +342,9 @@ const USER_COLUMNS: &str = concat!(
     "  JOIN roles r ON r.id = ur.role_id ",
     "  WHERE ur.user_id = users.id ",
     "    AND ur.scope_type = 'global' AND ur.scope_id IS NULL ",
-    "  ORDER BY CASE r.name WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END ",
+    "  ORDER BY CASE r.name ",
+    "    WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ",
+    "    WHEN 'editor' THEN 2 ELSE 3 END ",
     "  LIMIT 1",
     "), 'user') AS role, ",
     "is_banned, ban_reason, banned_until"

@@ -1,19 +1,20 @@
 #!/bin/bash
 # scripts/grant_role.sh — idempotently grant a GLOBAL role to a ymatch user.
 #
-# ADR 0004 §6 / #228 PR4. This is the per-environment operator tool for
-# granting the global `user` / `moderator` / `admin` role. It mirrors the
-# production `UserRepository::set_role` path (backend/src/repositories/user.rs):
-# it writes the `user_roles` global row (the single source of truth since ADR
-# 0006 dropped the `users.role` mirror). `proto.User.role` is derived from that
-# row at read time, so no `users` column is written. Re-running with the same
-# (username, role) leaves the user's state unchanged.
+# ADR 0004 §6 / #228 PR4 / #551. This is the per-environment operator tool for
+# granting the global `user` / `editor` / `moderator` / `admin` role. It mirrors
+# the production `UserRepository::set_role` path
+# (backend/src/repositories/user.rs): it writes the `user_roles` global row (the
+# single source of truth since ADR 0006 dropped the `users.role` mirror).
+# `proto.User.role` is derived from that row at read time, so no `users` column
+# is written. Re-running with the same (username, role) leaves the user's state
+# unchanged.
 #
 # Usage:
 #   ./scripts/grant_role.sh <username> <role>
 #
 #   <username>  an existing ymatch username
-#   <role>       one of: user, moderator, admin
+#   <role>       one of: user, editor, moderator, admin
 #
 # Database connection (auto-selected):
 #   * Default: `docker exec` into the running `ymatch_db` container. The
@@ -33,9 +34,8 @@
 # run it only against the environment you intend to change.
 #
 # Idempotent: re-granting the same role leaves the user's state unchanged.
-# Granting `user` DEMOTES
-# from moderator/admin (mirrors `set_role`), which is how you revoke an
-# elevated global role.
+# Granting `user` DEMOTES from editor/moderator/admin (mirrors `set_role`),
+# which is how you revoke an elevated global role.
 
 set -euo pipefail
 
@@ -43,7 +43,7 @@ usage() {
   cat >&2 <<EOF
 Usage: $0 <username> <role>
   <username>  existing ymatch username (chars: [A-Za-z0-9_.@-])
-  <role>      one of: user, moderator, admin
+  <role>      one of: user, editor, moderator, admin
 
 Env:
   DATABASE_URL  if set, connect via psql to this URL instead of docker exec
@@ -59,8 +59,8 @@ ROLE="$2"
 # defense against SQL injection and against granting a nonexistent role;
 # the SQL also looks the role id up defensively.
 case "$ROLE" in
-  user|moderator|admin) ;;
-  *) echo "error: <role> must be one of: user, moderator, admin (got '$ROLE')" >&2; usage ;;
+  user|editor|moderator|admin) ;;
+  *) echo "error: <role> must be one of: user, editor, moderator, admin (got '$ROLE')" >&2; usage ;;
 esac
 
 # Username charset guard: psql :'var' quoting does not escape embedded
@@ -94,7 +94,7 @@ echo "Granting global role '$ROLE' to user '$USERNAME'..."
 # than via psql `:'var` variables, because psql does NOT interpolate variables
 # inside a dollar-quoted (`$$ ... $$`) body — it treats the body as a string
 # literal. This is safe ONLY because of the validation above: <role> is one of
-# three literals, and <username> matched [A-Za-z0-9_.@-], so neither can contain
+# four literals, and <username> matched [A-Za-z0-9_.@-], so neither can contain
 # a quote or other SQL metacharacter that could break out of the string
 # literals below. The heredoc is unquoted so bash expands ${USERNAME}/${ROLE},
 # and `$$` is escaped as `\$\$` so bash does not expand it to its PID.

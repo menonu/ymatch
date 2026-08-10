@@ -1,11 +1,13 @@
 # Granting Global Roles
 
 This guide covers `scripts/grant_role.sh`, the operator tool for granting a
-**global** role (`user`, `moderator`, or `admin`) to a ymatch user. It is the
-per-environment mechanism required by [ADR 0004 §6](../explanation/adr/0004-rbac-permission-model.md)
-so that no personal identifier (a username) is ever committed to the public
-repo. Event-scoped roles (`creator` / `editor`) are **not** managed here —
-`creator` is auto-assigned at event creation, and `editor` is managed via the
+**global** role (`user`, `editor`, `moderator`, or `admin`) to a ymatch user. It
+is the per-environment mechanism required by
+[ADR 0004 §6](../explanation/adr/0004-rbac-permission-model.md) and
+[ADR 0016](../explanation/adr/0016-global-editor-role.md) so that no personal
+identifier (a username) is ever committed to the public repo. Event-scoped
+roles (`creator` / `editor`) are **not** managed here — `creator` is
+auto-assigned at event creation, and event `editor` is managed via the
 event-member API (`POST/DELETE/GET /api/v1/events/:id/members`).
 
 ## What it does
@@ -21,7 +23,7 @@ operation, mirroring the production `UserRepository::set_role` path:
 Keeping both in one transaction means they cannot drift (ADR 0004 §2). The
 script is **idempotent**: re-granting the same role leaves the user's state
 unchanged. Granting
-`user` **demotes** from `moderator`/`admin` — that is how you revoke an
+`user` **demotes** from `editor`/`moderator`/`admin` — that is how you revoke an
 elevated global role.
 
 ## Run it per environment
@@ -74,15 +76,16 @@ The DB password is a secret — read it from the environment, never hardcode it
   your own username), it **must** be git-ignored. `scripts/*local*` is
   gitignored for this purpose; name your wrapper `scripts/grant_role.local.sh`
   (or any `*local*` name) so it is never tracked.
-- The script validates the role (`user|moderator|admin`) and restricts the
-  username to `[A-Za-z0-9_.@-]` before interpolating either value into the
+- The script validates the role (`user|editor|moderator|admin`) and restricts
+  the username to `[A-Za-z0-9_.@-]` before interpolating either value into the
   SQL, so neither can contain a quote or SQL metacharacter. The script does
   **not** rely on psql parameter substitution (`:'var`), which cannot be used
   inside a dollar-quoted `DO` body — the charset + role-enum checks are the
   injection guard.
 - Granting a role is an admin/operator action — run it only against the
-  environment you intend to change. Prefer granting `moderator` over `admin`
-  unless full superuser access is required.
+  environment you intend to change. Prefer the least privilege that fits:
+  `editor` for content only, `moderator` for content + user/match moderation,
+  `admin` only when role management / superuser access is required.
 
 ## Verification
 

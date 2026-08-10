@@ -85,8 +85,8 @@ pub async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
 /// RBAC checks (which read `user_roles`) see the role. (`users.role` was
 /// dropped; the proto `User.role` field is derived from this row at read
 /// time.) Replaces any prior global role. Used by tests that need an
-/// admin/moderator actor and by the event-creation helpers (event creation
-/// now requires `event.create`, granted to moderator/admin only).
+/// admin/moderator/editor actor and by the event-creation helpers (event
+/// creation requires `event.create`, granted to editor/moderator/admin).
 pub async fn grant_global_role(pool: &PgPool, user_id: i64, role: &str) {
     let mut tx = pool.begin().await.unwrap();
     let role_id: i32 =
@@ -117,9 +117,9 @@ pub async fn grant_global_role(pool: &PgPool, user_id: i64, role: &str) {
 }
 
 /// Read `user_id`'s derived global role the way the production read path does
-/// (ADR 0006): from `user_roles` (scope_type='global', scope_id=NULL), with
-/// precedence `admin > moderator > user`, falling back to `'user'` when the
-/// user has no global assignment. Mirrors `USER_COLUMNS` in
+/// (ADR 0006 / #551): from `user_roles` (scope_type='global', scope_id=NULL),
+/// with precedence `admin > moderator > editor > user`, falling back to
+/// `'user'` when the user has no global assignment. Mirrors `USER_COLUMNS` in
 /// `backend/src/repositories/user.rs` so tests assert against the same value
 /// the API exposes as `User.role` (the `users.role` column was dropped).
 pub async fn global_role_of(pool: &PgPool, user_id: i64) -> String {
@@ -129,7 +129,9 @@ pub async fn global_role_of(pool: &PgPool, user_id: i64) -> String {
              JOIN roles r ON r.id = ur.role_id
              WHERE ur.user_id = $1
                AND ur.scope_type = 'global' AND ur.scope_id IS NULL
-             ORDER BY CASE r.name WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END
+             ORDER BY CASE r.name
+               WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1
+               WHEN 'editor' THEN 2 ELSE 3 END
              LIMIT 1), 'user')",
     )
     .bind(user_id as i32)

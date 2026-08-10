@@ -42,7 +42,8 @@ column is `Permission::as_str`.
 | Scope | Role | Description |
 |---|---|---|
 | `global` | `admin` | Full access / all permissions. Superuser bypass. |
-| `global` | `moderator` | Platform management: read user details, ban/unban, create & manage events, edit or remove any event/merch/group, delete matches. |
+| `global` | `moderator` | Platform management: read user details, ban/unban, create & manage events, edit or remove any event/merch/group, delete matches, creator transfers. |
+| `global` | `editor` | Create & manage events; edit or remove any event/merch/group. No ban/unban, match delete, role manage, or transfers (#551). Distinct from event/group-scoped `editor`. |
 | `global` | `user` | Standard trading. No elevated permissions (ordinary trading is ownership-checked). |
 | `event` | `creator` | Owns an event; manages its editors; can transfer creator; edits the event, its merch, and its groups. |
 | `event` | `editor` | Edits an event's merch and groups; can assign/remove other editors; cannot delete the event or transfer creator. |
@@ -61,14 +62,14 @@ overrides, which are *held* globally but *satisfy* an event-scope check).
 | `user.ban` | admin, moderator | `user.ban` | `admin::ban_user` (`POST /admin/users/:id/ban`) |
 | `user.unban` | admin, moderator | `user.unban` | `admin::unban_user` (`POST /admin/users/:id/unban`) |
 | `user.role.manage` | admin | `user.role.manage` | `admin::update_user_role` (`PUT /admin/users/:id/role`) |
-| `event.create` | admin, moderator | `event.create` | `events::create_event` (`POST /events`) |
-| `event.edit.any` | admin, moderator | `event.edit` (the event-scope check) | — (override; satisfies `event.edit`) |
-| `event.delete.any` | admin, moderator | `event.delete` (the event-scope check) | — (override; satisfies `event.delete` on `DELETE /admin/events/:id`) |
-| `merch.delete.any` | admin, moderator | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`); also gates admin catalog list `GET /admin/merch?user_id=` (#491 — intentional reuse: same staff set; no separate `*.list` yet) |
-| `merch.create.any` | admin, moderator | `merch.create` (the event-scope check) | — (override; satisfies `merch.create`) |
-| `merch.edit.any` | admin, moderator | `merch.edit` (the event-scope check) | — (override; satisfies `merch.edit`) |
-| `group.edit.any` | admin, moderator | `group.edit` (the event-scope check) | — (override; satisfies `group.edit`) |
-| `group.delete` | admin, moderator | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`); also gates `GET /admin/groups?user_id=` (#491 — list reuses delete staff set) |
+| `event.create` | admin, moderator, editor | `event.create` | `events::create_event` (`POST /events`) |
+| `event.edit.any` | admin, moderator, editor | `event.edit` (the event-scope check) | — (override; satisfies `event.edit`) |
+| `event.delete.any` | admin, moderator, editor | `event.delete` (the event-scope check) | — (override; satisfies `event.delete` on `DELETE /admin/events/:id`) |
+| `merch.delete.any` | admin, moderator, editor | `merch.delete` (the event-scope check) | `admin::delete_merch` (`DELETE /admin/merch/:id`); also gates admin catalog list `GET /admin/merch?user_id=` (#491 — intentional reuse: same staff set; no separate `*.list` yet) |
+| `merch.create.any` | admin, moderator, editor | `merch.create` (the event-scope check) | — (override; satisfies `merch.create`) |
+| `merch.edit.any` | admin, moderator, editor | `merch.edit` (the event-scope check) | — (override; satisfies `merch.edit`) |
+| `group.edit.any` | admin, moderator, editor | `group.edit` (the event-scope check) | — (override; satisfies `group.edit`) |
+| `group.delete` | admin, moderator, editor | `group.delete` | `admin::delete_group` (`DELETE /admin/events/:id/groups/:name`); also gates `GET /admin/groups?user_id=` (#491 — list reuses delete staff set) |
 | `match.delete` | admin, moderator | `match.delete` | `admin::delete_match` (`DELETE /admin/matches/:id`); also gates `GET /admin/matches?user_id=` (#491 — list reuses delete staff set) |
 | `event.creator.transfer` | admin, moderator | `event.creator.transfer` | `admin::transfer_event_creator` (`PUT /admin/events/:id/creator`) |
 | `group.creator.transfer` | admin, moderator | `group.creator.transfer` | `admin::transfer_group_creator` (`PUT /admin/events/:id/groups/:name/creator`) |
@@ -132,10 +133,10 @@ with `Scope::Group(merchandise_groups.id)` (#443 / ADR 0013). Global
   `user_roles` in sync.
 - **Group `editor`** is assigned/revoked via the group-member API, guarded by
   `group.member.manage` (group **creator** or **editor**, #443).
-- **Global `user`/`moderator`/`admin`** are granted per-environment with
+- **Global `user`/`editor`/`moderator`/`admin`** are granted per-environment with
   [`scripts/grant_role.sh <username> <role>`](../how_to/grant_roles.md), which
-  writes `users.role` and the `user_roles` global row in one transaction so the
-  mirror and the authoritative assignment cannot drift.
+  writes the `user_roles` global row (ADR 0006 single source of truth; #551 adds
+  `editor`).
 
 ## Adding a permission
 
