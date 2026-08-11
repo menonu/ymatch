@@ -241,6 +241,83 @@ void main() {
     expect(find.byIcon(Icons.check), findsNothing);
   });
 
+  testWidgets(
+    'username edit control stays tappable with long name on narrow viewport (#555)',
+    (tester) async {
+      // Phone-width surface where a long name previously shoved the edit
+      // IconButton into / past the right edge (#555).
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      const longName =
+          'super_long_username_that_would_push_edit_control_off_screen';
+      final auth = MockAuthController(_user(username: longName));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => auth),
+            backendSystemStatusProvider.overrideWith((ref) async => {}),
+          ],
+          child: _localized(const ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final editFinder = find.byTooltip('Edit username');
+      expect(editFinder, findsOneWidget);
+
+      final editRect = tester.getRect(editFinder);
+      final screenWidth =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+
+      // Comfortable Material touch target.
+      expect(editRect.width, greaterThanOrEqualTo(48));
+      expect(editRect.height, greaterThanOrEqualTo(48));
+
+      // Stay inset from the viewport edge (body 16 + card 24 padding, and
+      // the control itself must not sit flush against the right edge).
+      const minEdgeInset = 16.0;
+      expect(editRect.left, greaterThanOrEqualTo(minEdgeInset));
+      expect(screenWidth - editRect.right, greaterThanOrEqualTo(minEdgeInset));
+
+      // Fully on-screen and actually tappable → enters edit mode.
+      expect(editRect.left, greaterThanOrEqualTo(0));
+      expect(editRect.right, lessThanOrEqualTo(screenWidth));
+      await tester.tap(editFinder);
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'username edit control has comfortable hit target on phone width (#555)',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(
+              (ref) => MockAuthController(_user(username: 'alice')),
+            ),
+            backendSystemStatusProvider.overrideWith((ref) async => {}),
+          ],
+          child: _localized(const ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final editRect = tester.getRect(find.byTooltip('Edit username'));
+      final screenWidth =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+
+      expect(editRect.width, greaterThanOrEqualTo(48));
+      expect(editRect.height, greaterThanOrEqualTo(48));
+      expect(screenWidth - editRect.right, greaterThanOrEqualTo(16));
+    },
+  );
+
   testWidgets('username edit failure shows error snackbar (#454)', (
     tester,
   ) async {
