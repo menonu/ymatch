@@ -245,9 +245,13 @@ void main() {
     'username edit control stays tappable with long name on narrow viewport (#555)',
     (tester) async {
       // Phone-width surface where a long name previously shoved the edit
-      // IconButton into / past the right edge (#555).
-      await tester.binding.setSurfaceSize(const Size(360, 640));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      // IconButton into / past the right edge (#555). With dpr=1, physical
+      // size equals logical size (same pattern as home_screen_test #415).
+      const screenWidth = 360.0;
+      tester.view.physicalSize = const Size(screenWidth, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       const longName =
           'super_long_username_that_would_push_edit_control_off_screen';
@@ -267,8 +271,6 @@ void main() {
       expect(editFinder, findsOneWidget);
 
       final editRect = tester.getRect(editFinder);
-      final screenWidth =
-          tester.view.physicalSize.width / tester.view.devicePixelRatio;
 
       // Comfortable Material touch target.
       expect(editRect.width, greaterThanOrEqualTo(48));
@@ -292,8 +294,11 @@ void main() {
   testWidgets(
     'username edit control has comfortable hit target on phone width (#555)',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(360, 640));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      const screenWidth = 360.0;
+      tester.view.physicalSize = const Size(screenWidth, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
         ProviderScope(
@@ -309,8 +314,6 @@ void main() {
       await tester.pumpAndSettle();
 
       final editRect = tester.getRect(find.byTooltip('Edit username'));
-      final screenWidth =
-          tester.view.physicalSize.width / tester.view.devicePixelRatio;
 
       expect(editRect.width, greaterThanOrEqualTo(48));
       expect(editRect.height, greaterThanOrEqualTo(48));

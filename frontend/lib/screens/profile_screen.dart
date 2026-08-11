@@ -14,6 +14,12 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  /// Shared 48×48 padded target for profile IconButtons (#555).
+  static final ButtonStyle _iconHitTarget = IconButton.styleFrom(
+    minimumSize: const Size(48, 48),
+    tapTargetSize: MaterialTapTargetSize.padded,
+  );
+
   bool _editingUsername = false;
   late TextEditingController _usernameController;
 
@@ -105,18 +111,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           IconButton(
                             icon: const Icon(Icons.check),
                             color: Colors.green,
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              tapTargetSize: MaterialTapTargetSize.padded,
-                            ),
+                            style: _iconHitTarget,
                             onPressed: () => _saveUsername(user.id),
                           ),
                           IconButton(
                             icon: const Icon(Icons.close),
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              tapTargetSize: MaterialTapTargetSize.padded,
-                            ),
+                            style: _iconHitTarget,
                             onPressed: () =>
                                 setState(() => _editingUsername = false),
                           ),
@@ -140,10 +140,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             icon: const Icon(Icons.edit, size: 20),
                             color: Colors.grey,
                             tooltip: l10n.editUsername,
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              tapTargetSize: MaterialTapTargetSize.padded,
-                            ),
+                            style: _iconHitTarget,
                             onPressed: () {
                               _usernameController.text = user.username;
                               setState(() => _editingUsername = true);
@@ -177,10 +174,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 20),
                                 color: Theme.of(context).colorScheme.primary,
-                                style: IconButton.styleFrom(
-                                  minimumSize: const Size(48, 48),
-                                  tapTargetSize: MaterialTapTargetSize.padded,
-                                ),
+                                style: _iconHitTarget,
                                 onPressed: () async {
                                   if (user.hasUuid() && user.uuid.isNotEmpty) {
                                     await Clipboard.setData(
