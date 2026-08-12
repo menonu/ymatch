@@ -15,6 +15,7 @@ mod images;
 mod match_lifecycle;
 mod merch_inventory;
 mod notifications;
+mod push;
 mod rbac;
 mod system;
 mod trades;

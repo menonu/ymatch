@@ -88,6 +88,17 @@ erDiagram
         TIMESTAMPTZ created_at
     }
 
+    push_subscriptions {
+        SERIAL id PK
+        INTEGER user_id FK "NOT NULL"
+        TEXT endpoint "NOT NULL UNIQUE"
+        TEXT p256dh "NOT NULL"
+        TEXT auth "NOT NULL"
+        TEXT user_agent
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
     users ||--o{ events : "creates"
     events ||--o{ merchandise : "contains"
     users ||--o{ inventory : "owns"
@@ -96,6 +107,7 @@ erDiagram
     users ||--o{ matches : "user2"
     matches ||--o{ messages : "contains"
     users ||--o{ messages : "sends"
+    users ||--o{ push_subscriptions : "subscribes"
     users ||--o{ event_favorites : "favorites"
     events ||--o{ event_favorites : "favorited_by"
     users ||--o{ event_views : "views"
@@ -175,6 +187,19 @@ CREATE TABLE messages (
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION
 );
+
+-- Web Push subscriptions (ADR 0015 / #179). Not the same as users.device_token.
+CREATE TABLE push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,               -- browser PushSubscription.endpoint
+    p256dh TEXT NOT NULL,                        -- client ECDH public key
+    auth TEXT NOT NULL,                          -- auth secret
+    user_agent TEXT,                             -- optional client UA
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Index: idx_push_subscriptions_user_id (user_id)
 
 CREATE TABLE event_favorites (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

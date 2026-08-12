@@ -245,6 +245,20 @@ pub async fn put_json(pool: &PgPool, uri: &str, body: &str) -> axum::response::R
     .unwrap()
 }
 
+pub async fn delete_json(pool: &PgPool, uri: &str, body: &str) -> axum::response::Response {
+    let app = backend::routes::create_router(pool.clone(), test_storage());
+    app.oneshot(
+        Request::builder()
+            .method("DELETE")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
 pub async fn get_request(pool: &PgPool, uri: &str) -> axum::response::Response {
     let app = backend::routes::create_router(pool.clone(), test_storage());
     app.oneshot(

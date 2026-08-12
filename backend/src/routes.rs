@@ -32,6 +32,7 @@ use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::MatchRepository;
 use crate::repositories::merch::MerchandiseRepository;
 use crate::repositories::message::MessageRepository;
+use crate::repositories::push_subscription::PushSubscriptionRepository;
 use crate::repositories::rbac::RbacRepository;
 use crate::repositories::user::UserRepository;
 use crate::services::event::EventService;
@@ -82,6 +83,11 @@ pub struct AppState {
     pub event_favorites: Arc<EventFavoritesRepository>,
     pub event_views: Arc<EventViewsRepository>,
     pub group_favorites: Arc<GroupFavoritesRepository>,
+    pub push_subscriptions: Arc<PushSubscriptionRepository>,
+    /// Application-server VAPID public key (URL-safe base64). `None` when
+    /// Web Push is disabled (local/CI default). Private key is not held here;
+    /// the send path (later #179 PR) loads it from env only when sending.
+    pub vapid_public_key: Option<String>,
     pub policy: Arc<PermissionPolicy>,
     pub match_lifecycle: Arc<MatchLifecycleService>,
     pub event_service: Arc<EventService>,
@@ -186,6 +192,12 @@ impl FromRef<AppState> for Arc<GroupFavoritesRepository> {
     }
 }
 
+impl FromRef<AppState> for Arc<PushSubscriptionRepository> {
+    fn from_ref(input: &AppState) -> Self {
+        input.push_subscriptions.clone()
+    }
+}
+
 impl FromRef<AppState> for Arc<RbacRepository> {
     fn from_ref(input: &AppState) -> Self {
         input.rbac.clone()
@@ -213,6 +225,12 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     let event_views: Arc<EventViewsRepository> = Arc::new(EventViewsRepository::new(pool.clone()));
     let group_favorites: Arc<GroupFavoritesRepository> =
         Arc::new(GroupFavoritesRepository::new(pool.clone()));
+    let push_subscriptions: Arc<PushSubscriptionRepository> =
+        Arc::new(PushSubscriptionRepository::new(pool.clone()));
+    let vapid_public_key = std::env::var("VAPID_PUBLIC_KEY")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
     let match_lifecycle = Arc::new(MatchLifecycleService::new(
         pool.clone(),
         matches.clone(),
@@ -248,6 +266,8 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         event_favorites,
         event_views,
         group_favorites,
+        push_subscriptions,
+        vapid_public_key,
         policy,
         match_lifecycle,
         event_service,
@@ -441,6 +461,16 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
         // #491: images share AppState so upload/delete can require an active user.
         .route("/api/v1/images/upload", post(handlers::upload_image))
         .route("/api/v1/images/:filename", delete(handlers::delete_image))
+        // #179 / ADR 0015: Web Push subscription store + VAPID public key.
+        // Send path is a later PR; these routes only persist subscriptions.
+        .route(
+            "/api/v1/push/vapid-public-key",
+            get(handlers::get_vapid_public_key),
+        )
+        .route(
+            "/api/v1/push/subscriptions",
+            put(handlers::upsert_push_subscription).delete(handlers::delete_push_subscription),
+        )
         .layer(middleware::from_fn_with_state(
             api_limiter.clone(),
             |axum::extract::State(lim): axum::extract::State<Arc<IpLimiter>>,

@@ -9,6 +9,7 @@ pub mod mappers;
 mod matches;
 mod merch;
 mod messages;
+mod push;
 mod search;
 mod system;
 
@@ -22,5 +23,6 @@ pub use inventory::*;
 pub use matches::*;
 pub use merch::*;
 pub use messages::*;
+pub use push::*;
 pub use search::*;
 pub use system::*;
