@@ -1,4 +1,4 @@
-// Unit tests for app settings prefs (#545).
+// Unit tests for app settings prefs (#545, theme removed #553).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,43 +51,31 @@ void main() {
     });
   });
 
-  group('AppThemePreference', () {
-    test('fromStorage maps known values and falls back to system', () {
-      expect(AppThemePreference.fromStorage(null), AppThemePreference.system);
-      expect(AppThemePreference.fromStorage('light'), AppThemePreference.light);
-      expect(AppThemePreference.fromStorage('dark'), AppThemePreference.dark);
-      expect(AppThemePreference.fromStorage('nope'), AppThemePreference.system);
-    });
-
-    test('themeMode maps to Flutter ThemeMode', () {
-      expect(AppThemePreference.system.themeMode, ThemeMode.system);
-      expect(AppThemePreference.light.themeMode, ThemeMode.light);
-      expect(AppThemePreference.dark.themeMode, ThemeMode.dark);
-    });
-
-    test('storageValue round-trips through fromStorage', () {
-      for (final pref in AppThemePreference.values) {
-        expect(AppThemePreference.fromStorage(pref.storageValue), pref);
-      }
-    });
-  });
-
   group('AppSettings.load', () {
     test('returns defaults when prefs are empty', () async {
       final settings = await AppSettings.load();
       expect(settings, AppSettings.defaults);
       expect(settings.language, AppLanguagePreference.system);
-      expect(settings.theme, AppThemePreference.system);
     });
 
-    test('restores persisted language and theme', () async {
+    test('restores persisted language', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'app_settings_language': 'ja',
-        'app_settings_theme': 'dark',
       });
       final settings = await AppSettings.load();
       expect(settings.language, AppLanguagePreference.japanese);
-      expect(settings.theme, AppThemePreference.dark);
+    });
+
+    test('ignores legacy theme pref (#553)', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'app_settings_language': 'en',
+        'app_settings_theme': 'dark',
+      });
+      final settings = await AppSettings.load();
+      expect(
+        settings,
+        const AppSettings(language: AppLanguagePreference.english),
+      );
     });
   });
 
@@ -97,13 +85,9 @@ void main() {
       expect(empty.state, AppSettings.defaults);
 
       final seeded = AppSettingsController(
-        initial: const AppSettings(
-          language: AppLanguagePreference.english,
-          theme: AppThemePreference.light,
-        ),
+        initial: const AppSettings(language: AppLanguagePreference.english),
       );
       expect(seeded.state.language, AppLanguagePreference.english);
-      expect(seeded.state.theme, AppThemePreference.light);
     });
 
     test('setLanguage updates state and persists', () async {
@@ -117,18 +101,6 @@ void main() {
       // Re-load reflects the write.
       final reloaded = await AppSettings.load();
       expect(reloaded.language, AppLanguagePreference.japanese);
-    });
-
-    test('setTheme updates state and persists', () async {
-      final controller = AppSettingsController();
-      await controller.setTheme(AppThemePreference.dark);
-      expect(controller.state.theme, AppThemePreference.dark);
-
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('app_settings_theme'), 'dark');
-
-      final reloaded = await AppSettings.load();
-      expect(reloaded.theme, AppThemePreference.dark);
     });
 
     test('setLanguage no-ops when value unchanged (still ok)', () async {
@@ -146,7 +118,9 @@ void main() {
         overrides: [
           appSettingsProvider.overrideWith(
             (ref) => AppSettingsController(
-              initial: const AppSettings(theme: AppThemePreference.light),
+              initial: const AppSettings(
+                language: AppLanguagePreference.english,
+              ),
             ),
           ),
         ],
@@ -154,15 +128,15 @@ void main() {
       addTearDown(container.dispose);
 
       expect(
-        container.read(appSettingsProvider).theme,
-        AppThemePreference.light,
+        container.read(appSettingsProvider).language,
+        AppLanguagePreference.english,
       );
       await container
           .read(appSettingsProvider.notifier)
-          .setTheme(AppThemePreference.dark);
+          .setLanguage(AppLanguagePreference.japanese);
       expect(
-        container.read(appSettingsProvider).theme,
-        AppThemePreference.dark,
+        container.read(appSettingsProvider).language,
+        AppLanguagePreference.japanese,
       );
     });
   });

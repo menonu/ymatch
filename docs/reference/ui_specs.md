@@ -32,7 +32,7 @@ BottomNavBar
 │       └── MapPickerScreen (location selection)
 ├── Profile Tab
 │   ├── ProfileScreen
-│   └── SettingsScreen (language + theme prefs, #545)
+│   └── SettingsScreen (language prefs, #545; theme forced light #553)
 └── Admin Tab (conditional)
     └── AdminDashboardScreen
 ```
@@ -140,9 +140,8 @@ BottomNavBar
 ### SettingsScreen (#545)
 
 - Opened from Profile; client-only prefs via `SharedPreferences` (no backend sync)
-- **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale
-- **Theme**: System / Light / Dark (`SegmentedButton`) — System follows platform brightness; light/dark use `AppTheme.lightTheme` / `AppTheme.darkTheme`
-- Defaults for both: **System** (matches pre-#545 behavior for new users)
+- **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale; default **System**
+- **Theme**: forced **light** for all users (`ThemeMode.light`); selector removed due to dark-mode visibility issues (#553). `AppTheme.darkTheme` remains for a future re-introduction.
 
 ### AdminDashboardScreen
 
