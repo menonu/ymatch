@@ -65,6 +65,11 @@ jobs:
           DOMAIN: ${{ vars.OCI_DOMAIN_STAGING }}
           DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
           DB_PASSWORD: ${{ secrets.OCI_STAGING_DB_PASSWORD }}
+          # Web Push + VAPID (#179 / ADR 0015). Map staging-suffixed secrets →
+          # unsuffixed process env names used by docker-compose.oci.yml.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY_STAGING }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY_STAGING }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT_STAGING }}
         run: |
           if [ -z "$DOMAIN" ]; then
             echo "❌ Repository variable OCI_DOMAIN_STAGING is not set (public app FQDN)."
@@ -74,15 +79,22 @@ jobs:
             echo "❌ Secret DUCKDNS_TOKEN is not set."
             exit 1
           fi
+          if [ -n "${VAPID_PRIVATE_KEY:-}" ] && [ -n "${VAPID_PUBLIC_KEY:-}" ]; then
+            echo "Web Push: VAPID secrets present for staging"
+          else
+            echo "⚠️ Web Push: VAPID_*_STAGING secrets missing or empty; push will be no-op"
+          fi
           # Shell-safe remote env (printf %q) so secrets with special chars do not break.
-          REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q' \
-            "$DOMAIN" "$DUCKDNS_TOKEN" "$DB_PASSWORD")"
+          # VAPID_* may be empty (optional); still pass so host .env is refreshed.
+          REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q VAPID_PUBLIC_KEY=%q VAPID_PRIVATE_KEY=%q VAPID_SUBJECT=%q' \
+            "$DOMAIN" "$DUCKDNS_TOKEN" "$DB_PASSWORD" \
+            "${VAPID_PUBLIC_KEY:-}" "${VAPID_PRIVATE_KEY:-}" "${VAPID_SUBJECT:-}")"
           # shellcheck disable=SC2029
           ssh -i ~/.ssh/oci_key "ubuntu@${HOST}" "env ${REMOTE_ENV} bash -s" <<'DEPLOY_SCRIPT'
           set -euo pipefail
           cd ~/ymatch
 
-          # DOMAIN / DUCKDNS_TOKEN / DB_PASSWORD injected via ssh env (from vars/secrets).
+          # DOMAIN / DUCKDNS_TOKEN / DB_PASSWORD / VAPID_* injected via ssh env.
           ./scripts/oci_deploy_staging.sh
 
           echo "=== Running staging migrations ==="
@@ -114,6 +126,16 @@ jobs:
             echo "✅ Staging frontend healthy"
           else
             echo "⚠️ Staging frontend returned $FRONTEND"
+          fi
+
+          # Optional: Web Push public key when VAPID is configured (#179).
+          VAPID_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/api/v1/push/vapid-public-key" || true)
+          if [ "$VAPID_STATUS" = "200" ]; then
+            echo "✅ Staging VAPID public key endpoint OK"
+          elif [ "$VAPID_STATUS" = "404" ]; then
+            echo "ℹ️ Staging VAPID public key not configured (404; push no-op)"
+          else
+            echo "⚠️ Staging VAPID public key endpoint returned $VAPID_STATUS"
           fi
 
       - name: Report to New Relic

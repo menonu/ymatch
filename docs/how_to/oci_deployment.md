@@ -224,6 +224,9 @@ CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-o
 | `OCI_STAGING_VM_HOST` | secret | `deploy-oci-staging.yml` (staging) | **Every time the staging VM's public IP changes**. May be IP or the same FQDN as `OCI_DOMAIN_STAGING`. |
 | `OCI_STAGING_SSH_PRIVATE_KEY` | secret | `deploy-oci-staging.yml` (staging) | When the staging SSH key pair is rotated |
 | `OCI_STAGING_DB_PASSWORD` | secret | `deploy-oci-staging.yml` (staging) | When the staging database password changes |
+| `VAPID_PUBLIC_KEY_STAGING` | secret | `deploy-oci-staging.yml` → host `VAPID_PUBLIC_KEY` | When staging Web Push application-server keys rotate (#179) |
+| `VAPID_PRIVATE_KEY_STAGING` | secret | `deploy-oci-staging.yml` → host `VAPID_PRIVATE_KEY` | Same pair as public; **server-only** |
+| `VAPID_SUBJECT_STAGING` | secret | `deploy-oci-staging.yml` → host `VAPID_SUBJECT` | Contact URI (`mailto:` or `https:`); optional but recommended |
 | `DUCKDNS_TOKEN` | secret | `deploy-oci.yml`, `deploy-oci-staging.yml` | When the DuckDNS account token is rotated (issue #523) |
 | `OCI_DOMAIN` | **variable** | `deploy-oci.yml` | When the production public FQDN changes (e.g. `app.example.duckdns.org`) |
 | `OCI_DOMAIN_STAGING` | **variable** | `deploy-oci-staging.yml` | When the staging public FQDN changes |
