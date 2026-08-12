@@ -19,9 +19,11 @@
 //!         break  // one mutual edge is enough for this partner+group
 //! ```
 
+use crate::notifications;
 use crate::repositories::match_::{
     MatchRepository, REMATCH_REASON_AFTER_CANCELLED, REMATCH_REASON_AFTER_REJECTED,
 };
+use crate::repositories::push_subscription::PushSubscriptionRepository;
 use crate::repositories::user::UserRepository;
 use sqlx::PgPool;
 
@@ -93,7 +95,6 @@ pub fn rematch_reason_for(prior_status: &str) -> Option<&'static str> {
 /// Returns the number of PENDING rows newly created or reopened.
 pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
     let matches = MatchRepository::new(pool.clone());
-    let users = UserRepository::new(pool.clone());
     let mut matches_created = 0;
 
     // 1. Seed: every eligible WANT (ordered for stable fairness).
@@ -130,7 +131,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
                 // Mutual edge found for (want.user_id, partner_id, group).
                 if ensure_match_for_pair(
                     &matches,
-                    &users,
+                    pool,
                     want.user_id,
                     partner_id,
                     want.event_id,
@@ -154,7 +155,7 @@ pub async fn run_matching_algorithm(pool: &PgPool) -> Result<i32, String> {
 /// Returns `true` when a new PENDING was created or a terminal row reopened.
 async fn ensure_match_for_pair(
     matches: &MatchRepository,
-    users: &UserRepository,
+    pool: &PgPool,
     user_a: i32,
     user_b: i32,
     event_id: i32,
@@ -171,7 +172,7 @@ async fn ensure_match_for_pair(
                 .insert_pending(user_a, user_b, event_id, group_name)
                 .await
                 .map_err(|e| e.to_string())?;
-            notify_pair(users, user_a, user_b).await;
+            schedule_notify_pair(pool.clone(), user_a, user_b);
             Ok(true)
         }
         ExistingMatchAction::Reopen => {
@@ -186,7 +187,7 @@ async fn ensure_match_for_pair(
                 .await
                 .map_err(|e| e.to_string())?;
             if reopened {
-                notify_pair(users, user_a, user_b).await;
+                schedule_notify_pair(pool.clone(), user_a, user_b);
             }
             Ok(reopened)
         }
@@ -194,8 +195,23 @@ async fn ensure_match_for_pair(
     }
 }
 
-async fn notify_pair(users: &UserRepository, user_a: i32, user_b: i32) {
-    // Best-effort push. Missing user = vanished; other load errors logged (#266).
+/// Fire-and-forget Web Push for both parties (ADR 0015).
+///
+/// Runs off the matching loop so slow push endpoints do not stretch a pass.
+/// Never fails matching (errors stay inside the spawned task).
+fn schedule_notify_pair(pool: PgPool, user_a: i32, user_b: i32) {
+    tokio::spawn(async move {
+        notify_pair(pool, user_a, user_b).await;
+    });
+}
+
+/// Best-effort Web Push to both parties. Never panics out to matching.
+async fn notify_pair(pool: PgPool, user_a: i32, user_b: i32) {
+    let users = UserRepository::new(pool.clone());
+    let push_subs = PushSubscriptionRepository::new(pool);
+    let push_sender = notifications::global_sender();
+
+    // Missing user = vanished; other load errors logged (#266).
     let load = async |user_id: i32| match users.get_by_id(user_id).await {
         Ok(u) => u,
         Err(e) => {
@@ -211,12 +227,8 @@ async fn notify_pair(users: &UserRepository, user_a: i32, user_b: i32) {
     let u1 = load(user_a).await;
     let u2 = load(user_b).await;
     if let (Some(u1), Some(u2)) = (u1, u2) {
-        if let Some(token) = u1.device_token.as_deref() {
-            crate::notifications::send_match_notification(token, &u2.username).await;
-        }
-        if let Some(token) = u2.device_token.as_deref() {
-            crate::notifications::send_match_notification(token, &u1.username).await;
-        }
+        notifications::notify_user_of_match(&push_subs, push_sender, u1.id, &u2.username).await;
+        notifications::notify_user_of_match(&push_subs, push_sender, u2.id, &u1.username).await;
     }
 }
 
