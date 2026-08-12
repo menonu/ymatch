@@ -116,34 +116,35 @@ void main() {
     expect(languageButton.selected, {AppLanguagePreference.english});
   });
 
-  testWidgets('MyApp forces ThemeMode.light even when platform is dark (#553)', (
-    tester,
-  ) async {
-    tester.binding.platformDispatcher.platformBrightnessTestValue =
-        Brightness.dark;
-    addTearDown(
-      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
-    );
+  testWidgets(
+    'MyApp forces ThemeMode.light even when platform is dark (#553)',
+    (tester) async {
+      tester.binding.platformDispatcher.platformBrightnessTestValue =
+          Brightness.dark;
+      addTearDown(
+        tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appSettingsProvider.overrideWith(
-            (ref) => AppSettingsController(initial: AppSettings.defaults),
-          ),
-        ],
-        child: const MyApp(),
-      ),
-    );
-    // One frame is enough to build MaterialApp; avoid pumpAndSettle (auth
-    // checkLogin / redirects may keep scheduling frames).
-    await tester.pump();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appSettingsProvider.overrideWith(
+              (ref) => AppSettingsController(initial: AppSettings.defaults),
+            ),
+          ],
+          child: const MyApp(),
+        ),
+      );
+      // One frame is enough to build MaterialApp; avoid pumpAndSettle (auth
+      // checkLogin / redirects may keep scheduling frames).
+      await tester.pump();
 
-    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(materialApp.themeMode, ThemeMode.light);
-    expect(
-      tester.binding.platformDispatcher.platformBrightness,
-      Brightness.dark,
-    );
-  });
+      final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(materialApp.themeMode, ThemeMode.light);
+      expect(
+        tester.binding.platformDispatcher.platformBrightness,
+        Brightness.dark,
+      );
+    },
+  );
 }
