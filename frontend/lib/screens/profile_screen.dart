@@ -14,6 +14,12 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  /// Shared 48×48 padded target for profile IconButtons (#555).
+  static final ButtonStyle _iconHitTarget = IconButton.styleFrom(
+    minimumSize: const Size(48, 48),
+    tapTargetSize: MaterialTapTargetSize.padded,
+  );
+
   bool _editingUsername = false;
   late TextEditingController _usernameController;
 
@@ -83,7 +89,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Username row with edit support
+                    // Username row with edit support.
+                    // Keep the edit control next to the name (centered group)
+                    // and never let a long username push it past the card edge
+                    // (#555). IconButtons use an explicit 48×48 min target.
                     if (_editingUsername)
                       Row(
                         children: [
@@ -102,10 +111,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           IconButton(
                             icon: const Icon(Icons.check),
                             color: Colors.green,
+                            style: _iconHitTarget,
                             onPressed: () => _saveUsername(user.id),
                           ),
                           IconButton(
                             icon: const Icon(Icons.close),
+                            style: _iconHitTarget,
                             onPressed: () =>
                                 setState(() => _editingUsername = false),
                           ),
@@ -115,15 +126,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            user.username,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
+                          Flexible(
+                            child: Text(
+                              user.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.edit, size: 18),
+                            icon: const Icon(Icons.edit, size: 20),
                             color: Colors.grey,
                             tooltip: l10n.editUsername,
+                            style: _iconHitTarget,
                             onPressed: () {
                               _usernameController.text = user.username;
                               setState(() => _editingUsername = true);
@@ -143,20 +160,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                l10n.masterKeyUuid,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey,
+                              Expanded(
+                                child: Text(
+                                  l10n.masterKeyUuid,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 20),
                                 color: Theme.of(context).colorScheme.primary,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
+                                style: _iconHitTarget,
                                 onPressed: () async {
                                   if (user.hasUuid() && user.uuid.isNotEmpty) {
                                     await Clipboard.setData(
