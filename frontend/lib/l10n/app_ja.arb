@@ -79,6 +79,13 @@
   "settingsLanguageJapanese": "日本語",
   "settingsThemeLight": "ライト",
   "settingsThemeDark": "ダーク",
+  "settingsNotifications": "マッチ通知",
+  "settingsNotificationsSubtitle": "新しいマッチが見つかったときにバックグラウンドで通知します",
+  "settingsNotificationsUnsupported": "このブラウザでは利用できません",
+  "settingsNotificationsServerOff": "サーバーでプッシュ通知が有効になっていません",
+  "settingsNotificationsDenied": "権限がブロックされています。ブラウザの設定で通知を許可してください",
+  "settingsNotificationsIosHint": "iPhone / iPad では、ホーム画面に追加するとバックグラウンド通知が安定します。",
+  "settingsNotificationsError": "通知設定を更新できませんでした",
   "revisionInfo": "フロントエンド: {frontend}  /  バックエンド: {backend}",
 
   "selectImageSource": "画像の選択元",

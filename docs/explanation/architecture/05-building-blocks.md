@@ -66,7 +66,7 @@ Source: [`diagrams/05-backend-components.d2`](diagrams/05-backend-components.d2)
 | **Matching job** | Periodic discovery of mutual TRADE/WANT pairs within a group (raw SQL today) |
 | **Image storage** | Pluggable store for uploaded merch photos (local volume or object store) |
 | **Wire models** | Shared request/response shapes (protobuf-generated types) |
-| **Notifications** | Outbound auto-match alerts via **Web Push + VAPID** ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)): load stored subscriptions and POST encrypted push after match create/reopen; safe no-op when VAPID unset. Client subscribe/SW still #179 (not drawn on the L3 diagram) |
+| **Notifications** | Outbound auto-match alerts via **Web Push + VAPID** ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)): client service worker + Settings subscribe; backend loads stored subscriptions and POSTs after match create/reopen; safe no-op when VAPID unset (not drawn on the L3 diagram) |
 
 Layering sketch (same idea as [04 — Solution strategy](04-solution-strategy.md)):
 

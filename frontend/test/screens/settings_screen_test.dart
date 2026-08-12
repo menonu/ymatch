@@ -1,4 +1,4 @@
-// Widget tests for SettingsScreen (#545, theme removed #553).
+// Widget tests for SettingsScreen (#545, theme removed #553, push #179).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +10,12 @@ import 'package:frontend/main.dart';
 import 'package:frontend/providers/providers.dart';
 import 'package:frontend/screens/settings_screen.dart';
 import 'package:frontend/theme/app_theme.dart';
+
+WebPushController _fixedPush(Ref ref, WebPushState state) {
+  final c = WebPushController(ref, autoRefresh: false);
+  c.debugSetState(state);
+  return c;
+}
 
 Widget _app({
   required Widget child,
@@ -50,6 +56,12 @@ void main() {
           appSettingsProvider.overrideWith(
             (ref) => AppSettingsController(initial: AppSettings.defaults),
           ),
+          webPushProvider.overrideWith(
+            (ref) => _fixedPush(
+              ref,
+              const WebPushState(status: WebPushUiStatus.unsupported),
+            ),
+          ),
         ],
         child: const SettingsScreen(),
       ),
@@ -64,6 +76,8 @@ void main() {
     expect(find.text('日本語'), findsOneWidget);
     expect(find.text('Light'), findsNothing);
     expect(find.text('Dark'), findsNothing);
+    expect(find.text('Match notifications'), findsWidgets);
+    expect(find.text('Not available in this browser'), findsOneWidget);
   });
 
   testWidgets('selecting Japanese updates provider and localizes UI', (
@@ -72,7 +86,15 @@ void main() {
     final controller = AppSettingsController(initial: AppSettings.defaults);
     await tester.pumpWidget(
       _app(
-        overrides: [appSettingsProvider.overrideWith((ref) => controller)],
+        overrides: [
+          appSettingsProvider.overrideWith((ref) => controller),
+          webPushProvider.overrideWith(
+            (ref) => _fixedPush(
+              ref,
+              const WebPushState(status: WebPushUiStatus.unsupported),
+            ),
+          ),
+        ],
         child: const SettingsScreen(),
       ),
     );
@@ -99,6 +121,12 @@ void main() {
               initial: const AppSettings(
                 language: AppLanguagePreference.english,
               ),
+            ),
+          ),
+          webPushProvider.overrideWith(
+            (ref) => _fixedPush(
+              ref,
+              const WebPushState(status: WebPushUiStatus.unsupported),
             ),
           ),
         ],

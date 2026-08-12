@@ -530,6 +530,48 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsThemeDark;
 
+  /// Web Push match notification section title (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'Match notifications'**
+  String get settingsNotifications;
+
+  /// Subtitle under match notifications toggle (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'Background alerts when the system finds a new match'**
+  String get settingsNotificationsSubtitle;
+
+  /// Web Push unsupported on this client (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'Not available in this browser'**
+  String get settingsNotificationsUnsupported;
+
+  /// VAPID not configured (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'Push is not enabled on the server'**
+  String get settingsNotificationsServerOff;
+
+  /// Notification permission denied (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'Permission blocked — allow notifications in browser settings'**
+  String get settingsNotificationsDenied;
+
+  /// iOS PWA requirement note for Web Push (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'On iPhone/iPad, add this site to the Home Screen for reliable background alerts.'**
+  String get settingsNotificationsIosHint;
+
+  /// Generic error enabling/disabling push (#179)
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update notifications'**
+  String get settingsNotificationsError;
+
   /// Footer showing frontend and backend revision hashes
   ///
   /// In en, this message translates to:

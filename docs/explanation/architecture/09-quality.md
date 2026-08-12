@@ -75,11 +75,10 @@ a backlog dump:
   any active caller who knows a filename can delete it; tighten when storage
   gains an owner record.
 - Background match push is **decided** ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md):
-  Web Push + VAPID). Backend subscription store, API, and **send-on-match** are
-  in place when `VAPID_PRIVATE_KEY` is set; without keys the sender is a safe
-  no-op. Flutter web service worker / subscribe UX is still outstanding
-  ([#179](https://github.com/menonu/ymatch/issues/179)) — limits **usability**
-  for closed-tab alerts until the client lands.
+  Web Push + VAPID). Backend subscription store, API, send-on-match, and Flutter
+  web subscribe / service worker are in place when VAPID is configured. Remaining
+  gaps: production VAPID deploy wiring (staging done), iOS Home Screen PWA
+  install friction, and guaranteed delivery — see [#179](https://github.com/menonu/ymatch/issues/179).
 - Some operational runbooks assume maintainer familiarity with OCI free-tier
   quotas (see disaster recovery lessons) — **availability** / ops friction.
 
