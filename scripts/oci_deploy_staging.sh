@@ -19,6 +19,8 @@
 #   GH_TOKEN         - GitHub PAT for HTTPS git clone (avoids `gh` CLI auth)
 #   GH_SSH_KEY_PATH  - path to SSH deploy key for git clone
 #   DB_PASSWORD      - alternative to first positional argument
+#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
+#                    - Web Push (#179); CI maps VAPID_*_STAGING secrets here
 
 set -euo pipefail
 

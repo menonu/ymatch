@@ -317,9 +317,12 @@ print(f"{key}={shlex.quote(value)}")
 
 # Standard env keys written for docker-compose.oci.yml (issue #523).
 # Call after PUBLIC_IP / DOMAIN / DUCKDNS_* are set.
+# VAPID_* are optional (#179): only written when non-empty (staging deploy
+# injects them from VAPID_*_STAGING GitHub secrets; prod may omit).
 oci_write_oci_stack_env() {
   local dir="$1"
   oci_write_compose_env "$dir" \
     DB_PASSWORD PUBLIC_IP DOMAIN GIT_HASH \
-    DUCKDNS_TOKEN DUCKDNS_SUBDOMAIN
+    DUCKDNS_TOKEN DUCKDNS_SUBDOMAIN \
+    VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT
 }
