@@ -7,6 +7,7 @@
 # Required env (or prior .env): DOMAIN, DB_PASSWORD
 # Optional env:
 #   DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
+#   VAPID_*          - sticky from prior .env if set by CI deploy (#179)
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
 
@@ -18,7 +19,8 @@ source "$SCRIPT_DIR/oci_deploy_common.sh"
 
 REPO_DIR="$HOME/ymatch"
 oci_load_domain_env "$REPO_DIR"
-oci_load_env_keys "$REPO_DIR" DB_PASSWORD
+oci_load_env_keys "$REPO_DIR" DB_PASSWORD \
+  VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT
 oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 

@@ -272,6 +272,12 @@ gh secret set OCI_STAGING_VM_HOST --body "$OCI_STAGING_VM_HOST"
 gh secret set OCI_STAGING_SSH_PRIVATE_KEY < "$OCI_STAGING_SSH_PRIVATE_KEY"
 gh secret set OCI_STAGING_DB_PASSWORD --body "$OCI_STAGING_DB_PASSWORD"
 
+# Staging Web Push VAPID (#179) — URL-safe base64 keys from
+# `npx web-push generate-vapid-keys`; subject is mailto: or https: contact URI.
+# gh secret set VAPID_PUBLIC_KEY_STAGING --body "$VAPID_PUBLIC_KEY_STAGING"
+# gh secret set VAPID_PRIVATE_KEY_STAGING --body "$VAPID_PRIVATE_KEY_STAGING"
+# gh secret set VAPID_SUBJECT_STAGING --body "$VAPID_SUBJECT_STAGING"
+
 # Clean up
 shred -u /tmp/oci-secrets.env
 ```
