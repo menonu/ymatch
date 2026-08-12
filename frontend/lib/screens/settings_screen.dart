@@ -126,7 +126,8 @@ class _NotificationsTile extends StatelessWidget {
                     ? Icons.notifications_active_outlined
                     : Icons.notifications_off_outlined,
               ),
-        title: Text(l10n.settingsNotifications),
+        // Section header already says "Match notifications"; tile shows subtitle.
+        title: Text(l10n.settingsNotificationsSubtitle),
         subtitle: subtitle != null
             ? Text(
                 subtitle,

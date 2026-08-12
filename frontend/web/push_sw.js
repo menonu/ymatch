@@ -61,8 +61,6 @@ self.addEventListener('notificationclick', (event) => {
         // Prefer focusing an existing app tab.
         if ('focus' in client) {
           try {
-            const url = new URL(client.url);
-            // Navigate if possible, otherwise focus.
             if ('navigate' in client) {
               await client.navigate(targetPath);
             }

@@ -82,6 +82,28 @@ void main() {
       expect(await service.fetchVapidPublicKey(), 'BK_test_key');
     });
 
+    test('enable unsubscribes browser when persist fails', () async {
+      final mock = MockClient((request) async {
+        if (request.url.path.endsWith('/vapid-public-key')) {
+          return http.Response(jsonEncode({'publicKey': 'BKxx'}), 200);
+        }
+        if (request.method == 'PUT') {
+          return http.Response('fail', 500);
+        }
+        return http.Response('unexpected', 500);
+      });
+      final platform = _FakePlatform();
+      final config = ConfigService()..setBaseUrlForTest('http://test');
+      final service = WebPushService(
+        client: ApiClient(config, client: mock),
+        platformImpl: platform,
+      );
+
+      await expectLater(service.enable(7), throwsA(isA<Exception>()));
+      expect(platform.subscribed, isTrue);
+      expect(platform.unsubscribed, isTrue);
+    });
+
     test('enable persists subscription after subscribe', () async {
       final requests = <http.BaseRequest>[];
       final mock = MockClient((request) async {

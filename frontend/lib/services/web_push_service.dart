@@ -51,7 +51,15 @@ class WebPushService {
     }
     await _platform.ensureServiceWorker();
     final sub = await _platform.subscribe(vapid);
-    await _persist(userId, sub);
+    try {
+      await _persist(userId, sub);
+    } catch (e) {
+      // Avoid leaving a browser-only subscription that never reaches the server.
+      try {
+        await _platform.unsubscribe();
+      } catch (_) {}
+      rethrow;
+    }
     return sub;
   }
 

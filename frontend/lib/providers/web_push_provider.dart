@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// foundation already exports visibleForTesting
 
+import '../models/models.dart';
 import '../services/api_client.dart';
 import '../services/web_push_service.dart';
 import 'auth_provider.dart';
@@ -23,7 +23,7 @@ enum WebPushUiStatus {
   /// Supported but not subscribed (or permission not granted yet).
   off,
 
-  /// Browser subscription present (and ideally persisted).
+  /// Browser subscription present and persisted for the current user.
   on,
 
   /// Last enable/disable failed.
@@ -51,6 +51,14 @@ class WebPushController extends StateNotifier<WebPushState> {
   WebPushController(this._ref, {bool autoRefresh = true})
     : super(const WebPushState(status: WebPushUiStatus.loading)) {
     if (autoRefresh) {
+      // Re-sync when the signed-in user changes (switch account / logout).
+      _ref.listen<User?>(currentUserProvider, (prev, next) {
+        final prevId = prev?.id;
+        final nextId = next?.id;
+        if (prevId != nextId) {
+          refresh();
+        }
+      });
       refresh();
     }
   }
@@ -86,21 +94,29 @@ class WebPushController extends StateNotifier<WebPushState> {
       }
 
       final user = _ref.read(currentUserProvider);
-      if (user != null && perm == 'granted') {
-        // Re-persist subscription after login / redeploy when already granted.
-        try {
-          await _service.syncExisting(user.id);
-        } catch (_) {
-          // Ignore sync errors; still reflect browser state below.
+      if (user == null) {
+        state = const WebPushState(status: WebPushUiStatus.off);
+        return;
+      }
+
+      if (perm == 'granted') {
+        final sub = await _service.currentSubscription();
+        if (sub != null) {
+          try {
+            await _service.syncExisting(user.id);
+            state = const WebPushState(status: WebPushUiStatus.on);
+            return;
+          } catch (e) {
+            state = WebPushState(
+              status: WebPushUiStatus.error,
+              message: e.toString(),
+            );
+            return;
+          }
         }
       }
 
-      final sub = await _service.currentSubscription();
-      if (sub != null && perm == 'granted') {
-        state = const WebPushState(status: WebPushUiStatus.on);
-      } else {
-        state = const WebPushState(status: WebPushUiStatus.off);
-      }
+      state = const WebPushState(status: WebPushUiStatus.off);
     } catch (e) {
       state = WebPushState(
         status: WebPushUiStatus.error,
