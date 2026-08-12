@@ -14,6 +14,8 @@ import 'widgets/scaffold_with_nav_bar.dart';
 import 'screens/login_screen.dart';
 import 'providers/providers.dart';
 import 'theme/app_theme.dart';
+import 'utils/notification_click_stub.dart'
+    if (dart.library.html) 'utils/notification_click_web.dart';
 
 class CustomScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -183,13 +185,26 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  var _notificationClickInstalled = false;
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final settings = ref.watch(appSettingsProvider);
+
+    // Wire service-worker notificationclick → GoRouter (web only, #179).
+    if (!_notificationClickInstalled) {
+      _notificationClickInstalled = true;
+      installNotificationClickHandler(router);
+    }
 
     return MaterialApp.router(
       title: 'ymatch',
