@@ -11,7 +11,7 @@ message User {
   optional string uuid = 3;
   optional string device_token = 4;
   optional string created_at = 5;
-  optional string role = 6; // "user", "moderator", "admin"
+  optional string role = 6; // "user", "editor", "moderator", "admin"
   optional bool is_banned = 7;
   optional string ban_reason = 8;
   optional string banned_until = 9;
@@ -246,7 +246,7 @@ message BanUserRequest {
 }
 
 message UpdateUserRoleRequest {
-  string role = 1; // "user", "moderator", "admin"
+  string role = 1; // "user", "editor", "moderator", "admin"
 }
 
 message UpdateUsernameRequest {

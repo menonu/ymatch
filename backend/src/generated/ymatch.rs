@@ -13,7 +13,7 @@ pub struct User {
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "5")]
     pub created_at: ::core::option::Option<::prost::alloc::string::String>,
-    /// "user", "moderator", "admin"
+    /// "user", "editor", "moderator", "admin"
     #[prost(string, optional, tag = "6")]
     pub role: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(bool, optional, tag = "7")]
@@ -438,7 +438,7 @@ pub struct BanUserRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateUserRoleRequest {
-    /// "user", "moderator", "admin"
+    /// "user", "editor", "moderator", "admin"
     #[prost(string, tag = "1")]
     pub role: ::prost::alloc::string::String,
 }

@@ -210,6 +210,7 @@ The `users.role` field controls access levels across the platform:
 | `user`      | Default role. Can create events/merch, manage own inventory, trade.         |
 | `moderator` | Can delete any event, merchandise, or match via admin endpoints.            |
 | `admin`     | Full access including moderator powers plus user role management.           |
+| `editor`    | Create & manage events; edit or remove any event/merch/group (#551).        |
 
 **Ban enforcement:**
 - `is_banned` marks a user as banned. Banned users are rejected at login (`403 Forbidden`) and cannot create events.

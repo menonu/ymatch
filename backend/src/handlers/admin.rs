@@ -139,7 +139,8 @@ pub async fn update_user_role(
     // Only admin can change roles (ADR 0004: `user.role.manage` -> admin).
     require_global(&state, query.user_id, Permission::UserRoleManage).await?;
 
-    let valid_roles = ["user", "moderator", "admin"];
+    // #551: global hierarchy is user < editor < moderator < admin.
+    let valid_roles = ["user", "editor", "moderator", "admin"];
     if !valid_roles.contains(&payload.role.as_str()) {
         return Err(AppError::bad_request(format!(
             "Invalid role. Must be one of: {}",

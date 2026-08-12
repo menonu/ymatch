@@ -13,8 +13,12 @@ class ScaffoldWithNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final isAdminOrMod =
-        user != null && (user.role == 'admin' || user.role == 'moderator');
+    // #551: global editor has content admin surfaces (events/merch/groups).
+    final isStaff =
+        user != null &&
+        (user.role == 'admin' ||
+            user.role == 'moderator' ||
+            user.role == 'editor');
     final backendHealth = ref.watch(backendHealthProvider);
 
     // #535: split match lifecycle (red count, top-right) from unread chat
@@ -57,7 +61,7 @@ class ScaffoldWithNavBar extends ConsumerWidget {
       ),
     ];
 
-    if (isAdminOrMod) {
+    if (isStaff) {
       destinations.add(
         NavigationDestination(
           icon: const Icon(Icons.admin_panel_settings_outlined),

@@ -38,7 +38,7 @@ Direct, action-oriented instructions to solve specific problems or accomplish ke
 
 * [Development Workflow Guide](how_to/development_workflow.md): Step-by-step workflow for branches, pull requests, local lints, tests, and optional pre-merge E2E/coverage for risky PRs (#456).
 * [PR Review Guide](how_to/pr_review.md): Rubric, methodology, severity tags, and comment format for reviewing PRs (pairs with project skill `.claude/skills/pr-review/`); includes a short risky-change checklist for optional heavy CI.
-* [Granting Global Roles](how_to/grant_roles.md): Run `scripts/grant_role.sh <username> <role>` per environment to grant `user`/`moderator`/`admin` (ADR 0004 §6, #228) without committing a username.
+* [Granting Global Roles](how_to/grant_roles.md): Run `scripts/grant_role.sh <username> <role>` per environment to grant `user`/`editor`/`moderator`/`admin` (ADR 0004 §6, ADR 0016, #228 / #551) without committing a username.
 * [OCI Production Deployment (Always Free ARM)](how_to/oci_deployment.md): Steps to provision infrastructure with Terraform and deploy the full stack on OCI.
 * [Applying Terraform with Secrets (TF_VAR_ + .env)](how_to/terraform_apply.md): Run `terraform plan`/`apply` for the newrelic + oci modules without committing secrets or host identifiers (#284).
 * [OCI Credentials Management](how_to/oci_credentials.md): API key generation, rotation, and loss-recovery procedure for the RSA 2048 key used by Terraform and the OCI CLI.

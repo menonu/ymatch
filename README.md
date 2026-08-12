@@ -155,8 +155,9 @@ See the [Documentation Index](./docs/README.md) for full details.
 
 | Role       | Capabilities                                        |
 |-----------|-----------------------------------------------------|
-| `user`    | Create events, manage own items, trade              |
-| `moderator` | + Ban/unban users, admin delete operations        |
+| `user`    | Manage own items, trade                             |
+| `editor`  | + Create & manage events; edit/remove any event/merch/group |
+| `moderator` | + Ban/unban users, delete matches, creator transfers |
 | `admin`   | + Change user roles, full system access             |
 
 Banned users are blocked from all write operations. Temporary bans are supported via `banned_until`.

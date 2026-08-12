@@ -288,8 +288,8 @@ impl RbacRepository {
         Ok(row.map(|(name,)| name))
     }
 
-    /// The caller's single global role name (`admin` / `moderator` / `user`) if
-    /// they hold one (#366), or `None` if unassigned. Used by
+    /// The caller's single global role name (`admin` / `moderator` / `editor` /
+    /// `user`) if they hold one (#366 / #551), or `None` if unassigned. Used by
     /// `GET /events/:id/my-role` to report `global_override` — whether the
     /// caller's power on the event comes from a global role rather than event
     /// membership. The seeded model assigns at most one global role per user;
