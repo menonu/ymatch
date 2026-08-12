@@ -45,7 +45,7 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 | Browser ↔ API | HTTPS JSON REST | Base path `/api/v1`; see [API spec](../../reference/api_spec.md). |
 | Browser ↔ images | HTTPS | `/uploads/*` via API static files (`UPLOAD_DIR`). |
 | API ↔ Postgres | TCP SQL | Connection string from env (`DATABASE_URL`). |
-| API → browser push services | Web Push (HTTPS) | Planned ([#179](https://github.com/menonu/ymatch/issues/179)); no-op until VAPID + client subscriptions. VAPID-authenticated, best-effort after match create/reopen ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)). |
+| API → browser push services | Web Push (HTTPS) | Best-effort after match create/reopen when `VAPID_PRIVATE_KEY` is set and the user has stored subscriptions ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)). No-op without VAPID. Client subscribe/SW still [#179](https://github.com/menonu/ymatch/issues/179). |
 | CI ↔ VM | SSH + Docker | GitHub Actions deploy workflows. |
 | Ops ↔ OCI | OCI API / Terraform | Infra and Object Storage; secrets never in git. |
 
