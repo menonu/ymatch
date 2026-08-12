@@ -1,7 +1,7 @@
 //! Push subscription store for Web Push (ADR 0015 / #179).
 //!
-//! Owns the `push_subscriptions` table. Matching will later load rows by
-//! `user_id` to deliver auto-match alerts; this module is storage only.
+//! Owns the `push_subscriptions` table. The matching job loads rows by
+//! `user_id` when delivering auto-match alerts ([`crate::notifications`]).
 
 use crate::error::AppError;
 use sqlx::PgPool;

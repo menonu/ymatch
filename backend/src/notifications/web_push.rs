@@ -94,6 +94,9 @@ impl WebPushSender {
     pub fn new(vapid: Option<VapidConfig>) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(HTTP_TIMEOUT_SECS))
+            // Never follow redirects: a stored HTTPS endpoint must not be able
+            // to bounce the server into internal/metadata hosts (SSRF).
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("reqwest client");
         Self { vapid, client }
@@ -178,17 +181,16 @@ async fn post_message(
         req = req.header(name, value);
     }
 
-    let response = req
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| PushError::Transport(e.to_string()))?;
+    let response = req.body(body).send().await.map_err(|e| {
+        // reqwest Display can include the full URL (secret-bearing push path).
+        PushError::Transport(e.without_url().to_string())
+    })?;
 
     let status = response.status().as_u16();
     let resp_body = response
         .bytes()
         .await
-        .map_err(|e| PushError::Transport(e.to_string()))?
+        .map_err(|e| PushError::Transport(e.without_url().to_string()))?
         .to_vec();
 
     // Status semantics aligned with web-push `parse_response` (gone → drop sub).

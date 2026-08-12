@@ -1,10 +1,10 @@
-//! Web Push subscription HTTP handlers (ADR 0015 / #179 part 2).
+//! Web Push subscription HTTP handlers (ADR 0015 / #179).
 //!
 //! - Public VAPID key for `pushManager.subscribe`
 //! - Register / unregister browser `PushSubscription` rows
 //!
-//! Matching delivery (Web Push send) is a later PR; this module only
-//! persists subscriptions and exposes the public key when configured.
+//! Match-time delivery lives in [`crate::notifications`]; this module is the
+//! client-facing subscription store + public-key surface.
 
 use crate::error::AppError;
 use crate::handlers::common::{UserIdQuery, require_active_query_user};
