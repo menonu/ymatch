@@ -243,6 +243,28 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsThemeDark => 'ダーク';
 
   @override
+  String get settingsNotifications => 'マッチ通知';
+
+  @override
+  String get settingsNotificationsSubtitle => '新しいマッチが見つかったときにバックグラウンドで通知します';
+
+  @override
+  String get settingsNotificationsUnsupported => 'このブラウザでは利用できません';
+
+  @override
+  String get settingsNotificationsServerOff => 'サーバーでプッシュ通知が有効になっていません';
+
+  @override
+  String get settingsNotificationsDenied => '権限がブロックされています。ブラウザの設定で通知を許可してください';
+
+  @override
+  String get settingsNotificationsIosHint =>
+      'iPhone / iPad では、ホーム画面に追加するとバックグラウンド通知が安定します。';
+
+  @override
+  String get settingsNotificationsError => '通知設定を更新できませんでした';
+
+  @override
   String revisionInfo(String frontend, String backend) {
     return 'フロントエンド: $frontend  /  バックエンド: $backend';
   }

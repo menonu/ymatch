@@ -244,6 +244,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsThemeDark => 'Dark';
 
   @override
+  String get settingsNotifications => 'Match notifications';
+
+  @override
+  String get settingsNotificationsSubtitle =>
+      'Background alerts when the system finds a new match';
+
+  @override
+  String get settingsNotificationsUnsupported =>
+      'Not available in this browser';
+
+  @override
+  String get settingsNotificationsServerOff =>
+      'Push is not enabled on the server';
+
+  @override
+  String get settingsNotificationsDenied =>
+      'Permission blocked — allow notifications in browser settings';
+
+  @override
+  String get settingsNotificationsIosHint =>
+      'On iPhone/iPad, add this site to the Home Screen for reliable background alerts.';
+
+  @override
+  String get settingsNotificationsError => 'Could not update notifications';
+
+  @override
   String revisionInfo(String frontend, String backend) {
     return 'frontend: $frontend  /  backend: $backend';
   }

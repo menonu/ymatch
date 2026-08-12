@@ -339,6 +339,35 @@
     "description": "Dark theme option label (#545)"
   },
 
+  "settingsNotifications": "Match notifications",
+  "@settingsNotifications": {
+    "description": "Web Push match notification section title (#179)"
+  },
+  "settingsNotificationsSubtitle": "Background alerts when the system finds a new match",
+  "@settingsNotificationsSubtitle": {
+    "description": "Subtitle under match notifications toggle (#179)"
+  },
+  "settingsNotificationsUnsupported": "Not available in this browser",
+  "@settingsNotificationsUnsupported": {
+    "description": "Web Push unsupported on this client (#179)"
+  },
+  "settingsNotificationsServerOff": "Push is not enabled on the server",
+  "@settingsNotificationsServerOff": {
+    "description": "VAPID not configured (#179)"
+  },
+  "settingsNotificationsDenied": "Permission blocked — allow notifications in browser settings",
+  "@settingsNotificationsDenied": {
+    "description": "Notification permission denied (#179)"
+  },
+  "settingsNotificationsIosHint": "On iPhone/iPad, add this site to the Home Screen for reliable background alerts.",
+  "@settingsNotificationsIosHint": {
+    "description": "iOS PWA requirement note for Web Push (#179)"
+  },
+  "settingsNotificationsError": "Could not update notifications",
+  "@settingsNotificationsError": {
+    "description": "Generic error enabling/disabling push (#179)"
+  },
+
   "revisionInfo": "frontend: {frontend}  /  backend: {backend}",
   "@revisionInfo": {
     "description": "Footer showing frontend and backend revision hashes",

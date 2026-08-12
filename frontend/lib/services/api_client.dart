@@ -110,6 +110,32 @@ class ApiClient {
     }
   }
 
+  /// DELETE with a JSON body (e.g. Web Push unsubscribe by endpoint, #179).
+  Future<dynamic> deleteJson(String endpoint, Map<String, dynamic> body) async {
+    final uri = Uri.parse('${config.baseUrl}$endpoint');
+    try {
+      final request = http.Request('DELETE', uri)
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(body);
+      final streamed = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 10));
+      final response = await http.Response.fromStream(streamed);
+      return _handleResponse(response);
+    } on BackendUnavailableException {
+      rethrow;
+    } on SocketException {
+      throw BackendUnavailableException();
+    } on HttpException {
+      throw BackendUnavailableException();
+    } on http.ClientException {
+      throw BackendUnavailableException();
+    } catch (e) {
+      if (_isConnectionError(e)) throw BackendUnavailableException();
+      rethrow;
+    }
+  }
+
   bool _isConnectionError(Object e) {
     final msg = e.toString();
     return msg.contains('TimeoutException') ||

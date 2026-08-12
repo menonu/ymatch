@@ -17,3 +17,4 @@ export 'admin_provider.dart';
 export 'match_provider.dart';
 export 'chat_provider.dart';
 export 'search_provider.dart';
+export 'web_push_provider.dart';
