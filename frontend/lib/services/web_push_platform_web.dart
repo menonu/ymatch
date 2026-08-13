@@ -36,10 +36,11 @@ class BrowserWebPushPlatform implements WebPushPlatform {
   @override
   Future<void> ensureServiceWorker() async {
     final container = web.window.navigator.serviceWorker;
+    // Always re-register our push SW so we keep ownership of scope "/".
+    // Flutter's flutter_service_worker.js must not replace this registration
+    // (prod builds use --pwa-strategy=none).
     _registration = await container.register(_swPath.toJS).toDart;
     await container.ready.toDart;
-    final existing = await container.getRegistration().toDart;
-    _registration ??= existing;
   }
 
   Future<web.ServiceWorkerRegistration> _readyRegistration() async {

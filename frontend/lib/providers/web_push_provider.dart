@@ -1,14 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../services/web_push_service.dart';
 import 'auth_provider.dart';
 
+/// Local preference: user wants match push enabled (#179).
+///
+/// Survives SPA reloads even if the browser PushSubscription is briefly
+/// missing (e.g. after a service-worker race). Used to re-subscribe.
+const kWebPushEnabledPrefKey = 'web_push_match_notifications_enabled';
+
 /// UI-facing state for match push notifications (#179).
 enum WebPushUiStatus {
-  /// Still probing browser + server.
+  /// Still probing browser + server / auth.
   loading,
 
   /// Not web / no Push API / no service worker.
@@ -20,10 +27,10 @@ enum WebPushUiStatus {
   /// Browser permission denied.
   denied,
 
-  /// Supported but not subscribed (or permission not granted yet).
+  /// Supported but not subscribed (or user turned off).
   off,
 
-  /// Browser subscription present and persisted for the current user.
+  /// User wants push and browser subscription is active (or re-subscribed).
   on,
 
   /// Last enable/disable failed.
@@ -52,10 +59,13 @@ class WebPushController extends StateNotifier<WebPushState> {
     : super(const WebPushState(status: WebPushUiStatus.loading)) {
     if (autoRefresh) {
       // Re-sync when the signed-in user changes (switch account / logout).
-      _ref.listen<User?>(currentUserProvider, (prev, next) {
-        final prevId = prev?.id;
-        final nextId = next?.id;
-        if (prevId != nextId) {
+      // Also re-run after auth hydrates from data(null) → guest/user.
+      _ref.listen<AsyncValue<User?>>(authProvider, (prev, next) {
+        if (next.isLoading) return;
+        final prevId = prev?.valueOrNull?.id;
+        final nextId = next.valueOrNull?.id;
+        // Always refresh when auth settles or identity changes.
+        if (prev == null || prev.isLoading || prevId != nextId) {
           refresh();
         }
       });
@@ -72,6 +82,16 @@ class WebPushController extends StateNotifier<WebPushState> {
   }
 
   WebPushService get _service => _ref.read(webPushServiceProvider);
+
+  Future<bool> _readEnabledPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(kWebPushEnabledPrefKey) ?? false;
+  }
+
+  Future<void> _writeEnabledPref(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kWebPushEnabledPrefKey, enabled);
+  }
 
   Future<void> refresh() async {
     state = const WebPushState(status: WebPushUiStatus.loading);
@@ -93,26 +113,51 @@ class WebPushController extends StateNotifier<WebPushState> {
         return;
       }
 
-      final user = _ref.read(currentUserProvider);
+      // AuthController starts as data(null) while checkLogin() is in flight.
+      // Stay loading until auth has finished hydrating so we don't flash "off".
+      final auth = _ref.read(authProvider);
+      if (auth.isLoading) {
+        state = const WebPushState(status: WebPushUiStatus.loading);
+        return;
+      }
+
+      final user = auth.valueOrNull;
       if (user == null) {
         state = const WebPushState(status: WebPushUiStatus.off);
         return;
       }
 
-      if (perm == 'granted') {
-        final sub = await _service.currentSubscription();
-        if (sub != null) {
-          try {
-            await _service.syncExisting(user.id);
-            state = const WebPushState(status: WebPushUiStatus.on);
-            return;
-          } catch (e) {
-            state = WebPushState(
-              status: WebPushUiStatus.error,
-              message: e.toString(),
-            );
-            return;
-          }
+      final wantsEnabled = await _readEnabledPref();
+      final sub = await _service.currentSubscription();
+
+      if (sub != null && perm == 'granted') {
+        try {
+          await _service.syncExisting(user.id);
+          await _writeEnabledPref(true);
+          state = const WebPushState(status: WebPushUiStatus.on);
+          return;
+        } catch (e) {
+          state = WebPushState(
+            status: WebPushUiStatus.error,
+            message: e.toString(),
+          );
+          return;
+        }
+      }
+
+      // Preference says enabled but browser sub is missing (e.g. Flutter SW
+      // previously replaced push_sw.js). Re-subscribe automatically.
+      if (wantsEnabled && perm == 'granted') {
+        try {
+          await _service.enable(user.id);
+          state = const WebPushState(status: WebPushUiStatus.on);
+          return;
+        } catch (e) {
+          state = WebPushState(
+            status: WebPushUiStatus.error,
+            message: e.toString(),
+          );
+          return;
         }
       }
 
@@ -137,6 +182,7 @@ class WebPushController extends StateNotifier<WebPushState> {
     state = const WebPushState(status: WebPushUiStatus.loading);
     try {
       await _service.enable(user.id);
+      await _writeEnabledPref(true);
       state = const WebPushState(status: WebPushUiStatus.on);
     } catch (e) {
       final msg = e.toString();
@@ -152,13 +198,17 @@ class WebPushController extends StateNotifier<WebPushState> {
 
   Future<void> disable() async {
     final user = _ref.read(currentUserProvider);
-    if (user == null) {
-      state = const WebPushState(status: WebPushUiStatus.off);
-      return;
-    }
     state = const WebPushState(status: WebPushUiStatus.loading);
     try {
-      await _service.disable(user.id);
+      await _writeEnabledPref(false);
+      if (user != null) {
+        await _service.disable(user.id);
+      } else {
+        // Still drop browser subscription if possible.
+        try {
+          await _service.disable(0);
+        } catch (_) {}
+      }
       state = const WebPushState(status: WebPushUiStatus.off);
     } catch (e) {
       state = WebPushState(

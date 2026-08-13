@@ -45,11 +45,17 @@ COPY proto /proto
 # API_BASE_URL can be set at build time (e.g., for OCI deployment behind reverse proxy)
 ARG API_BASE_URL=""
 ARG GIT_HASH=""
+# --pwa-strategy=none: do NOT register flutter_service_worker.js.
+# That SW shares scope "/" with our Web Push SW (push_sw.js, #179) and would
+# replace it on every app load, wiping PushSubscription and flipping Settings
+# back to "off" even though the user still has browser permission.
 RUN --mount=type=cache,target=/root/.pub-cache \
     if [ -n "$API_BASE_URL" ]; then \
-      flutter build web --release --dart-define=API_BASE_URL=$API_BASE_URL --dart-define=GIT_HASH=$GIT_HASH; \
+      flutter build web --release --pwa-strategy=none \
+        --dart-define=API_BASE_URL=$API_BASE_URL --dart-define=GIT_HASH=$GIT_HASH; \
     else \
-      flutter build web --release --dart-define=GIT_HASH=$GIT_HASH; \
+      flutter build web --release --pwa-strategy=none \
+        --dart-define=GIT_HASH=$GIT_HASH; \
     fi
 
 # ---------------------------------------------------

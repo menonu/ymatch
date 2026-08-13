@@ -489,112 +489,104 @@ void main() {
     timeout: const Timeout(Duration(minutes: 2)),
   );
 
-  test(
-    'three offer modes produce the expected legs (#297)',
-    () async {
-      final a = _newApi();
+  test('three offer modes produce the expected legs (#297)', () async {
+    final a = _newApi();
 
-      // give-only: u1 proposes only their own give. Legs: giver=u1 only.
-      final mg = await _provisionPendingMatch(a.api, tag: 'mode-give');
-      expect(
-        await _offer(a, mg.id, mg.u1, [
-          pb.OfferItem(merchId: mg.cardA, giverUserId: mg.u1, quantity: 1),
-        ]),
-        200,
-      );
-      var match = await _getMatch(a.api, mg.u1, mg.id);
-      expect(match['offeredBy'], mg.u1);
-      expect(_giveTotal(match, mg.u1), 1);
-      expect(
-        _giveTotal(match, mg.u2),
-        0,
-        reason: 'give-only must not add a receive leg',
-      );
+    // give-only: u1 proposes only their own give. Legs: giver=u1 only.
+    final mg = await _provisionPendingMatch(a.api, tag: 'mode-give');
+    expect(
+      await _offer(a, mg.id, mg.u1, [
+        pb.OfferItem(merchId: mg.cardA, giverUserId: mg.u1, quantity: 1),
+      ]),
+      200,
+    );
+    var match = await _getMatch(a.api, mg.u1, mg.id);
+    expect(match['offeredBy'], mg.u1);
+    expect(_giveTotal(match, mg.u1), 1);
+    expect(
+      _giveTotal(match, mg.u2),
+      0,
+      reason: 'give-only must not add a receive leg',
+    );
 
-      // receive-only: u1 proposes only their receive (= u2's give). Legs:
-      // giver=u2 only; u1 gives nothing.
-      final mr = await _provisionPendingMatch(a.api, tag: 'mode-recv');
-      expect(
-        await _offer(a, mr.id, mr.u1, [
-          pb.OfferItem(merchId: mr.cardB, giverUserId: mr.u2, quantity: 1),
-        ]),
-        200,
-      );
-      match = await _getMatch(a.api, mr.u1, mr.id);
-      expect(match['offeredBy'], mr.u1);
-      expect(
-        _giveTotal(match, mr.u1),
-        0,
-        reason: 'receive-only must not add a give leg',
-      );
-      expect(_giveTotal(match, mr.u2), 1);
+    // receive-only: u1 proposes only their receive (= u2's give). Legs:
+    // giver=u2 only; u1 gives nothing.
+    final mr = await _provisionPendingMatch(a.api, tag: 'mode-recv');
+    expect(
+      await _offer(a, mr.id, mr.u1, [
+        pb.OfferItem(merchId: mr.cardB, giverUserId: mr.u2, quantity: 1),
+      ]),
+      200,
+    );
+    match = await _getMatch(a.api, mr.u1, mr.id);
+    expect(match['offeredBy'], mr.u1);
+    expect(
+      _giveTotal(match, mr.u1),
+      0,
+      reason: 'receive-only must not add a give leg',
+    );
+    expect(_giveTotal(match, mr.u2), 1);
 
-      // both: u1 proposes give + receive. Balanced; the non-proposer accepts.
-      final mb = await _provisionPendingMatch(a.api, tag: 'mode-both');
-      expect(
-        await _offer(a, mb.id, mb.u1, [
-          pb.OfferItem(merchId: mb.cardA, giverUserId: mb.u1, quantity: 1),
-          pb.OfferItem(merchId: mb.cardB, giverUserId: mb.u2, quantity: 1),
-        ]),
-        200,
-      );
-      match = await _getMatch(a.api, mb.u1, mb.id);
-      expect(_isBalanced(match, mb.u1, mb.u2), isTrue);
-      expect(await _setStatus(a, mb.id, mb.u2, 'ACCEPTED'), 200);
-      expect((await _getMatch(a.api, mb.u1, mb.id))['status'], 'ACCEPTED');
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
+    // both: u1 proposes give + receive. Balanced; the non-proposer accepts.
+    final mb = await _provisionPendingMatch(a.api, tag: 'mode-both');
+    expect(
+      await _offer(a, mb.id, mb.u1, [
+        pb.OfferItem(merchId: mb.cardA, giverUserId: mb.u1, quantity: 1),
+        pb.OfferItem(merchId: mb.cardB, giverUserId: mb.u2, quantity: 1),
+      ]),
+      200,
+    );
+    match = await _getMatch(a.api, mb.u1, mb.id);
+    expect(_isBalanced(match, mb.u1, mb.u2), isTrue);
+    expect(await _setStatus(a, mb.id, mb.u2, 'ACCEPTED'), 200);
+    expect((await _getMatch(a.api, mb.u1, mb.id))['status'], 'ACCEPTED');
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
-  test(
-    'reject from PENDING and from OFFERED is terminal (#297)',
-    () async {
-      final a = _newApi();
-      // Note: the user match listing (`GET /matches/user/{id}`) excludes
-      // REJECTED matches (`AND status != 'REJECTED'`), so a rejected match
-      // is not readable via that endpoint. We instead prove the REJECTED
-      // transition took effect by asserting the state machine is terminal:
-      // a re-offer on the rejected match is rejected with 400 ("Can only
-      // propose on PENDING or OFFERED matches"). The leg-clearing on reject
-      // is covered by the backend integration test
-      // (`test_trade_negotiation_counter_offer_and_balance`'s reject arm
-      // and `test_match_delete_match_items_removes_all`).
+  test('reject from PENDING and from OFFERED is terminal (#297)', () async {
+    final a = _newApi();
+    // Note: the user match listing (`GET /matches/user/{id}`) excludes
+    // REJECTED matches (`AND status != 'REJECTED'`), so a rejected match
+    // is not readable via that endpoint. We instead prove the REJECTED
+    // transition took effect by asserting the state machine is terminal:
+    // a re-offer on the rejected match is rejected with 400 ("Can only
+    // propose on PENDING or OFFERED matches"). The leg-clearing on reject
+    // is covered by the backend integration test
+    // (`test_trade_negotiation_counter_offer_and_balance`'s reject arm
+    // and `test_match_delete_match_items_removes_all`).
 
-      // PENDING → REJECTED. Either party may reject.
-      final m1 = await _provisionPendingMatch(a.api, tag: 'reject-pending');
-      expect(await _setStatus(a, m1.id, m1.u1, 'REJECTED'), 200);
-      // Terminal: the rejected match no longer accepts a proposal.
-      expect(
-        await _offer(a, m1.id, m1.u2, [
-          pb.OfferItem(merchId: m1.cardB, giverUserId: m1.u2, quantity: 1),
-        ]),
-        400,
-      );
+    // PENDING → REJECTED. Either party may reject.
+    final m1 = await _provisionPendingMatch(a.api, tag: 'reject-pending');
+    expect(await _setStatus(a, m1.id, m1.u1, 'REJECTED'), 200);
+    // Terminal: the rejected match no longer accepts a proposal.
+    expect(
+      await _offer(a, m1.id, m1.u2, [
+        pb.OfferItem(merchId: m1.cardB, giverUserId: m1.u2, quantity: 1),
+      ]),
+      400,
+    );
 
-      // OFFERED → REJECTED. Open first, then the other party rejects.
-      final m2 = await _provisionPendingMatch(a.api, tag: 'reject-offered');
-      expect(
-        await _offer(a, m2.id, m2.u1, [
-          pb.OfferItem(merchId: m2.cardA, giverUserId: m2.u1, quantity: 1),
-          pb.OfferItem(merchId: m2.cardB, giverUserId: m2.u2, quantity: 1),
-        ]),
-        200,
-      );
-      expect((await _getMatch(a.api, m2.u1, m2.id))['status'], 'OFFERED');
-      expect(await _setStatus(a, m2.id, m2.u2, 'REJECTED'), 200);
-      // Terminal: re-offer on the rejected match is rejected with 400.
-      expect(
-        await _offer(a, m2.id, m2.u2, [
-          pb.OfferItem(merchId: m2.cardB, giverUserId: m2.u2, quantity: 1),
-        ]),
-        400,
-      );
-      // And a status transition out of REJECTED is also rejected with 400
-      // ("Can only accept OFFERED matches" / reject-source guard).
-      expect(await _setStatus(a, m2.id, m2.u1, 'ACCEPTED'), 400);
-    },
-    timeout: const Timeout(Duration(minutes: 2)),
-  );
+    // OFFERED → REJECTED. Open first, then the other party rejects.
+    final m2 = await _provisionPendingMatch(a.api, tag: 'reject-offered');
+    expect(
+      await _offer(a, m2.id, m2.u1, [
+        pb.OfferItem(merchId: m2.cardA, giverUserId: m2.u1, quantity: 1),
+        pb.OfferItem(merchId: m2.cardB, giverUserId: m2.u2, quantity: 1),
+      ]),
+      200,
+    );
+    expect((await _getMatch(a.api, m2.u1, m2.id))['status'], 'OFFERED');
+    expect(await _setStatus(a, m2.id, m2.u2, 'REJECTED'), 200);
+    // Terminal: re-offer on the rejected match is rejected with 400.
+    expect(
+      await _offer(a, m2.id, m2.u2, [
+        pb.OfferItem(merchId: m2.cardB, giverUserId: m2.u2, quantity: 1),
+      ]),
+      400,
+    );
+    // And a status transition out of REJECTED is also rejected with 400
+    // ("Can only accept OFFERED matches" / reject-source guard).
+    expect(await _setStatus(a, m2.id, m2.u1, 'ACCEPTED'), 400);
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test(
     'per-leg want-quantity cap (#294) is enforced on propose via the wire (#297)',
