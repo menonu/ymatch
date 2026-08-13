@@ -64,10 +64,13 @@ class WebPushService {
   }
 
   /// Drop browser subscription and delete backend row when possible.
+  ///
+  /// [userId] may be 0 when signed-out; then only the browser subscription is
+  /// cleared (no server DELETE).
   Future<void> disable(int userId) async {
     final existing = await _platform.currentSubscription();
     await _platform.unsubscribe();
-    if (existing != null) {
+    if (existing != null && userId > 0) {
       try {
         await _client.deleteJson('/api/v1/push/subscriptions?user_id=$userId', {
           'endpoint': existing.endpoint,
