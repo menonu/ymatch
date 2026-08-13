@@ -29,8 +29,6 @@ services:
       - "8081:8081"     # Flutter web server
       - "5432:5432"     # PostgreSQL (project docker-compose)
       - "5050:5050"     # pgAdmin (project docker-compose)
-      - "7860:7860"     # Gradio / app UI
-      - "8080:8080"     # additional web UI
     volumes:
       - ${HOME}/ws:/home/ubuntu/ws
       - ./storage/.tmux.conf:/home/ubuntu/.tmux.conf
