@@ -524,6 +524,33 @@ void main() {
   );
 
   testWidgets(
+    'language control stays usable at the 840px three-column switchover (#570)',
+    (tester) async {
+      tester.view.physicalSize = const Size(840, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => MockAuthController(_user())),
+            backendSystemStatusProvider.overrideWith((ref) async => {}),
+          ],
+          child: _localized(const ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final language = tester.getRect(
+        find.byType(SegmentedButton<AppLanguagePreference>),
+      );
+      expect(language.width, greaterThan(220));
+    },
+  );
+
+  testWidgets(
     'Community card stacks below Settings on a narrow viewport (#570)',
     (tester) async {
       tester.view.physicalSize = const Size(360, 640);

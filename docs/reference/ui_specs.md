@@ -12,7 +12,7 @@
 |-----|----------|------|--------|-------------|
 | Items | アイテム | `event_outlined` | `HomeScreen` | Event list, search, favorites |
 | Matches | マッチ | `swap_horiz_outlined` | `TradeListScreen` | Trade matches with badge count |
-| Settings | 設定 | `settings_outlined` | `ProfileScreen` | Username, UUID, language, notifications |
+| Settings | 設定 | `settings_outlined` | `ProfileScreen` | Username, UUID, language, notifications, community |
 | Admin | 管理 | `admin_panel_settings_outlined` | `AdminDashboardScreen` | Admin/moderator only, conditional |
 
 > **Terminology:** the first tab is labeled **Items / アイテム** in the UI but
@@ -31,7 +31,7 @@ BottomNavBar
 │   └── ChatScreen (messaging per match)
 │       └── MapPickerScreen (location selection)
 ├── Settings Tab (`/profile`)
-│   └── ProfileScreen (username + inlined AppSettingsSection, #562)
+│   └── ProfileScreen (username + AppSettingsSection + CommunityCard, #562 / #570)
 └── Admin Tab (conditional)
     └── AdminDashboardScreen
 ```
