@@ -324,6 +324,99 @@ async fn test_rejected_excluded_from_projection(pool: PgPool) {
     assert_eq!(projected(&u1, fx.merch_a_id, "HAVE"), 2);
 }
 
+/// CANCELLED drops out even though match_items rows remain (unlike REJECTED).
+#[sqlx::test]
+async fn test_cancelled_excluded_from_projection(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "proj-cancel",
+        MutualTradeOptions {
+            have_qty: Some(2),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+    offer_balanced_1(
+        &pool,
+        match_id,
+        fx.user1_id,
+        fx.merch_a_id,
+        fx.merch_b_id,
+        fx.user2_id,
+        1,
+    )
+    .await;
+
+    // Zero TRADE collapses mutual cap → system CANCELLED; legs stay on disk.
+    set_inventory(&pool, fx.user1_id, fx.merch_a_id, "TRADE", 0).await;
+    let matches = list_user_matches(&pool, fx.user1_id).await;
+    assert!(
+        matches
+            .iter()
+            .any(|m| m["id"] == match_id && m["status"] == "CANCELLED"),
+        "expected CANCELLED match, got {matches:?}"
+    );
+
+    let u1 = list_inventory(&pool, fx.user1_id).await;
+    assert_eq!(qty(&u1, fx.merch_a_id, "TRADE"), 0);
+    assert_eq!(projected(&u1, fx.merch_a_id, "TRADE"), 0);
+    assert_eq!(qty(&u1, fx.merch_a_id, "HAVE"), 2);
+    assert_eq!(projected(&u1, fx.merch_a_id, "HAVE"), 2);
+    assert_eq!(qty(&u1, fx.merch_b_id, "WANT"), 1);
+    assert_eq!(projected(&u1, fx.merch_b_id, "WANT"), 1);
+    assert!(
+        find_row(&u1, fx.merch_b_id, "HAVE").is_none(),
+        "cancelled match must not synthesize receiver HAVE"
+    );
+}
+
+/// Counter-offer uses the latest on-table legs, not the first proposal.
+#[sqlx::test]
+async fn test_counter_offer_uses_latest_legs(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "proj-counter",
+        MutualTradeOptions {
+            u1_trade: 2,
+            u1_want: 2,
+            u2_trade: 2,
+            u2_want: 2,
+            have_qty: Some(2),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+    offer_balanced_1(
+        &pool,
+        match_id,
+        fx.user1_id,
+        fx.merch_a_id,
+        fx.merch_b_id,
+        fx.user2_id,
+        1,
+    )
+    .await;
+    // Non-proposer counters to 2:2 (partial upsert replaces qty on those merch).
+    offer_balanced_1(
+        &pool,
+        match_id,
+        fx.user2_id,
+        fx.merch_b_id,
+        fx.merch_a_id,
+        fx.user1_id,
+        2,
+    )
+    .await;
+
+    let u1 = list_inventory(&pool, fx.user1_id).await;
+    assert_eq!(qty(&u1, fx.merch_a_id, "TRADE"), 2);
+    assert_eq!(projected(&u1, fx.merch_a_id, "TRADE"), 0);
+    assert_eq!(qty(&u1, fx.merch_a_id, "HAVE"), 2);
+    assert_eq!(projected(&u1, fx.merch_a_id, "HAVE"), 0);
+    assert_eq!(qty(&u1, fx.merch_b_id, "WANT"), 2);
+    assert_eq!(projected(&u1, fx.merch_b_id, "WANT"), 0);
+}
+
 /// Upsert response omits projectedQuantity (absent = same as quantity).
 #[sqlx::test]
 async fn test_upsert_omits_projected_quantity(pool: PgPool) {
