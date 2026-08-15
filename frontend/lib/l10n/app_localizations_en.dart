@@ -270,6 +270,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsNotificationsError => 'Could not update notifications';
 
   @override
+  String get community => 'Community';
+
+  @override
+  String get communityXTooltip => 'X';
+
+  @override
+  String get communityDiscordTooltip => 'Discord';
+
+  @override
   String revisionInfo(String frontend, String backend) {
     return 'frontend: $frontend  /  backend: $backend';
   }

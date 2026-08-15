@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
+import '../widgets/community_card.dart';
 import '../widgets/how_to_trade.dart';
 import 'settings_screen.dart';
 
@@ -107,6 +108,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   /// Place app settings beside the username card when the viewport is wide
   /// enough for an unscaled language control in each column (#562).
+  /// Community sits in the same row as Settings on that breakpoint (#570).
   static const _wideBreakpoint = 840.0;
 
   Widget _usernameAndSettings(
@@ -115,6 +117,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     AppLocalizations l10n,
   ) {
     final usernameCard = _usernameCard(context, user, l10n);
+    const settingsCard = AppSettingsSection();
+    const communityCard = CommunityCard();
     final sideBySide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
     if (sideBySide) {
       return Row(
@@ -122,7 +126,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Expanded(child: usernameCard),
           const SizedBox(width: 16),
-          const Expanded(child: AppSettingsSection()),
+          const Expanded(child: settingsCard),
+          const SizedBox(width: 16),
+          communityCard,
         ],
       );
     }
@@ -131,7 +137,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       children: [
         usernameCard,
         const SizedBox(height: 24),
-        const AppSettingsSection(),
+        settingsCard,
+        const SizedBox(height: 24),
+        communityCard,
       ],
     );
   }

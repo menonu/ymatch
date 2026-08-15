@@ -72,6 +72,8 @@ services:
       args:
         API_BASE_URL: ""
         GIT_HASH: ${GIT_HASH:-unknown}
+        X_PROFILE_URL: ${X_PROFILE_URL:-}
+        DISCORD_INVITE_URL: ${DISCORD_INVITE_URL:-}
     container_name: ymatch_frontend
     restart: unless-stopped
     networks:
