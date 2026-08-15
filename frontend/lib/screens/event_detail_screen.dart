@@ -92,10 +92,12 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 inv.quantity;
             // Absent projectedQuantity means "same as quantity" (upsert /
             // older payloads). List inventory always sets the field (#427).
-            projectedLookup.putIfAbsent(inv.merchId, () => {})[inv.status] =
-                inv.hasProjectedQuantity()
-                    ? inv.projectedQuantity
-                    : inv.quantity;
+            projectedLookup.putIfAbsent(
+              inv.merchId,
+              () => {},
+            )[inv.status] = inv.hasProjectedQuantity()
+                ? inv.projectedQuantity
+                : inv.quantity;
           }
         }
 
