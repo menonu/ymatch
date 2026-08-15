@@ -52,7 +52,7 @@ services:
       PORT: "3000"
       IMAGE_STORAGE: local
       # Web Push + VAPID (ADR 0015 / #179). Optional — empty = safe no-op.
-      # Staging CI maps VAPID_*_STAGING secrets → these names on the host .env.
+      # Staging: VAPID_*_STAGING secrets → these names; production: VAPID_* secrets.
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
