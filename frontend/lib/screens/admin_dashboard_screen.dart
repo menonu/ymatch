@@ -1150,7 +1150,7 @@ class _AdminDebugTab extends ConsumerWidget {
               ),
             ),
             loading: () => const Text('Backend: Loading...'),
-            error: (_, __) => const Text('Backend: Error fetching version'),
+            error: (_, _) => const Text('Backend: Error fetching version'),
           ),
         ],
       ),

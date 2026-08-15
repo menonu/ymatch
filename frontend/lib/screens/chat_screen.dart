@@ -83,8 +83,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    if (user == null)
+    if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     final messagesAsync = ref.watch(messagesProvider(widget.matchId));
     final l10n = AppLocalizations.of(context)!;

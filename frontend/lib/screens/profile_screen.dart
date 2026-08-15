@@ -62,8 +62,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final l10n = AppLocalizations.of(context)!;
-    if (user == null)
+    if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       appBar: AppBar(),
@@ -254,7 +255,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             await Clipboard.setData(
                               ClipboardData(text: user.uuid),
                             );
-                            if (mounted) {
+                            // context is the BuildContext param of this builder.
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(l10n.masterKeyCopied)),
                               );
@@ -309,7 +311,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final backendRev = statusAsync.when(
       data: (data) => (data['backend_version'] as String?) ?? 'unknown',
       loading: () => '...',
-      error: (_, __) => 'error',
+      error: (_, _) => 'error',
     );
     final l10n = AppLocalizations.of(context)!;
     return Text(
