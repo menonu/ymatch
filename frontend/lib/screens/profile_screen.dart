@@ -255,7 +255,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             await Clipboard.setData(
                               ClipboardData(text: user.uuid),
                             );
-                            // context is the BuildContext param of this builder.
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(l10n.masterKeyCopied)),

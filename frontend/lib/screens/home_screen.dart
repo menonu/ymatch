@@ -603,7 +603,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
             // #483: event-scope member management (same dialog as #442).
-            // canManageMembers already implies role != null (promoted below).
+            // Safe: canManageMembers is only true when role != null.
             if (canManageMembers)
               ListTile(
                 key: const Key('manage_members_action'),
