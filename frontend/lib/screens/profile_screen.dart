@@ -105,9 +105,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  /// Place app settings beside the username card when the tab is wide
-  /// enough; stack them on phone-width surfaces (#562).
-  static const _wideBreakpoint = 600.0;
+  /// Place app settings beside the username card when the viewport is wide
+  /// enough for an unscaled language control in each column (#562).
+  static const _wideBreakpoint = 840.0;
 
   Widget _usernameAndSettings(
     BuildContext context,
@@ -115,28 +115,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     AppLocalizations l10n,
   ) {
     final usernameCard = _usernameCard(context, user, l10n);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final sideBySide = constraints.maxWidth >= _wideBreakpoint;
-        if (sideBySide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: usernameCard),
-              const SizedBox(width: 16),
-              const Expanded(child: AppSettingsSection()),
-            ],
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            usernameCard,
-            const SizedBox(height: 24),
-            const AppSettingsSection(),
-          ],
-        );
-      },
+    final sideBySide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
+    if (sideBySide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: usernameCard),
+          const SizedBox(width: 16),
+          const Expanded(child: AppSettingsSection()),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        usernameCard,
+        const SizedBox(height: 24),
+        const AppSettingsSection(),
+      ],
     );
   }
 

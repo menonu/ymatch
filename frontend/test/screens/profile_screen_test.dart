@@ -419,7 +419,7 @@ void main() {
   testWidgets(
     'settings sit next to the username card on a wide viewport (#562)',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 640);
+      tester.view.physicalSize = const Size(880, 640);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);

@@ -41,30 +41,27 @@ class AppSettingsSection extends ConsumerWidget {
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: SegmentedButton<AppLanguagePreference>(
-                segments: [
-                  ButtonSegment(
-                    value: AppLanguagePreference.system,
-                    label: Text(l10n.settingsSystem),
-                    icon: const Icon(Icons.language, size: 18),
-                  ),
-                  ButtonSegment(
-                    value: AppLanguagePreference.english,
-                    label: Text(l10n.settingsLanguageEnglish),
-                  ),
-                  ButtonSegment(
-                    value: AppLanguagePreference.japanese,
-                    label: Text(l10n.settingsLanguageJapanese),
-                  ),
-                ],
-                selected: {settings.language},
-                onSelectionChanged: (selected) {
-                  controller.setLanguage(selected.first);
-                },
-              ),
+            SegmentedButton<AppLanguagePreference>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: AppLanguagePreference.system,
+                  label: Text(l10n.settingsSystem),
+                  icon: const Icon(Icons.language, size: 18),
+                ),
+                ButtonSegment(
+                  value: AppLanguagePreference.english,
+                  label: Text(l10n.settingsLanguageEnglish),
+                ),
+                ButtonSegment(
+                  value: AppLanguagePreference.japanese,
+                  label: Text(l10n.settingsLanguageJapanese),
+                ),
+              ],
+              selected: {settings.language},
+              onSelectionChanged: (selected) {
+                controller.setLanguage(selected.first);
+              },
             ),
             const SizedBox(height: 28),
             Text(
