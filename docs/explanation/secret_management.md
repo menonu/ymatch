@@ -72,7 +72,8 @@ record of what was applied; some secret material is unfortunately
 | DB backup user email | `TF_VAR_db_backup_user_email` | — | OCI Identity user attribute (not a password) |
 | `db_password` TF var | `TF_VAR_db_password` in oci `.env` | — | **Declared but unused** by current OCI resources; production DB passwords are **not** this var |
 | Production / staging DB passwords | — | `OCI_DB_PASSWORD` / `OCI_STAGING_DB_PASSWORD` | Injected by deploy scripts into VM compose env |
-| Web Push VAPID (staging) | — | `VAPID_PUBLIC_KEY_STAGING` / `VAPID_PRIVATE_KEY_STAGING` / `VAPID_SUBJECT_STAGING` | Mapped to unsuffixed `VAPID_*` on the staging VM compose env (#179). Prod not wired yet. Not Terraform. |
+| Web Push VAPID (production) | — | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Mapped to host `VAPID_*` on the production VM compose env (#179). Not Terraform. |
+| Web Push VAPID (staging) | — | `VAPID_PUBLIC_KEY_STAGING` / `VAPID_PRIVATE_KEY_STAGING` / `VAPID_SUBJECT_STAGING` | Mapped to unsuffixed `VAPID_*` on the staging VM compose env (#179). Not Terraform. |
 | SSH **private** keys | `~/.ssh/…` (operator) | `OCI_SSH_PRIVATE_KEY` / `OCI_STAGING_SSH_PRIVATE_KEY` | VM `authorized_keys` has the public half only |
 | VM SSH host | — | Secrets `OCI_VM_HOST` / `OCI_STAGING_VM_HOST` | Prefer DuckDNS FQDN once verified (#526 optional) |
 | OCI API signing key (operator) | PEM path + `fingerprint` / `private_key_path` in gitignored `terraform/oci/terraform.tfvars`; `~/.oci/config` for CLI + Object Storage backend | — | OCI **provider** reads tfvars, not only `~/.oci`; see [oci_credentials](../how_to/oci_credentials.md) |
