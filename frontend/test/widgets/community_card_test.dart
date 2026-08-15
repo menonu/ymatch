@@ -1,6 +1,7 @@
 // Widget tests for CommunityCard (#570).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/widgets/community_card.dart';
@@ -27,6 +28,10 @@ void main() {
     // Visible labels for the networks must not appear — icons only.
     expect(find.text('X'), findsNothing);
     expect(find.text('Discord'), findsNothing);
+    expect(
+      _svgAssets(tester),
+      containsAll([CommunityCard.xIconAsset, CommunityCard.discordIconAsset]),
+    );
   });
 
   testWidgets('Japanese locale uses コミュニティ as the card title', (tester) async {
@@ -92,4 +97,11 @@ void main() {
 
     expect(find.textContaining('Could not open link'), findsOneWidget);
   });
+}
+
+Iterable<String> _svgAssets(WidgetTester tester) {
+  return tester.widgetList<SvgPicture>(find.byType(SvgPicture)).map((picture) {
+    final loader = picture.bytesLoader;
+    return loader is SvgAssetLoader ? loader.assetName : null;
+  }).whereType<String>();
 }
