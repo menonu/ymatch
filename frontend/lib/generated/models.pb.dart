@@ -742,6 +742,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     $core.String? photoUrl,
     $core.String? groupName,
     $core.bool? isDeleted,
+    $core.int? projectedQuantity,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -753,6 +754,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     if (photoUrl != null) result.photoUrl = photoUrl;
     if (groupName != null) result.groupName = groupName;
     if (isDeleted != null) result.isDeleted = isDeleted;
+    if (projectedQuantity != null) result.projectedQuantity = projectedQuantity;
     return result;
   }
 
@@ -778,6 +780,7 @@ class InventoryItem extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'photoUrl')
     ..aOS(8, _omitFieldNames ? '' : 'groupName')
     ..aOB(9, _omitFieldNames ? '' : 'isDeleted')
+    ..aI(10, _omitFieldNames ? '' : 'projectedQuantity')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -882,6 +885,19 @@ class InventoryItem extends $pb.GeneratedMessage {
   $core.bool hasIsDeleted() => $_has(8);
   @$pb.TagNumber(9)
   void clearIsDeleted() => $_clearField(9);
+
+  /// #427: quantity after in-progress trades settle (default apply + WANT
+  /// display). List inventory always sets this; may be negative (over-commit
+  /// is not clamped). Absent means "same as quantity" (upsert response and
+  /// match-candidate rows).
+  @$pb.TagNumber(10)
+  $core.int get projectedQuantity => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set projectedQuantity($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasProjectedQuantity() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearProjectedQuantity() => $_clearField(10);
 }
 
 class TradeMatch extends $pb.GeneratedMessage {

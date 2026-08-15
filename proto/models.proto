@@ -76,6 +76,11 @@ message InventoryItem {
   // Present on holder inventory lists so the UI can badge deleted items
   // (catalog lists are live-only and omit soft-deleted rows).
   optional bool is_deleted = 9;
+  // #427: quantity after in-progress trades settle (default apply + WANT
+  // display). List inventory always sets this; may be negative (over-commit
+  // is not clamped). Absent means "same as quantity" (upsert response and
+  // match-candidate rows).
+  optional int32 projected_quantity = 10;
 }
 
 message TradeMatch {

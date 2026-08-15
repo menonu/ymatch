@@ -47,7 +47,11 @@ use crate::error::AppError;
 use crate::generated::ymatch::{InventoryItem, OfferItem, OfferTradeRequest};
 use crate::repositories::inventory::InventoryRepository;
 use crate::repositories::match_::{CANCEL_REASON_INVENTORY_CAPACITY, MatchRepository};
+use crate::services::inventory_projection::{
+    ProjectionLeg, ProjectionMerch, accumulate_projection_deltas, attach_projected_quantities,
+};
 use sqlx::PgPool;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 const STATUS_PENDING: &str = "PENDING";
@@ -445,6 +449,40 @@ impl MatchLifecycleService {
         Ok(item)
     }
 
+    /// List the user's inventory rows with #427 `projected_quantity`.
+    ///
+    /// Existing rows always get the field (`quantity + delta`, possibly
+    /// negative). Statuses that have a delta but no row are synthesized at
+    /// `quantity = 0` so the client can show `0(n)`.
+    pub async fn list_inventory_with_projection(
+        &self,
+        user_id: i32,
+    ) -> Result<Vec<InventoryItem>, AppError> {
+        let mut items = self.inventory.list_for_user(user_id).await?;
+        let rows = self.matches.list_inventory_projection_legs(user_id).await?;
+
+        let mut merch: HashMap<i32, ProjectionMerch> = HashMap::new();
+        let mut legs = Vec::with_capacity(rows.len());
+        for row in rows {
+            merch.entry(row.merch_id).or_insert(ProjectionMerch {
+                merch_name: row.merch_name.clone(),
+                photo_url: row.photo_url.clone(),
+                group_name: row.group_name.clone(),
+                is_deleted: Some(row.is_deleted),
+            });
+            legs.push(ProjectionLeg {
+                match_id: row.match_id,
+                merch_id: row.merch_id,
+                giver_user_id: row.giver_user_id,
+                quantity: row.quantity,
+            });
+        }
+
+        let deltas = accumulate_projection_deltas(user_id, &legs, None, &[]);
+        attach_projected_quantities(&mut items, user_id, &deltas, &merch);
+        Ok(items)
+    }
+
     /// Cancel the user's active matches whose mutual cap is zero on either
     /// side (ADR 0010). Caller holds the transaction.
     async fn cancel_zero_capacity_for_user(
@@ -741,6 +779,12 @@ pub fn validate_cancel_transition(current_status: &str) -> Result<(), AppError> 
 /// `delta_have` is signed: positive increments HAVE, negative decrements
 /// HAVE (see `InventoryRepository::apply_trade_delta`). Factored out as a
 /// pure function so it can be unit-tested without a database.
+///
+/// Display projection (#427) uses the **default** giver HAVE− / TRADE− and
+/// receiver HAVE+ (plus a display-only WANT−) in
+/// [`crate::services::inventory_projection`] — it does not call this helper
+/// because apply-time `skip_have_decrement` must not affect always-on
+/// projected quantities.
 fn apply_inventory_delta(
     giver_id: i32,
     requesting_user_id: i32,

@@ -1,7 +1,7 @@
 //! Read-model queries for matches (list, items, counts, status snapshot).
 
 use super::{
-    MATCH_COLUMNS, MatchRepository, MatchStatusSnapshot, match_from_row,
+    InventoryProjectionRow, MATCH_COLUMNS, MatchRepository, MatchStatusSnapshot, match_from_row,
     match_status_snapshot_from_row,
 };
 use crate::error::AppError;
@@ -214,6 +214,8 @@ impl MatchRepository {
                     // #348: populated from the merch row (was hardcoded None).
                     group_name,
                     is_deleted: None,
+                    // Match candidates are LEAST-capped offer qty, not inventory.
+                    projected_quantity: None,
                 });
         }
         let mut wants_by_peer: HashMap<
@@ -239,6 +241,8 @@ impl MatchRepository {
                     // #348: populated from the merch row (was hardcoded None).
                     group_name,
                     is_deleted: None,
+                    // Match candidates are LEAST-capped offer qty, not inventory.
+                    projected_quantity: None,
                 });
         }
         let mut items_by_match: HashMap<i32, Vec<MatchItem>> = HashMap::new();
@@ -354,6 +358,52 @@ impl MatchRepository {
                 // as String and wrapped in Some, which panicked on
                 // NULL photo_url).
                 photo_url: r.get::<Option<String>, _>("photo_url"),
+            })
+            .collect())
+    }
+
+    /// Legs that contribute to #427 projected inventory for `user_id`.
+    ///
+    /// Included: `OFFERED`, `ACCEPTED`, and `COMPLETED` where this user's
+    /// apply flag is still null. Excluded: `PENDING` (no commitment),
+    /// `REJECTED`, `CANCELLED`, and `COMPLETED` after this user applied.
+    /// Uses current on-table `match_items` (latest proposal after counters).
+    pub async fn list_inventory_projection_legs(
+        &self,
+        user_id: i32,
+    ) -> Result<Vec<InventoryProjectionRow>, AppError> {
+        let rows = sqlx::query(
+            r#"SELECT mi.match_id, mi.merch_id, mi.giver_user_id, mi.quantity,
+                      m.name AS merch_name, m.photo_url, m.group_name, m.is_deleted
+               FROM match_items mi
+               JOIN matches mat ON mat.id = mi.match_id
+               JOIN merchandise m ON m.id = mi.merch_id
+               WHERE (mat.user1_id = $1 OR mat.user2_id = $1)
+                 AND (
+                   mat.status IN ('OFFERED', 'ACCEPTED')
+                   OR (
+                     mat.status = 'COMPLETED'
+                     AND (
+                       (mat.user1_id = $1 AND mat.user1_inventory_applied_at IS NULL)
+                       OR (mat.user2_id = $1 AND mat.user2_inventory_applied_at IS NULL)
+                     )
+                   )
+                 )"#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| InventoryProjectionRow {
+                match_id: r.get("match_id"),
+                merch_id: r.get("merch_id"),
+                giver_user_id: r.get("giver_user_id"),
+                quantity: r.get("quantity"),
+                merch_name: Some(r.get("merch_name")),
+                photo_url: r.get::<Option<String>, _>("photo_url"),
+                group_name: r.get::<Option<String>, _>("group_name"),
+                is_deleted: r.get("is_deleted"),
             })
             .collect())
     }

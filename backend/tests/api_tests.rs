@@ -12,6 +12,7 @@ mod favorites;
 mod group_members;
 mod groups;
 mod images;
+mod inventory_projection;
 mod match_lifecycle;
 mod merch_inventory;
 mod notifications;

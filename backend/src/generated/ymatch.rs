@@ -137,6 +137,12 @@ pub struct InventoryItem {
     /// (catalog lists are live-only and omit soft-deleted rows).
     #[prost(bool, optional, tag = "9")]
     pub is_deleted: ::core::option::Option<bool>,
+    /// #427: quantity after in-progress trades settle (default apply + WANT
+    /// display). List inventory always sets this; may be negative (over-commit
+    /// is not clamped). Absent means "same as quantity" (upsert response and
+    /// match-candidate rows).
+    #[prost(int32, optional, tag = "10")]
+    pub projected_quantity: ::core::option::Option<i32>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

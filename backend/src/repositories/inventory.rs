@@ -2,7 +2,9 @@
 //!
 //! [`InventoryRepository`] owns the `inventory` table operations. It powers:
 //!
-//! - the user inventory list endpoint (`handlers::inventory::get_user_inventory`)
+//! - the user inventory list endpoint via
+//!   [`crate::services::match_lifecycle::MatchLifecycleService`]
+//!   (`handlers::inventory::get_user_inventory`; #427 attaches projected qty)
 //! - the inventory upsert endpoint (`handlers::inventory::update_inventory`)
 //! - the trade-apply endpoint via
 //!   [`crate::services::match_lifecycle::MatchLifecycleService`]
@@ -85,6 +87,8 @@ impl InventoryRepository {
             photo_url: None,
             group_name: None,
             is_deleted: None,
+            // #427: upsert is current-qty only; absent = same as quantity.
+            projected_quantity: None,
         })
     }
 
@@ -120,6 +124,8 @@ impl InventoryRepository {
                 photo_url: row.get("photo_url"),
                 group_name: row.get("group_name"),
                 is_deleted: Some(row.get("is_deleted")),
+                // Filled by MatchLifecycleService::list_inventory_with_projection.
+                projected_quantity: None,
             })
             .collect())
     }

@@ -1613,6 +1613,9 @@ impl serde::Serialize for InventoryItem {
         if self.is_deleted.is_some() {
             len += 1;
         }
+        if self.projected_quantity.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.InventoryItem", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -1641,6 +1644,9 @@ impl serde::Serialize for InventoryItem {
         if let Some(v) = self.is_deleted.as_ref() {
             struct_ser.serialize_field("isDeleted", v)?;
         }
+        if let Some(v) = self.projected_quantity.as_ref() {
+            struct_ser.serialize_field("projectedQuantity", v)?;
+        }
         struct_ser.end()
     }
 }
@@ -1666,6 +1672,8 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
             "groupName",
             "is_deleted",
             "isDeleted",
+            "projected_quantity",
+            "projectedQuantity",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1679,6 +1687,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
             PhotoUrl,
             GroupName,
             IsDeleted,
+            ProjectedQuantity,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1709,6 +1718,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                             "photoUrl" | "photo_url" => Ok(GeneratedField::PhotoUrl),
                             "groupName" | "group_name" => Ok(GeneratedField::GroupName),
                             "isDeleted" | "is_deleted" => Ok(GeneratedField::IsDeleted),
+                            "projectedQuantity" | "projected_quantity" => Ok(GeneratedField::ProjectedQuantity),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1737,6 +1747,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                 let mut photo_url__ = None;
                 let mut group_name__ = None;
                 let mut is_deleted__ = None;
+                let mut projected_quantity__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -1801,6 +1812,14 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                             }
                             is_deleted__ = map_.next_value()?;
                         }
+                        GeneratedField::ProjectedQuantity => {
+                            if projected_quantity__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("projectedQuantity"));
+                            }
+                            projected_quantity__ = 
+                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                            ;
+                        }
                     }
                 }
                 Ok(InventoryItem {
@@ -1813,6 +1832,7 @@ impl<'de> serde::Deserialize<'de> for InventoryItem {
                     photo_url: photo_url__,
                     group_name: group_name__,
                     is_deleted: is_deleted__,
+                    projected_quantity: projected_quantity__,
                 })
             }
         }

@@ -69,6 +69,23 @@ pub struct MatchStatusSnapshot {
     pub user2_applied: bool,
 }
 
+/// On-table match_item that contributes to #427 inventory projection.
+///
+/// Status filter is applied in
+/// [`MatchRepository::list_inventory_projection_legs`]: OFFERED, ACCEPTED,
+/// and COMPLETED where this user has not yet applied.
+#[derive(Debug, Clone)]
+pub struct InventoryProjectionRow {
+    pub match_id: i32,
+    pub merch_id: i32,
+    pub giver_user_id: i32,
+    pub quantity: i32,
+    pub merch_name: Option<String>,
+    pub photo_url: Option<String>,
+    pub group_name: Option<String>,
+    pub is_deleted: bool,
+}
+
 pub struct MatchRepository {
     pool: PgPool,
 }
