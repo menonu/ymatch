@@ -24,7 +24,7 @@ used throughout this document.
 | `TradeListScreen` | Matches tab — trade list | マッチタブ — 取引一覧 |
 | `ChatScreen` | Chat (within a match) | チャット（マッチ内） |
 | `MapPickerScreen` | Location picker (tap / search / GPS) | 位置選択（タップ / 検索 / GPS） |
-| `ProfileScreen` | Profile tab | プロフィールタブ |
+| `ProfileScreen` | Settings tab | 設定タブ |
 | `AdminDashboardScreen` | Admin tab (admin/mod only) | 管理タブ（管理者/モデレータのみ） |
 
 ### Bottom-nav tabs
@@ -33,7 +33,7 @@ used throughout this document.
 |------------|----------|----------|
 | Items tab | Items | アイテム |
 | Matches tab | Matches | マッチ |
-| Profile tab | Profile | プロフィール |
+| Settings tab | Settings | 設定 |
 | Admin tab | Admin | 管理 |
 
 ## Screens
@@ -48,8 +48,8 @@ used throughout this document.
 | `TradeListScreen` | `screens/trade_list_screen.dart` | Trade matches across 5 status tabs |
 | `ChatScreen` | `screens/chat_screen.dart` | Messaging within a trade match |
 | `MapPickerScreen` | `screens/map_picker_screen.dart` | Location selection via OpenStreetMap; tap pin, place search (Nominatim), GPS my-location (#448) |
-| `ProfileScreen` | `screens/profile_screen.dart` | User profile, UUID, trading instructions, Settings entry (#545) |
-| `SettingsScreen` | `screens/settings_screen.dart` | App language preference (client-side, #545); theme forced light (#553) |
+| `ProfileScreen` | `screens/profile_screen.dart` | Username, UUID, trading instructions, inlined app settings (#562) |
+| `AppSettingsSection` | `screens/settings_screen.dart` | Language + match notifications next to the username card (#545, #179, #562); theme forced light (#553) |
 | `AdminDashboardScreen` | `screens/admin_dashboard_screen.dart` | Admin panel with 6 tabs (System, Users, Events, Groups, Items, Matches) plus Debug in debug builds only (#499). Events/Groups support change creator + manage editors (#432). |
 
 ## Navigation
@@ -58,7 +58,7 @@ used throughout this document.
 
 | Identifier | File | Tabs |
 |-----------|------|------|
-| `BottomNavBar` | `widgets/scaffold_with_nav_bar.dart` | Items, Matches, Profile, Admin (conditional) |
+| `BottomNavBar` | `widgets/scaffold_with_nav_bar.dart` | Items, Matches, Settings, Admin (conditional) |
 
 ### Tab Bars
 
@@ -129,6 +129,7 @@ used throughout this document.
 | `ZoomableImage` / `showZoomedImage` | Merch list (shared) | Tap thumbnail → dismissible dialog with `InteractiveViewer` pinch/pan zoom (#540) |
 | `MatchCard` | `TradeListScreen` | User avatar, status chip, local match datetime (#476), item chips, action buttons |
 | `ProfileCard` | `ProfileScreen` | Avatar, editable username, UUID section |
+| `AppSettingsSection` | `ProfileScreen` | Language + match notifications next to username card (#562) |
 | `InstructionsCard` | `ProfileScreen` | 3-step "How to Trade" guide |
 | `SystemStatusCard` | `AdminDashboardScreen` | Memory, CPU, uptime, OS info |
 | `DebugCard` | `AdminDashboardScreen` | Version info, test data generation |
@@ -277,21 +278,21 @@ used throughout this document.
 
 The "How to Trade" guide (3 steps, l10n keys `howToTrade` / `tradeStep1–3`) is
 the single source of truth in `widgets/how_to_trade.dart` and is surfaced in
-three places so new users can find it without digging into the Profile tab.
+three places so new users can find it without digging into the Settings tab.
 
 | Identifier | File | EN UI label | JA UI label | Where it appears |
 |------------|------|-------------|-------------|------------------|
 | `HowToTradeContent` | `widgets/how_to_trade.dart` | "How to Trade" guide (title + 3 steps) | 「取引方法」ガイド（見出し＋3ステップ） | `ProfileScreen` (`InstructionsCard`), `HowToTradeSheet` |
 | `showHowToTradeSheet` | `widgets/how_to_trade.dart` | Guide bottom sheet | 取引ガイド シート | Opened by `HowToTradeIconButton` |
 | `HowToTradeIconButton` | `widgets/how_to_trade.dart` | AppBar help (?) icon | AppBarヘルプ（？）アイコン | `HomeScreen`, `EventDetailScreen` AppBar |
-| `VirtualProfileTabBar` | `widgets/how_to_trade.dart` | Virtual Profile tab preview | 仮想プロフィールタブ | `LoginScreen` bottom-nav area |
+| `VirtualProfileTabBar` | `widgets/how_to_trade.dart` | Virtual Settings tab preview | 仮想設定タブ | `LoginScreen` bottom-nav area |
 | `LongDownArrow` | `widgets/how_to_trade.dart` | Long pointer arrow | 長い矢印ポインタ | `LoginScreen` (points at `VirtualProfileTabBar`) |
 | `HowToTradeStep` | `widgets/how_to_trade.dart` | One numbered guide step | ガイドの1ステップ | Inside `HowToTradeContent` |
 
 ### Behavior notes
 
 - **Login screen (`VirtualProfileTabBar`)**: a *pointer*, not an entry point.
-  Only the Profile tab is shown (Items/Matches hidden), in its real rightmost
+  Only the Settings tab is shown (Items/Matches hidden), in its real rightmost
   position; a long arrow points down at it. Tapping it does **not** open the
   guide — it shows the `howToPreviewTabHint` snackbar ("Available after login" /
   ログイン後に使用できます). It is only rendered in the default new-user state
@@ -301,5 +302,5 @@ three places so new users can find it without digging into the Profile tab.
   — primary color + a badge dot; once opened, it becomes a plain icon. The
   "seen" state persists across sessions via `howToHintSeenProvider`
   (SharedPreferences key `how_to_hint_seen`).
-- **Profile (`InstructionsCard`)**: renders `HowToTradeContent` inline — the
-  guide's original home, unchanged.
+- **Settings tab (`InstructionsCard`)**: renders `HowToTradeContent` inline —
+  the guide's original home, unchanged.

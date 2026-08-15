@@ -5,10 +5,10 @@ import '../providers/providers.dart';
 
 /// Renders the "How to Trade" guide — a title row plus three numbered steps.
 ///
-/// This is the single source of truth for the guide content, so the Profile
-/// card and the Home AppBar info-icon sheet show the exact same steps (sourced
-/// from the `howToTrade` / `tradeStep1–3` l10n keys). Extracted in #336 so new
-/// users can reach the guide without digging into the Profile tab.
+/// This is the single source of truth for the guide content, so the Settings
+/// tab card and the Home AppBar info-icon sheet show the exact same steps
+/// (sourced from the `howToTrade` / `tradeStep1–3` l10n keys). Extracted in
+/// #336 so new users can reach the guide without digging into the Settings tab.
 class HowToTradeContent extends StatelessWidget {
   const HowToTradeContent({super.key});
 
@@ -88,7 +88,7 @@ class HowToTradeStep extends StatelessWidget {
 
 /// Opens the how-to guide as a modal bottom sheet. Used by the Home AppBar
 /// info icon so a logged-in user can read the guide without navigating to the
-/// Profile tab.
+/// Settings tab.
 Future<void> showHowToTradeSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -137,7 +137,7 @@ class HowToTradeIconButton extends ConsumerWidget {
 }
 
 /// A long downward arrow drawn on the login screen to draw the user's eye from
-/// the hint text down to the virtual Profile tab in the bottom-nav area (#336).
+/// the hint text down to the virtual Settings tab in the bottom-nav area (#336).
 class LongDownArrow extends StatelessWidget {
   final double height;
   final Color color;
@@ -257,16 +257,16 @@ class _DashedBorderPainter extends CustomPainter {
       oldDelegate.strokeWidth != strokeWidth;
 }
 
-/// A "virtual" preview of the bottom-nav Profile tab, shown on the login
+/// A "virtual" preview of the bottom-nav Settings tab, shown on the login
 /// screen in the same area the real navigation bar occupies after login.
 ///
-/// Only the Profile tab is rendered — the Items and Matches tabs are
-/// irrelevant to this pointer and are hidden, but the Profile tab keeps its
+/// Only the Settings tab is rendered — the Items and Matches tabs are
+/// irrelevant to this pointer and are hidden, but the Settings tab keeps its
 /// real position (the rightmost of three equal-width slots, so its center sits
 /// where it will after login). A long arrow is drawn directly above it,
 /// pointing straight down at it. The tab is ghosted (dashed outline) and
 /// disabled — tapping it does NOT open the guide; it only tells the user the
-/// tab is available after login (#336).
+/// tab is available after login (#336, #562).
 class VirtualProfileTabBar extends StatelessWidget {
   const VirtualProfileTabBar({super.key});
 
@@ -280,7 +280,7 @@ class VirtualProfileTabBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Items slot — hidden (kept as empty space so the Profile tab stays
+          // Items slot — hidden (kept as empty space so the Settings tab stays
           // in its real rightmost-of-three position).
           const Expanded(child: SizedBox.shrink()),
           // Matches slot — hidden, same reason.
@@ -306,7 +306,7 @@ class VirtualProfileTabBar extends StatelessWidget {
   }
 }
 
-/// The single virtual Profile "tab" — a person icon in a selected-style pill
+/// The single virtual Settings "tab" — a settings icon in a selected-style pill
 /// with the label beneath, wrapped in a dashed outline to read as a preview.
 class _ProfileTab extends StatelessWidget {
   final String label;
@@ -340,7 +340,7 @@ class _ProfileTab extends StatelessWidget {
                   color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(Icons.person, color: color, size: 24),
+                child: Icon(Icons.settings, color: color, size: 24),
               ),
               const SizedBox(height: 4),
               Text(

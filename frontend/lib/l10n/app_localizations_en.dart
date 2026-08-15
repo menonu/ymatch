@@ -78,7 +78,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navMatches => 'Matches';
 
   @override
-  String get navProfile => 'Profile';
+  String get navProfile => 'Settings';
 
   @override
   String get navAdmin => 'Admin';
@@ -678,7 +678,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get howToHint =>
-      'The How to Trade guide is in the Profile tab — tap it after logging in to read it.';
+      'The How to Trade guide is in the Settings tab — tap it after logging in to read it.';
 
   @override
   String get howToPreviewTabHint => 'Available after login';

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
+import '../models/models.dart';
 import '../providers/providers.dart';
 import '../widgets/how_to_trade.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -70,168 +71,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Profile Card
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 48,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.1),
-                      child: Icon(
-                        Icons.person,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Username row with edit support.
-                    // Keep the edit control next to the name (centered group)
-                    // and never let a long username push it past the card edge
-                    // (#555). IconButtons use an explicit 48×48 min target.
-                    if (_editingUsername)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _usernameController,
-                              autofocus: true,
-                              decoration: InputDecoration(
-                                labelText: l10n.username,
-                                isDense: true,
-                              ),
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _saveUsername(user.id),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.check),
-                            color: Colors.green,
-                            style: _iconHitTarget,
-                            onPressed: () => _saveUsername(user.id),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            style: _iconHitTarget,
-                            onPressed: () =>
-                                setState(() => _editingUsername = false),
-                          ),
-                        ],
-                      )
-                    else
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              user.username,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 20),
-                            color: Colors.grey,
-                            tooltip: l10n.editUsername,
-                            style: _iconHitTarget,
-                            onPressed: () {
-                              _usernameController.text = user.username;
-                              setState(() => _editingUsername = true);
-                            },
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  l10n.masterKeyUuid,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.copy, size: 20),
-                                color: Theme.of(context).colorScheme.primary,
-                                style: _iconHitTarget,
-                                onPressed: () async {
-                                  if (user.hasUuid() && user.uuid.isNotEmpty) {
-                                    await Clipboard.setData(
-                                      ClipboardData(text: user.uuid),
-                                    );
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(l10n.masterKeyCopied),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SelectableText(
-                            user.hasUuid() && user.uuid.isNotEmpty
-                                ? user.uuid
-                                : l10n.unknown,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.orange,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  l10n.saveKeyWarning,
-                                  style: const TextStyle(
-                                    color: Colors.orange,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _usernameAndSettings(context, user, l10n),
 
             const SizedBox(height: 24),
 
@@ -241,19 +81,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: const Padding(
                 padding: EdgeInsets.all(24.0),
                 child: HowToTradeContent(),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // App Settings entry (#545)
-            Card(
-              margin: EdgeInsets.zero,
-              child: ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: Text(l10n.settings),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/profile/settings'),
               ),
             ),
 
@@ -272,6 +99,200 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 16),
             _buildRevisionInfo(context, ref),
             const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Place app settings beside the username card when the tab is wide
+  /// enough; stack them on phone-width surfaces (#562).
+  static const _wideBreakpoint = 600.0;
+
+  Widget _usernameAndSettings(
+    BuildContext context,
+    User user,
+    AppLocalizations l10n,
+  ) {
+    final usernameCard = _usernameCard(context, user, l10n);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sideBySide = constraints.maxWidth >= _wideBreakpoint;
+        if (sideBySide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: usernameCard),
+              const SizedBox(width: 16),
+              const Expanded(child: AppSettingsSection()),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            usernameCard,
+            const SizedBox(height: 24),
+            const AppSettingsSection(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _usernameCard(BuildContext context, User user, AppLocalizations l10n) {
+    return Card(
+      key: const Key('profile-username-card'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 48,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
+              child: Icon(
+                Icons.person,
+                size: 48,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Username row with edit support.
+            // Keep the edit control next to the name (centered group)
+            // and never let a long username push it past the card edge
+            // (#555). IconButtons use an explicit 48×48 min target.
+            if (_editingUsername)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _usernameController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: l10n.username,
+                        isDense: true,
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _saveUsername(user.id),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.check),
+                    color: Colors.green,
+                    style: _iconHitTarget,
+                    onPressed: () => _saveUsername(user.id),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    style: _iconHitTarget,
+                    onPressed: () => setState(() => _editingUsername = false),
+                  ),
+                ],
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      user.username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    color: Colors.grey,
+                    tooltip: l10n.editUsername,
+                    style: _iconHitTarget,
+                    onPressed: () {
+                      _usernameController.text = user.username;
+                      setState(() => _editingUsername = true);
+                    },
+                  ),
+                ],
+              ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.masterKeyUuid,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 20),
+                        color: Theme.of(context).colorScheme.primary,
+                        style: _iconHitTarget,
+                        onPressed: () async {
+                          if (user.hasUuid() && user.uuid.isNotEmpty) {
+                            await Clipboard.setData(
+                              ClipboardData(text: user.uuid),
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(l10n.masterKeyCopied)),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    user.hasUuid() && user.uuid.isNotEmpty
+                        ? user.uuid
+                        : l10n.unknown,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.saveKeyWarning,
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

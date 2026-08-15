@@ -6,7 +6,6 @@ import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/settings_screen.dart';
 import 'screens/trade_list_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
@@ -153,7 +152,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Profile Branch
+          // Settings tab (route stays /profile; label is Settings, #562)
           StatefulShellBranch(
             navigatorKey: _shellNavigatorProfileKey,
             routes: [
@@ -161,9 +160,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
                 routes: [
+                  // Old nested settings page now lives on the tab itself.
                   GoRoute(
                     path: 'settings',
-                    builder: (context, state) => const SettingsScreen(),
+                    redirect: (context, state) => '/profile',
                   ),
                 ],
               ),

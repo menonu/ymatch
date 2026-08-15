@@ -97,9 +97,9 @@
   "@navMatches": {
     "description": "Bottom navigation bar label for the matches tab"
   },
-  "navProfile": "Profile",
+  "navProfile": "Settings",
   "@navProfile": {
-    "description": "Bottom navigation bar label for the profile tab"
+    "description": "Bottom navigation bar label for the settings tab (#562)"
   },
   "navAdmin": "Admin",
   "@navAdmin": {
@@ -308,7 +308,7 @@
 
   "settings": "Settings",
   "@settings": {
-    "description": "App settings screen title and Profile entry label (#545)"
+    "description": "App settings section title on the Settings tab (#545, #562)"
   },
   "settingsLanguage": "Language",
   "@settingsLanguage": {
@@ -944,13 +944,13 @@
   "@noCompletedTrades": {
     "description": "Empty state for the Done tab"
   },
-  "howToHint": "The How to Trade guide is in the Profile tab — tap it after logging in to read it.",
+  "howToHint": "The How to Trade guide is in the Settings tab — tap it after logging in to read it.",
   "@howToHint": {
-    "description": "Hint shown on the login screen pointing new users to the how-to guide, which lives behind the Profile tab (available after login)"
+    "description": "Hint shown on the login screen pointing new users to the how-to guide, which lives behind the Settings tab (available after login)"
   },
   "howToPreviewTabHint": "Available after login",
   "@howToPreviewTabHint": {
-    "description": "Shown when the virtual Profile tab preview on the login screen is tapped — the tab is not usable until after login"
+    "description": "Shown when the virtual Settings tab preview on the login screen is tapped — the tab is not usable until after login"
   },
   "exportInventoryTitle": "Export inventory",
   "@exportInventoryTitle": {
