@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../services/api_client.dart';
 import '../models/models.dart';
 
@@ -36,6 +37,12 @@ class UserInventoryNotifier
             ..quantity = quantity
             ..merchName = item.merchName;
           if (item.hasIsDeleted()) updated.isDeleted = item.isDeleted;
+          // Reserved delta (projected − current) is independent of the
+          // stepper; shift both so `2(1)` becomes `3(2)` without a refetch.
+          if (item.hasProjectedQuantity()) {
+            updated.projectedQuantity =
+                item.projectedQuantity + (quantity - item.quantity);
+          }
           return updated;
         }
         return item;
@@ -49,7 +56,8 @@ class UserInventoryNotifier
             ..merchId = merchId
             ..status = status
             ..quantity = quantity
-            ..merchName = '',
+            ..merchName = ''
+            ..projectedQuantity = quantity,
         );
       }
       // filter out 0 quantity if desired, but for now just keep

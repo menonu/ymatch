@@ -26,6 +26,7 @@ class QuantityStepper extends StatelessWidget {
     this.enabled = true,
     this.label,
     this.labelColor,
+    this.quantityText,
     this.decrementSemanticLabel,
     this.incrementSemanticLabel,
   });
@@ -53,6 +54,9 @@ class QuantityStepper extends StatelessWidget {
 
   /// Color for [label]; defaults to [AppTheme.textSecondaryColor].
   final Color? labelColor;
+
+  /// Optional center text (e.g. `2(1)`). Defaults to [quantity] as a string.
+  final String? quantityText;
 
   /// Accessibility label for the decrement control.
   final String? decrementSemanticLabel;
@@ -92,6 +96,7 @@ class QuantityStepper extends StatelessWidget {
       expand: expand,
       label: hasLabel ? label : null,
       labelColor: labelColor ?? AppTheme.textSecondaryColor,
+      quantityText: quantityText,
     );
     final incVisual = _StepChip(
       icon: Icons.add,
@@ -234,16 +239,30 @@ class _QuantityCenter extends StatelessWidget {
     required this.expand,
     this.label,
     this.labelColor,
+    this.quantityText,
   });
 
   final int quantity;
   final bool expand;
   final String? label;
   final Color? labelColor;
+  final String? quantityText;
 
   @override
   Widget build(BuildContext context) {
     final hasLabel = label != null && label!.isNotEmpty;
+    final qtyLabel = quantityText ?? '$quantity';
+    final qtyStyle = const TextStyle(
+      fontSize: QuantityStepper._qtyFontSize,
+      fontWeight: FontWeight.bold,
+      height: 1.1,
+      color: AppTheme.textPrimaryColor,
+    );
+    // Scale down `2(-1)` / `12(8)` rather than overflowing the 44px track.
+    final qtyText = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(qtyLabel, textAlign: TextAlign.center, style: qtyStyle),
+    );
     final content = hasLabel
         ? Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -262,28 +281,10 @@ class _QuantityCenter extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 1),
-              Text(
-                '$quantity',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: QuantityStepper._qtyFontSize,
-                  fontWeight: FontWeight.bold,
-                  height: 1.1,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
+              qtyText,
             ],
           )
-        : Text(
-            '$quantity',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: QuantityStepper._qtyFontSize,
-              fontWeight: FontWeight.bold,
-              height: 1.1,
-              color: AppTheme.textPrimaryColor,
-            ),
-          );
+        : qtyText;
 
     return Container(
       width: expand ? double.infinity : null,

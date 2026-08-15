@@ -86,6 +86,14 @@ void main() {
     expect(called, isFalse);
   });
 
+  testWidgets('quantityText overrides the bare number (#427)', (tester) async {
+    await tester.pumpWidget(
+      wrap(const QuantityStepper(quantity: 2, quantityText: '2(1)')),
+    );
+    expect(find.text('2(1)'), findsOneWidget);
+    expect(find.text('2'), findsNothing);
+  });
+
   testWidgets('label renders above the bare quantity (#538)', (tester) async {
     await tester.pumpWidget(
       wrap(

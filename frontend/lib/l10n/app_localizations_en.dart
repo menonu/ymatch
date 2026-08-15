@@ -218,6 +218,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tradeStep3 => 'Go to Matches to see who wants to trade with you.';
 
   @override
+  String get tradeStep4 =>
+      'On the detailed item list, a number in parentheses is the quantity after in-progress trades settle (for example 2(1)). + and − still change only the current quantity.';
+
+  @override
   String get logOut => 'Log Out';
 
   @override

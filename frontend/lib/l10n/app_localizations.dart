@@ -476,6 +476,12 @@ abstract class AppLocalizations {
   /// **'Go to Matches to see who wants to trade with you.'**
   String get tradeStep3;
 
+  /// How-to-trade step 4: projected inventory parentheses (#427)
+  ///
+  /// In en, this message translates to:
+  /// **'On the detailed item list, a number in parentheses is the quantity after in-progress trades settle (for example 2(1)). + and − still change only the current quantity.'**
+  String get tradeStep4;
+
   /// Log out button label
   ///
   /// In en, this message translates to:

@@ -217,6 +217,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tradeStep3 => 'マッチを開き、取引したい相手を確認します。';
 
   @override
+  String get tradeStep4 =>
+      '詳細一覧では、括弧内の数字は進行中の取引が成立したあとの数量です（例: 2(1)）。＋/− が変えるのはいまの数量だけです。';
+
+  @override
   String get logOut => 'ログアウト';
 
   @override
