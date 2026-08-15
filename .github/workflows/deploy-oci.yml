@@ -100,6 +100,11 @@ jobs:
           else
             echo "⚠️ Web Push: VAPID_* secrets missing or empty; push will be no-op"
           fi
+          if [ -n "${X_PROFILE_URL:-}" ] && [ -n "${DISCORD_INVITE_URL:-}" ]; then
+            echo "Community: X_PROFILE_URL and DISCORD_INVITE_URL present"
+          else
+            echo "⚠️ Community: X_PROFILE_URL / DISCORD_INVITE_URL missing or empty; that icon will be hidden"
+          fi
           # Shell-safe remote env (printf %q) so secrets with special chars do not break.
           # VAPID_* may be empty (optional); still pass so host .env is refreshed.
           REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q VAPID_PUBLIC_KEY=%q VAPID_PRIVATE_KEY=%q VAPID_SUBJECT=%q X_PROFILE_URL=%q DISCORD_INVITE_URL=%q' \
