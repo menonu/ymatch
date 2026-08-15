@@ -368,6 +368,19 @@
     "description": "Generic error enabling/disabling push (#179)"
   },
 
+  "community": "Community",
+  "@community": {
+    "description": "Community card title on the Settings tab (#570)"
+  },
+  "communityXTooltip": "X",
+  "@communityXTooltip": {
+    "description": "Tooltip / a11y label for the official X profile link (#570)"
+  },
+  "communityDiscordTooltip": "Discord",
+  "@communityDiscordTooltip": {
+    "description": "Tooltip / a11y label for the official Discord invite (#570)"
+  },
+
   "revisionInfo": "frontend: {frontend}  /  backend: {backend}",
   "@revisionInfo": {
     "description": "Footer showing frontend and backend revision hashes",

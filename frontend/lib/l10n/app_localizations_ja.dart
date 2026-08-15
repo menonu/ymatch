@@ -265,6 +265,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsNotificationsError => '通知設定を更新できませんでした';
 
   @override
+  String get community => 'コミュニティ';
+
+  @override
+  String get communityXTooltip => 'X';
+
+  @override
+  String get communityDiscordTooltip => 'Discord';
+
+  @override
   String revisionInfo(String frontend, String backend) {
     return 'フロントエンド: $frontend  /  バックエンド: $backend';
   }
