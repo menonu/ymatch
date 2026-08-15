@@ -1,6 +1,5 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
-use crate::repositories::inventory::InventoryRepository;
 use crate::services::match_lifecycle::MatchLifecycleService;
 use axum::{
     Json,
@@ -26,9 +25,9 @@ pub async fn update_inventory(
 }
 
 pub async fn get_user_inventory(
-    State(inventory): State<Arc<InventoryRepository>>,
+    State(lifecycle): State<Arc<MatchLifecycleService>>,
     Path(user_id): Path<i32>,
 ) -> Result<Json<Vec<InventoryItem>>, AppError> {
-    let items = inventory.list_for_user(user_id).await?;
+    let items = lifecycle.list_inventory_with_projection(user_id).await?;
     Ok(Json(items))
 }

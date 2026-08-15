@@ -427,12 +427,22 @@ const InventoryItem$json = {
       '10': 'isDeleted',
       '17': true
     },
+    {
+      '1': 'projected_quantity',
+      '3': 10,
+      '4': 1,
+      '5': 5,
+      '9': 4,
+      '10': 'projectedQuantity',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_merch_name'},
     {'1': '_photo_url'},
     {'1': '_group_name'},
     {'1': '_is_deleted'},
+    {'1': '_projected_quantity'},
   ],
 };
 
@@ -442,9 +452,10 @@ final $typed_data.Uint8List inventoryItemDescriptor = $convert.base64Decode(
     'QSGQoIbWVyY2hfaWQYAyABKAVSB21lcmNoSWQSFgoGc3RhdHVzGAQgASgJUgZzdGF0dXMSGgoI'
     'cXVhbnRpdHkYBSABKAVSCHF1YW50aXR5EiIKCm1lcmNoX25hbWUYBiABKAlIAFIJbWVyY2hOYW'
     '1liAEBEiAKCXBob3RvX3VybBgHIAEoCUgBUghwaG90b1VybIgBARIiCgpncm91cF9uYW1lGAgg'
-    'ASgJSAJSCWdyb3VwTmFtZYgBARIiCgppc19kZWxldGVkGAkgASgISANSCWlzRGVsZXRlZIgBAU'
-    'INCgtfbWVyY2hfbmFtZUIMCgpfcGhvdG9fdXJsQg0KC19ncm91cF9uYW1lQg0KC19pc19kZWxl'
-    'dGVk');
+    'ASgJSAJSCWdyb3VwTmFtZYgBARIiCgppc19kZWxldGVkGAkgASgISANSCWlzRGVsZXRlZIgBAR'
+    'IyChJwcm9qZWN0ZWRfcXVhbnRpdHkYCiABKAVIBFIRcHJvamVjdGVkUXVhbnRpdHmIAQFCDQoL'
+    'X21lcmNoX25hbWVCDAoKX3Bob3RvX3VybEINCgtfZ3JvdXBfbmFtZUINCgtfaXNfZGVsZXRlZE'
+    'IVChNfcHJvamVjdGVkX3F1YW50aXR5');
 
 @$core.Deprecated('Use tradeMatchDescriptor instead')
 const TradeMatch$json = {

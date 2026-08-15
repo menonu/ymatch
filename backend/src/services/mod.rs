@@ -7,6 +7,7 @@
 //! live here too ([`match_lifecycle`], [`event`], [`group`]).
 pub mod event;
 pub mod group;
+pub mod inventory_projection;
 pub mod match_lifecycle;
 pub mod permission_catalog;
 pub mod permissions;

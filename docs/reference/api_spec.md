@@ -458,10 +458,46 @@ Upsert a user's inventory entry. Creates or updates the record based on the uniq
 
 Get a user's full inventory.
 
+Each row includes **current** `quantity` (DB) and **`projectedQuantity`**
+(#427): the quantity after every in-progress trade for this user settles.
+
+Contributing matches (user is a party; merch appears on a current on-table
+leg):
+
+- `OFFERED` / `ACCEPTED` — latest `match_items` after counters
+- `COMPLETED` and **this user's** inventory not yet applied
+
+Excluded: `PENDING`, `REJECTED`, `CANCELLED`, and `COMPLETED` after this
+user applied.
+
+Delta rules (default apply / [ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md);
+apply-time `skipHaveDecrement` is **not** reflected):
+
+| Role on the leg | HAVE | WANT | TRADE |
+|-----------------|------|------|-------|
+| Giver | −qty | — | −qty |
+| Receiver | +qty | −qty (display only; apply does not change WANT) | — |
+
+`projectedQuantity` is **not clamped** and may be negative (over-commit).
+Statuses with a non-zero delta but no inventory row are returned as
+`quantity: 0` (so the client can show `0(n)`).
+
+`POST /api/v1/user/inventory` (upsert) and match-candidate `InventoryItem`s
+omit `projectedQuantity` (absent means “same as `quantity`”).
+
 - **Response**: `200 OK`
   ```json
   [
-    { "id": 1, "user_id": 1, "merch_id": 101, "status": "HAVE", "quantity": 2, "updated_at": "..." }
+    {
+      "id": 1,
+      "userId": 1,
+      "merchId": 101,
+      "status": "HAVE",
+      "quantity": 2,
+      "projectedQuantity": 1,
+      "merchName": "Card A",
+      "isDeleted": false
+    }
   ]
   ```
 
