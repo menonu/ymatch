@@ -89,6 +89,7 @@
   "community": "コミュニティ",
   "communityXTooltip": "X",
   "communityDiscordTooltip": "Discord",
+  "communityGitHubTooltip": "GitHub",
   "revisionInfo": "フロントエンド: {frontend}  /  バックエンド: {backend}",
 
   "selectImageSource": "画像の選択元",

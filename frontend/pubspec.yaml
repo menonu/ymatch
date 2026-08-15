@@ -83,10 +83,11 @@ flutter:
   # (configured via l10n.yaml). See issue #207.
   generate: true
 
-  # Brand marks used by CommunityCard (#570).
+  # Brand marks used by CommunityCard (#570, #573).
   assets:
     - icons/x.svg
     - icons/discord.svg
+    - icons/github.svg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

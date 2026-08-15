@@ -481,48 +481,50 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Community card sits next to Settings on a wide viewport (#570)',
-    (tester) async {
-      tester.view.physicalSize = const Size(880, 640);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Community card sits next to Settings on a wide viewport (#570)', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(880, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authProvider.overrideWith((ref) => MockAuthController(_user())),
-            backendSystemStatusProvider.overrideWith((ref) async => {}),
-          ],
-          child: _localized(const ProfileScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          backendSystemStatusProvider.overrideWith((ref) async => {}),
+        ],
+        child: _localized(const ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final settings = tester.getRect(
-        find.byKey(const Key('app-settings-section')),
-      );
-      final community = tester.getRect(
-        find.byKey(const Key('community-section')),
-      );
+    final settings = tester.getRect(
+      find.byKey(const Key('app-settings-section')),
+    );
+    final community = tester.getRect(
+      find.byKey(const Key('community-section')),
+    );
 
-      expect(community.left, greaterThan(settings.right - 1));
-      expect(community.top, lessThan(settings.bottom));
-      // Community is compact; the language control in Settings must stay usable
-      // after adding the third column (#562 / #570).
-      final language = tester.getRect(
-        find.byType(SegmentedButton<AppLanguagePreference>),
-      );
-      expect(language.width, greaterThan(220));
-      expect(find.text('Community'), findsOneWidget);
-      // Icons only — no network name labels in the card body.
-      expect(find.text('Discord'), findsNothing);
-      // Profile tests do not pass --dart-define URLs; icons stay hidden (#572).
-      expect(find.byKey(const Key('community-x')), findsNothing);
-      expect(find.byKey(const Key('community-discord')), findsNothing);
-    },
-  );
+    expect(community.left, greaterThan(settings.right - 1));
+    expect(community.top, lessThan(settings.bottom));
+    // Community is compact; the language control in Settings must stay usable
+    // after adding the third column (#562 / #570).
+    final language = tester.getRect(
+      find.byType(SegmentedButton<AppLanguagePreference>),
+    );
+    expect(language.width, greaterThan(220));
+    expect(find.text('Community'), findsOneWidget);
+    // Icons only — no network name labels in the card body.
+    expect(find.text('Discord'), findsNothing);
+    expect(find.text('GitHub'), findsNothing);
+    // Profile tests do not pass --dart-define URLs; X/Discord stay hidden (#572).
+    // GitHub is hardcoded and always shown (#573).
+    expect(find.byKey(const Key('community-x')), findsNothing);
+    expect(find.byKey(const Key('community-discord')), findsNothing);
+    expect(find.byKey(const Key('community-github')), findsOneWidget);
+  });
 
   testWidgets(
     'language control stays usable at the 840px three-column switchover (#570)',

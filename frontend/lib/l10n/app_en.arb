@@ -380,6 +380,10 @@
   "@communityDiscordTooltip": {
     "description": "Tooltip / a11y label for the official Discord invite (#570)"
   },
+  "communityGitHubTooltip": "GitHub",
+  "@communityGitHubTooltip": {
+    "description": "Tooltip / a11y label for the public GitHub repository (#573)"
+  },
 
   "revisionInfo": "frontend: {frontend}  /  backend: {backend}",
   "@revisionInfo": {

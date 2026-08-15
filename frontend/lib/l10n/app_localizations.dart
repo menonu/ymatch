@@ -590,6 +590,12 @@ abstract class AppLocalizations {
   /// **'Discord'**
   String get communityDiscordTooltip;
 
+  /// Tooltip / a11y label for the public GitHub repository (#573)
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub'**
+  String get communityGitHubTooltip;
+
   /// Footer showing frontend and backend revision hashes
   ///
   /// In en, this message translates to:

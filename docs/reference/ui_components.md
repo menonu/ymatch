@@ -50,7 +50,7 @@ used throughout this document.
 | `MapPickerScreen` | `screens/map_picker_screen.dart` | Location selection via OpenStreetMap; tap pin, place search (Nominatim), GPS my-location (#448) |
 | `ProfileScreen` | `screens/profile_screen.dart` | Username, UUID, trading instructions, inlined app settings + community (#562, #570) |
 | `AppSettingsSection` | `screens/settings_screen.dart` | Language + match notifications next to the username card (#545, #179, #562); theme forced light (#553) |
-| `CommunityCard` | `widgets/community_card.dart` | Icon-only X / Discord links next to the Settings card (#570); URLs from `--dart-define` / GitHub Secrets (#572) |
+| `CommunityCard` | `widgets/community_card.dart` | Icon-only X / Discord / GitHub next to the Settings card (#570, #573); X/Discord URLs from `--dart-define` / Secrets (#572); GitHub hardcoded |
 | `AdminDashboardScreen` | `screens/admin_dashboard_screen.dart` | Admin panel with 6 tabs (System, Users, Events, Groups, Items, Matches) plus Debug in debug builds only (#499). Events/Groups support change creator + manage editors (#432). |
 
 ## Navigation
