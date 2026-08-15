@@ -3,14 +3,15 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 
-/// Official community links on the Settings tab (#570, #572).
+/// Official community links on the Settings tab (#570, #572, #573).
 ///
 /// Icons only — brand names live in tooltips / semantics, not as labels.
 /// Marks are the Simple Icons SVGs in `frontend/icons/`.
 ///
-/// Destinations come from `--dart-define` (`X_PROFILE_URL`,
-/// `DISCORD_INVITE_URL`), injected at deploy from GitHub Secrets. An icon is
-/// omitted when its URL is unset or not `https`.
+/// X and Discord destinations come from `--dart-define` (`X_PROFILE_URL`,
+/// `DISCORD_INVITE_URL`), injected at deploy from GitHub Secrets. Those icons
+/// are omitted when the URL is unset or not `https`. GitHub is always shown
+/// with a hardcoded public repo URL (#573).
 class CommunityCard extends StatelessWidget {
   const CommunityCard({
     super.key,
@@ -35,8 +36,12 @@ class CommunityCard extends StatelessWidget {
     'DISCORD_INVITE_URL',
   );
 
+  /// Public source repository — hardcoded, not secret-injected (#573).
+  static const githubRepoUrl = 'https://github.com/menonu/ymatch';
+
   static const xIconAsset = 'icons/x.svg';
   static const discordIconAsset = 'icons/discord.svg';
+  static const githubIconAsset = 'icons/github.svg';
 
   /// Accepts trimmed `https` URLs only; anything else is treated as unset.
   static Uri? resolveHttpsUrl(String raw) {
@@ -59,12 +64,15 @@ class CommunityCard extends StatelessWidget {
   Uri? get _discordUri =>
       resolveHttpsUrl(discordInviteUrl ?? discordInviteUrlFromEnvironment);
 
+  Uri get _githubUri => Uri.parse(githubRepoUrl);
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final iconColor = Theme.of(context).colorScheme.onSurface;
     final xUri = _xUri;
     final discordUri = _discordUri;
+    final githubUri = _githubUri;
 
     return Card(
       key: const Key('community-section'),
@@ -81,33 +89,35 @@ class CommunityCard extends StatelessWidget {
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            if (xUri != null || discordUri != null) ...[
-              const SizedBox(height: 16),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (xUri != null)
-                    IconButton(
-                      key: const Key('community-x'),
-                      tooltip: l10n.communityXTooltip,
-                      style: _iconHitTarget,
-                      onPressed: () => _open(context, xUri, l10n),
-                      icon: _BrandIcon(asset: xIconAsset, color: iconColor),
-                    ),
-                  if (discordUri != null)
-                    IconButton(
-                      key: const Key('community-discord'),
-                      tooltip: l10n.communityDiscordTooltip,
-                      style: _iconHitTarget,
-                      onPressed: () => _open(context, discordUri, l10n),
-                      icon: _BrandIcon(
-                        asset: discordIconAsset,
-                        color: iconColor,
-                      ),
-                    ),
-                ],
-              ),
-            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (xUri != null)
+                  IconButton(
+                    key: const Key('community-x'),
+                    tooltip: l10n.communityXTooltip,
+                    style: _iconHitTarget,
+                    onPressed: () => _open(context, xUri, l10n),
+                    icon: _BrandIcon(asset: xIconAsset, color: iconColor),
+                  ),
+                if (discordUri != null)
+                  IconButton(
+                    key: const Key('community-discord'),
+                    tooltip: l10n.communityDiscordTooltip,
+                    style: _iconHitTarget,
+                    onPressed: () => _open(context, discordUri, l10n),
+                    icon: _BrandIcon(asset: discordIconAsset, color: iconColor),
+                  ),
+                IconButton(
+                  key: const Key('community-github'),
+                  tooltip: l10n.communityGitHubTooltip,
+                  style: _iconHitTarget,
+                  onPressed: () => _open(context, githubUri, l10n),
+                  icon: _BrandIcon(asset: githubIconAsset, color: iconColor),
+                ),
+              ],
+            ),
           ],
         ),
       ),

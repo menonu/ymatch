@@ -1,4 +1,4 @@
-// Widget tests for CommunityCard (#570).
+// Widget tests for CommunityCard (#570, #572, #573).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -33,18 +33,31 @@ void main() {
     },
   );
 
-  testWidgets('hides X and Discord when URLs are not injected (#572)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_wrap(const CommunityCard()));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Community'), findsOneWidget);
-    expect(find.byKey(const Key('community-x')), findsNothing);
-    expect(find.byKey(const Key('community-discord')), findsNothing);
+  test('hardcoded GitHub repo URL is public https (#573)', () {
+    expect(CommunityCard.githubRepoUrl, 'https://github.com/menonu/ymatch');
+    expect(
+      CommunityCard.resolveHttpsUrl(CommunityCard.githubRepoUrl),
+      Uri.parse(CommunityCard.githubRepoUrl),
+    );
   });
 
-  testWidgets('shows icon-only X / Discord when https URLs are injected', (
+  testWidgets(
+    'always shows GitHub; hides X and Discord when not injected (#572, #573)',
+    (tester) async {
+      await tester.pumpWidget(_wrap(const CommunityCard()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Community'), findsOneWidget);
+      expect(find.byKey(const Key('community-github')), findsOneWidget);
+      expect(find.byTooltip('GitHub'), findsOneWidget);
+      expect(find.text('GitHub'), findsNothing);
+      expect(find.byKey(const Key('community-x')), findsNothing);
+      expect(find.byKey(const Key('community-discord')), findsNothing);
+      expect(_svgAssets(tester), [CommunityCard.githubIconAsset]);
+    },
+  );
+
+  testWidgets('shows icon-only X / Discord / GitHub when URLs are set', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -59,14 +72,21 @@ void main() {
 
     expect(find.byKey(const Key('community-x')), findsOneWidget);
     expect(find.byKey(const Key('community-discord')), findsOneWidget);
+    expect(find.byKey(const Key('community-github')), findsOneWidget);
     expect(find.byTooltip('X'), findsOneWidget);
     expect(find.byTooltip('Discord'), findsOneWidget);
+    expect(find.byTooltip('GitHub'), findsOneWidget);
     // Visible labels for the networks must not appear — icons only.
     expect(find.text('X'), findsNothing);
     expect(find.text('Discord'), findsNothing);
+    expect(find.text('GitHub'), findsNothing);
     expect(
       _svgAssets(tester),
-      containsAll([CommunityCard.xIconAsset, CommunityCard.discordIconAsset]),
+      containsAll([
+        CommunityCard.xIconAsset,
+        CommunityCard.discordIconAsset,
+        CommunityCard.githubIconAsset,
+      ]),
     );
   });
 
@@ -78,6 +98,7 @@ void main() {
 
     expect(find.text('コミュニティ'), findsOneWidget);
     expect(find.text('Community'), findsNothing);
+    expect(find.byTooltip('GitHub'), findsOneWidget);
   });
 
   testWidgets('tapping X launches the injected profile URL (#572)', (
@@ -126,6 +147,28 @@ void main() {
     await tester.pump();
 
     expect(launched.single.toString(), discordUrl);
+  });
+
+  testWidgets('tapping GitHub launches the hardcoded repo URL (#573)', (
+    tester,
+  ) async {
+    final launched = <Uri>[];
+    await tester.pumpWidget(
+      _wrap(
+        CommunityCard(
+          launchUrlOverride: (uri) async {
+            launched.add(uri);
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('community-github')));
+    await tester.pump();
+
+    expect(launched.single.toString(), CommunityCard.githubRepoUrl);
   });
 
   testWidgets('failed launch shows a snackbar', (tester) async {
