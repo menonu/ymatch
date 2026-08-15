@@ -130,9 +130,10 @@ class _NotificationsTile extends StatelessWidget {
                   ? Icons.notifications_active_outlined
                   : Icons.notifications_off_outlined,
             ),
-      // Section header is "Match notifications"; avoid repeating the long
-      // description under it. Status/error text only when relevant.
-      title: subtitle != null
+      // Section header is the short label; the tile title is the
+      // description (once). Status/error sits under it when relevant (#568).
+      title: Text(l10n.settingsNotificationsSubtitle),
+      subtitle: subtitle != null
           ? Text(
               subtitle,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -143,8 +144,7 @@ class _NotificationsTile extends StatelessWidget {
                     : theme.colorScheme.onSurfaceVariant,
               ),
             )
-          : const SizedBox.shrink(),
-      subtitle: null,
+          : null,
       value: push.isOn,
       onChanged: onChanged,
     );
