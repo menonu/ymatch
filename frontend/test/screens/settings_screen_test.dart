@@ -76,7 +76,11 @@ void main() {
     expect(find.text('日本語'), findsOneWidget);
     expect(find.text('Light'), findsNothing);
     expect(find.text('Dark'), findsNothing);
-    expect(find.text('Match notifications'), findsWidgets);
+    expect(find.text('Match notifications'), findsOneWidget);
+    expect(
+      find.text('Background alerts when the system finds a new match'),
+      findsOneWidget,
+    );
     expect(find.text('Not available in this browser'), findsOneWidget);
   });
 
@@ -107,6 +111,9 @@ void main() {
     // Screen strings switch to JA once MaterialApp.locale updates.
     expect(find.text('設定'), findsOneWidget);
     expect(find.text('言語'), findsOneWidget);
+    expect(find.text('マッチ通知'), findsOneWidget);
+    expect(find.text('新しいマッチが見つかったときにバックグラウンドで通知します'), findsOneWidget);
+    expect(find.text('このブラウザでは利用できません'), findsOneWidget);
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('app_settings_language'), 'ja');
@@ -173,6 +180,67 @@ void main() {
         tester.binding.platformDispatcher.platformBrightness,
         Brightness.dark,
       );
+    },
+  );
+
+  testWidgets(
+    'on/off push shows the match-notification description once (#568)',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          overrides: [
+            appSettingsProvider.overrideWith(
+              (ref) => AppSettingsController(initial: AppSettings.defaults),
+            ),
+            webPushProvider.overrideWith(
+              (ref) => _fixedPush(
+                ref,
+                const WebPushState(status: WebPushUiStatus.off),
+              ),
+            ),
+          ],
+          child: const AppSettingsSection(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Match notifications'), findsOneWidget);
+      expect(
+        find.text('Background alerts when the system finds a new match'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Japanese on/off push shows the match-notification description once (#568)',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          locale: const Locale('ja'),
+          overrides: [
+            appSettingsProvider.overrideWith(
+              (ref) => AppSettingsController(
+                initial: const AppSettings(
+                  language: AppLanguagePreference.japanese,
+                ),
+              ),
+            ),
+            webPushProvider.overrideWith(
+              (ref) => _fixedPush(
+                ref,
+                const WebPushState(status: WebPushUiStatus.on),
+              ),
+            ),
+          ],
+          child: const AppSettingsSection(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('マッチ通知'), findsOneWidget);
+      expect(find.text('新しいマッチが見つかったときにバックグラウンドで通知します'), findsOneWidget);
+      expect(find.text('このブラウザでは利用できません'), findsNothing);
     },
   );
 }

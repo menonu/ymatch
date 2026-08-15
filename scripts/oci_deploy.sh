@@ -56,7 +56,9 @@ echo "Building and starting containers (this may take 10-20 minutes on first run
 
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="https://${DOMAIN}" \
-  --build-arg GIT_HASH="$GIT_HASH"
+  --build-arg GIT_HASH="$GIT_HASH" \
+  --build-arg X_PROFILE_URL="${X_PROFILE_URL:-}" \
+  --build-arg DISCORD_INVITE_URL="${DISCORD_INVITE_URL:-}"
 
 oci_compose "$REPO_DIR" up -d
 

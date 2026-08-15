@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -267,6 +268,18 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsNotificationsError => '通知設定を更新できませんでした';
+
+  @override
+  String get community => 'コミュニティ';
+
+  @override
+  String get communityXTooltip => 'X';
+
+  @override
+  String get communityDiscordTooltip => 'Discord';
+
+  @override
+  String get communityGitHubTooltip => 'GitHub';
 
   @override
   String revisionInfo(String frontend, String backend) {

@@ -17,6 +17,8 @@
 #   DB_PASSWORD      - alternative to first positional argument
 #   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
 #                    - Web Push (#179); CI maps VAPID_* GitHub secrets here
+#   X_PROFILE_URL / DISCORD_INVITE_URL
+#                    - Community card (#572); CI maps same-named GitHub secrets
 
 set -euo pipefail
 
@@ -62,6 +64,8 @@ echo "Building and starting production containers..."
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="https://${DOMAIN}" \
   --build-arg GIT_HASH="$GIT_HASH" \
+  --build-arg X_PROFILE_URL="${X_PROFILE_URL:-}" \
+  --build-arg DISCORD_INVITE_URL="${DISCORD_INVITE_URL:-}" \
   backend frontend caddy
 
 oci_compose_up_stack "$REPO_DIR"

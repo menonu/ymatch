@@ -51,6 +51,7 @@ dependencies:
   image_picker: ^1.2.1
   geolocator: ^14.0.3
   web: ^1.1.1
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +67,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   json_serializable: ^6.11.3
   build_runner: ^2.10.4
+  # Direct imports in test/scenarios/user_journey_test.dart (#575).
+  image_picker_platform_interface: ^2.11.1
+  plugin_platform_interface: ^2.1.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -82,10 +86,11 @@ flutter:
   # (configured via l10n.yaml). See issue #207.
   generate: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # Brand marks used by CommunityCard (#570, #573).
+  assets:
+    - icons/x.svg
+    - icons/discord.svg
+    - icons/github.svg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

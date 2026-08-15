@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
+import '../widgets/community_card.dart';
 import '../widgets/how_to_trade.dart';
 import 'settings_screen.dart';
 
@@ -61,8 +62,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final l10n = AppLocalizations.of(context)!;
-    if (user == null)
+    if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       appBar: AppBar(),
@@ -107,6 +109,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   /// Place app settings beside the username card when the viewport is wide
   /// enough for an unscaled language control in each column (#562).
+  /// Community sits in the same row as Settings on that breakpoint (#570).
   static const _wideBreakpoint = 840.0;
 
   Widget _usernameAndSettings(
@@ -115,6 +118,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     AppLocalizations l10n,
   ) {
     final usernameCard = _usernameCard(context, user, l10n);
+    const settingsCard = AppSettingsSection();
+    const communityCard = CommunityCard();
     final sideBySide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
     if (sideBySide) {
       return Row(
@@ -122,7 +127,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Expanded(child: usernameCard),
           const SizedBox(width: 16),
-          const Expanded(child: AppSettingsSection()),
+          const Expanded(child: settingsCard),
+          const SizedBox(width: 16),
+          communityCard,
         ],
       );
     }
@@ -131,7 +138,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       children: [
         usernameCard,
         const SizedBox(height: 24),
-        const AppSettingsSection(),
+        settingsCard,
+        const SizedBox(height: 24),
+        communityCard,
       ],
     );
   }
@@ -246,7 +255,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             await Clipboard.setData(
                               ClipboardData(text: user.uuid),
                             );
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(l10n.masterKeyCopied)),
                               );
@@ -301,7 +310,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final backendRev = statusAsync.when(
       data: (data) => (data['backend_version'] as String?) ?? 'unknown',
       loading: () => '...',
-      error: (_, __) => 'error',
+      error: (_, _) => 'error',
     );
     final l10n = AppLocalizations.of(context)!;
     return Text(

@@ -578,6 +578,30 @@ abstract class AppLocalizations {
   /// **'Could not update notifications'**
   String get settingsNotificationsError;
 
+  /// Community card title on the Settings tab (#570)
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get community;
+
+  /// Tooltip / a11y label for the official X profile link (#570)
+  ///
+  /// In en, this message translates to:
+  /// **'X'**
+  String get communityXTooltip;
+
+  /// Tooltip / a11y label for the official Discord invite (#570)
+  ///
+  /// In en, this message translates to:
+  /// **'Discord'**
+  String get communityDiscordTooltip;
+
+  /// Tooltip / a11y label for the public GitHub repository (#573)
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub'**
+  String get communityGitHubTooltip;
+
   /// Footer showing frontend and backend revision hashes
   ///
   /// In en, this message translates to:
