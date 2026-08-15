@@ -90,6 +90,97 @@ void main() {
         reason: 'optimistic state should be rolled back on failure',
       );
     });
+
+    test('optimistic update shifts reserved projected delta (#427)', () async {
+      Map<String, dynamic>? posted;
+      final api = _apiWith(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/user/1/inventory') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 1,
+                  'userId': 1,
+                  'merchId': 10,
+                  'status': 'HAVE',
+                  'quantity': 2,
+                  'projectedQuantity': 1,
+                },
+              ]),
+              200,
+            );
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/user/inventory') {
+            posted = jsonDecode(request.body) as Map<String, dynamic>;
+            return http.Response(jsonEncode(posted), 200);
+          }
+          return http.Response(jsonEncode([]), 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(inventoryProvider(1).notifier);
+      await container.read(inventoryProvider(1).future);
+      await notifier.updateItem(10, 'HAVE', 3);
+
+      final item = notifier.state.value!.single;
+      expect(item.quantity, 3);
+      expect(item.projectedQuantity, 2);
+      expect(posted!['quantity'], 3);
+      expect(posted!.containsKey('projectedQuantity'), isFalse);
+    });
+
+    test(
+      'rollback restores projectedQuantity when POST fails (#427)',
+      () async {
+        final api = _apiWith(
+          client: MockClient((request) async {
+            if (request.method == 'GET' &&
+                request.url.path == '/api/v1/user/1/inventory') {
+              return http.Response(
+                jsonEncode([
+                  {
+                    'id': 1,
+                    'userId': 1,
+                    'merchId': 10,
+                    'status': 'HAVE',
+                    'quantity': 2,
+                    'projectedQuantity': 1,
+                  },
+                ]),
+                200,
+              );
+            }
+            if (request.method == 'POST' &&
+                request.url.path == '/api/v1/user/inventory') {
+              return http.Response('Internal Server Error', 500);
+            }
+            return http.Response(jsonEncode([]), 200);
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [apiClientProvider.overrideWith((ref) => api)],
+        );
+        addTearDown(container.dispose);
+
+        final notifier = container.read(inventoryProvider(1).notifier);
+        await container.read(inventoryProvider(1).future);
+
+        await expectLater(
+          notifier.updateItem(10, 'HAVE', 3),
+          throwsA(isA<Exception>()),
+        );
+
+        final item = notifier.state.value!.single;
+        expect(item.quantity, 2);
+        expect(item.projectedQuantity, 1);
+      },
+    );
   });
 
   group('EventsController fire-and-forget toggles', () {

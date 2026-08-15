@@ -135,7 +135,7 @@ BottomNavBar
   - **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale; default **System**. Client-only via `SharedPreferences` (no backend sync)
   - **Match notifications**: Web Push toggle (#179)
   - **Theme**: forced **light** for all users (`ThemeMode.light`); selector removed due to dark-mode visibility issues (#553). `AppTheme.darkTheme` remains for a future re-introduction
-- **Instructions Card**: 3-step "How to Trade" guide
+- **Instructions Card**: 3-step "How to Trade" guide + projected-qty note (#427)
 - **Logout Button**: Red themed
 - **Revision Info**: Frontend/backend git hashes
 - Old `/profile/settings` redirects to `/profile`

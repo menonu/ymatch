@@ -130,7 +130,7 @@ used throughout this document.
 | `MatchCard` | `TradeListScreen` | User avatar, status chip, local match datetime (#476), item chips, action buttons |
 | `ProfileCard` | `ProfileScreen` | Avatar, editable username, UUID section |
 | `AppSettingsSection` | `ProfileScreen` | Language + match notifications next to username card (#562) |
-| `InstructionsCard` | `ProfileScreen` | 3-step "How to Trade" guide |
+| `InstructionsCard` | `ProfileScreen` | 3-step "How to Trade" guide + projected-qty note |
 | `SystemStatusCard` | `AdminDashboardScreen` | Memory, CPU, uptime, OS info |
 | `DebugCard` | `AdminDashboardScreen` | Version info, test data generation |
 
@@ -276,13 +276,14 @@ used throughout this document.
 
 ## How-to Guide Components (#336)
 
-The "How to Trade" guide (3 steps, l10n keys `howToTrade` / `tradeStep1–3`) is
+The "How to Trade" guide (3 steps + projected-qty note, l10n keys
+`howToTrade` / `tradeStep1–4`) is
 the single source of truth in `widgets/how_to_trade.dart` and is surfaced in
 three places so new users can find it without digging into the Settings tab.
 
 | Identifier | File | EN UI label | JA UI label | Where it appears |
 |------------|------|-------------|-------------|------------------|
-| `HowToTradeContent` | `widgets/how_to_trade.dart` | "How to Trade" guide (title + 4 steps) | 「取引方法」ガイド（見出し＋4ステップ） | `ProfileScreen` (`InstructionsCard`), `HowToTradeSheet` |
+| `HowToTradeContent` | `widgets/how_to_trade.dart` | "How to Trade" guide (title + 3 steps + projected-qty note) | 「取引方法」ガイド（見出し＋3ステップ＋括弧の説明） | `ProfileScreen` (`InstructionsCard`), `HowToTradeSheet` |
 | `showHowToTradeSheet` | `widgets/how_to_trade.dart` | Guide bottom sheet | 取引ガイド シート | Opened by `HowToTradeIconButton` |
 | `HowToTradeIconButton` | `widgets/how_to_trade.dart` | AppBar help (?) icon | AppBarヘルプ（？）アイコン | `HomeScreen`, `EventDetailScreen` AppBar |
 | `VirtualProfileTabBar` | `widgets/how_to_trade.dart` | Virtual Settings tab preview | 仮想設定タブ | `LoginScreen` bottom-nav area |

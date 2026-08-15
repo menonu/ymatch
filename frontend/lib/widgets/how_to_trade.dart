@@ -8,7 +8,8 @@ import '../providers/providers.dart';
 ///
 /// This is the single source of truth for the guide content, so the Settings
 /// tab card and the Home AppBar info-icon sheet show the exact same steps
-/// (sourced from the `howToTrade` / `tradeStep1–4` l10n keys). Extracted in
+/// (sourced from the `howToTrade` / `tradeStep1–3` keys plus `tradeStep4`
+/// as an unnumbered notation note). Extracted in
 /// #336 so new users can reach the guide without digging into the Settings tab.
 class HowToTradeContent extends StatelessWidget {
   const HowToTradeContent({super.key});
@@ -39,7 +40,15 @@ class HowToTradeContent extends StatelessWidget {
         HowToTradeStep(step: '1', text: l10n.tradeStep1),
         HowToTradeStep(step: '2', text: l10n.tradeStep2),
         HowToTradeStep(step: '3', text: l10n.tradeStep3),
-        HowToTradeStep(step: '4', text: l10n.tradeStep4),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            l10n.tradeStep4,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ],
     );
   }
