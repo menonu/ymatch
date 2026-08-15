@@ -70,13 +70,6 @@ class AppSettingsSection extends ConsumerWidget {
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 4),
-            Text(
-              l10n.settingsNotificationsSubtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
             const SizedBox(height: 8),
             _NotificationsTile(
               push: push,
@@ -137,9 +130,9 @@ class _NotificationsTile extends StatelessWidget {
                   ? Icons.notifications_active_outlined
                   : Icons.notifications_off_outlined,
             ),
-      // Section header already says "Match notifications"; tile shows subtitle.
-      title: Text(l10n.settingsNotificationsSubtitle),
-      subtitle: subtitle != null
+      // Section header is "Match notifications"; avoid repeating the long
+      // description under it. Status/error text only when relevant.
+      title: subtitle != null
           ? Text(
               subtitle,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -150,7 +143,8 @@ class _NotificationsTile extends StatelessWidget {
                     : theme.colorScheme.onSurfaceVariant,
               ),
             )
-          : null,
+          : const SizedBox.shrink(),
+      subtitle: null,
       value: push.isOn,
       onChanged: onChanged,
     );
