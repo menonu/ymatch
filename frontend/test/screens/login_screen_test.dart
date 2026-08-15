@@ -106,8 +106,8 @@ void main() {
   );
 
   testWidgets(
-    'LoginScreen shows a virtual Profile tab + long arrow pointing to it '
-    '(#336)',
+    'LoginScreen shows a virtual Settings tab + long arrow pointing to it '
+    '(#336, #562)',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -117,19 +117,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Hint points the user to the Profile tab (read after login).
+      // Hint points the user to the Settings tab (read after login).
       expect(
         find.text(
-          'The How to Trade guide is in the Profile tab — tap it after '
+          'The How to Trade guide is in the Settings tab — tap it after '
           'logging in to read it.',
         ),
         findsOneWidget,
       );
       // A long arrow draws the eye down toward the bottom-nav area.
       expect(find.byType(LongDownArrow), findsOneWidget);
-      // The virtual Profile tab is rendered where the real nav bar will be.
+      // The virtual Settings tab is rendered where the real nav bar will be.
       expect(find.byType(VirtualProfileTabBar), findsOneWidget);
-      expect(find.text('Profile'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.byIcon(Icons.settings), findsOneWidget);
       // The Items / Matches tabs are irrelevant here and are hidden.
       expect(find.text('Items'), findsNothing);
       expect(find.text('Matches'), findsNothing);
@@ -138,8 +139,8 @@ void main() {
     },
   );
 
-  testWidgets('LoginScreen virtual Profile tab is disabled — tapping shows '
-      '"Available after login" and does not open the guide (#336)', (
+  testWidgets('LoginScreen virtual Settings tab is disabled — tapping shows '
+      '"Available after login" and does not open the guide (#336, #562)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -150,7 +151,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Profile'));
+    await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
     // Tapping the virtual tab tells the user it is available after login…

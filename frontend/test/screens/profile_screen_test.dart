@@ -1,7 +1,7 @@
-// Widget tests for ProfileScreen (#319, #454).
+// Widget tests for ProfileScreen (#319, #454, #562).
 //
 // Covers How-to-Trade copy, null-user loading, username edit success/failure,
-// logout, and backend revision error path.
+// logout, backend revision error path, and inlined app settings.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -231,14 +231,14 @@ void main() {
 
     expect(find.byType(TextField), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'newname');
-    await tester.tap(find.byIcon(Icons.check));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
     await tester.pumpAndSettle();
 
     expect(auth.lastUpdatedUsername, 'newname');
     expect(find.text('newname'), findsOneWidget);
     expect(find.text('Username updated'), findsOneWidget);
     // Edit mode closed.
-    expect(find.byIcon(Icons.check), findsNothing);
+    expect(find.widgetWithIcon(IconButton, Icons.check), findsNothing);
   });
 
   testWidgets(
@@ -340,12 +340,12 @@ void main() {
     await tester.tap(find.byTooltip('Edit username'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'taken-name');
-    await tester.tap(find.byIcon(Icons.check));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Failed to update username:'), findsOneWidget);
     // Still in edit mode after failure (username not committed).
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.widgetWithIcon(IconButton, Icons.check), findsOneWidget);
   });
 
   testWidgets('empty username save is a no-op (#454)', (tester) async {
@@ -364,12 +364,12 @@ void main() {
     await tester.tap(find.byTooltip('Edit username'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '   ');
-    await tester.tap(find.byIcon(Icons.check));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
     await tester.pumpAndSettle();
 
     expect(auth.lastUpdatedUsername, isNull);
     expect(find.byType(SnackBar), findsNothing);
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.widgetWithIcon(IconButton, Icons.check), findsOneWidget);
   });
 
   testWidgets('Log Out calls authController.logout (#454)', (tester) async {
@@ -394,7 +394,9 @@ void main() {
     expect(auth.logoutCalls, 1);
   });
 
-  testWidgets('Profile exposes Settings entry (#545)', (tester) async {
+  testWidgets('profile inlines language and notification settings (#562)', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -406,9 +408,76 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Settings'));
-    await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Match notifications'), findsWidgets);
+    expect(find.byType(SegmentedButton<AppLanguagePreference>), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsOneWidget);
+    // Nested Settings entry (list tile → /profile/settings) is gone.
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
   });
+
+  testWidgets(
+    'settings sit next to the username card on a wide viewport (#562)',
+    (tester) async {
+      tester.view.physicalSize = const Size(880, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(
+              (ref) => MockAuthController(_user(username: 'alice')),
+            ),
+            backendSystemStatusProvider.overrideWith((ref) async => {}),
+          ],
+          child: _localized(const ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final userCard = tester.getRect(
+        find.byKey(const Key('profile-username-card')),
+      );
+      final settings = tester.getRect(
+        find.byKey(const Key('app-settings-section')),
+      );
+
+      expect(settings.left, greaterThan(userCard.right - 1));
+      expect(settings.top, lessThan(userCard.bottom));
+    },
+  );
+
+  testWidgets(
+    'settings stack below the username card on a narrow viewport (#562)',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(
+              (ref) => MockAuthController(_user(username: 'alice')),
+            ),
+            backendSystemStatusProvider.overrideWith((ref) async => {}),
+          ],
+          child: _localized(const ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final userCard = tester.getRect(
+        find.byKey(const Key('profile-username-card')),
+      );
+      final settings = tester.getRect(
+        find.byKey(const Key('app-settings-section')),
+      );
+
+      expect(settings.top, greaterThan(userCard.bottom - 1));
+    },
+  );
 }

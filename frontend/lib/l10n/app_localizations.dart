@@ -230,10 +230,10 @@ abstract class AppLocalizations {
   /// **'Matches'**
   String get navMatches;
 
-  /// Bottom navigation bar label for the profile tab
+  /// Bottom navigation bar label for the settings tab (#562)
   ///
   /// In en, this message translates to:
-  /// **'Profile'**
+  /// **'Settings'**
   String get navProfile;
 
   /// Bottom navigation bar label for the admin tab
@@ -482,7 +482,7 @@ abstract class AppLocalizations {
   /// **'Log Out'**
   String get logOut;
 
-  /// App settings screen title and Profile entry label (#545)
+  /// App settings section title on the Settings tab (#545, #562)
   ///
   /// In en, this message translates to:
   /// **'Settings'**
@@ -1316,13 +1316,13 @@ abstract class AppLocalizations {
   /// **'No completed trades yet.'**
   String get noCompletedTrades;
 
-  /// Hint shown on the login screen pointing new users to the how-to guide, which lives behind the Profile tab (available after login)
+  /// Hint shown on the login screen pointing new users to the how-to guide, which lives behind the Settings tab (available after login)
   ///
   /// In en, this message translates to:
-  /// **'The How to Trade guide is in the Profile tab — tap it after logging in to read it.'**
+  /// **'The How to Trade guide is in the Settings tab — tap it after logging in to read it.'**
   String get howToHint;
 
-  /// Shown when the virtual Profile tab preview on the login screen is tapped — the tab is not usable until after login
+  /// Shown when the virtual Settings tab preview on the login screen is tapped — the tab is not usable until after login
   ///
   /// In en, this message translates to:
   /// **'Available after login'**

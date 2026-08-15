@@ -12,7 +12,7 @@
 |-----|----------|------|--------|-------------|
 | Items | アイテム | `event_outlined` | `HomeScreen` | Event list, search, favorites |
 | Matches | マッチ | `swap_horiz_outlined` | `TradeListScreen` | Trade matches with badge count |
-| Profile | プロフィール | `person_outlined` | `ProfileScreen` | User profile, UUID, settings |
+| Settings | 設定 | `settings_outlined` | `ProfileScreen` | Username, UUID, language, notifications |
 | Admin | 管理 | `admin_panel_settings_outlined` | `AdminDashboardScreen` | Admin/moderator only, conditional |
 
 > **Terminology:** the first tab is labeled **Items / アイテム** in the UI but
@@ -30,9 +30,8 @@ BottomNavBar
 │   ├── TradeListScreen (match list)
 │   └── ChatScreen (messaging per match)
 │       └── MapPickerScreen (location selection)
-├── Profile Tab
-│   ├── ProfileScreen
-│   └── SettingsScreen (language prefs, #545; theme forced light #553)
+├── Settings Tab (`/profile`)
+│   └── ProfileScreen (username + inlined AppSettingsSection, #562)
 └── Admin Tab (conditional)
     └── AdminDashboardScreen
 ```
@@ -49,8 +48,8 @@ BottomNavBar
   - "Restore Existing Account" — shows UUID input form
 - **How-to pointer (#336)**: in the default new-user state, a hint line
   (`howToHint`) + a long down arrow + a `VirtualProfileTabBar` (a dashed
-  "virtual" Profile tab) rendered in the bottom-nav area — the same area the
-  real nav bar occupies after login. Only the Profile tab is shown (Items /
+  "virtual" Settings tab) rendered in the bottom-nav area — the same area the
+  real nav bar occupies after login. Only the Settings tab is shown (Items /
   Matches hidden), in its real rightmost position. Tapping it does **not**
   open the guide; it shows the `howToPreviewTabHint` snackbar ("Available
   after login" / ログイン後に使用できます). Hidden during backend error /
@@ -129,19 +128,17 @@ BottomNavBar
 - "Confirm" button returns `LatLng`
 - Default center: Tokyo when GPS is unavailable
 
-### ProfileScreen
+### ProfileScreen (Settings tab)
 
-- **Profile Card**: Avatar, editable username (inline), UUID with copy button, warning text
+- **Username Card**: Avatar, editable username (inline), UUID with copy button, warning text
+- **App settings** (`AppSettingsSection`, #562): sits **next to** the username card on wide viewports (≥840px) and stacks below it on narrower widths
+  - **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale; default **System**. Client-only via `SharedPreferences` (no backend sync)
+  - **Match notifications**: Web Push toggle (#179)
+  - **Theme**: forced **light** for all users (`ThemeMode.light`); selector removed due to dark-mode visibility issues (#553). `AppTheme.darkTheme` remains for a future re-introduction
 - **Instructions Card**: 3-step "How to Trade" guide
-- **Settings entry** (#545): list tile → `SettingsScreen` (`/profile/settings`)
 - **Logout Button**: Red themed
 - **Revision Info**: Frontend/backend git hashes
-
-### SettingsScreen (#545)
-
-- Opened from Profile; client-only prefs via `SharedPreferences` (no backend sync)
-- **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale; default **System**
-- **Theme**: forced **light** for all users (`ThemeMode.light`); selector removed due to dark-mode visibility issues (#553). `AppTheme.darkTheme` remains for a future re-introduction.
+- Old `/profile/settings` redirects to `/profile`
 
 ### AdminDashboardScreen
 

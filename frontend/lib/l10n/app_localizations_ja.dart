@@ -78,7 +78,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get navMatches => 'マッチ';
 
   @override
-  String get navProfile => 'プロフィール';
+  String get navProfile => '設定';
 
   @override
   String get navAdmin => '管理';
@@ -668,7 +668,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get noCompletedTrades => '完了した取引はまだありません。';
 
   @override
-  String get howToHint => '取引ガイドはプロフィールタブにあります。ログイン後にタップして確認しましょう。';
+  String get howToHint => '取引ガイドは設定タブにあります。ログイン後にタップして確認しましょう。';
 
   @override
   String get howToPreviewTabHint => 'ログイン後に使用できます';

@@ -181,10 +181,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
             // Point brand-new users at the How to Trade guide, which lives
-            // behind the Profile tab. A long arrow (drawn inside the virtual
-            // tab bar below) points down at the Profile tab, rendered in the
+            // behind the Settings tab. A long arrow (drawn inside the virtual
+            // tab bar below) points down at the Settings tab, rendered in the
             // bottom-nav area — the same area the real nav bar occupies after
-            // login (#336).
+            // login (#336, #562).
             if (showGuidePointer)
               Padding(
                 padding: const EdgeInsets.fromLTRB(32, 0, 32, 8),
@@ -197,9 +197,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ],
         ),
       ),
-      // Virtual preview of the bottom-nav Profile tab, shown where the real
+      // Virtual preview of the bottom-nav Settings tab, shown where the real
       // nav bar will be after login. Tapping it does not open the guide — it
-      // only tells the user the tab is available after login (#336).
+      // only tells the user the tab is available after login (#336, #562).
       bottomNavigationBar: showGuidePointer
           ? const VirtualProfileTabBar()
           : null,

@@ -1,4 +1,4 @@
-// Widget tests for SettingsScreen (#545, theme removed #553, push #179).
+// Widget tests for AppSettingsSection (#545, theme removed #553, push #179, #562).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,7 +63,7 @@ void main() {
             ),
           ),
         ],
-        child: const SettingsScreen(),
+        child: const AppSettingsSection(),
       ),
     );
     await tester.pumpAndSettle();
@@ -95,7 +95,7 @@ void main() {
             ),
           ),
         ],
-        child: const SettingsScreen(),
+        child: const AppSettingsSection(),
       ),
     );
     await tester.pumpAndSettle();
@@ -130,7 +130,7 @@ void main() {
             ),
           ),
         ],
-        child: const SettingsScreen(),
+        child: const AppSettingsSection(),
       ),
     );
     await tester.pumpAndSettle();
