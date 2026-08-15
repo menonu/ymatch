@@ -518,8 +518,9 @@ void main() {
       expect(find.text('Community'), findsOneWidget);
       // Icons only — no network name labels in the card body.
       expect(find.text('Discord'), findsNothing);
-      expect(find.byKey(const Key('community-x')), findsOneWidget);
-      expect(find.byKey(const Key('community-discord')), findsOneWidget);
+      // Profile tests do not pass --dart-define URLs; icons stay hidden (#572).
+      expect(find.byKey(const Key('community-x')), findsNothing);
+      expect(find.byKey(const Key('community-discord')), findsNothing);
     },
   );
 

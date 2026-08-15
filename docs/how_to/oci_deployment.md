@@ -231,6 +231,8 @@ CI/CD workflows (`.github/workflows/deploy-oci.yml` for production and `deploy-o
 | `VAPID_PRIVATE_KEY_STAGING` | secret | `deploy-oci-staging.yml` → host `VAPID_PRIVATE_KEY` | Same pair as public; **server-only** |
 | `VAPID_SUBJECT_STAGING` | secret | `deploy-oci-staging.yml` → host `VAPID_SUBJECT` | Contact URI (`mailto:` or `https:`); optional but recommended |
 | `DUCKDNS_TOKEN` | secret | `deploy-oci.yml`, `deploy-oci-staging.yml` | When the DuckDNS account token is rotated (issue #523) |
+| `X_PROFILE_URL` | secret | `deploy-oci.yml`, `deploy-oci-staging.yml` → frontend `--dart-define` | When the official X profile URL changes (#572). Public once baked into `main.dart.js`. |
+| `DISCORD_INVITE_URL` | secret | `deploy-oci.yml`, `deploy-oci-staging.yml` → frontend `--dart-define` | When the Discord invite is rotated (#572). Public once baked into `main.dart.js`. |
 | `OCI_DOMAIN` | **variable** | `deploy-oci.yml` | When the production public FQDN changes (e.g. `app.example.duckdns.org`) |
 | `OCI_DOMAIN_STAGING` | **variable** | `deploy-oci-staging.yml` | When the staging public FQDN changes |
 | `OCI_CLI_USER` | `db-backup.yml` | When the least-privilege `ymatch-db-backup` user changes |
@@ -284,6 +286,10 @@ gh secret set OCI_STAGING_DB_PASSWORD --body "$OCI_STAGING_DB_PASSWORD"
 # gh secret set VAPID_PUBLIC_KEY_STAGING --body "$VAPID_PUBLIC_KEY_STAGING"
 # gh secret set VAPID_PRIVATE_KEY_STAGING --body "$VAPID_PRIVATE_KEY_STAGING"
 # gh secret set VAPID_SUBJECT_STAGING --body "$VAPID_SUBJECT_STAGING"
+
+# Community card (#572) — public once baked into the Flutter JS bundle.
+# gh secret set X_PROFILE_URL --body "$X_PROFILE_URL"
+# gh secret set DISCORD_INVITE_URL --body "$DISCORD_INVITE_URL"
 
 # Clean up
 shred -u /tmp/oci-secrets.env

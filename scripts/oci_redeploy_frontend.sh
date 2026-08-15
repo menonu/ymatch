@@ -8,6 +8,7 @@
 # Optional env:
 #   DUCKDNS_SUBDOMAIN / DUCKDNS_TOKEN
 #   VAPID_*          - sticky from prior .env if set by CI deploy (#179)
+#   X_PROFILE_URL / DISCORD_INVITE_URL - Community card (#572); sticky from .env
 #   GH_TOKEN         - GitHub PAT for HTTPS git pull/clone
 #   GH_SSH_KEY_PATH  - SSH deploy key for git pull/clone
 
@@ -21,7 +22,8 @@ REPO_DIR="$HOME/ymatch"
 oci_load_domain_env "$REPO_DIR"
 # Redeploy may omit secrets in the shell; restore sticky keys from prior .env.
 oci_load_env_keys "$REPO_DIR" DB_PASSWORD \
-  VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT
+  VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT \
+  X_PROFILE_URL DISCORD_INVITE_URL
 oci_sync_repo "$REPO_DIR"
 cd "$REPO_DIR"
 
@@ -40,6 +42,8 @@ echo "=== Rebuilding frontend (API_BASE_URL=${API_BASE_URL}) ==="
 
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="$API_BASE_URL" \
+  --build-arg X_PROFILE_URL="${X_PROFILE_URL:-}" \
+  --build-arg DISCORD_INVITE_URL="${DISCORD_INVITE_URL:-}" \
   frontend
 
 oci_compose "$REPO_DIR" up -d frontend

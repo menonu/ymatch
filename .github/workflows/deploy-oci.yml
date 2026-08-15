@@ -83,6 +83,9 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          # Community card destinations (#572). Public once baked into JS.
+          X_PROFILE_URL: ${{ secrets.X_PROFILE_URL }}
+          DISCORD_INVITE_URL: ${{ secrets.DISCORD_INVITE_URL }}
         run: |
           if [ -z "$DOMAIN" ]; then
             echo "❌ Repository variable OCI_DOMAIN is not set (public app FQDN)."
@@ -99,9 +102,10 @@ jobs:
           fi
           # Shell-safe remote env (printf %q) so secrets with special chars do not break.
           # VAPID_* may be empty (optional); still pass so host .env is refreshed.
-          REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q VAPID_PUBLIC_KEY=%q VAPID_PRIVATE_KEY=%q VAPID_SUBJECT=%q' \
+          REMOTE_ENV="$(printf 'DOMAIN=%q DUCKDNS_TOKEN=%q DB_PASSWORD=%q VAPID_PUBLIC_KEY=%q VAPID_PRIVATE_KEY=%q VAPID_SUBJECT=%q X_PROFILE_URL=%q DISCORD_INVITE_URL=%q' \
             "$DOMAIN" "$DUCKDNS_TOKEN" "$DB_PASSWORD" \
-            "${VAPID_PUBLIC_KEY:-}" "${VAPID_PRIVATE_KEY:-}" "${VAPID_SUBJECT:-}")"
+            "${VAPID_PUBLIC_KEY:-}" "${VAPID_PRIVATE_KEY:-}" "${VAPID_SUBJECT:-}" \
+            "${X_PROFILE_URL:-}" "${DISCORD_INVITE_URL:-}")"
           # shellcheck disable=SC2029
           ssh -i ~/.ssh/oci_key "ubuntu@${HOST}" "env ${REMOTE_ENV} bash -s" <<'DEPLOY_SCRIPT'
           set -euo pipefail

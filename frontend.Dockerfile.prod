@@ -45,6 +45,10 @@ COPY proto /proto
 # API_BASE_URL can be set at build time (e.g., for OCI deployment behind reverse proxy)
 ARG API_BASE_URL=""
 ARG GIT_HASH=""
+# Community destinations (#572). Injected from GitHub Secrets at deploy;
+# empty hides that icon. Quoted so `?` / `&` in URLs stay intact.
+ARG X_PROFILE_URL=""
+ARG DISCORD_INVITE_URL=""
 # --pwa-strategy=none: do NOT register flutter_service_worker.js.
 # That SW shares scope "/" with our Web Push SW (push_sw.js, #179) and would
 # replace it on every app load, wiping PushSubscription and flipping Settings
@@ -52,10 +56,15 @@ ARG GIT_HASH=""
 RUN --mount=type=cache,target=/root/.pub-cache \
     if [ -n "$API_BASE_URL" ]; then \
       flutter build web --release --pwa-strategy=none \
-        --dart-define=API_BASE_URL=$API_BASE_URL --dart-define=GIT_HASH=$GIT_HASH; \
+        --dart-define=API_BASE_URL="$API_BASE_URL" \
+        --dart-define=GIT_HASH="$GIT_HASH" \
+        --dart-define=X_PROFILE_URL="$X_PROFILE_URL" \
+        --dart-define=DISCORD_INVITE_URL="$DISCORD_INVITE_URL"; \
     else \
       flutter build web --release --pwa-strategy=none \
-        --dart-define=GIT_HASH=$GIT_HASH; \
+        --dart-define=GIT_HASH="$GIT_HASH" \
+        --dart-define=X_PROFILE_URL="$X_PROFILE_URL" \
+        --dart-define=DISCORD_INVITE_URL="$DISCORD_INVITE_URL"; \
     fi
 
 # ---------------------------------------------------

@@ -319,10 +319,12 @@ print(f"{key}={shlex.quote(value)}")
 # Call after PUBLIC_IP / DOMAIN / DUCKDNS_* are set.
 # VAPID_* are optional (#179): only written when non-empty.
 # Staging CI maps VAPID_*_STAGING secrets; production maps VAPID_* secrets.
+# X_PROFILE_URL / DISCORD_INVITE_URL are optional (#572): frontend dart-defines.
 oci_write_oci_stack_env() {
   local dir="$1"
   oci_write_compose_env "$dir" \
     DB_PASSWORD PUBLIC_IP DOMAIN GIT_HASH \
     DUCKDNS_TOKEN DUCKDNS_SUBDOMAIN \
-    VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT
+    VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT \
+    X_PROFILE_URL DISCORD_INVITE_URL
 }

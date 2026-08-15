@@ -14,13 +14,49 @@ Widget _wrap(Widget child, {Locale? locale}) => MaterialApp(
 );
 
 void main() {
-  testWidgets('shows Community title and icon-only X / Discord buttons', (
+  test(
+    'resolveHttpsUrl accepts https and rejects empty / non-https (#572)',
+    () {
+      expect(
+        CommunityCard.resolveHttpsUrl('https://x.com/ymatchdev'),
+        Uri.parse('https://x.com/ymatchdev'),
+      );
+      expect(
+        CommunityCard.resolveHttpsUrl('  https://discord.gg/invite  '),
+        Uri.parse('https://discord.gg/invite'),
+      );
+      expect(CommunityCard.resolveHttpsUrl(''), isNull);
+      expect(CommunityCard.resolveHttpsUrl('   '), isNull);
+      expect(CommunityCard.resolveHttpsUrl('http://x.com/ymatchdev'), isNull);
+      expect(CommunityCard.resolveHttpsUrl('javascript:alert(1)'), isNull);
+      expect(CommunityCard.resolveHttpsUrl('not a url'), isNull);
+    },
+  );
+
+  testWidgets('hides X and Discord when URLs are not injected (#572)', (
     tester,
   ) async {
     await tester.pumpWidget(_wrap(const CommunityCard()));
     await tester.pumpAndSettle();
 
     expect(find.text('Community'), findsOneWidget);
+    expect(find.byKey(const Key('community-x')), findsNothing);
+    expect(find.byKey(const Key('community-discord')), findsNothing);
+  });
+
+  testWidgets('shows icon-only X / Discord when https URLs are injected', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        const CommunityCard(
+          xProfileUrl: 'https://x.com/ymatchdev',
+          discordInviteUrl: 'https://discord.gg/test-invite',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('community-x')), findsOneWidget);
     expect(find.byKey(const Key('community-discord')), findsOneWidget);
     expect(find.byTooltip('X'), findsOneWidget);
@@ -44,11 +80,15 @@ void main() {
     expect(find.text('Community'), findsNothing);
   });
 
-  testWidgets('tapping X launches the official X profile', (tester) async {
+  testWidgets('tapping X launches the injected profile URL (#572)', (
+    tester,
+  ) async {
+    const xUrl = 'https://x.com/ymatchdev';
     final launched = <Uri>[];
     await tester.pumpWidget(
       _wrap(
         CommunityCard(
+          xProfileUrl: xUrl,
           launchUrlOverride: (uri) async {
             launched.add(uri);
             return true;
@@ -61,15 +101,18 @@ void main() {
     await tester.tap(find.byKey(const Key('community-x')));
     await tester.pump();
 
-    expect(launched, [CommunityCard.xUri]);
-    expect(launched.single.toString(), 'https://x.com/ymatchdev');
+    expect(launched.single.toString(), xUrl);
   });
 
-  testWidgets('tapping Discord launches the official invite', (tester) async {
+  testWidgets('tapping Discord launches the injected invite URL (#572)', (
+    tester,
+  ) async {
+    const discordUrl = 'https://discord.gg/test-invite';
     final launched = <Uri>[];
     await tester.pumpWidget(
       _wrap(
         CommunityCard(
+          discordInviteUrl: discordUrl,
           launchUrlOverride: (uri) async {
             launched.add(uri);
             return true;
@@ -82,13 +125,17 @@ void main() {
     await tester.tap(find.byKey(const Key('community-discord')));
     await tester.pump();
 
-    expect(launched, [CommunityCard.discordUri]);
-    expect(launched.single.toString(), 'https://discord.gg/QWcCJspb7T');
+    expect(launched.single.toString(), discordUrl);
   });
 
   testWidgets('failed launch shows a snackbar', (tester) async {
     await tester.pumpWidget(
-      _wrap(CommunityCard(launchUrlOverride: (_) async => false)),
+      _wrap(
+        CommunityCard(
+          xProfileUrl: 'https://x.com/ymatchdev',
+          launchUrlOverride: (_) async => false,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
