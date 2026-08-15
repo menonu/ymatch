@@ -85,10 +85,17 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         }
 
         final Map<int, Map<String, int>> inventoryLookup = {};
+        final Map<int, Map<String, int>> projectedLookup = {};
         if (inventoryAsync != null && inventoryAsync.hasValue) {
           for (final inv in inventoryAsync.value!) {
             inventoryLookup.putIfAbsent(inv.merchId, () => {})[inv.status] =
                 inv.quantity;
+            // Absent projectedQuantity means "same as quantity" (upsert /
+            // older payloads). List inventory always sets the field (#427).
+            projectedLookup.putIfAbsent(inv.merchId, () => {})[inv.status] =
+                inv.hasProjectedQuantity()
+                    ? inv.projectedQuantity
+                    : inv.quantity;
           }
         }
 
@@ -762,6 +769,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                             items[index],
                                             inventoryLookup,
                                             displayMode,
+                                            projectedLookup: projectedLookup,
                                           );
                                         },
                                       );

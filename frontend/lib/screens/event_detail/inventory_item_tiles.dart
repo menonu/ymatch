@@ -9,6 +9,7 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_helper.dart';
+import '../../utils/inventory_quantity_format.dart';
 import '../../widgets/quantity_stepper.dart';
 import 'edit_merch_dialog.dart';
 import 'merch_filters.dart';
@@ -429,12 +430,14 @@ Widget buildDetailedInventoryItem(
   User? user,
   Merchandise item,
   Map<int, Map<String, int>> lookup,
-  InventoryDisplayMode displayMode,
-) {
+  InventoryDisplayMode displayMode, {
+  Map<int, Map<String, int>>? projectedLookup,
+}) {
   final merchInv = lookup[item.id] ?? {};
   final haveQty = merchInv['HAVE'] ?? 0;
   final wantQty = merchInv['WANT'] ?? 0;
   final tradeQty = merchInv['TRADE'] ?? 0;
+  final merchProj = projectedLookup?[item.id] ?? const <String, int>{};
 
   final flags = inventoryDisplayFlags(displayMode);
   final showHave = flags.showHave;
@@ -527,6 +530,7 @@ Widget buildDetailedInventoryItem(
                               displayLabel: l10n.have,
                               color: AppTheme.haveColor,
                               qty: haveQty,
+                              projectedQty: merchProj['HAVE'],
                               onUpdate: isDeleted
                                   ? null
                                   : (q) => _updateInv(
@@ -550,6 +554,7 @@ Widget buildDetailedInventoryItem(
                               displayLabel: l10n.want,
                               color: AppTheme.wantColor,
                               qty: wantQty,
+                              projectedQty: merchProj['WANT'],
                               onUpdate: isDeleted
                                   ? null
                                   : (q) => _updateInv(
@@ -572,6 +577,7 @@ Widget buildDetailedInventoryItem(
                               displayLabel: l10n.trade,
                               color: AppTheme.tradeColor,
                               qty: tradeQty,
+                              projectedQty: merchProj['TRADE'],
                               onUpdate: isDeleted
                                   ? null
                                   : (q) => _updateInv(
@@ -732,14 +738,17 @@ Widget _buildStepper({
   required String displayLabel,
   required Color color,
   required int qty,
+  int? projectedQty,
   void Function(int)? onUpdate,
 }) {
   final enabled = onUpdate != null;
   final l10n = AppLocalizations.of(context)!;
   // #538: detailed-view only — flat framed control, tinted ± chips, bare
   // label+qty, half-area hits. expand:true fills the column.
+  // #427: `2(1)` is projected after in-progress trades; ± still edit DB qty.
   return QuantityStepper(
     quantity: qty,
+    quantityText: formatInventoryQuantity(qty, projectedQty),
     expand: true,
     enabled: enabled,
     label: displayLabel,

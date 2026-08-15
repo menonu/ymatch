@@ -282,7 +282,7 @@ three places so new users can find it without digging into the Settings tab.
 
 | Identifier | File | EN UI label | JA UI label | Where it appears |
 |------------|------|-------------|-------------|------------------|
-| `HowToTradeContent` | `widgets/how_to_trade.dart` | "How to Trade" guide (title + 3 steps) | 「取引方法」ガイド（見出し＋3ステップ） | `ProfileScreen` (`InstructionsCard`), `HowToTradeSheet` |
+| `HowToTradeContent` | `widgets/how_to_trade.dart` | "How to Trade" guide (title + 4 steps) | 「取引方法」ガイド（見出し＋4ステップ） | `ProfileScreen` (`InstructionsCard`), `HowToTradeSheet` |
 | `showHowToTradeSheet` | `widgets/how_to_trade.dart` | Guide bottom sheet | 取引ガイド シート | Opened by `HowToTradeIconButton` |
 | `HowToTradeIconButton` | `widgets/how_to_trade.dart` | AppBar help (?) icon | AppBarヘルプ（？）アイコン | `HomeScreen`, `EventDetailScreen` AppBar |
 | `VirtualProfileTabBar` | `widgets/how_to_trade.dart` | Virtual Settings tab preview | 仮想設定タブ | `LoginScreen` bottom-nav area |

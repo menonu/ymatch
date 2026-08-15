@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 
-/// Renders the "How to Trade" guide — a title row plus three numbered steps.
+/// Renders the "How to Trade" guide — a title row plus numbered steps.
 ///
 /// This is the single source of truth for the guide content, so the Settings
 /// tab card and the Home AppBar info-icon sheet show the exact same steps
-/// (sourced from the `howToTrade` / `tradeStep1–3` l10n keys). Extracted in
+/// (sourced from the `howToTrade` / `tradeStep1–4` l10n keys). Extracted in
 /// #336 so new users can reach the guide without digging into the Settings tab.
 class HowToTradeContent extends StatelessWidget {
   const HowToTradeContent({super.key});
@@ -28,9 +29,8 @@ class HowToTradeContent extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               l10n.howToTrade,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -38,6 +38,7 @@ class HowToTradeContent extends StatelessWidget {
         HowToTradeStep(step: '1', text: l10n.tradeStep1),
         HowToTradeStep(step: '2', text: l10n.tradeStep2),
         HowToTradeStep(step: '3', text: l10n.tradeStep3),
+        HowToTradeStep(step: '4', text: l10n.tradeStep4),
       ],
     );
   }
@@ -62,9 +63,8 @@ class HowToTradeStep extends StatelessWidget {
             height: 24,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Text(

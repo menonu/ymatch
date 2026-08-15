@@ -301,6 +301,10 @@
   "@tradeStep3": {
     "description": "How-to-trade step 3"
   },
+  "tradeStep4": "On the detailed item list, a number in parentheses is the quantity after in-progress trades settle (for example 2(1)). + and − still change only the current quantity.",
+  "@tradeStep4": {
+    "description": "How-to-trade step 4: projected inventory parentheses (#427)"
+  },
   "logOut": "Log Out",
   "@logOut": {
     "description": "Log out button label"

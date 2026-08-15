@@ -1555,4 +1555,107 @@ void main() {
     final preview = tester.widget<SelectableText>(find.byType(SelectableText));
     expect(preview.data, 'Own: TestPen42*2');
   });
+
+  testWidgets(
+    'detailed view shows current(projected) and omits parens when equal (#427)',
+    (tester) async {
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final client = ApiClient(
+        config,
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/user/1/inventory') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 1,
+                  'userId': 1,
+                  'merchId': 10,
+                  'status': 'HAVE',
+                  'quantity': 2,
+                  'projectedQuantity': 1,
+                  'merchName': 'TestPen42',
+                },
+                {
+                  'id': 2,
+                  'userId': 1,
+                  'merchId': 10,
+                  'status': 'TRADE',
+                  'quantity': 1,
+                  'projectedQuantity': 1,
+                  'merchName': 'TestPen42',
+                },
+              ]),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWith((ref) => client),
+            authProvider.overrideWith((ref) => _MockAuthController(_user())),
+            merchProvider(
+              5,
+            ).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          ],
+          child: _localized(const EventDetailScreen(eventId: 5)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('2(1)'), findsOneWidget);
+      expect(find.text('1'), findsWidgets);
+      expect(find.text('1(1)'), findsNothing);
+    },
+  );
+
+  testWidgets('grid view does not show projected parentheses (#427)', (
+    tester,
+  ) async {
+    final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
+    final client = ApiClient(
+      config,
+      client: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.path == '/api/v1/user/1/inventory') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 1,
+                'userId': 1,
+                'merchId': 10,
+                'status': 'HAVE',
+                'quantity': 2,
+                'projectedQuantity': 1,
+                'merchName': 'TestPen42',
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => client),
+          authProvider.overrideWith((ref) => _MockAuthController(_user())),
+          merchProvider(5).overrideWith((ref) async => [_merch(creatorId: 1)]),
+          viewModeProvider(5).overrideWith((ref) => ViewMode.grid),
+        ],
+        child: _localized(const EventDetailScreen(eventId: 5)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2(1)'), findsNothing);
+    expect(find.byKey(const Key('stepper_inc_HAVE')), findsNothing);
+  });
 }
