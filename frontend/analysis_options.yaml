@@ -7,6 +7,19 @@
 
 # The following line activates a set of recommended lints for Flutter apps,
 # packages, and plugins designed to encourage good coding practices.
+#
+# analyzer.exclude matches Flutter 3.47+'s AnalysisOptionsMigration so
+# `flutter pub get` / `flutter analyze` do not rewrite this file on every run
+# (#575). Platform runner dirs and build output are not app sources.
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

@@ -1483,7 +1483,7 @@ void main() {
 
         // Keep messagesProvider alive so invalidate re-runs the future
         // (autoDispose would otherwise drop it between reads).
-        final sub = container.listen(messagesProvider(9), (_, __) {});
+        final sub = container.listen(messagesProvider(9), (_, _) {});
         addTearDown(sub.close);
         await container.read(messagesProvider(9).future);
         expect(getCount, 1);
@@ -1536,7 +1536,7 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        final sub = container.listen(messagesProvider(9), (_, __) {});
+        final sub = container.listen(messagesProvider(9), (_, _) {});
         addTearDown(sub.close);
         await container.read(messagesProvider(9).future);
         expect(getCount, 1);
@@ -1629,7 +1629,7 @@ void main() {
         addTearDown(container.dispose);
 
         // Keep debounced provider alive so the listen + timer run.
-        final sub = container.listen(debouncedSearchQueryProvider, (_, __) {});
+        final sub = container.listen(debouncedSearchQueryProvider, (_, _) {});
         addTearDown(sub.close);
 
         // Rapid intermediate keystrokes must not hit the API.
@@ -1655,7 +1655,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      final sub = container.listen(debouncedSearchQueryProvider, (_, __) {});
+      final sub = container.listen(debouncedSearchQueryProvider, (_, _) {});
       addTearDown(sub.close);
 
       container.read(searchQueryProvider.notifier).state = 'card';

@@ -25,12 +25,14 @@ final eventsProvider = FutureProvider<List<Event>>((ref) async {
   events.sort((a, b) {
     if (a.hasIsFavorite() &&
         a.isFavorite &&
-        (!b.hasIsFavorite() || !b.isFavorite))
+        (!b.hasIsFavorite() || !b.isFavorite)) {
       return -1;
+    }
     if ((!a.hasIsFavorite() || !a.isFavorite) &&
         b.hasIsFavorite() &&
-        b.isFavorite)
+        b.isFavorite) {
       return 1;
+    }
     // Otherwise sort by id descending (newest first)
     return b.id.compareTo(a.id);
   });

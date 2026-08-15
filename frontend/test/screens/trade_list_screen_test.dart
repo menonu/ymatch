@@ -340,7 +340,7 @@ void main() {
 
   // #314: a completed match stays conversable — the Message button and card
   // tap remain available on the Done tab, just like on the other tabs.
-  TradeMatch _completedMatch() => TradeMatch()
+  TradeMatch completedMatch() => TradeMatch()
     ..id = 200
     ..user1Id = 1
     ..user2Id = 2
@@ -356,7 +356,7 @@ void main() {
       ProviderScope(
         overrides: [
           authProvider.overrideWith((ref) => MockAuthController(_user())),
-          matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
+          matchesProvider(1).overrideWith((ref) async => [completedMatch()]),
           notificationCountsProvider(
             1,
           ).overrideWith((ref) async => NotificationCounts()),
@@ -385,7 +385,7 @@ void main() {
       ProviderScope(
         overrides: [
           authProvider.overrideWith((ref) => MockAuthController(_user())),
-          matchesProvider(1).overrideWith((ref) async => [_completedMatch()]),
+          matchesProvider(1).overrideWith((ref) async => [completedMatch()]),
           notificationCountsProvider(
             1,
           ).overrideWith((ref) async => NotificationCounts()),
@@ -454,7 +454,7 @@ void main() {
 
   // #322 / ADR 0001 / #534: event stays on the header; group name chip is
   // shown to the right of each give/receive section title (twice total).
-  TradeMatch _groupMatch() => TradeMatch()
+  TradeMatch groupMatch() => TradeMatch()
     ..id = 101
     ..user1Id = 1
     ..user2Id = 2
@@ -471,7 +471,7 @@ void main() {
         ProviderScope(
           overrides: [
             authProvider.overrideWith((ref) => MockAuthController(_user())),
-            matchesProvider(1).overrideWith((ref) async => [_groupMatch()]),
+            matchesProvider(1).overrideWith((ref) async => [groupMatch()]),
             notificationCountsProvider(
               1,
             ).overrideWith((ref) async => NotificationCounts()),
@@ -497,7 +497,7 @@ void main() {
   testWidgets(
     'match card prefers groupDisplayName over groupName on item rows (#466 / #534)',
     (WidgetTester tester) async {
-      final match = _groupMatch()..groupDisplayName = 'Booster Boxes';
+      final match = groupMatch()..groupDisplayName = 'Booster Boxes';
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -590,7 +590,7 @@ void main() {
   });
 
   // #476: match card shows created_at as local datetime; list is latest-first.
-  TradeMatch _matchWithUser({
+  TradeMatch matchWithUser({
     required int id,
     required String username,
     required String status,
@@ -613,7 +613,7 @@ void main() {
     'match card shows created_at as local datetime when present (#476)',
     (WidgetTester tester) async {
       const iso = '2026-07-01T15:30:00Z';
-      final match = _matchWithUser(
+      final match = matchWithUser(
         id: 301,
         username: 'Alice',
         status: 'PENDING',
@@ -643,7 +643,7 @@ void main() {
   testWidgets('match card omits datetime when created_at is missing (#476)', (
     WidgetTester tester,
   ) async {
-    final match = _matchWithUser(id: 302, username: 'Bob', status: 'PENDING');
+    final match = matchWithUser(id: 302, username: 'Bob', status: 'PENDING');
 
     await tester.pumpWidget(
       ProviderScope(
@@ -675,19 +675,19 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       // Deliberately reverse chronological input order.
-      final older = _matchWithUser(
+      final older = matchWithUser(
         id: 10,
         username: 'OlderUser',
         status: 'PENDING',
         createdAt: '2026-07-01T10:00:00Z',
       );
-      final newer = _matchWithUser(
+      final newer = matchWithUser(
         id: 20,
         username: 'NewerUser',
         status: 'PENDING',
         createdAt: '2026-07-03T10:00:00Z',
       );
-      final middle = _matchWithUser(
+      final middle = matchWithUser(
         id: 15,
         username: 'MiddleUser',
         status: 'PENDING',
