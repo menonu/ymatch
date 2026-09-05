@@ -101,8 +101,9 @@ stateDiagram-v2
 After `COMPLETED`, each party may **apply inventory** as a separate, idempotent
 step (status stays `COMPLETED`; not a further state-machine transition). Deltas
 and gates are summarized under [Inventory status semantics](#inventory-status-semantics)
-below; full decisions in [ADR 0009](../adr/0009-apply-inventory-decrements-giver-have.md)
-and [ADR 0014](../adr/0014-fail-closed-inventory-apply.md).
+below; full decisions in [ADR 0009](../adr/0009-apply-inventory-decrements-giver-have.md),
+[ADR 0014](../adr/0014-fail-closed-inventory-apply.md), and
+[ADR 0017](../adr/0017-apply-inventory-decrements-receiver-want.md).
 
 ```mermaid
 sequenceDiagram
@@ -120,7 +121,7 @@ sequenceDiagram
     A->>API: complete
     API->>DB: status=COMPLETED
     A->>API: apply inventory (A side)
-    API->>DB: TRADE fail-closed; HAVE best-effort; mark applied
+    API->>DB: TRADE fail-closed; HAVE/WANT best-effort; mark applied
     B->>API: apply inventory (B side)
   else Reject
     API->>DB: status=REJECTED
@@ -178,12 +179,14 @@ flowchart LR
     T3[Giver TRADE −qty fail-closed]
     H1[Giver HAVE −qty best-effort clamp]
     H2[Receiver HAVE +qty]
+    W3[Receiver WANT −qty best-effort clamp]
   end
   TRADE --> matching
   WANT --> matching
   TRADE --> negotiate
   WANT --> negotiate
   TRADE --> apply
+  WANT --> apply
   HAVE --> apply
 ```
 
@@ -195,6 +198,7 @@ flowchart LR
 | Offer/accept: require **giver** supply | yes | — | — |
 | Apply: giver decrement | fail-closed | — | best-effort clamp |
 | Apply: receiver increment | — | — | yes |
+| Apply: receiver decrement | — | best-effort clamp | — |
 
 ### Negotiation quantity gates
 
@@ -214,20 +218,23 @@ WANT or TRADE changes still fail closed with **400**.
 ### Apply deltas (after COMPLETED)
 
 Each participant applies independently (idempotent per user side). Per absolute
-leg, for the **requesting** user ([ADR 0009](../adr/0009-apply-inventory-decrements-giver-have.md)):
+leg, for the **requesting** user ([ADR 0009](../adr/0009-apply-inventory-decrements-giver-have.md),
+[ADR 0017](../adr/0017-apply-inventory-decrements-receiver-want.md)):
 
 | Role | Default | `skipHaveDecrement: true` |
 |------|---------|---------------------------|
 | Giver | `TRADE −qty` (fail-closed), `HAVE −qty` (clamp ≥ 0) | `TRADE −qty` only |
-| Receiver | `HAVE +qty` | same (flag ignored) |
+| Receiver | `HAVE +qty`, `WANT −qty` (clamp ≥ 0) | same (flag ignored) |
 
 - **TRADE** insufficient → **400**, no inventory mutation for that apply
   transaction ([ADR 0014](../adr/0014-fail-closed-inventory-apply.md)).
 - **HAVE** short or missing → clamp to 0; apply still succeeds. HAVE may drift
   from physical reality if the user never tracked it; that is accepted for a
   convenience field.
-- Successful TRADE decrements also re-evaluate mutual capacity for the user’s
-  other active matches ([ADR 0010](../adr/0010-inventory-mutual-capacity-invalidation.md)).
+- **WANT** short or missing → clamp to 0 (missing row is a no-op); apply still
+  succeeds. There is no skip-WANT flag.
+- Successful TRADE or WANT decrements also re-evaluate mutual capacity for the
+  user’s other active matches ([ADR 0010](../adr/0010-inventory-mutual-capacity-invalidation.md)).
 
 ### User-driven inventory edits
 

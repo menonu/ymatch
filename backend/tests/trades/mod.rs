@@ -154,6 +154,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .find(|i| i["merchId"] == merch_b_id && i["status"] == "HAVE");
     assert!(u1_have_b.is_some(), "User1 should HAVE Card B");
     assert_eq!(u1_have_b.unwrap()["quantity"].as_i64().unwrap(), 1);
+    let u1_want_b = inv1
+        .iter()
+        .find(|i| i["merchId"] == merch_b_id && i["status"] == "WANT");
+    assert_eq!(
+        u1_want_b
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0),
+        0,
+        "User1 WANT Card B should decrement 1→0 (#579)"
+    );
 
     // Verify User2's inventory is NOT yet changed (User2 hasn't applied)
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -176,6 +186,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         u2_trade_b_before.is_some()
             && u2_trade_b_before.unwrap()["quantity"].as_i64().unwrap() == 1,
         "User2 TRADE Card B should still be 1 (not yet applied)"
+    );
+    let u2_want_a_before = inv2_before
+        .iter()
+        .find(|i| i["merchId"] == merch_a_id && i["status"] == "WANT");
+    assert_eq!(
+        u2_want_a_before
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0),
+        1,
+        "User2 WANT Card A should still be 1 until User2 applies (#579)"
     );
 
     // 11. inventory_applied: true for User1, false for User2
@@ -280,6 +300,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .find(|i| i["merchId"] == merch_a_id && i["status"] == "HAVE");
     assert!(u2_have_a.is_some(), "User2 should HAVE Card A");
     assert_eq!(u2_have_a.unwrap()["quantity"].as_i64().unwrap(), 1);
+    let u2_want_a = inv2
+        .iter()
+        .find(|i| i["merchId"] == merch_a_id && i["status"] == "WANT");
+    assert_eq!(
+        u2_want_a
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0),
+        0,
+        "User2 WANT Card A should decrement 1→0 (#579)"
+    );
 
     // 14. Double-apply for User2 → 409 Conflict
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -438,6 +468,17 @@ async fn test_apply_inventory_concurrent_single_winner(pool: PgPool) {
     .unwrap();
     assert_eq!(have_b, 1, "user1 HAVE merch B must increment once");
 
+    let want_b: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+    )
+    .bind(user1_id as i32)
+    .bind(merch_b_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(want_b, 0, "user1 WANT merch B must decrement once (1→0)");
+
     let applied: Option<chrono::DateTime<chrono::Utc>> =
         sqlx::query_scalar("SELECT user1_inventory_applied_at FROM matches WHERE id = $1")
             .bind(match_id as i32)
@@ -555,6 +596,130 @@ async fn test_apply_inventory_skip_have_decrement(pool: PgPool) {
         .map(|i| json_i64(i, "quantity"))
         .unwrap_or(-1);
     assert_eq!(have_b, 1, "receiver HAVE still increments");
+    let want_b = inv1
+        .iter()
+        .find(|i| json_i64(i, "merchId") == card_b && i["status"] == "WANT")
+        .map(|i| json_i64(i, "quantity"))
+        .unwrap_or(0);
+    assert_eq!(want_b, 0, "receiver WANT still decrements with skip-HAVE");
+}
+
+/// #579: WANT− on apply must re-evaluate ADR 0010. U1 keeps leftover TRADE
+/// so the other match dies because WANT B→0, not because supply hit 0.
+#[sqlx::test]
+async fn test_apply_inventory_want_decrement_cancels_other_match(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "want-cap",
+        MutualTradeOptions {
+            event_name: Some("WANT Cap Event"),
+            group_name: "Cards",
+            u1_trade: 2,
+            u1_want: 1,
+            u2_trade: 1,
+            u2_want: 1,
+            have_qty: Some(2),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+    let user3_id = login_guest(&pool, "want-cap-u3", "tok3").await;
+    set_inventory(&pool, user3_id, fx.merch_b_id, "TRADE", 1).await;
+    set_inventory(&pool, user3_id, fx.merch_a_id, "WANT", 1).await;
+
+    let other_match: i32 = sqlx::query_scalar(
+        "INSERT INTO matches (user1_id, user2_id, event_id, group_name, status)
+         VALUES ($1, $2, $3, 'Cards', 'PENDING') RETURNING id",
+    )
+    .bind(fx.user1_id as i32)
+    .bind(user3_id as i32)
+    .bind(fx.event_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let offer_body = format!(
+        r#"{{"userId": {}, "items": [
+            {{"merchId": {}, "giverUserId": {}, "quantity": 1}},
+            {{"merchId": {}, "giverUserId": {}, "quantity": 1}}
+        ]}}"#,
+        fx.user1_id, fx.merch_a_id, fx.user1_id, fx.merch_b_id, fx.user2_id
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &offer_body
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "ACCEPTED", "userId": {}}}"#, fx.user2_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "COMPLETED", "userId": {}}}"#, fx.user1_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/apply-inventory", match_id),
+            &format!(r#"{{"userId": {}}}"#, fx.user1_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    let other_status: String = sqlx::query_scalar("SELECT status FROM matches WHERE id = $1")
+        .bind(other_match)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        other_status, "CANCELLED",
+        "PENDING with U3 must cancel when apply zeros U1 WANT of B"
+    );
+
+    let trade_a: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'TRADE'",
+    )
+    .bind(fx.user1_id as i32)
+    .bind(fx.merch_a_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        trade_a, 1,
+        "U1 TRADE A still 1; cancel must be from WANT B→0, not TRADE 0"
+    );
+
+    let want_b: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+    )
+    .bind(fx.user1_id as i32)
+    .bind(fx.merch_b_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(want_b, 0, "U1 WANT B must be 0 after apply");
 }
 
 #[sqlx::test]

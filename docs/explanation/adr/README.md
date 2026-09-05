@@ -110,7 +110,7 @@ Migrations, issue numbers, and API routes (`POST /api/v1/...`) are fine when the
 | [0006](0006-derive-user-role-from-user-roles.md) | Derive `User.role` from `user_roles` at Read Time (drop `users.role` mirror) | Accepted | 2026-07-10 |
 | [0007](0007-inventory-export-text-formats.md) | Client-Side Inventory Export with Text Formats | Accepted | 2026-07-13 |
 | [0008](0008-merchandise-deletion-semantics.md) | Merchandise Deletion Semantics and the `CANCELLED` Match Status | Accepted (UI visibility of `CANCELLED` revised in part by [0010](0010-inventory-mutual-capacity-invalidation.md); catalog visibility of soft-deleted merch revised in part by [0011](0011-hide-deleted-merch-from-catalog.md)) | 2026-07-14 |
-| [0009](0009-apply-inventory-decrements-giver-have.md) | Apply Inventory Decrements Giver HAVE by Default | Accepted (TRADE clamp superseded in part by [0014](0014-fail-closed-inventory-apply.md)) | 2026-07-15 |
+| [0009](0009-apply-inventory-decrements-giver-have.md) | Apply Inventory Decrements Giver HAVE by Default | Accepted (TRADE clamp superseded in part by [0014](0014-fail-closed-inventory-apply.md); receiver apply deltas superseded in part by [0017](0017-apply-inventory-decrements-receiver-want.md)) | 2026-07-15 |
 | [0010](0010-inventory-mutual-capacity-invalidation.md) | Inventory Mutual-Capacity Invalidation and Visible `CANCELLED` | Accepted | 2026-07-17 |
 | [0011](0011-hide-deleted-merch-from-catalog.md) | Hide Soft-Deleted Merchandise from Catalog Surfaces by Default | Accepted | 2026-07-18 |
 | [0012](0012-rematch-after-reject-or-cancel.md) | Rematch After Reject or Cancel (Reopen PENDING with Prior-History Annotation) | Accepted | 2026-07-18 |
@@ -118,3 +118,4 @@ Migrations, issue numbers, and API routes (`POST /api/v1/...`) are fine when the
 | [0014](0014-fail-closed-inventory-apply.md) | Fail-Closed TRADE Capacity (HAVE Optional) | Accepted | 2026-07-22 |
 | [0015](0015-web-push-vapid-auto-match.md) | Background Auto-Match Alerts via Web Push + VAPID | Accepted | 2026-08-10 |
 | [0016](0016-global-editor-role.md) | Global `editor` Role | Accepted | 2026-08-10 |
+| [0017](0017-apply-inventory-decrements-receiver-want.md) | Apply Inventory Decrements Receiver WANT | Accepted | 2026-09-05 |

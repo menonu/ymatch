@@ -205,9 +205,10 @@ async fn test_completed_unapplied_then_excluded_after_apply(pool: PgPool) {
     // Receiver HAVE of B is now real (applied); no leftover projection.
     assert_eq!(qty(&u1_after, fx.merch_b_id, "HAVE"), 1);
     assert_eq!(projected(&u1_after, fx.merch_b_id, "HAVE"), 1);
-    // Apply does not change WANT; match is excluded so parens disappear.
-    assert_eq!(qty(&u1_after, fx.merch_b_id, "WANT"), 1);
-    assert_eq!(projected(&u1_after, fx.merch_b_id, "WANT"), 1);
+    // Apply persists receiver WANT− (#579); match is excluded so parens
+    // disappear against the new quantity.
+    assert_eq!(qty(&u1_after, fx.merch_b_id, "WANT"), 0);
+    assert_eq!(projected(&u1_after, fx.merch_b_id, "WANT"), 0);
 
     // User2 has not applied: still projected.
     let u2 = list_inventory(&pool, fx.user2_id).await;

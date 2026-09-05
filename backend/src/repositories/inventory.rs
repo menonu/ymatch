@@ -142,11 +142,17 @@ impl InventoryRepository {
     ///     HAVE is optional bookkeeping (not a trade gate); short HAVE never
     ///     fails apply.
     ///   - `0`: skip HAVE
+    /// - `delta_want` (signed, #579):
+    ///   - `< 0`: decrement the WANT row by `|delta_want|`, **clamped at 0**.
+    ///     Missing WANT is a no-op. Short WANT never fails apply (the
+    ///     physical exchange already completed).
+    ///   - `>= 0`: skip WANT
     ///
     /// Implemented as a single CTE so the generic `Executor` parameter
     /// (consumed by `.fetch_one()`) is used exactly once per call. The
-    /// `$1 > 0` / `$4 > 0` / `$4 < 0` predicates short-circuit unused
-    /// branches. TRADE is fail-closed; HAVE decrement may soft-clamp.
+    /// `$1 > 0` / `$4 > 0` / `$4 < 0` / `$5 < 0` predicates short-circuit
+    /// unused branches. TRADE is fail-closed; HAVE and WANT decrements may
+    /// soft-clamp.
     pub async fn apply_trade_delta<'c, E>(
         &self,
         exec: E,
@@ -154,12 +160,13 @@ impl InventoryRepository {
         merch_id: i32,
         delta_trade: i32,
         delta_have: i32,
+        delta_want: i32,
     ) -> Result<(), AppError>
     where
         E: sqlx::Executor<'c, Database = sqlx::Postgres>,
     {
-        // TRADE is gated before write (fail-closed). HAVE is best-effort:
-        // clamp at 0 so missing/low HAVE never blocks a valid TRADE apply.
+        // TRADE is gated before write (fail-closed). HAVE and WANT are
+        // best-effort: clamp at 0 so missing/low rows never block apply.
         let row = sqlx::query(
             r#"
             WITH caps AS (
@@ -199,6 +206,14 @@ impl InventoryRepository {
                   AND $4 < 0
                   AND (SELECT trade_ok FROM gate)
                 RETURNING 1
+            ),
+            want_dec AS (
+                UPDATE inventory
+                SET quantity = GREATEST(quantity + $5, 0)
+                WHERE user_id = $2 AND merch_id = $3 AND status = 'WANT'
+                  AND $5 < 0
+                  AND (SELECT trade_ok FROM gate)
+                RETURNING 1
             )
             SELECT trade_ok FROM gate
             "#,
@@ -207,6 +222,7 @@ impl InventoryRepository {
         .bind(user_id)
         .bind(merch_id)
         .bind(delta_have)
+        .bind(delta_want)
         .fetch_one(exec)
         .await?;
 

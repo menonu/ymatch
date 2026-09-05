@@ -65,6 +65,7 @@ Screens / navigation  →  app state  →  API client  →  Backend
 | Merch create | Gated by `merch.create` (curated catalog) | [0005](../adr/0005-merch-create-permission.md) |
 | User.role field | Derived from `user_roles` at read time | [0006](../adr/0006-derive-user-role-from-user-roles.md) |
 | Apply HAVE | Default: giver HAVE− on apply; opt-out flag | [0009](../adr/0009-apply-inventory-decrements-giver-have.md) |
+| Apply WANT | Receiver WANT− on apply (clamp ≥ 0; no skip) | [0017](../adr/0017-apply-inventory-decrements-receiver-want.md) |
 | Capacity cancel | Zero mutual TRADE∩WANT → system CANCELLED | [0010](../adr/0010-inventory-mutual-capacity-invalidation.md) |
 | Trade capacity | Giver TRADE gates offer/accept/apply; HAVE optional | [0014](../adr/0014-fail-closed-inventory-apply.md) |
 

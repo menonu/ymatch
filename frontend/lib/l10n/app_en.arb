@@ -856,17 +856,17 @@
   "@updateInventory": {
     "description": "Button to apply a completed trade to inventory"
   },
-  "applyInventoryConfirmBody": "Apply this completed trade to your inventory. By default, items you gave decrease both Trade (TRADE) and Owned (HAVE).",
+  "applyInventoryConfirmBody": "Apply this completed trade to your inventory. By default, items you gave decrease both Trade (TRADE) and Owned (HAVE), and items you received increase Owned (HAVE) and decrease Want (WANT).",
   "@applyInventoryConfirmBody": {
-    "description": "Body text in the apply-inventory confirmation dialog (#429)"
+    "description": "Body text in the apply-inventory confirmation dialog (#429 / #579)"
   },
   "skipHaveDecrementLabel": "Do not update owned (HAVE) quantity",
   "@skipHaveDecrementLabel": {
     "description": "Checkbox: leave giver HAVE unchanged when applying inventory (#429)"
   },
-  "skipHaveDecrementHint": "Only decrease Trade (TRADE). Use when HAVE is tracked separately.",
+  "skipHaveDecrementHint": "Do not decrease Owned (HAVE) for items you gave. Trade (TRADE) and Want (WANT) still update; received HAVE still increases.",
   "@skipHaveDecrementHint": {
-    "description": "Subtitle under the skip-HAVE checkbox (#429)"
+    "description": "Subtitle under the skip-HAVE checkbox (#429 / #579)"
   },
   "inventoryUpdated": "Inventory Updated",
   "@inventoryUpdated": {

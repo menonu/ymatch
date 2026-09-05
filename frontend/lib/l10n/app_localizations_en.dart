@@ -611,14 +611,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get applyInventoryConfirmBody =>
-      'Apply this completed trade to your inventory. By default, items you gave decrease both Trade (TRADE) and Owned (HAVE).';
+      'Apply this completed trade to your inventory. By default, items you gave decrease both Trade (TRADE) and Owned (HAVE), and items you received increase Owned (HAVE) and decrease Want (WANT).';
 
   @override
   String get skipHaveDecrementLabel => 'Do not update owned (HAVE) quantity';
 
   @override
   String get skipHaveDecrementHint =>
-      'Only decrease Trade (TRADE). Use when HAVE is tracked separately.';
+      'Do not decrease Owned (HAVE) for items you gave. Trade (TRADE) and Want (WANT) still update; received HAVE still increases.';
 
   @override
   String get inventoryUpdated => 'Inventory Updated';
