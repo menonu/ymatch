@@ -81,7 +81,7 @@
   "settingsThemeLight": "ライト",
   "settingsThemeDark": "ダーク",
   "settingsNotifications": "通知",
-  "settingsNotificationsSubtitle": "新しいマッチ、オファー受信、成立、メッセージをバックグラウンドで通知します",
+  "settingsNotificationsSubtitle": "新しいマッチ、オファー受信、オファー承諾、メッセージをバックグラウンドで通知します",
   "settingsNotificationsUnsupported": "このブラウザでは利用できません",
   "settingsNotificationsServerOff": "サーバーでプッシュ通知が有効になっていません",
   "settingsNotificationsDenied": "権限がブロックされています。ブラウザの設定で通知を許可してください",

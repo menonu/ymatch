@@ -79,7 +79,7 @@ void main() {
     expect(find.text('Notifications'), findsOneWidget);
     expect(
       find.text(
-        'Background alerts for new matches, incoming offers, accepted trades, and messages',
+        'Background alerts for new matches, incoming offers, accepted offers, and messages',
       ),
       findsOneWidget,
     );
@@ -114,7 +114,10 @@ void main() {
     expect(find.text('設定'), findsOneWidget);
     expect(find.text('言語'), findsOneWidget);
     expect(find.text('通知'), findsOneWidget);
-    expect(find.text('新しいマッチ、オファー受信、成立、メッセージをバックグラウンドで通知します'), findsOneWidget);
+    expect(
+      find.text('新しいマッチ、オファー受信、オファー承諾、メッセージをバックグラウンドで通知します'),
+      findsOneWidget,
+    );
     expect(find.text('このブラウザでは利用できません'), findsOneWidget);
 
     final prefs = await SharedPreferences.getInstance();
@@ -209,7 +212,7 @@ void main() {
     expect(find.text('Notifications'), findsOneWidget);
     expect(
       find.text(
-        'Background alerts for new matches, incoming offers, accepted trades, and messages',
+        'Background alerts for new matches, incoming offers, accepted offers, and messages',
       ),
       findsOneWidget,
     );
@@ -243,7 +246,7 @@ void main() {
 
       expect(find.text('通知'), findsOneWidget);
       expect(
-        find.text('新しいマッチ、オファー受信、成立、メッセージをバックグラウンドで通知します'),
+        find.text('新しいマッチ、オファー受信、オファー承諾、メッセージをバックグラウンドで通知します'),
         findsOneWidget,
       );
       expect(find.text('このブラウザでは利用できません'), findsNothing);

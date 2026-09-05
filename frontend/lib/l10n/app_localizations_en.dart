@@ -252,7 +252,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsNotificationsSubtitle =>
-      'Background alerts for new matches, incoming offers, accepted trades, and messages';
+      'Background alerts for new matches, incoming offers, accepted offers, and messages';
 
   @override
   String get settingsNotificationsUnsupported =>

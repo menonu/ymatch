@@ -251,7 +251,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsNotificationsSubtitle =>
-      '新しいマッチ、オファー受信、成立、メッセージをバックグラウンドで通知します';
+      '新しいマッチ、オファー受信、オファー承諾、メッセージをバックグラウンドで通知します';
 
   @override
   String get settingsNotificationsUnsupported => 'このブラウザでは利用できません';

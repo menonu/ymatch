@@ -347,7 +347,7 @@
   "@settingsNotifications": {
     "description": "Web Push notification section title (#179, #577)"
   },
-  "settingsNotificationsSubtitle": "Background alerts for new matches, incoming offers, accepted trades, and messages",
+  "settingsNotificationsSubtitle": "Background alerts for new matches, incoming offers, accepted offers, and messages",
   "@settingsNotificationsSubtitle": {
     "description": "Subtitle under notifications toggle (#179, #577)"
   },

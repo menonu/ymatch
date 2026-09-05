@@ -545,7 +545,7 @@ abstract class AppLocalizations {
   /// Subtitle under notifications toggle (#179, #577)
   ///
   /// In en, this message translates to:
-  /// **'Background alerts for new matches, incoming offers, accepted trades, and messages'**
+  /// **'Background alerts for new matches, incoming offers, accepted offers, and messages'**
   String get settingsNotificationsSubtitle;
 
   /// Web Push unsupported on this client (#179)

@@ -71,17 +71,28 @@ pub fn message_received_body(
     message_type: Option<&str>,
     content: &str,
 ) -> String {
-    match message_type {
-        Some("LOCATION") => format!("{actor_username} shared a location"),
-        _ => {
-            let preview = truncate_preview(content);
-            if preview.is_empty() {
-                format!("{actor_username} sent a message")
-            } else {
-                format!("{actor_username}: {preview}")
-            }
-        }
+    if is_location_share(message_type, content) {
+        return format!("{actor_username} shared a location");
     }
+    let preview = truncate_preview(content);
+    if preview.is_empty() {
+        format!("{actor_username} sent a message")
+    } else {
+        format!("{actor_username}: {preview}")
+    }
+}
+
+/// Chat location share is often TEXT + a maps URL (the Flutter client does
+/// not set `message_type: LOCATION`). Redact both shapes so coordinates
+/// never appear on the OS banner (#577 review).
+fn is_location_share(message_type: Option<&str>, content: &str) -> bool {
+    if message_type == Some("LOCATION") {
+        return true;
+    }
+    let lower = content.to_ascii_lowercase();
+    lower.contains("maps.app.goo.gl")
+        || lower.contains("google.com/maps")
+        || lower.contains("maps.apple.com")
 }
 
 pub fn message_received_payload(
@@ -157,15 +168,25 @@ pub fn schedule_notify_from_actor<F>(
     F: FnOnce(&str) -> String + Send + 'static,
 {
     tokio::spawn(async move {
-        notify_from_actor(&pool, recipient_id, actor_id, kind, build_payload).await;
+        notify_from_actor(
+            &pool,
+            global_sender(),
+            recipient_id,
+            actor_id,
+            kind,
+            build_payload,
+        )
+        .await;
     });
 }
 
 /// Best-effort: resolve actor username, then deliver `build_payload(username)`.
 ///
-/// Never panics; never returns an error to the caller.
+/// Never panics; never returns an error to the caller. Tests pass an
+/// explicit [`WebPushSender`]; production uses [`global_sender`].
 pub async fn notify_from_actor<F>(
     pool: &PgPool,
+    sender: &WebPushSender,
     recipient_id: i32,
     actor_id: i32,
     kind: &'static str,
@@ -193,7 +214,7 @@ pub async fn notify_from_actor<F>(
 
     let payload = build_payload(&actor.username);
     let push_subs = PushSubscriptionRepository::new(pool.clone());
-    notify_user(&push_subs, global_sender(), recipient_id, &payload, kind).await;
+    notify_user(&push_subs, sender, recipient_id, &payload, kind).await;
 }
 
 /// Best-effort: load the user's push subscriptions and deliver `payload`.
@@ -346,10 +367,23 @@ mod tests {
     }
 
     #[test]
-    fn message_payload_location_does_not_leak_coordinates() {
+    fn message_payload_location_type_does_not_leak_coordinates() {
         let body = message_received_body("alice", Some("LOCATION"), "35.0,139.0");
         assert_eq!(body, "alice shared a location");
         assert!(!body.contains("35.0"));
+    }
+
+    #[test]
+    fn message_payload_maps_url_text_does_not_leak_coordinates() {
+        // Shipped chat client sends location as TEXT + Google Maps URL.
+        let url = "https://www.google.com/maps/search/?api=1&query=35.0,139.0";
+        for message_type in [None, Some("TEXT")] {
+            let body = message_received_body("alice", message_type, url);
+            assert_eq!(body, "alice shared a location");
+            assert!(!body.contains("35.0"));
+            assert!(!body.contains("139.0"));
+            assert!(!body.contains("maps"));
+        }
     }
 
     #[test]
@@ -386,9 +420,54 @@ mod tests {
         .unwrap();
 
         // Would panic if a payload builder ran; skip must not call it.
-        notify_from_actor(&pool, user_id, user_id, "offer", |_| {
+        let sender = WebPushSender::new(None);
+        notify_from_actor(&pool, &sender, user_id, user_id, "offer", |_| {
             panic!("must not build payload for self-notify")
         })
+        .await;
+    }
+
+    #[sqlx::test]
+    async fn notify_from_actor_loads_username_and_delivers(pool: PgPool) {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/from-actor"))
+            .respond_with(ResponseTemplate::new(201))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let actor_id: i32 = sqlx::query_scalar(
+            "INSERT INTO users (username, uuid) VALUES ('alice-actor', 'uuid-actor') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let recipient_id: i32 = sqlx::query_scalar(
+            "INSERT INTO users (username, uuid) VALUES ('bob-recip', 'uuid-recip') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let repo = PushSubscriptionRepository::new(pool.clone());
+        let endpoint = format!("{}/from-actor", server.uri());
+        repo.upsert(recipient_id, &endpoint, TEST_P256DH, TEST_AUTH, None)
+            .await
+            .unwrap();
+
+        let sender = WebPushSender::new(Some(VapidConfig {
+            private_key: TEST_VAPID_PRIVATE.into(),
+            subject: "mailto:test@ymatch.local".into(),
+        }));
+        notify_from_actor(
+            &pool,
+            &sender,
+            recipient_id,
+            actor_id,
+            "offer",
+            |username| offer_received_payload(username, 11),
+        )
         .await;
     }
 
