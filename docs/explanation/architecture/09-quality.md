@@ -74,14 +74,15 @@ a backlog dump:
   (plus content-type + 1MB size). There is still **no per-object ownership** —
   any active caller who knows a filename can delete it; tighten when storage
   gains an owner record.
-- Background match push is **decided** ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md):
-  Web Push + VAPID). Backend subscription store, API, send-on-match, and Flutter
-  web subscribe / service worker are in place when VAPID is configured. Flutter
-  web builds use `--pwa-strategy=none` so `flutter_service_worker.js` does not
-  replace `push_sw.js` (which would wipe PushSubscriptions). Staging and
-  production inject VAPID via GitHub Secrets + OCI deploy. Remaining gaps: iOS
-  Home Screen PWA install friction and guaranteed delivery — see
-  [#179](https://github.com/menonu/ymatch/issues/179).
+- Background trade push is **decided** ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md):
+  Web Push + VAPID). Backend subscription store, API, send-on-match / offer /
+  accept / chat message ([#577](https://github.com/menonu/ymatch/issues/577)),
+  and Flutter web subscribe / service worker are in place when VAPID is
+  configured. Flutter web builds use `--pwa-strategy=none` so
+  `flutter_service_worker.js` does not replace `push_sw.js` (which would wipe
+  PushSubscriptions). Staging and production inject VAPID via GitHub Secrets +
+  OCI deploy. Remaining gaps: iOS Home Screen PWA install friction and
+  guaranteed delivery — see [#179](https://github.com/menonu/ymatch/issues/179).
 - Some operational runbooks assume maintainer familiarity with OCI free-tier
   quotas (see disaster recovery lessons) — **availability** / ops friction.
 

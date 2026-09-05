@@ -68,7 +68,9 @@ flowchart TD
   F --> I[Sleep until next interval]
 ```
 
-Matching creates or reopens **PENDING** opportunities. It does not move inventory.
+Matching creates or reopens **PENDING** opportunities. After insert or rematch
+reopen, both parties get a best-effort Web Push ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)).
+It does not move inventory.
 It uses only **TRADE** (supply) and **WANT** (demand); **HAVE** is ignored
 ([inventory status semantics](#inventory-status-semantics)). Scope rules:
 [ADR 0001](../adr/0001-match-scoped-to-item-group.md). Rematch after reject/cancel:
@@ -126,6 +128,11 @@ sequenceDiagram
 ```
 
 Enforcement highlights:
+
+After a committed offer (including counter) or accept, the other participant
+gets a best-effort Web Push ([#577](https://github.com/menonu/ymatch/issues/577)).
+Chat TEXT/LOCATION messages do the same for the other party. Push never rolls
+back the committed event.
 
 - Only the **non-proposer** may accept; balance Σ qty each side gives equal and > 0.
 - Legs are **absolute** (`giver_user_id`, merch, qty), not offerer-relative.

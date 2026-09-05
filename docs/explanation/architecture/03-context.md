@@ -28,7 +28,7 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 - Guest and account auth, RBAC
 - Admin/moderator surfaces
 - Image upload serving (local volume in OCI)
-- Background auto-match alerts via **Web Push + VAPID** (web/PWA clients; see [ADR 0015](../adr/0015-web-push-vapid-auto-match.md)) — implementation tracked in [#179](https://github.com/menonu/ymatch/issues/179); sender remains a safe no-op until VAPID + client subscription land
+- Background trade alerts via **Web Push + VAPID** (web/PWA clients; see [ADR 0015](../adr/0015-web-push-vapid-auto-match.md)): auto-match (#179), incoming offer, offer accepted, and chat message ([#577](https://github.com/menonu/ymatch/issues/577)). Safe no-op when VAPID is unset.
 
 ### Out of scope (external or not productized)
 
@@ -45,7 +45,7 @@ Source: [`diagrams/03-system-context.d2`](diagrams/03-system-context.d2)
 | Browser ↔ API | HTTPS JSON REST | Base path `/api/v1`; see [API spec](../../reference/api_spec.md). |
 | Browser ↔ images | HTTPS | `/uploads/*` via API static files (`UPLOAD_DIR`). |
 | API ↔ Postgres | TCP SQL | Connection string from env (`DATABASE_URL`). |
-| API → browser push services | Web Push (HTTPS) | Best-effort after match create/reopen when `VAPID_PRIVATE_KEY` is set and the user has stored subscriptions ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md)). No-op without VAPID. Client subscribe/SW still [#179](https://github.com/menonu/ymatch/issues/179). |
+| API → browser push services | Web Push (HTTPS) | Best-effort after match create/reopen, incoming offer, offer accepted, and chat message when `VAPID_PRIVATE_KEY` is set and the user has stored subscriptions ([ADR 0015](../adr/0015-web-push-vapid-auto-match.md), [#577](https://github.com/menonu/ymatch/issues/577)). No-op without VAPID. |
 | CI ↔ VM | SSH + Docker | GitHub Actions deploy workflows. |
 | Ops ↔ OCI | OCI API / Terraform | Infra and Object Storage; secrets never in git. |
 

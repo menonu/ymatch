@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 
-/// Language + match-notification prefs, inlined on the Settings tab (#562).
+/// Language + notification prefs, inlined on the Settings tab (#562).
 ///
 /// Theme control removed temporarily (#553) due to dark-mode visibility issues.
-/// Match notifications (Web Push) live here (#179).
+/// Trade notifications (Web Push) live here (#179, #577).
 class AppSettingsSection extends ConsumerWidget {
   const AppSettingsSection({super.key});
 

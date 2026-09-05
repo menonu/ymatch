@@ -536,16 +536,16 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsThemeDark;
 
-  /// Web Push match notification section title (#179)
+  /// Web Push notification section title (#179, #577)
   ///
   /// In en, this message translates to:
-  /// **'Match notifications'**
+  /// **'Notifications'**
   String get settingsNotifications;
 
-  /// Subtitle under match notifications toggle (#179)
+  /// Subtitle under notifications toggle (#179, #577)
   ///
   /// In en, this message translates to:
-  /// **'Background alerts when the system finds a new match'**
+  /// **'Background alerts for new matches, incoming offers, accepted trades, and messages'**
   String get settingsNotificationsSubtitle;
 
   /// Web Push unsupported on this client (#179)

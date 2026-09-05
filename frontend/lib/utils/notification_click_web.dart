@@ -1,4 +1,4 @@
-// Web-only: open Matches when a push notification is clicked (#179).
+// Web-only: open the payload path when a push notification is clicked (#179, #577).
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 
 import 'dart:js_interop';

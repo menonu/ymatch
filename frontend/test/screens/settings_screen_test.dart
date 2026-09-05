@@ -76,9 +76,11 @@ void main() {
     expect(find.text('日本語'), findsOneWidget);
     expect(find.text('Light'), findsNothing);
     expect(find.text('Dark'), findsNothing);
-    expect(find.text('Match notifications'), findsOneWidget);
+    expect(find.text('Notifications'), findsOneWidget);
     expect(
-      find.text('Background alerts when the system finds a new match'),
+      find.text(
+        'Background alerts for new matches, incoming offers, accepted trades, and messages',
+      ),
       findsOneWidget,
     );
     expect(find.text('Not available in this browser'), findsOneWidget);
@@ -111,8 +113,8 @@ void main() {
     // Screen strings switch to JA once MaterialApp.locale updates.
     expect(find.text('設定'), findsOneWidget);
     expect(find.text('言語'), findsOneWidget);
-    expect(find.text('マッチ通知'), findsOneWidget);
-    expect(find.text('新しいマッチが見つかったときにバックグラウンドで通知します'), findsOneWidget);
+    expect(find.text('通知'), findsOneWidget);
+    expect(find.text('新しいマッチ、オファー受信、成立、メッセージをバックグラウンドで通知します'), findsOneWidget);
     expect(find.text('このブラウザでは利用できません'), findsOneWidget);
 
     final prefs = await SharedPreferences.getInstance();
@@ -183,37 +185,38 @@ void main() {
     },
   );
 
-  testWidgets(
-    'on/off push shows the match-notification description once (#568)',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          overrides: [
-            appSettingsProvider.overrideWith(
-              (ref) => AppSettingsController(initial: AppSettings.defaults),
+  testWidgets('on/off push shows the notification description once (#568)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        overrides: [
+          appSettingsProvider.overrideWith(
+            (ref) => AppSettingsController(initial: AppSettings.defaults),
+          ),
+          webPushProvider.overrideWith(
+            (ref) => _fixedPush(
+              ref,
+              const WebPushState(status: WebPushUiStatus.off),
             ),
-            webPushProvider.overrideWith(
-              (ref) => _fixedPush(
-                ref,
-                const WebPushState(status: WebPushUiStatus.off),
-              ),
-            ),
-          ],
-          child: const AppSettingsSection(),
-        ),
-      );
-      await tester.pumpAndSettle();
+          ),
+        ],
+        child: const AppSettingsSection(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Match notifications'), findsOneWidget);
-      expect(
-        find.text('Background alerts when the system finds a new match'),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(
+      find.text(
+        'Background alerts for new matches, incoming offers, accepted trades, and messages',
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
-    'Japanese on/off push shows the match-notification description once (#568)',
+    'Japanese on/off push shows the notification description once (#568)',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -238,8 +241,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('マッチ通知'), findsOneWidget);
-      expect(find.text('新しいマッチが見つかったときにバックグラウンドで通知します'), findsOneWidget);
+      expect(find.text('通知'), findsOneWidget);
+      expect(
+        find.text('新しいマッチ、オファー受信、成立、メッセージをバックグラウンドで通知します'),
+        findsOneWidget,
+      );
       expect(find.text('このブラウザでは利用できません'), findsNothing);
     },
   );

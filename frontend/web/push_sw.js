@@ -1,6 +1,7 @@
-// Web Push service worker for ymatch (#179 / ADR 0015).
+// Web Push service worker for ymatch (#179 / ADR 0015 / #577).
 // Registered separately from Flutter's caching service worker.
 // Handles background push display and notification clicks.
+// Payload may set title, body, and path (e.g. /matches or /matches/chat/:id).
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

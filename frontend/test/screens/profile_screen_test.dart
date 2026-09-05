@@ -409,7 +409,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Language'), findsOneWidget);
-    expect(find.text('Match notifications'), findsWidgets);
+    expect(find.text('Notifications'), findsWidgets);
     expect(find.byType(SegmentedButton<AppLanguagePreference>), findsOneWidget);
     expect(find.byType(SwitchListTile), findsOneWidget);
     // Nested Settings entry (list tile → /profile/settings) is gone.

@@ -1,18 +1,27 @@
-//! Outbound match notifications via **Web Push + VAPID** (ADR 0015 / #179).
+//! Outbound trade notifications via **Web Push + VAPID** (ADR 0015 / #179 / #577).
 //!
-//! When VAPID is not configured the send path is a safe no-op (log only) so
-//! local/CI never call external push services. Delivery failures are logged
-//! and never fail match creation.
+//! Events: auto-match, incoming offer (including counter), offer accepted, and
+//! chat message. When VAPID is not configured the send path is a safe no-op
+//! (log only) so local/CI never call external push services. Delivery failures
+//! are logged and never fail match / offer / accept / send.
 
 mod web_push;
 
 pub use web_push::{PushError, SendOutcome, VapidConfig, WebPushSender};
 
 use crate::repositories::push_subscription::PushSubscriptionRepository;
+use crate::repositories::user::UserRepository;
+use sqlx::PgPool;
 use std::sync::OnceLock;
 
 /// Title shown in the notification shade / OS banner.
 pub const MATCH_NOTIFICATION_TITLE: &str = "New match";
+pub const OFFER_NOTIFICATION_TITLE: &str = "New offer";
+pub const ACCEPTED_NOTIFICATION_TITLE: &str = "Offer accepted";
+pub const MESSAGE_NOTIFICATION_TITLE: &str = "New message";
+
+const MATCHES_PATH: &str = "/matches";
+const MESSAGE_PREVIEW_MAX_CHARS: usize = 80;
 
 /// Body text for a new auto-match / rematch reopen.
 pub fn match_notification_body(partner_username: &str) -> String {
@@ -21,15 +30,104 @@ pub fn match_notification_body(partner_username: &str) -> String {
 
 /// JSON payload delivered to the service worker `push` event.
 pub fn match_notification_payload(partner_username: &str) -> String {
+    push_payload(
+        MATCH_NOTIFICATION_TITLE,
+        &match_notification_body(partner_username),
+        MATCHES_PATH,
+    )
+}
+
+/// Deep-link into the trade chat for offer / accept / message alerts (#577).
+pub fn trade_chat_path(match_id: i32) -> String {
+    format!("/matches/chat/{match_id}")
+}
+
+pub fn offer_received_body(actor_username: &str) -> String {
+    format!("{actor_username} sent you an offer. Open the trade to review it.")
+}
+
+pub fn offer_received_payload(actor_username: &str, match_id: i32) -> String {
+    push_payload(
+        OFFER_NOTIFICATION_TITLE,
+        &offer_received_body(actor_username),
+        &trade_chat_path(match_id),
+    )
+}
+
+pub fn offer_accepted_body(actor_username: &str) -> String {
+    format!("{actor_username} accepted your offer.")
+}
+
+pub fn offer_accepted_payload(actor_username: &str, match_id: i32) -> String {
+    push_payload(
+        ACCEPTED_NOTIFICATION_TITLE,
+        &offer_accepted_body(actor_username),
+        &trade_chat_path(match_id),
+    )
+}
+
+pub fn message_received_body(
+    actor_username: &str,
+    message_type: Option<&str>,
+    content: &str,
+) -> String {
+    match message_type {
+        Some("LOCATION") => format!("{actor_username} shared a location"),
+        _ => {
+            let preview = truncate_preview(content);
+            if preview.is_empty() {
+                format!("{actor_username} sent a message")
+            } else {
+                format!("{actor_username}: {preview}")
+            }
+        }
+    }
+}
+
+pub fn message_received_payload(
+    actor_username: &str,
+    match_id: i32,
+    message_type: Option<&str>,
+    content: &str,
+) -> String {
+    push_payload(
+        MESSAGE_NOTIFICATION_TITLE,
+        &message_received_body(actor_username, message_type, content),
+        &trade_chat_path(match_id),
+    )
+}
+
+fn push_payload(title: &str, body: &str, path: &str) -> String {
     serde_json::json!({
-        "title": MATCH_NOTIFICATION_TITLE,
-        "body": match_notification_body(partner_username),
+        "title": title,
+        "body": body,
+        "path": path,
     })
     .to_string()
 }
 
+fn truncate_preview(content: &str) -> String {
+    let collapsed = content.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut chars = collapsed.chars();
+    let taken: String = chars.by_ref().take(MESSAGE_PREVIEW_MAX_CHARS).collect();
+    if chars.next().is_some() {
+        format!("{taken}…")
+    } else {
+        taken
+    }
+}
+
+/// The participant who is not `actor_id`.
+pub fn other_participant(user1_id: i32, user2_id: i32, actor_id: i32) -> i32 {
+    if actor_id == user1_id {
+        user2_id
+    } else {
+        user1_id
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Process-global sender (matching background job)
+// Process-global sender (matching background job + request-path hooks)
 // ---------------------------------------------------------------------------
 
 static SENDER: OnceLock<WebPushSender> = OnceLock::new();
@@ -46,64 +144,110 @@ pub fn global_sender() -> &'static WebPushSender {
     SENDER.get_or_init(WebPushSender::from_env)
 }
 
-/// Best-effort: load the user's push subscriptions and deliver a match alert.
+/// Fire-and-forget: load the actor's username and notify the other party.
+///
+/// Never fails the caller. Skips when `recipient_id == actor_id`.
+pub fn schedule_notify_from_actor<F>(
+    pool: PgPool,
+    recipient_id: i32,
+    actor_id: i32,
+    kind: &'static str,
+    build_payload: F,
+) where
+    F: FnOnce(&str) -> String + Send + 'static,
+{
+    tokio::spawn(async move {
+        notify_from_actor(&pool, recipient_id, actor_id, kind, build_payload).await;
+    });
+}
+
+/// Best-effort: resolve actor username, then deliver `build_payload(username)`.
+///
+/// Never panics; never returns an error to the caller.
+pub async fn notify_from_actor<F>(
+    pool: &PgPool,
+    recipient_id: i32,
+    actor_id: i32,
+    kind: &'static str,
+    build_payload: F,
+) where
+    F: FnOnce(&str) -> String,
+{
+    if recipient_id == actor_id {
+        tracing::debug!(recipient_id, kind, "push skipped (actor is recipient)");
+        return;
+    }
+
+    let users = UserRepository::new(pool.clone());
+    let actor = match users.get_by_id(actor_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            tracing::debug!(actor_id, kind, "push skipped (actor not found)");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, actor_id, kind, "push: failed to load actor");
+            return;
+        }
+    };
+
+    let payload = build_payload(&actor.username);
+    let push_subs = PushSubscriptionRepository::new(pool.clone());
+    notify_user(&push_subs, global_sender(), recipient_id, &payload, kind).await;
+}
+
+/// Best-effort: load the user's push subscriptions and deliver `payload`.
 ///
 /// Never panics; never returns an error to the caller. On HTTP 404/410 the
-/// dead subscription row is deleted so later matches skip it.
-pub async fn notify_user_of_match(
+/// dead subscription row is deleted so later events skip it.
+pub async fn notify_user(
     push_subs: &PushSubscriptionRepository,
     sender: &WebPushSender,
     user_id: i32,
-    partner_username: &str,
+    payload: &str,
+    kind: &str,
 ) {
     if !sender.is_enabled() {
-        tracing::debug!(
-            user_id,
-            partner_username,
-            "match push skipped (VAPID not configured)"
-        );
+        tracing::debug!(user_id, kind, "push skipped (VAPID not configured)");
         return;
     }
 
     let subs = match push_subs.list_by_user(user_id).await {
         Ok(s) => s,
         Err(e) => {
-            tracing::warn!(
-                error = %e,
-                user_id,
-                "match push: failed to load subscriptions"
-            );
+            tracing::warn!(error = %e, user_id, kind, "push: failed to load subscriptions");
             return;
         }
     };
 
     if subs.is_empty() {
-        tracing::debug!(user_id, "match push skipped (no subscriptions)");
+        tracing::debug!(user_id, kind, "push skipped (no subscriptions)");
         return;
     }
 
-    let payload = match_notification_payload(partner_username);
     for sub in subs {
-        match sender.send_to_subscription(&sub, &payload).await {
+        match sender.send_to_subscription(&sub, payload).await {
             Ok(SendOutcome::Delivered) => {
                 tracing::info!(
                     user_id,
+                    kind,
                     endpoint_host = %endpoint_host(&sub.endpoint),
-                    partner_username,
-                    "match push delivered"
+                    "push delivered"
                 );
             }
             Ok(SendOutcome::Gone) => {
                 tracing::info!(
                     user_id,
+                    kind,
                     endpoint_host = %endpoint_host(&sub.endpoint),
-                    "match push endpoint gone; removing subscription"
+                    "push endpoint gone; removing subscription"
                 );
                 if let Err(e) = push_subs.delete_by_endpoint(user_id, &sub.endpoint).await {
                     tracing::warn!(
                         error = %e,
                         user_id,
-                        "match push: failed to delete dead subscription"
+                        kind,
+                        "push: failed to delete dead subscription"
                     );
                 }
             }
@@ -111,13 +255,24 @@ pub async fn notify_user_of_match(
                 tracing::warn!(
                     error = %e,
                     user_id,
+                    kind,
                     endpoint_host = %endpoint_host(&sub.endpoint),
-                    partner_username,
-                    "match push delivery failed"
+                    "push delivery failed"
                 );
             }
         }
     }
+}
+
+/// Best-effort match alert. Wrapper around [`notify_user`] for the matcher.
+pub async fn notify_user_of_match(
+    push_subs: &PushSubscriptionRepository,
+    sender: &WebPushSender,
+    user_id: i32,
+    partner_username: &str,
+) {
+    let payload = match_notification_payload(partner_username);
+    notify_user(push_subs, sender, user_id, &payload, "match").await;
 }
 
 fn endpoint_host(endpoint: &str) -> String {
@@ -141,6 +296,10 @@ mod tests {
         "BGa4N1PI79lboMR_YrwCiCsgp35DRvedt7opHcf0yM3iOBTSoQYqQLwWxAfRKE6tsDnReWmhsImkhDF_DBdkNSU";
     const TEST_AUTH: &str = "EvcWjEgzr4rbvhfi3yds0A";
 
+    fn parse_payload(raw: &str) -> serde_json::Value {
+        serde_json::from_str(raw).unwrap()
+    }
+
     #[test]
     fn body_includes_partner_and_trades_hint() {
         let body = match_notification_body("alice");
@@ -149,11 +308,63 @@ mod tests {
     }
 
     #[test]
-    fn payload_is_json_with_title_and_body() {
-        let raw = match_notification_payload("bob");
-        let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    fn match_payload_is_json_with_title_body_and_path() {
+        let v = parse_payload(&match_notification_payload("bob"));
         assert_eq!(v["title"], MATCH_NOTIFICATION_TITLE);
         assert!(v["body"].as_str().unwrap().contains("bob"));
+        assert_eq!(v["path"], MATCHES_PATH);
+    }
+
+    #[test]
+    fn offer_payload_names_actor_and_opens_chat() {
+        let v = parse_payload(&offer_received_payload("alice", 42));
+        assert_eq!(v["title"], OFFER_NOTIFICATION_TITLE);
+        assert!(v["body"].as_str().unwrap().contains("alice"));
+        assert_eq!(v["path"], "/matches/chat/42");
+    }
+
+    #[test]
+    fn accepted_payload_names_actor_and_opens_chat() {
+        let v = parse_payload(&offer_accepted_payload("bob", 7));
+        assert_eq!(v["title"], ACCEPTED_NOTIFICATION_TITLE);
+        assert!(v["body"].as_str().unwrap().contains("bob"));
+        assert!(v["body"].as_str().unwrap().contains("accepted"));
+        assert_eq!(v["path"], "/matches/chat/7");
+    }
+
+    #[test]
+    fn message_payload_includes_preview_and_opens_chat() {
+        let v = parse_payload(&message_received_payload(
+            "alice",
+            9,
+            Some("TEXT"),
+            "hello there",
+        ));
+        assert_eq!(v["title"], MESSAGE_NOTIFICATION_TITLE);
+        assert_eq!(v["body"], "alice: hello there");
+        assert_eq!(v["path"], "/matches/chat/9");
+    }
+
+    #[test]
+    fn message_payload_location_does_not_leak_coordinates() {
+        let body = message_received_body("alice", Some("LOCATION"), "35.0,139.0");
+        assert_eq!(body, "alice shared a location");
+        assert!(!body.contains("35.0"));
+    }
+
+    #[test]
+    fn message_preview_truncates_long_text() {
+        let long = "a".repeat(120);
+        let body = message_received_body("bob", Some("TEXT"), &long);
+        assert!(body.starts_with("bob: "));
+        assert!(body.ends_with('…'));
+        assert!(body.chars().count() < 120);
+    }
+
+    #[test]
+    fn other_participant_picks_the_non_actor() {
+        assert_eq!(other_participant(1, 2, 1), 2);
+        assert_eq!(other_participant(1, 2, 2), 1);
     }
 
     #[tokio::test]
@@ -163,6 +374,22 @@ mod tests {
         let repo = PushSubscriptionRepository::new(pool);
         let sender = WebPushSender::new(None);
         notify_user_of_match(&repo, &sender, 1, "partner").await;
+    }
+
+    #[sqlx::test]
+    async fn notify_from_actor_skips_when_recipient_is_actor(pool: PgPool) {
+        let user_id: i32 = sqlx::query_scalar(
+            "INSERT INTO users (username, uuid) VALUES ('self-push', 'uuid-self-push') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Would panic if a payload builder ran; skip must not call it.
+        notify_from_actor(&pool, user_id, user_id, "offer", |_| {
+            panic!("must not build payload for self-notify")
+        })
+        .await;
     }
 
     #[sqlx::test]
@@ -207,5 +434,36 @@ mod tests {
         let remaining = repo.list_by_user(user_id).await.unwrap();
         assert_eq!(remaining.len(), 1, "gone endpoint should be removed");
         assert_eq!(remaining[0].endpoint, alive);
+    }
+
+    #[sqlx::test]
+    async fn notify_user_delivers_offer_payload(pool: PgPool) {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/offer"))
+            .respond_with(ResponseTemplate::new(201))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let user_id: i32 = sqlx::query_scalar(
+            "INSERT INTO users (username, uuid) VALUES ('push-offer-u', 'uuid-push-o') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let repo = PushSubscriptionRepository::new(pool.clone());
+        let endpoint = format!("{}/offer", server.uri());
+        repo.upsert(user_id, &endpoint, TEST_P256DH, TEST_AUTH, None)
+            .await
+            .unwrap();
+
+        let sender = WebPushSender::new(Some(VapidConfig {
+            private_key: TEST_VAPID_PRIVATE.into(),
+            subject: "mailto:test@ymatch.local".into(),
+        }));
+        let payload = offer_received_payload("alice", 11);
+        notify_user(&repo, &sender, user_id, &payload, "offer").await;
     }
 }

@@ -133,7 +133,7 @@ BottomNavBar
 - **Username Card**: Avatar, editable username (inline), UUID with copy button, warning text
 - **App settings** (`AppSettingsSection`, #562): sits **next to** the username card on wide viewports (≥840px) and stacks below it on narrower widths
   - **Language**: System / English / Japanese (`SegmentedButton`) — System follows device/browser locale; default **System**. Client-only via `SharedPreferences` (no backend sync)
-  - **Match notifications**: Web Push toggle (#179)
+  - **Notifications**: Web Push toggle for matches, incoming offers, accepted trades, and messages (#179, #577)
   - **Theme**: forced **light** for all users (`ThemeMode.light`); selector removed due to dark-mode visibility issues (#553). `AppTheme.darkTheme` remains for a future re-introduction
 - **Community** (`CommunityCard`, #570 / #572 / #573): sits **next to** the Settings card on wide viewports (≥840px) and stacks below it on narrower widths. Icons only (tooltips for a11y). X and Discord destinations are baked in at frontend build from GitHub Secrets (`X_PROFILE_URL`, `DISCORD_INVITE_URL`); those icons are omitted when the URL is unset or not `https`. GitHub always links to the public repo (`https://github.com/menonu/ymatch`, hardcoded).
 - **Instructions Card**: 3-step "How to Trade" guide + projected-qty note (#427)
