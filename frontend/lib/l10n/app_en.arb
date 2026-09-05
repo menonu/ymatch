@@ -864,7 +864,7 @@
   "@skipHaveDecrementLabel": {
     "description": "Checkbox: leave giver HAVE unchanged when applying inventory (#429)"
   },
-  "skipHaveDecrementHint": "Do not change Owned (HAVE). Trade (TRADE) and Want (WANT) still update.",
+  "skipHaveDecrementHint": "Do not decrease Owned (HAVE) for items you gave. Trade (TRADE) and Want (WANT) still update; received HAVE still increases.",
   "@skipHaveDecrementHint": {
     "description": "Subtitle under the skip-HAVE checkbox (#429 / #579)"
   },

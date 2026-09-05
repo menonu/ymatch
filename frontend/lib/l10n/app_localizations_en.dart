@@ -618,7 +618,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skipHaveDecrementHint =>
-      'Do not change Owned (HAVE). Trade (TRADE) and Want (WANT) still update.';
+      'Do not decrease Owned (HAVE) for items you gave. Trade (TRADE) and Want (WANT) still update; received HAVE still increases.';
 
   @override
   String get inventoryUpdated => 'Inventory Updated';

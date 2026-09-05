@@ -198,7 +198,7 @@
   "updateInventory": "在庫を更新",
   "applyInventoryConfirmBody": "完了した取引を在庫に反映します。既定では、渡したアイテムは譲（TRADE）と所持（HAVE）の両方が減り、受け取ったアイテムは所持（HAVE）が増え、求（WANT）が減ります。",
   "skipHaveDecrementLabel": "所持（HAVE）には反映しない",
-  "skipHaveDecrementHint": "所持（HAVE）は変えません。譲（TRADE）と求（WANT）は通常どおり更新されます。",
+  "skipHaveDecrementHint": "渡したアイテムの所持（HAVE）は減らしません。譲（TRADE）と求（WANT）は更新され、受け取ったアイテムの所持は増えます。",
   "inventoryUpdated": "在庫更新済",
   "inventoryUpdatedSnack": "在庫を更新しました！",
   "makeTradeOffer": "取引オファーを作成",

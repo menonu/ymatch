@@ -612,7 +612,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skipHaveDecrementHint =>
-      '所持（HAVE）は変えません。譲（TRADE）と求（WANT）は通常どおり更新されます。';
+      '渡したアイテムの所持（HAVE）は減らしません。譲（TRADE）と求（WANT）は更新され、受け取ったアイテムの所持は増えます。';
 
   @override
   String get inventoryUpdated => '在庫更新済';

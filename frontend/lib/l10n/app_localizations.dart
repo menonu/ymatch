@@ -1217,7 +1217,7 @@ abstract class AppLocalizations {
   /// Subtitle under the skip-HAVE checkbox (#429 / #579)
   ///
   /// In en, this message translates to:
-  /// **'Do not change Owned (HAVE). Trade (TRADE) and Want (WANT) still update.'**
+  /// **'Do not decrease Owned (HAVE) for items you gave. Trade (TRADE) and Want (WANT) still update; received HAVE still increases.'**
   String get skipHaveDecrementHint;
 
   /// Label shown when a trade's inventory was already applied
