@@ -154,6 +154,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .find(|i| i["merchId"] == merch_b_id && i["status"] == "HAVE");
     assert!(u1_have_b.is_some(), "User1 should HAVE Card B");
     assert_eq!(u1_have_b.unwrap()["quantity"].as_i64().unwrap(), 1);
+    let u1_want_b = inv1
+        .iter()
+        .find(|i| i["merchId"] == merch_b_id && i["status"] == "WANT");
+    assert_eq!(
+        u1_want_b
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0),
+        0,
+        "User1 WANT Card B should decrement 1→0 (#579)"
+    );
 
     // Verify User2's inventory is NOT yet changed (User2 hasn't applied)
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -280,6 +290,16 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .find(|i| i["merchId"] == merch_a_id && i["status"] == "HAVE");
     assert!(u2_have_a.is_some(), "User2 should HAVE Card A");
     assert_eq!(u2_have_a.unwrap()["quantity"].as_i64().unwrap(), 1);
+    let u2_want_a = inv2
+        .iter()
+        .find(|i| i["merchId"] == merch_a_id && i["status"] == "WANT");
+    assert_eq!(
+        u2_want_a
+            .and_then(|i| i.get("quantity").and_then(|v| v.as_i64()))
+            .unwrap_or(0),
+        0,
+        "User2 WANT Card A should decrement 1→0 (#579)"
+    );
 
     // 14. Double-apply for User2 → 409 Conflict
     let app = backend::routes::create_router(pool.clone(), test_storage());
@@ -438,6 +458,17 @@ async fn test_apply_inventory_concurrent_single_winner(pool: PgPool) {
     .unwrap();
     assert_eq!(have_b, 1, "user1 HAVE merch B must increment once");
 
+    let want_b: i32 = sqlx::query_scalar(
+        "SELECT quantity FROM inventory
+         WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+    )
+    .bind(user1_id as i32)
+    .bind(merch_b_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(want_b, 0, "user1 WANT merch B must decrement once (1→0)");
+
     let applied: Option<chrono::DateTime<chrono::Utc>> =
         sqlx::query_scalar("SELECT user1_inventory_applied_at FROM matches WHERE id = $1")
             .bind(match_id as i32)
@@ -555,6 +586,12 @@ async fn test_apply_inventory_skip_have_decrement(pool: PgPool) {
         .map(|i| json_i64(i, "quantity"))
         .unwrap_or(-1);
     assert_eq!(have_b, 1, "receiver HAVE still increments");
+    let want_b = inv1
+        .iter()
+        .find(|i| json_i64(i, "merchId") == card_b && i["status"] == "WANT")
+        .map(|i| json_i64(i, "quantity"))
+        .unwrap_or(0);
+    assert_eq!(want_b, 0, "receiver WANT still decrements with skip-HAVE");
 }
 
 #[sqlx::test]

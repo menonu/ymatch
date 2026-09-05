@@ -470,13 +470,14 @@ leg):
 Excluded: `PENDING`, `REJECTED`, `CANCELLED`, and `COMPLETED` after this
 user applied.
 
-Delta rules (default apply / [ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md);
+Delta rules (default apply / [ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md),
+[ADR 0017](../explanation/adr/0017-apply-inventory-decrements-receiver-want.md);
 apply-time `skipHaveDecrement` is **not** reflected):
 
 | Role on the leg | HAVE | WANT | TRADE |
 |-----------------|------|------|-------|
 | Giver | −qty | — | −qty |
-| Receiver | +qty | −qty (display only; apply does not change WANT) | — |
+| Receiver | +qty | −qty | — |
 
 `projectedQuantity` is **not clamped** and may be negative (over-commit).
 Statuses with a non-zero delta but no inventory row are returned as
@@ -540,15 +541,17 @@ applies independently; a second apply for the same user returns `409 Conflict`.
 
 Per absolute leg `(giver_user_id, merch_id, quantity)`
 ([ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md),
-[ADR 0014](../explanation/adr/0014-fail-closed-inventory-apply.md)):
+[ADR 0014](../explanation/adr/0014-fail-closed-inventory-apply.md),
+[ADR 0017](../explanation/adr/0017-apply-inventory-decrements-receiver-want.md)):
 
 | Party | Default | `skipHaveDecrement: true` |
 |-------|---------|---------------------------|
 | Giver | `TRADE −qty` (**fail-closed** if insufficient), `HAVE −qty` (**clamp ≥ 0**) | `TRADE −qty` only |
-| Receiver | `HAVE +qty` | same (flag ignored) |
+| Receiver | `HAVE +qty`, `WANT −qty` (**clamp ≥ 0**) | same (flag ignored) |
 
-HAVE is optional bookkeeping: short/missing HAVE never fails apply. TRADE is
-the trade pool and must cover `qty`. See
+HAVE is optional bookkeeping: short/missing HAVE never fails apply. WANT
+short/missing also clamps at 0 (missing row is a no-op). TRADE is the trade
+pool and must cover `qty`. See
 [inventory status semantics](../explanation/architecture/06-runtime.md#inventory-status-semantics).
 
 - **Request Body**:

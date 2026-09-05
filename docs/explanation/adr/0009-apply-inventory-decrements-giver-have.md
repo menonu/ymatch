@@ -1,6 +1,6 @@
 # ADR 0009: Apply Inventory Decrements Giver HAVE by Default
 
-- **Status**: Accepted (insufficient **TRADE** clamp superseded in part by [ADR 0014](0014-fail-closed-inventory-apply.md); HAVE clamp remains best-effort)
+- **Status**: Accepted (insufficient **TRADE** clamp superseded in part by [ADR 0014](0014-fail-closed-inventory-apply.md); HAVE clamp remains best-effort; receiver apply deltas superseded in part by [ADR 0017](0017-apply-inventory-decrements-receiver-want.md))
 - **Date**: 2026-07-15
 - **Supersedes**: Partial supersession of [ADR 0002](0002-negotiation-state-machine.md) § Decision point 6 (apply-inventory deltas only)
 

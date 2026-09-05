@@ -605,13 +605,14 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get applyInventoryConfirmBody =>
-      '完了した取引を在庫に反映します。既定では、渡したアイテムは譲（TRADE）と所持（HAVE）の両方が減ります。';
+      '完了した取引を在庫に反映します。既定では、渡したアイテムは譲（TRADE）と所持（HAVE）の両方が減り、受け取ったアイテムは所持（HAVE）が増え、求（WANT）が減ります。';
 
   @override
   String get skipHaveDecrementLabel => '所持（HAVE）には反映しない';
 
   @override
-  String get skipHaveDecrementHint => '譲（TRADE）のみ減らします。所持を別管理している場合に使います。';
+  String get skipHaveDecrementHint =>
+      '所持（HAVE）は変えません。譲（TRADE）と求（WANT）は通常どおり更新されます。';
 
   @override
   String get inventoryUpdated => '在庫更新済';

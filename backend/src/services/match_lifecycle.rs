@@ -40,8 +40,8 @@
 //! The apply-inventory step runs *after* COMPLETED and updates the
 //! `inventory` table based on the offer's `match_items` legs. Each side
 //! applies independently; the per-user flag (`user{1,2}_inventory_applied_at`)
-//! prevents double-application. TRADE decrements from apply also re-evaluate
-//! the acting user's other active matches (ADR 0010).
+//! prevents double-application. TRADE and WANT decrements from apply also
+//! re-evaluate the acting user's other active matches (ADR 0010).
 
 use crate::error::AppError;
 use crate::generated::ymatch::{InventoryItem, OfferItem, OfferTradeRequest};
@@ -340,13 +340,13 @@ impl MatchLifecycleService {
     /// match. Each side applies independently; the per-user flag
     /// (`user{1,2}_inventory_applied_at`) prevents double-application.
     ///
-    /// Legs are absolute (#297 / #429): for each leg `(giver, merch, qty)`,
-    /// by default the giver's TRADE **and** HAVE decrease by qty and the
-    /// receiver's HAVE increases by qty. When `skip_have_decrement` is true,
-    /// the giver's HAVE is left unchanged (legacy). TRADE apply is
-    /// **fail-closed** (#493 / ADR 0014): insufficient TRADE returns 400.
-    /// HAVE is optional bookkeeping — short HAVE is clamped at 0 and never
-    /// fails apply. The pure side selection lives in
+    /// Legs are absolute (#297 / #429 / #579): for each leg `(giver, merch,
+    /// qty)`, by default the giver's TRADE **and** HAVE decrease by qty and
+    /// the receiver's HAVE increases by qty while WANT decreases by qty.
+    /// When `skip_have_decrement` is true, the giver's HAVE is left
+    /// unchanged (legacy). TRADE apply is **fail-closed** (#493 / ADR 0014):
+    /// insufficient TRADE returns 400. HAVE and WANT shortfalls clamp at 0
+    /// and never fail apply. The pure side selection lives in
     /// [`apply_inventory_delta`] (so it can be unit-tested without a
     /// database); the transaction-bearing part is covered by the integration
     /// tests `test_trade_lifecycle_offer_accept_complete_apply` and
@@ -408,28 +408,35 @@ impl MatchLifecycleService {
             .list_match_items_in_tx(&mut *tx, match_id)
             .await?;
 
-        // ADR 0010: TRADE decrements can zero mutual capacity for *other*
-        // active matches the user is still negotiating.
-        let mut traded = false;
+        // ADR 0010: TRADE or WANT decrements can zero mutual capacity for
+        // *other* active matches the user is still negotiating.
+        let mut capacity_changed = false;
 
         for item in &items {
-            // Absolute leg (#297/#429):
+            // Absolute leg (#297/#429/#579):
             //   requesting == giver    -> TRADE −qty, and HAVE −qty unless skip
-            //   requesting == receiver -> HAVE +qty
-            let (delta_trade, delta_have) = apply_inventory_delta(
+            //   requesting == receiver -> HAVE +qty, WANT −qty
+            let (delta_trade, delta_have, delta_want) = apply_inventory_delta(
                 item.giver_user_id,
                 user_id,
                 item.quantity,
                 skip_have_decrement,
             );
-            if delta_trade == 0 && delta_have == 0 {
+            if delta_trade == 0 && delta_have == 0 && delta_want == 0 {
                 continue;
             }
-            if delta_trade > 0 {
-                traded = true;
+            if delta_trade > 0 || delta_want < 0 {
+                capacity_changed = true;
             }
             self.inventory
-                .apply_trade_delta(&mut *tx, user_id, item.merch_id, delta_trade, delta_have)
+                .apply_trade_delta(
+                    &mut *tx,
+                    user_id,
+                    item.merch_id,
+                    delta_trade,
+                    delta_have,
+                    delta_want,
+                )
                 .await?;
         }
 
@@ -439,7 +446,7 @@ impl MatchLifecycleService {
             .mark_inventory_applied(&mut *tx, match_id, is_user1)
             .await?;
 
-        if traded {
+        if capacity_changed {
             self.cancel_zero_capacity_for_user(&mut tx, user_id).await?;
         }
 
@@ -794,20 +801,21 @@ pub fn validate_cancel_transition(current_status: &str) -> Result<(), AppError> 
 }
 
 /// Map `(giver_id, requesting_user_id, quantity, skip_have_decrement) ->
-/// (delta_trade, delta_have)`.
+/// (delta_trade, delta_have, delta_want)`.
 ///
-/// Absolute legs (#297 / #429):
+/// Absolute legs (#297 / #429 / #579):
 /// - **Giver** (default): TRADE decreases by qty and HAVE decreases by qty
-///   → `(qty, -qty)`.
-/// - **Giver** with `skip_have_decrement`: TRADE decreases only → `(qty, 0)`.
-/// - **Receiver**: HAVE increases by qty → `(0, qty)`.
+///   → `(qty, -qty, 0)`.
+/// - **Giver** with `skip_have_decrement`: TRADE decreases only → `(qty, 0, 0)`.
+/// - **Receiver**: HAVE increases by qty and WANT decreases by qty
+///   → `(0, qty, -qty)`.
 ///
-/// `delta_have` is signed: positive increments HAVE, negative decrements
-/// HAVE (see `InventoryRepository::apply_trade_delta`). Factored out as a
-/// pure function so it can be unit-tested without a database.
+/// `delta_have` and `delta_want` are signed: positive increments, negative
+/// decrements (see `InventoryRepository::apply_trade_delta`). Factored out
+/// as a pure function so it can be unit-tested without a database.
 ///
 /// Display projection (#427) uses the **default** giver HAVE− / TRADE− and
-/// receiver HAVE+ (plus a display-only WANT−) in
+/// receiver HAVE+ / WANT− in
 /// [`crate::services::inventory_projection`] — it does not call this helper
 /// because apply-time `skip_have_decrement` must not affect always-on
 /// projected quantities.
@@ -816,12 +824,12 @@ fn apply_inventory_delta(
     requesting_user_id: i32,
     quantity: i32,
     skip_have_decrement: bool,
-) -> (i32, i32) {
+) -> (i32, i32, i32) {
     if giver_id == requesting_user_id {
         let have_delta = if skip_have_decrement { 0 } else { -quantity };
-        (quantity, have_delta)
+        (quantity, have_delta, 0)
     } else {
-        (0, quantity)
+        (0, quantity, -quantity)
     }
 }
 
@@ -846,33 +854,34 @@ mod tests {
             .collect()
     }
 
-    // --- apply_inventory_delta (giver-absolute, #297 / #429) ---
+    // --- apply_inventory_delta (giver-absolute, #297 / #429 / #579) ---
 
     #[test]
     fn giver_default_decrements_trade_and_have() {
         // Requesting user is the giver: TRADE −qty and HAVE −qty (#429).
-        assert_eq!(apply_inventory_delta(1, 1, 3, false), (3, -3));
+        // Giver WANT is unchanged (#579).
+        assert_eq!(apply_inventory_delta(1, 1, 3, false), (3, -3, 0));
     }
 
     #[test]
     fn giver_skip_have_decrements_trade_only() {
-        // Opt-out: leave HAVE unchanged (pre-#429 behavior).
-        assert_eq!(apply_inventory_delta(1, 1, 3, true), (3, 0));
+        // Opt-out: leave HAVE unchanged (pre-#429 behavior). WANT still 0.
+        assert_eq!(apply_inventory_delta(1, 1, 3, true), (3, 0, 0));
     }
 
     #[test]
-    fn receiver_increments_own_have() {
-        // Requesting user is the receiver: their HAVE increases by qty.
+    fn receiver_increments_have_and_decrements_want() {
+        // Requesting user is the receiver: HAVE +qty and WANT −qty (#579).
         // skip_have_decrement is irrelevant for the receiver.
-        assert_eq!(apply_inventory_delta(2, 1, 5, false), (0, 5));
-        assert_eq!(apply_inventory_delta(2, 1, 5, true), (0, 5));
+        assert_eq!(apply_inventory_delta(2, 1, 5, false), (0, 5, -5));
+        assert_eq!(apply_inventory_delta(2, 1, 5, true), (0, 5, -5));
     }
 
     #[test]
     fn zero_quantity_is_noop() {
-        assert_eq!(apply_inventory_delta(1, 1, 0, false), (0, 0));
-        assert_eq!(apply_inventory_delta(2, 1, 0, false), (0, 0));
-        assert_eq!(apply_inventory_delta(1, 1, 0, true), (0, 0));
+        assert_eq!(apply_inventory_delta(1, 1, 0, false), (0, 0, 0));
+        assert_eq!(apply_inventory_delta(2, 1, 0, false), (0, 0, 0));
+        assert_eq!(apply_inventory_delta(1, 1, 0, true), (0, 0, 0));
     }
 
     // --- validate_legs (want-quantity cap, giver model) ---

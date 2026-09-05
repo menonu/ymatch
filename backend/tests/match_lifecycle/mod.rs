@@ -248,7 +248,7 @@ async fn test_inventory_apply_trade_delta_decrement_only(pool: PgPool) {
 
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 2, 0)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 2, 0, 0)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -278,7 +278,7 @@ async fn test_inventory_apply_trade_delta_increment_only(pool: PgPool) {
 
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, 4)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, 4, 0)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -318,7 +318,7 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
     .unwrap();
 
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
-    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -2)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -2, 0)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -333,7 +333,7 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
 
     // HAVE is optional bookkeeping: over-decrement clamps at 0 and does not
     // fail apply (#493 product clarification).
-    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -10)
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, -10, 0)
         .await
         .unwrap();
     let qty: (i32,) = sqlx::query_as(
@@ -348,13 +348,70 @@ async fn test_inventory_apply_trade_delta_have_decrement(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn test_inventory_apply_trade_delta_want_decrement(pool: PgPool) {
+    let (u1, _, _, merch_for_u1, merch_without_want) = setup_pending_match_with_merch(&pool).await;
+
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO inventory (user_id, merch_id, status, quantity) VALUES ($1, $2, 'WANT', 5)",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, 0, -2)
+        .await
+        .unwrap();
+    let qty: (i32,) = sqlx::query_as(
+        "SELECT quantity FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(qty.0, 3, "WANT started at 5, decremented by 2");
+
+    // Short WANT clamps at 0 and does not fail apply (#579).
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 0, 0, -10)
+        .await
+        .unwrap();
+    let qty: (i32,) = sqlx::query_as(
+        "SELECT quantity FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+    )
+    .bind(u1 as i32)
+    .bind(merch_for_u1)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(qty.0, 0, "WANT decrement clamps at 0");
+
+    // Missing WANT row: no-op, no synthetic WANT created.
+    inv.apply_trade_delta(&mut *tx, u1 as i32, merch_without_want, 0, 0, -1)
+        .await
+        .unwrap();
+    let count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM inventory WHERE user_id = $1 AND merch_id = $2 AND status = 'WANT'",
+    )
+    .bind(u1 as i32)
+    .bind(merch_without_want)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(count.0, 0, "missing WANT must not insert a row");
+}
+
+#[sqlx::test]
 async fn test_inventory_apply_trade_delta_insufficient_trade_fails(pool: PgPool) {
     let (u1, _, _, merch_for_u1, _) = setup_pending_match_with_merch(&pool).await;
     // TRADE starts at 5 in the fixture.
     let mut tx = pool.begin().await.unwrap();
     let inv = backend::repositories::inventory::InventoryRepository::new(pool.clone());
     let err = inv
-        .apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 10, 0)
+        .apply_trade_delta(&mut *tx, u1 as i32, merch_for_u1, 10, 0, 0)
         .await
         .expect_err("TRADE over-decrement must fail closed");
     assert!(

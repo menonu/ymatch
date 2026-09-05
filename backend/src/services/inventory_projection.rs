@@ -2,8 +2,8 @@
 //!
 //! `GET /api/v1/user/:id/inventory` returns both the DB `quantity` and a
 //! `projected_quantity` after every contributing match settles. Deltas follow
-//! default apply ([`super::match_lifecycle`] / ADR 0009) plus a display-only
-//! WANT decrement for the receiver.
+//! default apply ([`super::match_lifecycle`] / ADR 0009 / ADR 0017): giver
+//! HAVE−/TRADE−, receiver HAVE+/WANT−.
 //!
 //! Negative projected values are **allowed** (not clamped). A future offer /
 //! accept warning can treat `projected < 0` as over-commit; preview that
@@ -41,11 +41,10 @@ pub struct ProjectionMerch {
 /// `(merch_id, status)` → signed delta to add to DB quantity.
 pub type ProjectionDeltas = HashMap<(i32, &'static str), i32>;
 
-/// Per-leg display deltas for `user_id` (default apply + WANT display).
+/// Per-leg display deltas for `user_id` (default apply).
 ///
 /// - Giver: `HAVE −qty`, `TRADE −qty`
-/// - Receiver: `HAVE +qty`, `WANT −qty` (WANT is display-only; apply does not
-///   change WANT)
+/// - Receiver: `HAVE +qty`, `WANT −qty` (same rule as apply, ADR 0017)
 ///
 /// Zero / negative `qty` contribute nothing. `skip_have_decrement` is
 /// apply-time only and is never reflected here.
