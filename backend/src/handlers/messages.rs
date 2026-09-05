@@ -1,6 +1,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::{UserIdQuery, require_active_query_user};
+use crate::repositories::match_::MatchStatusSnapshot;
 use crate::routes::AppState;
 use axum::{
     Json,
@@ -26,7 +27,7 @@ async fn require_match_participant(
     state: &AppState,
     match_id: i32,
     user_id: i32,
-) -> Result<(), AppError> {
+) -> Result<MatchStatusSnapshot, AppError> {
     let snapshot = state
         .matches
         .get_status_snapshot(match_id)
@@ -35,7 +36,7 @@ async fn require_match_participant(
     if user_id != snapshot.user1_id && user_id != snapshot.user2_id {
         return Err(AppError::forbidden("Not part of this match"));
     }
-    Ok(())
+    Ok(snapshot)
 }
 
 pub async fn list_messages(
@@ -65,7 +66,7 @@ pub async fn send_message(
     // identity is still body `sender_id`, but outsiders cannot inject into
     // matches they are not part of.
     let sender = state.policy.verify_active(payload.sender_id).await?;
-    require_match_participant(&state, match_id, sender.id).await?;
+    let snapshot = require_match_participant(&state, match_id, sender.id).await?;
 
     if payload.content.chars().count() > MAX_MESSAGE_CONTENT_LEN {
         return Err(AppError::bad_request(format!(
@@ -85,5 +86,25 @@ pub async fn send_message(
             payload.longitude,
         )
         .await?;
+    // Best-effort: TEXT / LOCATION only reach this handler (#577). Never fail
+    // the persisted message if push is down.
+    let recipient_id =
+        crate::notifications::other_participant(snapshot.user1_id, snapshot.user2_id, sender.id);
+    let message_type = payload.message_type.clone();
+    let content = payload.content.clone();
+    crate::notifications::schedule_notify_from_actor(
+        state.pool.clone(),
+        recipient_id,
+        sender.id,
+        "message",
+        move |username| {
+            crate::notifications::message_received_payload(
+                username,
+                match_id,
+                message_type.as_deref(),
+                &content,
+            )
+        },
+    );
     Ok(Json(msg))
 }

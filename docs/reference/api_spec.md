@@ -900,10 +900,11 @@ Backend health check.
 
 ## 10. Web Push subscriptions (ADR 0015 / #179)
 
-Background auto-match alerts use **Web Push + VAPID**. These endpoints store
-browser `PushSubscription` material and expose the VAPID **public** key.
-Delivery after match create/reopen is a separate implementation step; without
-`VAPID_PUBLIC_KEY` the public-key route returns 404 and matching still works.
+Background trade alerts (auto-match, incoming offer, offer accepted, chat
+message) use **Web Push + VAPID**. These endpoints store browser
+`PushSubscription` material and expose the VAPID **public** key. Delivery is
+best-effort after the committed event; without `VAPID_PUBLIC_KEY` the
+public-key route returns 404 and match / offer / accept / send still work.
 
 ### GET /api/v1/push/vapid-public-key
 

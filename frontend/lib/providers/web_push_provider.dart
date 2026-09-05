@@ -7,13 +7,13 @@ import '../services/api_client.dart';
 import '../services/web_push_service.dart';
 import 'auth_provider.dart';
 
-/// Local preference: user wants match push enabled (#179).
+/// Local preference: user wants trade push enabled (#179, #577).
 ///
 /// Survives SPA reloads even if the browser PushSubscription is briefly
 /// missing (e.g. after a service-worker race). Used to re-subscribe.
 const kWebPushEnabledPrefKey = 'web_push_match_notifications_enabled';
 
-/// UI-facing state for match push notifications (#179).
+/// UI-facing state for trade push notifications (#179, #577).
 enum WebPushUiStatus {
   /// Still probing browser + server / auth.
   loading,

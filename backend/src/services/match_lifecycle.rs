@@ -192,6 +192,20 @@ impl MatchLifecycleService {
             .await?;
 
         tx.commit().await?;
+        // Best-effort: incoming offer / counter-offer (#577). Never fails the
+        // committed proposal if push is misconfigured or the endpoint is down.
+        let recipient_id = crate::notifications::other_participant(
+            locked.user1_id,
+            locked.user2_id,
+            offer.user_id,
+        );
+        crate::notifications::schedule_notify_from_actor(
+            self.pool.clone(),
+            recipient_id,
+            offer.user_id,
+            "offer",
+            move |username| crate::notifications::offer_received_payload(username, match_id),
+        );
         Ok(())
     }
 
@@ -307,6 +321,18 @@ impl MatchLifecycleService {
         }
 
         tx.commit().await?;
+        if new_status == STATUS_ACCEPTED {
+            // Best-effort: tell the proposer their offer was accepted (#577).
+            let recipient_id =
+                crate::notifications::other_participant(locked.user1_id, locked.user2_id, user_id);
+            crate::notifications::schedule_notify_from_actor(
+                self.pool.clone(),
+                recipient_id,
+                user_id,
+                "accept",
+                move |username| crate::notifications::offer_accepted_payload(username, match_id),
+            );
+        }
         Ok(())
     }
 

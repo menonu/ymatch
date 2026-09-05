@@ -343,13 +343,13 @@
     "description": "Dark theme option label (#545)"
   },
 
-  "settingsNotifications": "Match notifications",
+  "settingsNotifications": "Notifications",
   "@settingsNotifications": {
-    "description": "Web Push match notification section title (#179)"
+    "description": "Web Push notification section title (#179, #577)"
   },
-  "settingsNotificationsSubtitle": "Background alerts when the system finds a new match",
+  "settingsNotificationsSubtitle": "Background alerts for new matches, incoming offers, accepted offers, and messages",
   "@settingsNotificationsSubtitle": {
-    "description": "Subtitle under match notifications toggle (#179)"
+    "description": "Subtitle under notifications toggle (#179, #577)"
   },
   "settingsNotificationsUnsupported": "Not available in this browser",
   "@settingsNotificationsUnsupported": {

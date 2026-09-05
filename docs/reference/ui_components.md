@@ -49,7 +49,7 @@ used throughout this document.
 | `ChatScreen` | `screens/chat_screen.dart` | Messaging within a trade match |
 | `MapPickerScreen` | `screens/map_picker_screen.dart` | Location selection via OpenStreetMap; tap pin, place search (Nominatim), GPS my-location (#448) |
 | `ProfileScreen` | `screens/profile_screen.dart` | Username, UUID, trading instructions, inlined app settings + community (#562, #570) |
-| `AppSettingsSection` | `screens/settings_screen.dart` | Language + match notifications next to the username card (#545, #179, #562); theme forced light (#553) |
+| `AppSettingsSection` | `screens/settings_screen.dart` | Language + trade notifications next to the username card (#545, #179, #562, #577); theme forced light (#553) |
 | `CommunityCard` | `widgets/community_card.dart` | Icon-only X / Discord / GitHub next to the Settings card (#570, #573); X/Discord URLs from `--dart-define` / Secrets (#572); GitHub hardcoded |
 | `AdminDashboardScreen` | `screens/admin_dashboard_screen.dart` | Admin panel with 6 tabs (System, Users, Events, Groups, Items, Matches) plus Debug in debug builds only (#499). Events/Groups support change creator + manage editors (#432). |
 
@@ -130,7 +130,7 @@ used throughout this document.
 | `ZoomableImage` / `showZoomedImage` | Merch list (shared) | Tap thumbnail → dismissible dialog with `InteractiveViewer` pinch/pan zoom (#540) |
 | `MatchCard` | `TradeListScreen` | User avatar, status chip, local match datetime (#476), item chips, action buttons |
 | `ProfileCard` | `ProfileScreen` | Avatar, editable username, UUID section |
-| `AppSettingsSection` | `ProfileScreen` | Language + match notifications next to username card (#562) |
+| `AppSettingsSection` | `ProfileScreen` | Language + trade notifications next to username card (#562, #577) |
 | `InstructionsCard` | `ProfileScreen` | 3-step "How to Trade" guide + projected-qty note |
 | `SystemStatusCard` | `AdminDashboardScreen` | Memory, CPU, uptime, OS info |
 | `DebugCard` | `AdminDashboardScreen` | Version info, test data generation |

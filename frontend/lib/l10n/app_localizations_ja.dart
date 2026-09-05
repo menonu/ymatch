@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -248,10 +247,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsThemeDark => 'ダーク';
 
   @override
-  String get settingsNotifications => 'マッチ通知';
+  String get settingsNotifications => '通知';
 
   @override
-  String get settingsNotificationsSubtitle => '新しいマッチが見つかったときにバックグラウンドで通知します';
+  String get settingsNotificationsSubtitle =>
+      '新しいマッチ、オファー受信、オファー承諾、メッセージをバックグラウンドで通知します';
 
   @override
   String get settingsNotificationsUnsupported => 'このブラウザでは利用できません';
