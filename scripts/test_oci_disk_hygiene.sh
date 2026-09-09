@@ -83,18 +83,44 @@ REDEPLOY_SCRIPTS=(
   "$SCRIPT_DIR/oci_redeploy_staging_frontend.sh"
 )
 
-for f in "${FULL_STACK_SCRIPTS[@]}"; do
-  [ -f "$f" ] || fail "missing $f"
-  count="$(grep -c 'oci_prune_build_cache' "$f" || true)"
-  [ "$count" -ge 2 ] || fail "$f must call oci_prune_build_cache at least twice (before build + after up); found $count"
-  pass "$(basename "$f") calls oci_prune_build_cache ${count}x"
-done
+assert_prune_around_build() {
+  local f="$1"
+  python3 - "$f" <<'PY' || return 1
+import re, sys
+from pathlib import Path
 
-for f in "${REDEPLOY_SCRIPTS[@]}"; do
+path = Path(sys.argv[1])
+lines = []
+for raw in path.read_text(encoding="utf-8").splitlines():
+    stripped = raw.split("#", 1)[0].strip()
+    if stripped:
+        lines.append(stripped)
+
+prune = [i for i, l in enumerate(lines) if l == "oci_prune_build_cache" or l.startswith("oci_prune_build_cache ")]
+build = [i for i, l in enumerate(lines) if re.search(r"\bbuild\b", l) and "oci_compose" in l]
+up = [
+    i
+    for i, l in enumerate(lines)
+    if "oci_compose_up_stack" in l or re.search(r"\bup\b", l) and "oci_compose" in l
+]
+if len(prune) < 2:
+    raise SystemExit(f"{path.name}: need >=2 oci_prune_build_cache calls, found {len(prune)}")
+if not build:
+    raise SystemExit(f"{path.name}: no oci_compose build call found")
+if not up:
+    raise SystemExit(f"{path.name}: no oci_compose up / oci_compose_up_stack call found")
+if prune[0] >= build[0]:
+    raise SystemExit(f"{path.name}: first oci_prune_build_cache must be before build")
+if prune[-1] <= up[-1]:
+    raise SystemExit(f"{path.name}: last oci_prune_build_cache must be after up")
+print(f"{path.name}: prune around build/up ({len(prune)} calls)")
+PY
+}
+
+for f in "${FULL_STACK_SCRIPTS[@]}" "${REDEPLOY_SCRIPTS[@]}"; do
   [ -f "$f" ] || fail "missing $f"
-  grep -q 'oci_prune_build_cache' "$f" \
-    || fail "$f does not call oci_prune_build_cache"
-  pass "$(basename "$f") calls oci_prune_build_cache"
+  out="$(assert_prune_around_build "$f" 2>&1)" || fail "$out"
+  pass "$out"
 done
 
 # ---------------------------------------------------------------------------

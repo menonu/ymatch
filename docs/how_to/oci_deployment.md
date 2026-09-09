@@ -164,12 +164,13 @@ cd ~/ymatch && ./scripts/oci_redeploy_frontend.sh
 
 ### Full Stack
 
-On the VM:
+On the VM use the deploy scripts (they prune BuildKit cache around the
+build — issue #581). Do not `docker compose … up -d --build` on the 50 GB
+boot volume; that pattern is what filled the disk.
+
 ```bash
-cd ~/ymatch && git pull && \
-  PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com) \
-  DB_PASSWORD=<password> \
-  docker compose -f docker-compose.oci.yml up -d --build
+cd ~/ymatch && ./scripts/oci_deploy_production.sh   # production
+# cd ~/ymatch && ./scripts/oci_deploy_staging.sh    # staging
 ```
 
 ## Management
