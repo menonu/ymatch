@@ -164,12 +164,13 @@ cd ~/ymatch && ./scripts/oci_redeploy_frontend.sh
 
 ### Full Stack
 
-On the VM:
+On the VM use the deploy scripts (they prune BuildKit cache around the
+build — issue #581). Do not `docker compose … up -d --build` on the 50 GB
+boot volume; that pattern is what filled the disk.
+
 ```bash
-cd ~/ymatch && git pull && \
-  PUBLIC_IP=$(curl -sf http://checkip.amazonaws.com) \
-  DB_PASSWORD=<password> \
-  docker compose -f docker-compose.oci.yml up -d --build
+cd ~/ymatch && ./scripts/oci_deploy_production.sh   # production
+# cd ~/ymatch && ./scripts/oci_deploy_staging.sh    # staging
 ```
 
 ## Management
@@ -203,6 +204,24 @@ docker compose -f docker-compose.oci.yml restart backend
 ### Check Disk Usage
 ```bash
 df -h /
+docker system df
+```
+
+On-VM `docker compose build` accumulates BuildKit cache in containerd
+snapshots (the 50 GB Always Free boot volume tripped **High Disk Usage
+(>80%)** at ~30 GB of reclaimable cache — issue #581). Full-stack and
+redeploy scripts call `oci_prune_build_cache` before compile and after
+`up`, keeping 8 GB of LRU cache (`OCI_BUILD_CACHE_KEEP` overrides).
+
+Container `json-file` logs are capped in `docker-compose.oci.yml`
+(`max-size: 10m`, `max-file: 3`). Recreate containers (normal deploy)
+for the logging options to take effect on already-running services.
+
+Manual reclaim (do **not** `docker system prune --volumes` — that
+deletes `ymatch_pg_data` / `ymatch_uploads`):
+
+```bash
+docker builder prune --all --force --keep-storage=8GB
 docker system df
 ```
 

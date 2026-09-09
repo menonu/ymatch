@@ -54,6 +54,9 @@ cd "$REPO_DIR"
 echo ""
 echo "Building and starting containers (this may take 10-20 minutes on first run)..."
 
+# Free BuildKit cache before compile so a tight 50GB disk can still build (#581).
+oci_prune_build_cache
+
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="https://${DOMAIN}" \
   --build-arg GIT_HASH="$GIT_HASH" \
@@ -61,6 +64,7 @@ oci_compose "$REPO_DIR" build \
   --build-arg DISCORD_INVITE_URL="${DISCORD_INVITE_URL:-}"
 
 oci_compose "$REPO_DIR" up -d
+oci_prune_build_cache
 
 echo ""
 echo "Waiting for services to start..."

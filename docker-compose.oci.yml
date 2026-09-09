@@ -11,11 +11,20 @@
 #   - Primary:  https://{$DOMAIN}  (FQDN from env / GitHub var OCI_DOMAIN(_STAGING))
 #   - Legacy:   https://{$PUBLIC_IP}.nip.io → 301 redirect to {$DOMAIN}
 #
-# Usage:
+# Usage: prefer scripts/oci_deploy_production.sh / oci_deploy_staging.sh
+# (they prune BuildKit cache around the build — #581). Direct compose:
 #   DOMAIN=$OCI_DOMAIN PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc \
-#     docker compose -f docker-compose.oci.yml --profile ddns up -d --build
+#     docker compose -f docker-compose.oci.yml --profile ddns up -d
 #
 # DuckDNS keep-alive (profile "ddns") requires DUCKDNS_TOKEN + DUCKDNS_SUBDOMAIN.
+
+# json-file rotation (#581). The default driver is unbounded; backend DEBUG
+# sqlx traffic filled 3.1GB in 4 days on the 50GB boot volume.
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # --- PostgreSQL ---
@@ -23,6 +32,7 @@ services:
     image: ghcr.io/menonu/ymatch/postgres:16-alpine
     container_name: ymatch_db
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ymatch_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD env var}
@@ -46,6 +56,7 @@ services:
         GIT_HASH: ${GIT_HASH:-unknown}
     container_name: ymatch_backend
     restart: unless-stopped
+    logging: *default-logging
     environment:
       DATABASE_URL: "postgres://ymatch_user:${DB_PASSWORD}@db:5432/ymatch"
       RUST_LOG: info
@@ -76,6 +87,7 @@ services:
         DISCORD_INVITE_URL: ${DISCORD_INVITE_URL:-}
     container_name: ymatch_frontend
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - ymatch
 
@@ -84,6 +96,7 @@ services:
     image: ghcr.io/menonu/ymatch/caddy:2-alpine
     container_name: ymatch_caddy
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -109,6 +122,7 @@ services:
     image: lscr.io/linuxserver/duckdns:latest
     container_name: ymatch_duckdns
     restart: unless-stopped
+    logging: *default-logging
     profiles: ["ddns"]
     environment:
       PUID: "1000"
