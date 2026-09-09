@@ -40,6 +40,7 @@ oci_write_oci_stack_env "$REPO_DIR"
 
 echo "=== Rebuilding frontend (API_BASE_URL=${API_BASE_URL}) ==="
 
+oci_prune_build_cache
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="$API_BASE_URL" \
   --build-arg X_PROFILE_URL="${X_PROFILE_URL:-}" \
@@ -47,6 +48,7 @@ oci_compose "$REPO_DIR" build \
   frontend
 
 oci_compose "$REPO_DIR" up -d frontend
+oci_prune_build_cache
 
 echo "✅ Frontend redeployed"
 echo "App: https://${DOMAIN}"

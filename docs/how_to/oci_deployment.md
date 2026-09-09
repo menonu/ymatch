@@ -206,6 +206,24 @@ df -h /
 docker system df
 ```
 
+On-VM `docker compose build` accumulates BuildKit cache in containerd
+snapshots (the 50 GB Always Free boot volume tripped **High Disk Usage
+(>80%)** at ~30 GB of reclaimable cache — issue #581). Full-stack and
+redeploy scripts call `oci_prune_build_cache` before compile and after
+`up`, keeping 8 GB of LRU cache (`OCI_BUILD_CACHE_KEEP` overrides).
+
+Container `json-file` logs are capped in `docker-compose.oci.yml`
+(`max-size: 10m`, `max-file: 3`). Recreate containers (normal deploy)
+for the logging options to take effect on already-running services.
+
+Manual reclaim (do **not** `docker system prune --volumes` — that
+deletes `ymatch_pg_data` / `ymatch_uploads`):
+
+```bash
+docker builder prune --all --force --keep-storage=8GB
+docker system df
+```
+
 ## GitHub Secrets Management
 
 > **Broader map:** local Terraform `.env`, GitHub Secrets, remote state,

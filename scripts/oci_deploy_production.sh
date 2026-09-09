@@ -60,6 +60,9 @@ cd "$REPO_DIR"
 echo ""
 echo "Building and starting production containers..."
 
+# Free BuildKit cache before compile so a tight 50GB disk can still build (#581).
+oci_prune_build_cache
+
 # Build production frontend with correct API base URL (HTTPS via configured DOMAIN).
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="https://${DOMAIN}" \
@@ -69,6 +72,7 @@ oci_compose "$REPO_DIR" build \
   backend frontend caddy
 
 oci_compose_up_stack "$REPO_DIR"
+oci_prune_build_cache
 
 echo ""
 echo "Waiting for production services to start..."

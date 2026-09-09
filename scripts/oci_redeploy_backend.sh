@@ -35,8 +35,10 @@ export DB_PASSWORD GIT_HASH
 oci_write_oci_stack_env "$REPO_DIR"
 
 echo "=== Rebuilding backend ==="
+oci_prune_build_cache
 oci_compose "$REPO_DIR" build backend
 oci_compose "$REPO_DIR" up -d backend
+oci_prune_build_cache
 
 echo "Waiting for backend to restart..."
 sleep 5

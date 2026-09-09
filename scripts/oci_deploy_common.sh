@@ -14,6 +14,7 @@
 #   oci_get_git_hash <repo_dir>           - rev-parse or "manual"
 #   oci_write_compose_env <dir> <vars...> - write .env file for docker compose
 #   oci_write_oci_stack_env <dir>         - write standard stack keys
+#   oci_prune_build_cache                 - cap BuildKit cache (OCI_BUILD_CACHE_KEEP)
 #
 # Required env (set by caller): DB_PASSWORD, PUBLIC_IP, DOMAIN, GIT_HASH
 #   DOMAIN — public FQDN (e.g. from GitHub Actions var OCI_DOMAIN / OCI_DOMAIN_STAGING,
@@ -175,6 +176,19 @@ oci_update_duckdns() {
     echo "ERROR: DuckDNS one-shot update failed" >&2
     return 1
   fi
+}
+
+# Cap BuildKit cache so on-VM rust/flutter compiles cannot fill the 50GB
+# Always Free boot volume (#581). Default keep-storage is 8GB of LRU cache.
+# Override with OCI_BUILD_CACHE_KEEP (docker bytes syntax, e.g. 4GB).
+# Prune failure is non-fatal so a healthy roll-out is not blocked by GC.
+oci_prune_build_cache() {
+  local keep="${OCI_BUILD_CACHE_KEEP:-8GB}"
+  echo "=== Pruning Docker build cache (keep ${keep}) ==="
+  if ! docker builder prune --all --force --keep-storage="$keep"; then
+    echo "⚠️  docker builder prune failed; continuing" >&2
+  fi
+  return 0
 }
 
 # Start the standard OCI stack; include duckdns when token is present.

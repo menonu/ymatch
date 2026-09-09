@@ -150,3 +150,16 @@ jobs:
 
       - name: Run nginx config smoke test
         run: scripts/test_frontend_nginx.sh
+
+  oci-disk-hygiene:
+    # Regression guard for #581: BuildKit prune helper + compose json-file
+    # log caps. No containers; mocked docker + compose YAML parse.
+    name: OCI Disk Hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Test deploy prune helper and compose logging
+        run: scripts/test_oci_disk_hygiene.sh

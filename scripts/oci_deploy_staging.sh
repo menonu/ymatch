@@ -64,6 +64,9 @@ cd "$REPO_DIR"
 echo ""
 echo "Building and starting staging containers..."
 
+# Free BuildKit cache before compile so a tight 50GB disk can still build (#581).
+oci_prune_build_cache
+
 oci_compose "$REPO_DIR" build \
   --build-arg API_BASE_URL="https://${DOMAIN}" \
   --build-arg GIT_HASH="$GIT_HASH" \
@@ -72,6 +75,7 @@ oci_compose "$REPO_DIR" build \
   db backend frontend caddy
 
 oci_compose_up_stack "$REPO_DIR"
+oci_prune_build_cache
 
 echo ""
 echo "Waiting for staging services to start..."
