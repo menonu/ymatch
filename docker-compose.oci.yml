@@ -11,9 +11,10 @@
 #   - Primary:  https://{$DOMAIN}  (FQDN from env / GitHub var OCI_DOMAIN(_STAGING))
 #   - Legacy:   https://{$PUBLIC_IP}.nip.io → 301 redirect to {$DOMAIN}
 #
-# Usage:
+# Usage: prefer scripts/oci_deploy_production.sh / oci_deploy_staging.sh
+# (they prune BuildKit cache around the build — #581). Direct compose:
 #   DOMAIN=$OCI_DOMAIN PUBLIC_IP=x.x.x.x DB_PASSWORD=xxx GIT_HASH=abc \
-#     docker compose -f docker-compose.oci.yml --profile ddns up -d --build
+#     docker compose -f docker-compose.oci.yml --profile ddns up -d
 #
 # DuckDNS keep-alive (profile "ddns") requires DUCKDNS_TOKEN + DUCKDNS_SUBDOMAIN.
 
