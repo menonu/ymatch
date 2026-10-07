@@ -12,3 +12,8 @@ bool isActiveForMe(TradeMatch m) =>
 /// Per-user completion: Done only once the viewer has completed it.
 bool isCompletedForMe(TradeMatch m) =>
     m.status == 'COMPLETED' && m.completedByMe;
+
+/// Status the viewer sees on the card chip: a match still in progress for
+/// them reads ACCEPTED even if the counterpart already completed it.
+String displayStatusForMe(TradeMatch m) =>
+    isActiveForMe(m) ? 'ACCEPTED' : m.status;

@@ -245,7 +245,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CONFLICT);
 
-    // 13. User2 completes on their side (per-user completion), then applies
+    // 13. User2 completes on their side (per-user completion)
     assert_eq!(
         post_json(
             &pool,
@@ -256,7 +256,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .status(),
         StatusCode::OK
     );
-    // 13. User2 applies inventory
+    // 14. User2 applies inventory
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -322,7 +322,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         "User2 WANT Card A should decrement 1→0 (#579)"
     );
 
-    // 14. Double-apply for User2 → 409 Conflict
+    // 15. Double-apply for User2 → 409 Conflict
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -337,7 +337,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CONFLICT);
 
-    // 15. Notification counts
+    // 16. Notification counts
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -2323,6 +2323,17 @@ async fn test_complete_is_per_user(pool: PgPool) {
     assert_eq!(m2["status"], "COMPLETED");
     assert_eq!(flags(m2), (false, true), "user2 sees counterpart completed");
 
+    // User1 messages after completing; the match is still in progress for
+    // user2, so it counts toward user2's unread nav badge.
+    let msg =
+        format!(r#"{{"matchId": {match_id}, "senderId": {u1}, "content": "done on my side"}}"#);
+    assert_eq!(
+        post_json(&pool, &format!("/api/v1/matches/{match_id}/messages"), &msg)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+
     // User2's in-progress badge still counts the match until they complete.
     let counts2: serde_json::Value = serde_json::from_str(
         &body_to_string(
@@ -2333,7 +2344,8 @@ async fn test_complete_is_per_user(pool: PgPool) {
         .await,
     )
     .unwrap();
-    assert_eq!(counts2["accepted"], 1);
+    assert_eq!(json_i64(&counts2, "accepted"), 1);
+    assert_eq!(json_i64(&counts2, "unreadMessages"), 1);
     let counts1: serde_json::Value = serde_json::from_str(
         &body_to_string(
             get_request(&pool, &format!("/api/v1/matches/user/{u1}/counts"))
@@ -2343,7 +2355,7 @@ async fn test_complete_is_per_user(pool: PgPool) {
         .await,
     )
     .unwrap();
-    assert!(counts1["accepted"].as_i64().unwrap_or(0) == 0);
+    assert_eq!(json_i64(&counts1, "accepted"), 0);
 
     // User2 cannot apply before completing themselves.
     assert_eq!(

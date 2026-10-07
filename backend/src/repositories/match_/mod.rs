@@ -73,6 +73,28 @@ pub struct MatchStatusSnapshot {
     pub user2_completed: bool,
 }
 
+impl MatchStatusSnapshot {
+    /// Whether `user_id` has applied inventory. Callers check participation
+    /// first; a non-participant reads as user2.
+    pub fn applied_by(&self, user_id: i32) -> bool {
+        if user_id == self.user1_id {
+            self.user1_applied
+        } else {
+            self.user2_applied
+        }
+    }
+
+    /// Whether `user_id` has completed on their side (per-user completion).
+    /// Callers check participation first; a non-participant reads as user2.
+    pub fn completed_by(&self, user_id: i32) -> bool {
+        if user_id == self.user1_id {
+            self.user1_completed
+        } else {
+            self.user2_completed
+        }
+    }
+}
+
 /// On-table match_item that contributes to #427 inventory projection.
 ///
 /// Status filter is applied in

@@ -249,13 +249,7 @@ impl MatchLifecycleService {
             // Per-user completion: the first completion freezes the match
             // as COMPLETED; each participant stamps only their own flag, so
             // the counterpart keeps it in-progress until they complete.
-            let is_user1 = user_id == locked.user1_id;
-            let completed_by_user = if is_user1 {
-                locked.user1_completed
-            } else {
-                locked.user2_completed
-            };
-            if validate_complete(&locked.status, completed_by_user)?
+            if validate_complete(&locked.status, locked.completed_by(user_id))?
                 == CompleteAction::CompleteMatch
             {
                 self.matches
@@ -263,7 +257,7 @@ impl MatchLifecycleService {
                     .await?;
             }
             self.matches
-                .mark_completed(&mut *tx, match_id, is_user1)
+                .mark_completed(&mut *tx, match_id, user_id == locked.user1_id)
                 .await?;
             tx.commit().await?;
             return Ok(());
@@ -425,22 +419,12 @@ impl MatchLifecycleService {
         }
 
         let is_user1 = user_id == snapshot.user1_id;
-        let completed_by_user = if is_user1 {
-            snapshot.user1_completed
-        } else {
-            snapshot.user2_completed
-        };
-        if !completed_by_user {
+        if !snapshot.completed_by(user_id) {
             return Err(AppError::bad_request(
                 "Complete the match before applying inventory",
             ));
         }
-        if is_user1 && snapshot.user1_applied {
-            return Err(AppError::conflict(
-                "Inventory already applied for this user",
-            ));
-        }
-        if !is_user1 && snapshot.user2_applied {
+        if snapshot.applied_by(user_id) {
             return Err(AppError::conflict(
                 "Inventory already applied for this user",
             ));

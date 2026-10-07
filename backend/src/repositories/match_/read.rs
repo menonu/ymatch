@@ -298,18 +298,26 @@ impl MatchRepository {
                 .cloned()
                 .unwrap_or_default();
             m.selected_items = items_by_match.get(&m.id).cloned().unwrap_or_default();
-            let (me, peer) = if m.user1_id == user_id {
-                ("user1", "user2")
+            let (my_applied, my_completed, peer_completed) = if m.user1_id == user_id {
+                (
+                    "user1_inventory_applied_at",
+                    "user1_completed_at",
+                    "user2_completed_at",
+                )
             } else {
-                ("user2", "user1")
+                (
+                    "user2_inventory_applied_at",
+                    "user2_completed_at",
+                    "user1_completed_at",
+                )
             };
             let is_set = |col: &str| {
                 row.get::<Option<chrono::DateTime<chrono::Utc>>, _>(col)
                     .is_some()
             };
-            m.inventory_applied = is_set(&format!("{me}_inventory_applied_at"));
-            m.completed_by_me = is_set(&format!("{me}_completed_at"));
-            m.counterpart_completed = is_set(&format!("{peer}_completed_at"));
+            m.inventory_applied = is_set(my_applied);
+            m.completed_by_me = is_set(my_completed);
+            m.counterpart_completed = is_set(peer_completed);
             // #535: default 0 when the match has no unread peer messages.
             m.unread_message_count = unread_by_match.get(&m.id).copied().unwrap_or(0);
             out.push(m);
@@ -444,7 +452,15 @@ impl MatchRepository {
                    (SELECT COUNT(*) FROM messages msg
                     JOIN matches m ON msg.match_id = m.id
                     WHERE (m.user1_id = $1 OR m.user2_id = $1)
-                      AND m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                      AND (
+                        m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                        -- Still in progress for this user (per-user completion).
+                        OR (
+                          m.status = 'COMPLETED'
+                          AND CASE WHEN m.user1_id = $1 THEN m.user1_completed_at
+                                   ELSE m.user2_completed_at END IS NULL
+                        )
+                      )
                       AND msg.sender_id != $1
                       AND COALESCE(msg.message_type, 'TEXT') <> 'SYSTEM'
                       AND msg.created_at > COALESCE(
