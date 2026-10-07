@@ -110,6 +110,11 @@ message TradeMatch {
   // Zero when unknown (e.g. admin list_all) or fully read. Marked read when
   // the caller lists messages for this match.
   int32 unread_message_count = 18;
+  // Per-user completion: the listing caller has moved this match to Done.
+  // A COMPLETED match the caller has not completed stays in-progress for them.
+  bool completed_by_me = 19;
+  // Per-user completion: the other participant has completed on their side.
+  bool counterpart_completed = 20;
 }
 
 message MatchItem {

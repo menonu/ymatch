@@ -67,6 +67,10 @@ pub struct MatchStatusSnapshot {
     pub group_name: String,
     pub user1_applied: bool,
     pub user2_applied: bool,
+    /// Per-user completion (`user{1,2}_completed_at`): each participant
+    /// moves the match to Done on their own side.
+    pub user1_completed: bool,
+    pub user2_completed: bool,
 }
 
 /// On-table match_item that contributes to #427 inventory projection.
@@ -178,6 +182,12 @@ fn match_status_snapshot_from_row(r: sqlx::postgres::PgRow) -> MatchStatusSnapsh
         user2_applied: r
             .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
             .is_some(),
+        user1_completed: r
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_completed_at")
+            .is_some(),
+        user2_completed: r
+            .get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_completed_at")
+            .is_some(),
     }
 }
 
@@ -191,6 +201,9 @@ fn match_from_row(row: &sqlx::postgres::PgRow) -> TradeMatch {
         created_at: to_rfc3339(row.get("created_at")),
         offered_by: row.get("offered_by"),
         inventory_applied: false,
+        // Per-user completion: only list_for_user fills these.
+        completed_by_me: false,
+        counterpart_completed: false,
         other_user: None,
         user_haves: vec![],
         user_wants: vec![],

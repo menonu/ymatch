@@ -345,6 +345,7 @@ void main() {
     ..user1Id = 1
     ..user2Id = 2
     ..status = 'COMPLETED'
+    ..completedByMe = true
     ..inventoryApplied = true
     ..userHaves.add(_item(10, 'Give Pen', 3, 1))
     ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
@@ -717,6 +718,96 @@ void main() {
       expect(middleY, lessThan(olderY));
     },
   );
+
+  // Per-user completion: each participant moves ACCEPTED → Done themselves.
+  TradeMatch perUserCompleted({
+    required bool completedByMe,
+    required bool counterpartCompleted,
+  }) => TradeMatch()
+    ..id = 300
+    ..user1Id = 1
+    ..user2Id = 2
+    ..status = 'COMPLETED'
+    ..completedByMe = completedByMe
+    ..counterpartCompleted = counterpartCompleted
+    ..userHaves.add(_item(10, 'Give Pen', 3, 1))
+    ..userWants.add(_item(20, 'Recv Notebook', 2, 2));
+
+  Future<void> pumpTrades(WidgetTester tester, TradeMatch m) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthController(_user())),
+          matchesProvider(1).overrideWith((ref) async => [m]),
+          notificationCountsProvider(
+            1,
+          ).overrideWith((ref) async => NotificationCounts()),
+        ],
+        child: _localized(const TradeListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openTab(WidgetTester tester, String label) async {
+    await tester.tap(
+      find.descendant(of: find.byType(TabBar), matching: find.text(label)),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'match completed only by the counterpart stays on Active with Mark Complete',
+    (WidgetTester tester) async {
+      await pumpTrades(
+        tester,
+        perUserCompleted(completedByMe: false, counterpartCompleted: true),
+      );
+
+      await openTab(tester, 'Active');
+      expect(find.text('Mark Complete'), findsOneWidget);
+      expect(find.text('Partner marked this trade complete'), findsOneWidget);
+      // Still in progress for me: chip reads ACCEPTED, not COMPLETED.
+      expect(find.text('ACCEPTED'), findsOneWidget);
+      expect(find.text('COMPLETED'), findsNothing);
+
+      await openTab(tester, 'Done');
+      expect(find.textContaining('Give Pen'), findsNothing);
+      expect(find.text('Update Inventory'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'match I completed is on Done even before the counterpart completes',
+    (WidgetTester tester) async {
+      await pumpTrades(
+        tester,
+        perUserCompleted(completedByMe: true, counterpartCompleted: false),
+      );
+
+      await openTab(tester, 'Active');
+      expect(find.text('Mark Complete'), findsNothing);
+      expect(find.textContaining('Give Pen'), findsNothing);
+
+      await openTab(tester, 'Done');
+      expect(find.text('Update Inventory'), findsOneWidget);
+      expect(find.text('Waiting for partner to complete'), findsOneWidget);
+    },
+  );
+
+  testWidgets('match completed by both shows no partner hint on Done', (
+    WidgetTester tester,
+  ) async {
+    await pumpTrades(
+      tester,
+      perUserCompleted(completedByMe: true, counterpartCompleted: true),
+    );
+
+    await openTab(tester, 'Done');
+    expect(find.text('Update Inventory'), findsOneWidget);
+    expect(find.text('Waiting for partner to complete'), findsNothing);
+    expect(find.text('Partner marked this trade complete'), findsNothing);
+  });
 }
 
 User _user() => User()

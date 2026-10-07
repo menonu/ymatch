@@ -83,6 +83,10 @@ class MatchCardActions extends StatelessWidget {
       case TradeTab.active:
         return _actionBar(
           children: [
+            if (match.counterpartCompleted) ...[
+              Flexible(child: _hint(l10n.partnerMarkedComplete)),
+              const SizedBox(width: 8),
+            ],
             ElevatedButton(
               onPressed: () => onUpdateStatus('COMPLETED'),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
@@ -91,9 +95,16 @@ class MatchCardActions extends StatelessWidget {
           ],
         );
       case TradeTab.completed:
+        // Per-user completion: the counterpart may still have it in progress.
+        final awaitingPartner =
+            match.status == 'COMPLETED' && !match.counterpartCompleted;
         if (!match.inventoryApplied) {
           return _actionBar(
             children: [
+              if (awaitingPartner) ...[
+                Flexible(child: _hint(l10n.waitingForPartnerComplete)),
+                const SizedBox(width: 8),
+              ],
               OutlinedButton.icon(
                 onPressed: onApplyInventory,
                 icon: const Icon(Icons.inventory, size: 16),
@@ -111,6 +122,10 @@ class MatchCardActions extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (awaitingPartner) ...[
+                  Flexible(child: _hint(l10n.waitingForPartnerComplete)),
+                  const SizedBox(width: 8),
+                ],
                 const Icon(Icons.check_circle, size: 16, color: Colors.green),
                 const SizedBox(width: 4),
                 Text(
@@ -123,6 +138,9 @@ class MatchCardActions extends StatelessWidget {
         );
     }
   }
+
+  Widget _hint(String text) =>
+      Text(text, style: TextStyle(fontSize: 12, color: Colors.grey[600]));
 
   Widget _actionBar({required List<Widget> children}) {
     return Column(

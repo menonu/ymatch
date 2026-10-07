@@ -1196,6 +1196,18 @@ abstract class AppLocalizations {
   /// **'Mark Complete'**
   String get markComplete;
 
+  /// Hint on an active trade the counterpart already marked complete (per-user completion)
+  ///
+  /// In en, this message translates to:
+  /// **'Partner marked this trade complete'**
+  String get partnerMarkedComplete;
+
+  /// Hint on a trade this user completed while the counterpart has not yet
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for partner to complete'**
+  String get waitingForPartnerComplete;
+
   /// Button to apply a completed trade to inventory
   ///
   /// In en, this message translates to:

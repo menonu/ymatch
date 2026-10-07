@@ -1,4 +1,5 @@
-//! Lifecycle write paths for matches (lock, status, legs, delete, applied flags).
+//! Lifecycle write paths for matches (lock, status, legs, delete, applied /
+//! completed flags).
 
 use super::{MatchRepository, MatchStatusSnapshot, match_status_snapshot_from_row};
 use crate::error::AppError;
@@ -18,7 +19,8 @@ impl MatchRepository {
     {
         let row = sqlx::query(
             "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
-                    user1_inventory_applied_at, user2_inventory_applied_at
+                    user1_inventory_applied_at, user2_inventory_applied_at,
+                    user1_completed_at, user2_completed_at
              FROM matches WHERE id = $1 FOR UPDATE",
         )
         .bind(match_id)
@@ -273,6 +275,40 @@ impl MatchRepository {
             return Err(AppError::conflict(
                 "Inventory already applied for this user",
             ));
+        }
+        Ok(())
+    }
+
+    /// Stamp the per-user completion timestamp. `is_user1` picks which
+    /// column to write.
+    ///
+    /// Conditional on the column still being NULL, like
+    /// [`Self::mark_inventory_applied`]: when `rows_affected == 0` (already
+    /// completed by this user, or match missing), returns
+    /// [`AppError::Conflict`] (HTTP 409).
+    pub async fn mark_completed<'c, E>(
+        &self,
+        exec: E,
+        match_id: i32,
+        is_user1: bool,
+    ) -> Result<(), AppError>
+    where
+        E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+    {
+        let col = if is_user1 {
+            "user1_completed_at"
+        } else {
+            "user2_completed_at"
+        };
+        // Column name is one of two fixed literals above, not user input.
+        let sql = format!("UPDATE matches SET {col} = NOW() WHERE id = $1 AND {col} IS NULL");
+        let affected = sqlx::query(&sql)
+            .bind(match_id)
+            .execute(exec)
+            .await?
+            .rows_affected();
+        if affected == 0 {
+            return Err(AppError::conflict("Match already completed by this user"));
         }
         Ok(())
     }

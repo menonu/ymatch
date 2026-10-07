@@ -533,11 +533,21 @@ Update the status of a match.
   ```
 - **Allowed values**: `ACCEPTED`, `REJECTED`, `COMPLETED`
 - **Response**: `200 OK`
+- **`COMPLETED` is per-user**
+  ([ADR 0018](../explanation/adr/0018-per-user-match-completion.md)): the first
+  participant to complete moves the match `ACCEPTED → COMPLETED` and records
+  only their own completion; the other participant completes separately
+  (allowed while the match is `COMPLETED`). Listed matches carry
+  `completedByMe` / `counterpartCompleted` for the caller. Errors: `400` unless
+  the match is `ACCEPTED` or `COMPLETED`; `403` if not a participant; `409` if
+  this user already completed.
 
 ### POST /api/v1/matches/:id/apply-inventory
 
-Apply this user's inventory deltas for a **COMPLETED** match. Each participant
-applies independently; a second apply for the same user returns `409 Conflict`.
+Apply this user's inventory deltas for a **COMPLETED** match that this user has
+completed on their side ([ADR 0018](../explanation/adr/0018-per-user-match-completion.md)).
+Each participant applies independently; a second apply for the same user
+returns `409 Conflict`.
 
 Per absolute leg `(giver_user_id, merch_id, quantity)`
 ([ADR 0009](../explanation/adr/0009-apply-inventory-decrements-giver-have.md),
@@ -565,7 +575,8 @@ pool and must cover `qty`. See
   - `skipHaveDecrement` (optional, default `false`): when `true`, do not
     decrement the giver's HAVE (legacy).
 - **Response**: `200 OK`
-- **Errors**: `400` if match is not `COMPLETED`, or insufficient **TRADE** for
+- **Errors**: `400` if match is not `COMPLETED`, this user has not completed it
+  yet, or insufficient **TRADE** for
   a give leg; `403` if not a participant; `404` if match missing; `409` if
   this user already applied.
 - **Concurrency / client retry** (#492): check, deltas, and the per-user

@@ -886,10 +886,10 @@ class InventoryItem extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearIsDeleted() => $_clearField(9);
 
-  /// #427: quantity after in-progress trades settle (default apply + WANT
-  /// display). List inventory always sets this; may be negative (over-commit
-  /// is not clamped). Absent means "same as quantity" (upsert response and
-  /// match-candidate rows).
+  /// #427: quantity after in-progress trades settle (default apply: giver
+  /// HAVE−/TRADE−, receiver HAVE+/WANT−). List inventory always sets this;
+  /// may be negative (over-commit is not clamped). Absent means "same as
+  /// quantity" (upsert response and match-candidate rows).
   @$pb.TagNumber(10)
   $core.int get projectedQuantity => $_getIZ(9);
   @$pb.TagNumber(10)
@@ -920,6 +920,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     $core.String? lastTerminalStatus,
     $core.String? lastTerminalAt,
     $core.int? unreadMessageCount,
+    $core.bool? completedByMe,
+    $core.bool? counterpartCompleted,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -942,6 +944,9 @@ class TradeMatch extends $pb.GeneratedMessage {
     if (lastTerminalAt != null) result.lastTerminalAt = lastTerminalAt;
     if (unreadMessageCount != null)
       result.unreadMessageCount = unreadMessageCount;
+    if (completedByMe != null) result.completedByMe = completedByMe;
+    if (counterpartCompleted != null)
+      result.counterpartCompleted = counterpartCompleted;
     return result;
   }
 
@@ -979,6 +984,8 @@ class TradeMatch extends $pb.GeneratedMessage {
     ..aOS(16, _omitFieldNames ? '' : 'lastTerminalStatus')
     ..aOS(17, _omitFieldNames ? '' : 'lastTerminalAt')
     ..aI(18, _omitFieldNames ? '' : 'unreadMessageCount')
+    ..aOB(19, _omitFieldNames ? '' : 'completedByMe')
+    ..aOB(20, _omitFieldNames ? '' : 'counterpartCompleted')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1151,6 +1158,27 @@ class TradeMatch extends $pb.GeneratedMessage {
   $core.bool hasUnreadMessageCount() => $_has(17);
   @$pb.TagNumber(18)
   void clearUnreadMessageCount() => $_clearField(18);
+
+  /// Per-user completion: the listing caller has moved this match to Done.
+  /// A COMPLETED match the caller has not completed stays in-progress for them.
+  @$pb.TagNumber(19)
+  $core.bool get completedByMe => $_getBF(18);
+  @$pb.TagNumber(19)
+  set completedByMe($core.bool value) => $_setBool(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasCompletedByMe() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearCompletedByMe() => $_clearField(19);
+
+  /// Per-user completion: the other participant has completed on their side.
+  @$pb.TagNumber(20)
+  $core.bool get counterpartCompleted => $_getBF(19);
+  @$pb.TagNumber(20)
+  set counterpartCompleted($core.bool value) => $_setBool(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasCounterpartCompleted() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearCounterpartCompleted() => $_clearField(20);
 }
 
 class MatchItem extends $pb.GeneratedMessage {

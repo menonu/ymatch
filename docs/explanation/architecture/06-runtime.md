@@ -89,7 +89,8 @@ stateDiagram-v2
   OFFERED --> OFFERED: non-proposer counters
   OFFERED --> ACCEPTED: non-proposer accepts balanced offer
   OFFERED --> REJECTED: either rejects
-  ACCEPTED --> COMPLETED: complete
+  ACCEPTED --> COMPLETED: first party completes
+  COMPLETED --> COMPLETED: other party completes (own flag only)
   COMPLETED --> [*]
   PENDING --> CANCELLED: system cancel (merch delete / cap=0)
   OFFERED --> CANCELLED: system cancel
@@ -98,8 +99,12 @@ stateDiagram-v2
   CANCELLED --> PENDING: rematch when mutual caps hold
 ```
 
-After `COMPLETED`, each party may **apply inventory** as a separate, idempotent
-step (status stays `COMPLETED`; not a further state-machine transition). Deltas
+Completion is per-user ([ADR 0018](../adr/0018-per-user-match-completion.md)):
+the first party's complete moves the match to `COMPLETED` and records only
+their own completion; the match stays In progress for the other party until
+they complete too. After completing on their side, each party may **apply
+inventory** as a separate, idempotent step (status stays `COMPLETED`; not a
+further state-machine transition). Deltas
 and gates are summarized under [Inventory status semantics](#inventory-status-semantics)
 below; full decisions in [ADR 0009](../adr/0009-apply-inventory-decrements-giver-have.md),
 [ADR 0014](../adr/0014-fail-closed-inventory-apply.md), and
@@ -119,9 +124,11 @@ sequenceDiagram
   alt Accept (B is non-proposer, balanced)
     API->>DB: re-check WANT+TRADE on full legs, status=ACCEPTED
     A->>API: complete
-    API->>DB: status=COMPLETED
+    API->>DB: status=COMPLETED, A completed
     A->>API: apply inventory (A side)
     API->>DB: TRADE fail-closed; HAVE/WANT best-effort; mark applied
+    B->>API: complete
+    API->>DB: B completed (status unchanged)
     B->>API: apply inventory (B side)
   else Reject
     API->>DB: status=REJECTED

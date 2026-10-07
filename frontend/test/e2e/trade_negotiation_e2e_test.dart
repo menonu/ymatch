@@ -745,9 +745,16 @@ void main() {
       expect(await _setStatus(a, m.id, m.u2, 'ACCEPTED'), 200);
       expect((await _getMatch(a.api, m.u1, m.id))['status'], 'ACCEPTED');
 
-      // Either party completes.
+      // Completion is per-user: u1 completes on their side; the match is
+      // COMPLETED but u2 has not completed yet.
       expect(await _setStatus(a, m.id, m.u1, 'COMPLETED'), 200);
-      expect((await _getMatch(a.api, m.u1, m.id))['status'], 'COMPLETED');
+      final u1View = await _getMatch(a.api, m.u1, m.id);
+      expect(u1View['status'], 'COMPLETED');
+      expect(u1View['completedByMe'], isTrue);
+      expect(
+        (await _getMatch(a.api, m.u2, m.id))['completedByMe'],
+        isNot(true),
+      );
 
       // Apply inventory independently per side; the per-user
       // `inventoryApplied` flag is scoped to the requesting user, so read
@@ -757,6 +764,9 @@ void main() {
       // u1 cannot apply twice (idempotency guard) → 409.
       expect(await _applyInventory(a, m.id, m.u1), 409);
 
+      // u2 must complete on their own side before applying.
+      expect(await _applyInventory(a, m.id, m.u2), 400);
+      expect(await _setStatus(a, m.id, m.u2, 'COMPLETED'), 200);
       expect(await _applyInventory(a, m.id, m.u2), 200);
       expect((await _getMatch(a.api, m.u2, m.id))['inventoryApplied'], isTrue);
     },

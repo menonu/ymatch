@@ -100,7 +100,13 @@ class TradeMatchCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          MatchStatusChip(status: match.status),
+                          // Per-user completion: still ACCEPTED for a viewer
+                          // who has not completed yet.
+                          MatchStatusChip(
+                            status: isActiveForMe(match)
+                                ? 'ACCEPTED'
+                                : match.status,
+                          ),
                           // ADR 0012 / #477: prior-history annotation after rematch.
                           if (match.hasLastTerminalStatus()) ...[
                             const SizedBox(height: 2),

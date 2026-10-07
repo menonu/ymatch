@@ -331,10 +331,10 @@ void main() {
       );
       expect(acceptStatus, 200);
 
-      // 8. Mark the trade COMPLETED. The state machine allows
-      //    ACCEPTED → COMPLETED (one transition); a second COMPLETED
-      //    would be rejected with "Can only complete ACCEPTED matches".
-      //    Either user can drive this transition.
+      // 8. Mark the trade COMPLETED. Completion is per-user: the first
+      //    participant flips ACCEPTED → COMPLETED and stamps only their own
+      //    flag; the other participant completes separately (and must, before
+      //    applying their own inventory). A repeat by the same user is 409.
       final complete = await helper._post('/api/v1/matches/$matchId/status', {
         'status': 'COMPLETED',
         'userId': u1Id,

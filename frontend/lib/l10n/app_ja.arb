@@ -195,6 +195,8 @@
   "cancelOffer": "オファーを取り消す",
   "waitingForResponse": "返信待ち...",
   "markComplete": "完了にする",
+  "partnerMarkedComplete": "相手が完了にしました",
+  "waitingForPartnerComplete": "相手の完了待ち",
   "updateInventory": "在庫を更新",
   "applyInventoryConfirmBody": "完了した取引を在庫に反映します。既定では、渡したアイテムは譲（TRADE）と所持（HAVE）の両方が減り、受け取ったアイテムは所持（HAVE）が増え、求（WANT）が減ります。",
   "skipHaveDecrementLabel": "所持（HAVE）には反映しない",

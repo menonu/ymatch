@@ -601,6 +601,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get markComplete => '完了にする';
 
   @override
+  String get partnerMarkedComplete => '相手が完了にしました';
+
+  @override
+  String get waitingForPartnerComplete => '相手の完了待ち';
+
+  @override
   String get updateInventory => '在庫を更新';
 
   @override
