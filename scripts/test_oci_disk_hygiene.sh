@@ -171,5 +171,11 @@ print("services with log caps: " + ", ".join(names))
 PY
 pass "docker-compose.oci.yml caps json-file logs on every service"
 
+# ---------------------------------------------------------------------------
+# Deploys make no DuckDNS API call (#586). Chained here so the existing
+# OCI Disk Hygiene CI job runs it without a workflow change.
+# ---------------------------------------------------------------------------
+"$SCRIPT_DIR/test_oci_deploy_dns.sh"
+
 echo
 echo "All OCI disk hygiene checks passed."

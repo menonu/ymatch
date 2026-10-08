@@ -45,7 +45,6 @@ oci_sync_repo "$REPO_DIR"
 # Determine env vars for docker compose
 GIT_HASH="$(oci_get_git_hash "$REPO_DIR")"
 export GIT_HASH
-oci_update_duckdns
 oci_write_oci_stack_env "$REPO_DIR"
 
 cd "$REPO_DIR"
