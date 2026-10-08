@@ -309,7 +309,11 @@ class HomeScreen extends ConsumerWidget {
                         : 0;
                     return bPop.compareTo(aPop);
                   case EventSort.nameDesc:
-                    return b.name.toLowerCase().compareTo(a.name.toLowerCase());
+                    final byName = b.name.toLowerCase().compareTo(
+                      a.name.toLowerCase(),
+                    );
+                    // Tie-break by id so equal names keep a stable order.
+                    return byName != 0 ? byName : b.id.compareTo(a.id);
                   case EventSort.recent:
                     return b.id.compareTo(a.id);
                 }

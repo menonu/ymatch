@@ -714,6 +714,22 @@ void main() {
       ]);
     });
 
+    testWidgets('equal names (ignoring case) tie-break by id descending', (
+      tester,
+    ) async {
+      final saved = [...events];
+      events
+        ..clear()
+        ..addAll([ev(10, 'same Fest'), ev(11, 'Same Fest')]);
+      addTearDown(
+        () => events
+          ..clear()
+          ..addAll(saved),
+      );
+      await pumpHome(tester);
+      expectTopToBottom(tester, const ['Same Fest', 'same Fest']);
+    });
+
     testWidgets('Newest First still sorts by id descending', (tester) async {
       await pumpHome(tester);
       await tester.tap(find.byTooltip('Sort Events'));
