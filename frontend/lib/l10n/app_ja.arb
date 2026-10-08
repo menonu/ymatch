@@ -34,7 +34,7 @@
   "sortEvents": "イベントを並べ替え",
   "sortNewestFirst": "新着順",
   "sortMostPopular": "人気順",
-  "sortAlphabetical": "名前順（Z→A）",
+  "sortNameDesc": "名前順（Z→A）",
   "newEvent": "新規イベント",
   "filterAllEvents": "すべてのイベント",
   "filterFavorites": "お気に入り",

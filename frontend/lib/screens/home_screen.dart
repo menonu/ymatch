@@ -8,13 +8,11 @@ import '../utils/group_display.dart';
 import '../widgets/how_to_trade.dart';
 import '../widgets/manage_event_members_dialog.dart';
 
-enum EventSort { recent, popular, alphabetical }
+enum EventSort { nameDesc, recent, popular }
 
 // Default: descending name order, so year-prefixed events list newest
 // year first (#585).
-final eventSortProvider = StateProvider<EventSort>(
-  (ref) => EventSort.alphabetical,
-);
+final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.nameDesc);
 
 enum EventFilter { all, favorite, joined }
 
@@ -80,16 +78,16 @@ class HomeScreen extends ConsumerWidget {
               itemBuilder: (BuildContext context) =>
                   <PopupMenuEntry<EventSort>>[
                     PopupMenuItem<EventSort>(
+                      value: EventSort.nameDesc,
+                      child: Text(l10n.sortNameDesc),
+                    ),
+                    PopupMenuItem<EventSort>(
                       value: EventSort.recent,
                       child: Text(l10n.sortNewestFirst),
                     ),
                     PopupMenuItem<EventSort>(
                       value: EventSort.popular,
                       child: Text(l10n.sortMostPopular),
-                    ),
-                    PopupMenuItem<EventSort>(
-                      value: EventSort.alphabetical,
-                      child: Text(l10n.sortAlphabetical),
                     ),
                   ],
             ),
@@ -310,8 +308,7 @@ class HomeScreen extends ConsumerWidget {
                         ? b.activeParticipants
                         : 0;
                     return bPop.compareTo(aPop);
-                  case EventSort.alphabetical:
-                    // Descending (Z→A) (#585).
+                  case EventSort.nameDesc:
                     return b.name.toLowerCase().compareTo(a.name.toLowerCase());
                   case EventSort.recent:
                     return b.id.compareTo(a.id);

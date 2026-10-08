@@ -276,7 +276,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Name (Z→A)'**
-  String get sortAlphabetical;
+  String get sortNameDesc;
 
   /// Floating action button label to create a new event
   ///

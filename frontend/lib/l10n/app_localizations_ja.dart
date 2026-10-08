@@ -99,7 +99,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sortMostPopular => '人気順';
 
   @override
-  String get sortAlphabetical => '名前順（Z→A）';
+  String get sortNameDesc => '名前順（Z→A）';
 
   @override
   String get newEvent => '新規イベント';
