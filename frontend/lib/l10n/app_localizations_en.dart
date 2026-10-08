@@ -99,7 +99,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sortMostPopular => 'Most Popular';
 
   @override
-  String get sortAlphabetical => 'Alphabetical';
+  String get sortNameDesc => 'Name (Z→A)';
 
   @override
   String get newEvent => 'New Event';

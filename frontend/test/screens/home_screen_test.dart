@@ -640,4 +640,129 @@ void main() {
       expect(putCount, 1);
     },
   );
+  group('event sort (#585)', () {
+    // Ids are chosen so that id-descending ("Newest First") yields a
+    // different order than descending names.
+    Event ev(int id, String name, {bool fav = false}) => Event()
+      ..id = id
+      ..name = name
+      ..creatorId = 99
+      ..isFavorite = fav;
+    final events = [
+      ev(6, '0000 Fest'),
+      ev(5, '2025 Fest'),
+      ev(4, 'alpha Fest'),
+      ev(3, '2026 Fest'),
+      ev(2, 'Zulu Fest'),
+      ev(1, 'Beta Fest', fav: true),
+    ];
+
+    Future<void> pumpHome(WidgetTester tester, {Locale? locale}) async {
+      // Tall viewport so the lazily built ListView renders every card.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final user = User()
+        ..id = 1
+        ..username = 'viewer';
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) => _MockAuthController(user)),
+            eventsProvider.overrideWith((ref) async => [...events]),
+            apiClientProvider.overrideWithValue(
+              ApiClient(
+                ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+                client: MockClient((_) async => http.Response('[]', 200)),
+              ),
+            ),
+          ],
+          child: _localized(
+            const HomeScreen(),
+            locale: locale ?? const Locale('en'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    void expectTopToBottom(WidgetTester tester, List<String> names) {
+      final ys = [
+        for (final name in names) tester.getTopLeft(find.text(name)).dy,
+      ];
+      for (var i = 1; i < ys.length; i++) {
+        expect(
+          ys[i],
+          greaterThan(ys[i - 1]),
+          reason: '${names[i]} should be below ${names[i - 1]}',
+        );
+      }
+    }
+
+    testWidgets('defaults to descending name order, favorites first', (
+      tester,
+    ) async {
+      await pumpHome(tester);
+      expectTopToBottom(tester, const [
+        'Beta Fest',
+        'Zulu Fest',
+        'alpha Fest',
+        '2026 Fest',
+        '2025 Fest',
+        '0000 Fest',
+      ]);
+    });
+
+    testWidgets('equal names (ignoring case) tie-break by id descending', (
+      tester,
+    ) async {
+      final saved = [...events];
+      events
+        ..clear()
+        ..addAll([ev(10, 'same Fest'), ev(11, 'Same Fest')]);
+      addTearDown(
+        () => events
+          ..clear()
+          ..addAll(saved),
+      );
+      await pumpHome(tester);
+      expectTopToBottom(tester, const ['Same Fest', 'same Fest']);
+    });
+
+    testWidgets('Newest First still sorts by id descending', (tester) async {
+      await pumpHome(tester);
+      await tester.tap(find.byTooltip('Sort Events'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Newest First'));
+      await tester.pumpAndSettle();
+      expectTopToBottom(tester, const [
+        'Beta Fest',
+        '0000 Fest',
+        '2025 Fest',
+        'alpha Fest',
+        '2026 Fest',
+        'Zulu Fest',
+      ]);
+    });
+
+    testWidgets('sort menu lists Name (Z→A) first', (tester) async {
+      await pumpHome(tester);
+      await tester.tap(find.byTooltip('Sort Events'));
+      await tester.pumpAndSettle();
+      final items = find.byType(PopupMenuItem<EventSort>);
+      expect(
+        tester.widget<PopupMenuItem<EventSort>>(items.first).value,
+        EventSort.nameDesc,
+      );
+      expect(find.text('Name (Z→A)'), findsOneWidget);
+    });
+
+    testWidgets('sort menu shows the ja Name (Z→A) label', (tester) async {
+      await pumpHome(tester, locale: const Locale('ja'));
+      await tester.tap(find.byTooltip('イベントを並べ替え'));
+      await tester.pumpAndSettle();
+      expect(find.text('名前順（Z→A）'), findsOneWidget);
+    });
+  });
 }

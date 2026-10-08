@@ -57,7 +57,7 @@ BottomNavBar
 
 ### HomeScreen (Items Tab)
 
-- **AppBar**: Search bar (events/groups), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh button, sort popup menu (Newest / Most Popular / Alphabetical)
+- **AppBar**: Search bar (events/groups), **help (?) icon** (`HowToTradeIconButton`, #336 — opens the How to Trade guide sheet; emphasized on first login), refresh button, sort popup menu (Name Z→A — default, #585 / Newest / Most Popular)
 - **Favorite Shortcuts**: Horizontal scrollable row of `ActionChip` widgets for favorited events and groups
 - **Filter Bar**: `SegmentedButton` — All Events, Favorites, My Items
 - **Event List**: `ListView.builder` of event cards with:
