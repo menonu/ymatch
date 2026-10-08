@@ -21,9 +21,13 @@ pass() {
   echo "✅ $*"
 }
 
-for f in oci_deploy_common.sh oci_deploy.sh oci_deploy_production.sh oci_deploy_staging.sh; do
-  path="$SCRIPT_DIR/$f"
-  [ -f "$path" ] || fail "missing $path"
+# Every OCI deploy / redeploy entry point plus the shared library.
+shopt -s nullglob
+deploy_scripts=("$SCRIPT_DIR"/oci_deploy*.sh "$SCRIPT_DIR"/oci_redeploy*.sh)
+shopt -u nullglob
+[ "${#deploy_scripts[@]}" -ge 4 ] || fail "expected OCI deploy scripts under $SCRIPT_DIR"
+for path in "${deploy_scripts[@]}"; do
+  f="$(basename "$path")"
   if grep -nE 'oci_update_duckdns|duckdns_update\.sh|DUCKDNS_OPTIONAL' "$path"; then
     fail "$f still runs a deploy-time DuckDNS update; DNS errors must not block deploys"
   fi
