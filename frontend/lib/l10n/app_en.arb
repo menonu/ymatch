@@ -126,9 +126,9 @@
   "@sortMostPopular": {
     "description": "Sort option: most popular events first"
   },
-  "sortAlphabetical": "Alphabetical",
+  "sortAlphabetical": "Name (Z→A)",
   "@sortAlphabetical": {
-    "description": "Sort option: alphabetical order"
+    "description": "Sort option: descending name order (default)"
   },
   "newEvent": "New Event",
   "@newEvent": {

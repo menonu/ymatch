@@ -73,7 +73,7 @@ used throughout this document.
 
 | Identifier | Parent Screen | Options |
 |-----------|---------------|---------|
-| `EventSortMenu` | `HomeScreen` | Newest, Most Popular, Alphabetical |
+| `EventSortMenu` | `HomeScreen` | Name (Z→A, default), Newest, Most Popular |
 | `InventoryDisplayMenu` | `EventDetailScreen` | Just HAVE, WANT & TRADE, All |
 | `ViewModeMenu` | `EventDetailScreen` | Detailed View, Grid View, Compact List |
 | `EventOverflowMenu` | `EventDetailScreen` | Want All Missing |

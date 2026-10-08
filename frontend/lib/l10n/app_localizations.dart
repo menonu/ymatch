@@ -272,10 +272,10 @@ abstract class AppLocalizations {
   /// **'Most Popular'**
   String get sortMostPopular;
 
-  /// Sort option: alphabetical order
+  /// Sort option: descending name order (default)
   ///
   /// In en, this message translates to:
-  /// **'Alphabetical'**
+  /// **'Name (Z→A)'**
   String get sortAlphabetical;
 
   /// Floating action button label to create a new event

@@ -640,4 +640,71 @@ void main() {
       expect(putCount, 1);
     },
   );
+  testWidgets('defaults to descending name order with favorites first (#585)', (
+    tester,
+  ) async {
+    // Tall viewport so the lazily built ListView renders every card.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final user = User()
+      ..id = 1
+      ..username = 'viewer';
+    // Ids are chosen so that id-descending ("Newest First") would yield a
+    // different order than descending names.
+    Event ev(int id, String name, {bool fav = false}) => Event()
+      ..id = id
+      ..name = name
+      ..creatorId = 99
+      ..isFavorite = fav;
+    final events = [
+      ev(6, '0000 Fest'),
+      ev(5, '2025 Fest'),
+      ev(4, 'alpha Fest'),
+      ev(3, '2026 Fest'),
+      ev(2, 'Zulu Fest'),
+      ev(1, 'Beta Fest', fav: true),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _MockAuthController(user)),
+          eventsProvider.overrideWith((ref) async => events),
+          apiClientProvider.overrideWithValue(
+            ApiClient(
+              ConfigService()..setBaseUrlForTest('http://localhost:3000'),
+              client: MockClient((_) async => http.Response('[]', 200)),
+            ),
+          ),
+        ],
+        child: _localized(const HomeScreen(), locale: const Locale('en')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const expected = [
+      'Beta Fest',
+      'Zulu Fest',
+      'alpha Fest',
+      '2026 Fest',
+      '2025 Fest',
+      '0000 Fest',
+    ];
+    final ys = [
+      for (final name in expected) tester.getTopLeft(find.text(name)).dy,
+    ];
+    for (var i = 1; i < ys.length; i++) {
+      expect(
+        ys[i],
+        greaterThan(ys[i - 1]),
+        reason: '${expected[i]} should be below ${expected[i - 1]}',
+      );
+    }
+
+    await tester.tap(find.byTooltip('Sort Events'));
+    await tester.pumpAndSettle();
+    expect(find.text('Name (Z→A)'), findsOneWidget);
+  });
 }

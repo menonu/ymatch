@@ -10,7 +10,11 @@ import '../widgets/manage_event_members_dialog.dart';
 
 enum EventSort { recent, popular, alphabetical }
 
-final eventSortProvider = StateProvider<EventSort>((ref) => EventSort.recent);
+// Default: descending name order, so year-prefixed events list newest
+// year first (#585).
+final eventSortProvider = StateProvider<EventSort>(
+  (ref) => EventSort.alphabetical,
+);
 
 enum EventFilter { all, favorite, joined }
 
@@ -307,7 +311,8 @@ class HomeScreen extends ConsumerWidget {
                         : 0;
                     return bPop.compareTo(aPop);
                   case EventSort.alphabetical:
-                    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                    // Descending (Z→A) (#585).
+                    return b.name.toLowerCase().compareTo(a.name.toLowerCase());
                   case EventSort.recent:
                     return b.id.compareTo(a.id);
                 }
