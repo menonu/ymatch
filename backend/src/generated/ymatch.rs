@@ -197,6 +197,13 @@ pub struct TradeMatch {
     /// the caller lists messages for this match.
     #[prost(int32, tag = "18")]
     pub unread_message_count: i32,
+    /// Per-user completion: the listing caller has moved this match to Done.
+    /// A COMPLETED match the caller has not completed stays in-progress for them.
+    #[prost(bool, tag = "19")]
+    pub completed_by_me: bool,
+    /// Per-user completion: the other participant has completed on their side.
+    #[prost(bool, tag = "20")]
+    pub counterpart_completed: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

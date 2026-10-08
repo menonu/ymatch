@@ -119,3 +119,4 @@ Migrations, issue numbers, and API routes (`POST /api/v1/...`) are fine when the
 | [0015](0015-web-push-vapid-auto-match.md) | Background Auto-Match Alerts via Web Push + VAPID | Accepted | 2026-08-10 |
 | [0016](0016-global-editor-role.md) | Global `editor` Role | Accepted | 2026-08-10 |
 | [0017](0017-apply-inventory-decrements-receiver-want.md) | Apply Inventory Decrements Receiver WANT | Accepted | 2026-09-05 |
+| [0018](0018-per-user-match-completion.md) | Per-User Match Completion | Accepted | 2026-10-07 |

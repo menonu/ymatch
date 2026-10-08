@@ -607,6 +607,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markComplete => 'Mark Complete';
 
   @override
+  String get partnerMarkedComplete => 'Partner marked this trade complete';
+
+  @override
+  String get waitingForPartnerComplete => 'Waiting for partner to complete';
+
+  @override
   String get updateInventory => 'Update Inventory';
 
   @override

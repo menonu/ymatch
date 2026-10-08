@@ -100,7 +100,7 @@ class TradeMatchCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          MatchStatusChip(status: match.status),
+                          MatchStatusChip(status: displayStatusForMe(match)),
                           // ADR 0012 / #477: prior-history annotation after rematch.
                           if (match.hasLastTerminalStatus()) ...[
                             const SizedBox(height: 2),

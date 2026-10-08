@@ -55,10 +55,12 @@ class _TradeListScreenState extends ConsumerState<TradeListScreen>
           (m) => m.status == 'OFFERED' && m.offeredBy != userId,
         );
       case TradeTab.active:
-        filtered = matches.where((m) => m.status == 'ACCEPTED');
+        // Per-user completion: a match the counterpart completed stays
+        // here until this user completes it too.
+        filtered = matches.where(isActiveForMe);
       case TradeTab.completed:
         filtered = matches.where(
-          (m) => m.status == 'COMPLETED' || m.status == 'CANCELLED',
+          (m) => isCompletedForMe(m) || m.status == 'CANCELLED',
         );
     }
     // #476: latest-first by created_at (defensive — do not rely on server

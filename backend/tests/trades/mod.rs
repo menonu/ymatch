@@ -245,7 +245,18 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CONFLICT);
 
-    // 13. User2 applies inventory
+    // 13. User2 completes on their side (per-user completion)
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/status", match_id),
+            &format!(r#"{{"status": "COMPLETED", "userId": {}}}"#, user2_id)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    // 14. User2 applies inventory
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -311,7 +322,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         "User2 WANT Card A should decrement 1→0 (#579)"
     );
 
-    // 14. Double-apply for User2 → 409 Conflict
+    // 15. Double-apply for User2 → 409 Conflict
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -326,7 +337,7 @@ async fn test_trade_lifecycle_offer_accept_complete_apply(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CONFLICT);
 
-    // 15. Notification counts
+    // 16. Notification counts
     let app = backend::routes::create_router(pool.clone(), test_storage());
     let resp = app
         .oneshot(
@@ -2235,4 +2246,162 @@ async fn test_matcher_two_disjoint_pairs_no_cross_match(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(groups, vec!["P1".to_string(), "P2".to_string()]);
+}
+
+/// Completing is per-user: one participant's "Mark complete" freezes the
+/// match as COMPLETED but only stamps their own flag, so the counterpart
+/// still sees it as in-progress until they complete it themselves. Apply
+/// inventory requires the caller's own completion.
+#[sqlx::test]
+async fn test_complete_is_per_user(pool: PgPool) {
+    let (fx, match_id) = setup_pending_mutual_match(
+        &pool,
+        "per-user-complete",
+        MutualTradeOptions {
+            have_qty: Some(1),
+            ..MutualTradeOptions::default()
+        },
+    )
+    .await;
+    let (u1, u2) = (fx.user1_id, fx.user2_id);
+    let status_uri = format!("/api/v1/matches/{}/status", match_id);
+    let apply_uri = format!("/api/v1/matches/{}/apply-inventory", match_id);
+    let offer_body = format!(
+        r#"{{"userId": {u1}, "items": [
+            {{"merchId": {}, "giverUserId": {u1}, "quantity": 1}},
+            {{"merchId": {}, "giverUserId": {u2}, "quantity": 1}}
+        ]}}"#,
+        fx.merch_a_id, fx.merch_b_id
+    );
+    let complete = |user: i64| format!(r#"{{"status": "COMPLETED", "userId": {user}}}"#);
+    let flags = |m: &serde_json::Value| {
+        (
+            m["completedByMe"].as_bool().unwrap_or(false),
+            m["counterpartCompleted"].as_bool().unwrap_or(false),
+        )
+    };
+
+    assert_eq!(
+        post_json(
+            &pool,
+            &format!("/api/v1/matches/{}/offer", match_id),
+            &offer_body
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        post_json(
+            &pool,
+            &status_uri,
+            &format!(r#"{{"status": "ACCEPTED", "userId": {u2}}}"#)
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+
+    // Nobody has completed yet: apply is not allowed for either side.
+    assert_eq!(
+        post_json(&pool, &apply_uri, &format!(r#"{{"userId": {u1}}}"#))
+            .await
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // User1 completes.
+    assert_eq!(
+        post_json(&pool, &status_uri, &complete(u1)).await.status(),
+        StatusCode::OK
+    );
+
+    let m1 = &list_user_matches(&pool, u1).await[0];
+    assert_eq!(m1["status"], "COMPLETED");
+    assert_eq!(flags(m1), (true, false), "user1 completed, user2 not yet");
+    let m2 = &list_user_matches(&pool, u2).await[0];
+    assert_eq!(m2["status"], "COMPLETED");
+    assert_eq!(flags(m2), (false, true), "user2 sees counterpart completed");
+
+    // User1 messages after completing; the match is still in progress for
+    // user2, so it counts toward user2's unread nav badge.
+    let msg =
+        format!(r#"{{"matchId": {match_id}, "senderId": {u1}, "content": "done on my side"}}"#);
+    assert_eq!(
+        post_json(&pool, &format!("/api/v1/matches/{match_id}/messages"), &msg)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+
+    // User2's in-progress badge still counts the match until they complete.
+    let counts2: serde_json::Value = serde_json::from_str(
+        &body_to_string(
+            get_request(&pool, &format!("/api/v1/matches/user/{u2}/counts"))
+                .await
+                .into_body(),
+        )
+        .await,
+    )
+    .unwrap();
+    assert_eq!(json_i64(&counts2, "accepted"), 1);
+    assert_eq!(json_i64(&counts2, "unreadMessages"), 1);
+    let counts1: serde_json::Value = serde_json::from_str(
+        &body_to_string(
+            get_request(&pool, &format!("/api/v1/matches/user/{u1}/counts"))
+                .await
+                .into_body(),
+        )
+        .await,
+    )
+    .unwrap();
+    assert_eq!(json_i64(&counts1, "accepted"), 0);
+
+    // User2 cannot apply before completing themselves.
+    assert_eq!(
+        post_json(&pool, &apply_uri, &format!(r#"{{"userId": {u2}}}"#))
+            .await
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    // User1 can apply right away.
+    assert_eq!(
+        post_json(&pool, &apply_uri, &format!(r#"{{"userId": {u1}}}"#))
+            .await
+            .status(),
+        StatusCode::OK
+    );
+
+    // User1 completing again conflicts.
+    assert_eq!(
+        post_json(&pool, &status_uri, &complete(u1)).await.status(),
+        StatusCode::CONFLICT
+    );
+
+    // A non-participant cannot complete on anyone's behalf.
+    let outsider = login_guest(&pool, "per-user-complete-outsider", "t-out").await;
+    assert_eq!(
+        post_json(&pool, &status_uri, &complete(outsider))
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+
+    // User2 completes, then may apply.
+    assert_eq!(
+        post_json(&pool, &status_uri, &complete(u2)).await.status(),
+        StatusCode::OK
+    );
+    let m2 = &list_user_matches(&pool, u2).await[0];
+    assert_eq!(flags(m2), (true, true));
+    assert_eq!(
+        post_json(&pool, &status_uri, &complete(u2)).await.status(),
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        post_json(&pool, &apply_uri, &format!(r#"{{"userId": {u2}}}"#))
+            .await
+            .status(),
+        StatusCode::OK
+    );
 }

@@ -42,6 +42,7 @@ impl MatchRepository {
         // the card can show a renamed label without mutating group_name.
         let match_sql = r#"SELECT m.id, m.user1_id, m.user2_id, m.status, m.offered_by,
                       m.user1_inventory_applied_at, m.user2_inventory_applied_at,
+                      m.user1_completed_at, m.user2_completed_at,
                       m.created_at, m.event_id, m.group_name, e.name AS event_name,
                       mg.display_name AS group_display_name,
                       m.rematch_count, m.last_terminal_status, m.last_terminal_at,
@@ -297,13 +298,26 @@ impl MatchRepository {
                 .cloned()
                 .unwrap_or_default();
             m.selected_items = items_by_match.get(&m.id).cloned().unwrap_or_default();
-            m.inventory_applied = if m.user1_id == user_id {
-                row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("user1_inventory_applied_at")
-                    .is_some()
+            let (my_applied, my_completed, peer_completed) = if m.user1_id == user_id {
+                (
+                    "user1_inventory_applied_at",
+                    "user1_completed_at",
+                    "user2_completed_at",
+                )
             } else {
-                row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("user2_inventory_applied_at")
+                (
+                    "user2_inventory_applied_at",
+                    "user2_completed_at",
+                    "user1_completed_at",
+                )
+            };
+            let is_set = |col: &str| {
+                row.get::<Option<chrono::DateTime<chrono::Utc>>, _>(col)
                     .is_some()
             };
+            m.inventory_applied = is_set(my_applied);
+            m.completed_by_me = is_set(my_completed);
+            m.counterpart_completed = is_set(peer_completed);
             // #535: default 0 when the match has no unread peer messages.
             m.unread_message_count = unread_by_match.get(&m.id).copied().unwrap_or(0);
             out.push(m);
@@ -423,12 +437,30 @@ impl MatchRepository {
                    (SELECT COUNT(*) FROM matches
                     WHERE (user1_id = $1 OR user2_id = $1)
                       AND status = 'OFFERED' AND offered_by != $1) AS offers_in,
+                   -- In-progress for this user: ACCEPTED, or COMPLETED by the
+                   -- counterpart but not yet by this user (per-user completion).
                    (SELECT COUNT(*) FROM matches
-                    WHERE (user1_id = $1 OR user2_id = $1) AND status = 'ACCEPTED') AS accepted,
+                    WHERE (user1_id = $1 OR user2_id = $1)
+                      AND (
+                        status = 'ACCEPTED'
+                        OR (
+                          status = 'COMPLETED'
+                          AND CASE WHEN user1_id = $1 THEN user1_completed_at
+                                   ELSE user2_completed_at END IS NULL
+                        )
+                      )) AS accepted,
                    (SELECT COUNT(*) FROM messages msg
                     JOIN matches m ON msg.match_id = m.id
                     WHERE (m.user1_id = $1 OR m.user2_id = $1)
-                      AND m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                      AND (
+                        m.status IN ('PENDING', 'OFFERED', 'ACCEPTED')
+                        -- Still in progress for this user (per-user completion).
+                        OR (
+                          m.status = 'COMPLETED'
+                          AND CASE WHEN m.user1_id = $1 THEN m.user1_completed_at
+                                   ELSE m.user2_completed_at END IS NULL
+                        )
+                      )
                       AND msg.sender_id != $1
                       AND COALESCE(msg.message_type, 'TEXT') <> 'SYSTEM'
                       AND msg.created_at > COALESCE(
@@ -470,7 +502,8 @@ impl MatchRepository {
     ) -> Result<Option<MatchStatusSnapshot>, AppError> {
         let row = sqlx::query(
             "SELECT user1_id, user2_id, status, offered_by, event_id, group_name,
-                    user1_inventory_applied_at, user2_inventory_applied_at
+                    user1_inventory_applied_at, user2_inventory_applied_at,
+                    user1_completed_at, user2_completed_at
              FROM matches WHERE id = $1",
         )
         .bind(match_id)

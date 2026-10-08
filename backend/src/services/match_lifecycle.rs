@@ -13,7 +13,8 @@
 //!        │                   ├─accept (non-proposer + balanced)──> ACCEPTED
 //!        │                   └─reject──────────────────────────> REJECTED
 //!        └──reject──> REJECTED
-//!     ACCEPTED ──complete──> COMPLETED
+//!     ACCEPTED ──complete (either participant)──> COMPLETED
+//!     COMPLETED ──complete (the other participant)──> COMPLETED (flag only)
 //!
 //!     PENDING  ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
 //!     OFFERED  ──cancel (system: item deleted or inventory cap=0)──► CANCELLED
@@ -36,6 +37,12 @@
 //! Rematch (ADR 0012) is system-driven in the periodic matcher: a
 //! `REJECTED` or `CANCELLED` pair+group row is reopened to `PENDING` when
 //! mutual capacity holds again (or still). `COMPLETED` is not rematchable.
+//!
+//! Completion is per-user: the first participant to complete flips the
+//! match to `COMPLETED` (freezing it against cancel / rematch) and stamps
+//! only their own `user{1,2}_completed_at`. The counterpart keeps the match
+//! in-progress until they complete it themselves; clients route tabs on the
+//! caller's own flag.
 //!
 //! The apply-inventory step runs *after* COMPLETED and updates the
 //! `inventory` table based on the offer's `match_items` legs. Each side
@@ -213,7 +220,9 @@ impl MatchLifecycleService {
     ///
     /// - PENDING/OFFERED -> REJECTED  (cascades to delete match_items)
     /// - OFFERED         -> ACCEPTED  (non-proposer + balanced only)
-    /// - ACCEPTED        -> COMPLETED
+    /// - ACCEPTED        -> COMPLETED (stamps the caller's completion flag)
+    /// - COMPLETED       -> COMPLETED (counterpart already completed; stamps
+    ///   only the caller's flag, 409 if already stamped)
     ///
     /// `user_id` is the acting user (carried by `UpdateMatchStatusRequest`
     /// since #297); `validate_participation` closes the previous authz gap
@@ -235,6 +244,25 @@ impl MatchLifecycleService {
             .ok_or_else(|| AppError::not_found("Match not found"))?;
 
         validate_participation(user_id, locked.user1_id, locked.user2_id)?;
+
+        if new_status == STATUS_COMPLETED {
+            // Per-user completion: the first completion freezes the match
+            // as COMPLETED; each participant stamps only their own flag, so
+            // the counterpart keeps it in-progress until they complete.
+            if validate_complete(&locked.status, locked.completed_by(user_id))?
+                == CompleteAction::CompleteMatch
+            {
+                self.matches
+                    .set_status(&mut *tx, match_id, STATUS_COMPLETED)
+                    .await?;
+            }
+            self.matches
+                .mark_completed(&mut *tx, match_id, user_id == locked.user1_id)
+                .await?;
+            tx.commit().await?;
+            return Ok(());
+        }
+
         validate_status_transition(new_status, &locked.status)?;
 
         if new_status == STATUS_ACCEPTED {
@@ -337,7 +365,8 @@ impl MatchLifecycleService {
     }
 
     /// Apply the requesting user's inventory changes for a COMPLETED
-    /// match. Each side applies independently; the per-user flag
+    /// match the caller has completed on their own side (400 otherwise).
+    /// Each side applies independently; the per-user flag
     /// (`user{1,2}_inventory_applied_at`) prevents double-application.
     ///
     /// Legs are absolute (#297 / #429 / #579): for each leg `(giver, merch,
@@ -390,12 +419,12 @@ impl MatchLifecycleService {
         }
 
         let is_user1 = user_id == snapshot.user1_id;
-        if is_user1 && snapshot.user1_applied {
-            return Err(AppError::conflict(
-                "Inventory already applied for this user",
+        if !snapshot.completed_by(user_id) {
+            return Err(AppError::bad_request(
+                "Complete the match before applying inventory",
             ));
         }
-        if !is_user1 && snapshot.user2_applied {
+        if snapshot.applied_by(user_id) {
             return Err(AppError::conflict(
                 "Inventory already applied for this user",
             ));
@@ -776,13 +805,38 @@ fn validate_status_transition(new_status: &str, current_status: &str) -> Result<
         ("ACCEPTED", s) if s != STATUS_OFFERED => {
             Err(AppError::bad_request("Can only accept OFFERED matches"))
         }
-        ("COMPLETED", s) if s != STATUS_ACCEPTED => {
-            Err(AppError::bad_request("Can only complete ACCEPTED matches"))
-        }
         ("REJECTED", s) if s != STATUS_PENDING && s != STATUS_OFFERED => Err(
             AppError::bad_request("Can only reject PENDING or OFFERED matches"),
         ),
         _ => Ok(()),
+    }
+}
+
+/// What a user's "complete" does to the match row.
+#[derive(Debug, PartialEq, Eq)]
+enum CompleteAction {
+    /// ACCEPTED -> COMPLETED, and stamp the caller's completion flag.
+    CompleteMatch,
+    /// Already COMPLETED by the counterpart: stamp only the caller's flag.
+    MarkSelf,
+}
+
+/// Validate a user's completion against the match status and whether
+/// this user already completed (per-user completion).
+///
+/// Factored out of [`MatchLifecycleService::change_status`] so it can be
+/// unit-tested without a database.
+fn validate_complete(
+    current_status: &str,
+    completed_by_user: bool,
+) -> Result<CompleteAction, AppError> {
+    match current_status {
+        STATUS_ACCEPTED => Ok(CompleteAction::CompleteMatch),
+        STATUS_COMPLETED if completed_by_user => {
+            Err(AppError::conflict("Match already completed by this user"))
+        }
+        STATUS_COMPLETED => Ok(CompleteAction::MarkSelf),
+        _ => Err(AppError::bad_request("Can only complete ACCEPTED matches")),
     }
 }
 
@@ -1222,7 +1276,7 @@ mod tests {
         );
     }
 
-    // --- validate_status_transition (the four-arm guard) ---
+    // --- validate_status_transition (accept / reject guards) ---
 
     #[test]
     fn accept_from_pending_rejected() {
@@ -1237,17 +1291,48 @@ mod tests {
         assert_eq!(validate_status_transition("ACCEPTED", "OFFERED"), Ok(()));
     }
 
+    // --- validate_complete (per-user completion) ---
+
     #[test]
     fn complete_from_offered_rejected() {
         assert_eq!(
-            validate_status_transition("COMPLETED", "OFFERED"),
+            validate_complete("OFFERED", false),
             Err(AppError::bad_request("Can only complete ACCEPTED matches"))
         );
     }
 
     #[test]
-    fn complete_from_accepted_ok() {
-        assert_eq!(validate_status_transition("COMPLETED", "ACCEPTED"), Ok(()));
+    fn complete_from_accepted_completes_match() {
+        assert_eq!(
+            validate_complete("ACCEPTED", false),
+            Ok(CompleteAction::CompleteMatch)
+        );
+    }
+
+    #[test]
+    fn complete_after_counterpart_marks_only_self() {
+        // The counterpart already completed (match is COMPLETED); this user
+        // has not, so only their own flag is stamped.
+        assert_eq!(
+            validate_complete(STATUS_COMPLETED, false),
+            Ok(CompleteAction::MarkSelf)
+        );
+    }
+
+    #[test]
+    fn complete_twice_by_same_user_conflicts() {
+        assert_eq!(
+            validate_complete(STATUS_COMPLETED, true),
+            Err(AppError::conflict("Match already completed by this user"))
+        );
+    }
+
+    #[test]
+    fn complete_from_cancelled_rejected() {
+        assert_eq!(
+            validate_complete(STATUS_CANCELLED, false),
+            Err(AppError::bad_request("Can only complete ACCEPTED matches"))
+        );
     }
 
     #[test]
@@ -1284,7 +1369,7 @@ mod tests {
     #[test]
     fn complete_from_pending_rejected() {
         assert_eq!(
-            validate_status_transition("COMPLETED", "PENDING"),
+            validate_complete("PENDING", false),
             Err(AppError::bad_request("Can only complete ACCEPTED matches"))
         );
     }

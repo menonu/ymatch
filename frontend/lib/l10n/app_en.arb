@@ -852,6 +852,14 @@
   "@markComplete": {
     "description": "Button to mark an active trade complete"
   },
+  "partnerMarkedComplete": "Partner marked this trade complete",
+  "@partnerMarkedComplete": {
+    "description": "Hint on an active trade the counterpart already marked complete (per-user completion)"
+  },
+  "waitingForPartnerComplete": "Waiting for partner to complete",
+  "@waitingForPartnerComplete": {
+    "description": "Hint on a trade this user completed while the counterpart has not yet"
+  },
   "updateInventory": "Update Inventory",
   "@updateInventory": {
     "description": "Button to apply a completed trade to inventory"

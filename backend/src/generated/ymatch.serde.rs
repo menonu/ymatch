@@ -4582,6 +4582,12 @@ impl serde::Serialize for TradeMatch {
         if self.unread_message_count != 0 {
             len += 1;
         }
+        if self.completed_by_me {
+            len += 1;
+        }
+        if self.counterpart_completed {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.TradeMatch", len)?;
         if self.id != 0 {
             struct_ser.serialize_field("id", &self.id)?;
@@ -4637,6 +4643,12 @@ impl serde::Serialize for TradeMatch {
         if self.unread_message_count != 0 {
             struct_ser.serialize_field("unreadMessageCount", &self.unread_message_count)?;
         }
+        if self.completed_by_me {
+            struct_ser.serialize_field("completedByMe", &self.completed_by_me)?;
+        }
+        if self.counterpart_completed {
+            struct_ser.serialize_field("counterpartCompleted", &self.counterpart_completed)?;
+        }
         struct_ser.end()
     }
 }
@@ -4681,6 +4693,10 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             "lastTerminalAt",
             "unread_message_count",
             "unreadMessageCount",
+            "completed_by_me",
+            "completedByMe",
+            "counterpart_completed",
+            "counterpartCompleted",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4703,6 +4719,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
             LastTerminalStatus,
             LastTerminalAt,
             UnreadMessageCount,
+            CompletedByMe,
+            CounterpartCompleted,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4742,6 +4760,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                             "lastTerminalStatus" | "last_terminal_status" => Ok(GeneratedField::LastTerminalStatus),
                             "lastTerminalAt" | "last_terminal_at" => Ok(GeneratedField::LastTerminalAt),
                             "unreadMessageCount" | "unread_message_count" => Ok(GeneratedField::UnreadMessageCount),
+                            "completedByMe" | "completed_by_me" => Ok(GeneratedField::CompletedByMe),
+                            "counterpartCompleted" | "counterpart_completed" => Ok(GeneratedField::CounterpartCompleted),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4779,6 +4799,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                 let mut last_terminal_status__ = None;
                 let mut last_terminal_at__ = None;
                 let mut unread_message_count__ = None;
+                let mut completed_by_me__ = None;
+                let mut counterpart_completed__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -4901,6 +4923,18 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
+                        GeneratedField::CompletedByMe => {
+                            if completed_by_me__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("completedByMe"));
+                            }
+                            completed_by_me__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::CounterpartCompleted => {
+                            if counterpart_completed__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("counterpartCompleted"));
+                            }
+                            counterpart_completed__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(TradeMatch {
@@ -4922,6 +4956,8 @@ impl<'de> serde::Deserialize<'de> for TradeMatch {
                     last_terminal_status: last_terminal_status__,
                     last_terminal_at: last_terminal_at__,
                     unread_message_count: unread_message_count__.unwrap_or_default(),
+                    completed_by_me: completed_by_me__.unwrap_or_default(),
+                    counterpart_completed: counterpart_completed__.unwrap_or_default(),
                 })
             }
         }
