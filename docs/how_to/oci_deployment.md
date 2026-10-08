@@ -333,6 +333,7 @@ With DuckDNS (issue #523):
 
 1. `task tf:oci:apply` (or `terraform apply`) runs `null_resource.duckdns_*` and updates the A record to the new IP (requires `duckdns_domain` / `duckdns_domain_staging` in `terraform.tfvars` + `TF_VAR_duckdns_token`).
 2. The optional `linuxserver/duckdns` sidecar (compose profile `ddns`) also keeps the A record fresh after deploy.
+   Deploy scripts do **not** call the DuckDNS API themselves, so a DuckDNS outage never blocks a release (issue #586).
 3. If `OCI_VM_HOST` / `OCI_STAGING_VM_HOST` still stores the **raw IP**, update it after apply. Prefer storing the same FQDN as `OCI_DOMAIN` / `OCI_DOMAIN_STAGING` so SSH targets stay stable.
 
 ```bash

@@ -9,7 +9,6 @@
 #   oci_require_domain                    - require DOMAIN; derive/validate DUCKDNS_SUBDOMAIN
 #   oci_compose <dir> <args...>           - docker compose with optional ddns profile
 #   oci_compose_up_stack <dir>            - up db/backend/frontend/caddy[+duckdns]
-#   oci_update_duckdns                    - one-shot DuckDNS A update (hard-fail unless DUCKDNS_OPTIONAL=1)
 #   oci_sync_repo <repo_dir>              - git pull / clone (handles non-git, GH_TOKEN, etc.)
 #   oci_get_git_hash <repo_dir>           - rev-parse or "manual"
 #   oci_write_compose_env <dir> <vars...> - write .env file for docker compose
@@ -21,15 +20,13 @@
 #            or the previous compose .env). No hardcoded hostname defaults in scripts.
 # Optional env:
 #   DUCKDNS_SUBDOMAIN   - bare DuckDNS name; default: first label of DOMAIN
-#   DUCKDNS_TOKEN       - enable DNS keep-alive + one-shot update
-#   DUCKDNS_OPTIONAL=1  - soft-fail one-shot DuckDNS update (default: hard-fail when enabled)
+#   DUCKDNS_TOKEN       - enable the duckdns keep-alive sidecar (A record is
+#                         also set by Terraform; deploys never call the DuckDNS
+#                         API themselves, #586)
 #   GH_TOKEN            - GitHub PAT for HTTPS clone (preferred)
 #   GH_SSH_KEY_PATH     - path to SSH key for git clone (alternative)
 
 set -euo pipefail
-
-# Directory of this common library (stable even when sourced).
-_OCI_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Auto-detect public IP from OCI metadata service
 oci_detect_public_ip() {
@@ -152,30 +149,6 @@ oci_compose() {
   fi
   docker compose --env-file "$dir/.env" "${profile_args[@]}" \
     -f "$dir/docker-compose.oci.yml" "$@"
-}
-
-# One-shot DuckDNS update using PUBLIC_IP. No-op when token/subdomain unset.
-# Hard-fails on API error unless DUCKDNS_OPTIONAL=1.
-oci_update_duckdns() {
-  if ! oci_duckdns_enabled; then
-    echo "DuckDNS token/subdomain not set; skipping one-shot DNS update"
-    return 0
-  fi
-  if [ -z "${PUBLIC_IP:-}" ]; then
-    echo "ERROR: PUBLIC_IP not set; cannot update DuckDNS" >&2
-    return 1
-  fi
-  if ! DUCKDNS_DOMAIN="$DUCKDNS_SUBDOMAIN" \
-    DUCKDNS_TOKEN="$DUCKDNS_TOKEN" \
-    DUCKDNS_IP="$PUBLIC_IP" \
-    "$_OCI_COMMON_DIR/duckdns_update.sh"; then
-    if [ "${DUCKDNS_OPTIONAL:-}" = "1" ]; then
-      echo "⚠️  DuckDNS one-shot update failed (DUCKDNS_OPTIONAL=1; continuing)" >&2
-      return 0
-    fi
-    echo "ERROR: DuckDNS one-shot update failed" >&2
-    return 1
-  fi
 }
 
 # Cap BuildKit cache so on-VM rust/flutter compiles cannot fill the 50GB
