@@ -270,7 +270,7 @@ used throughout this document.
 | `eventSortProvider` | `HomeScreen` | Current sort mode |
 | `eventFilterProvider` | `HomeScreen` | Current filter mode |
 | `viewModeProvider` | `EventDetailScreen` | Detailed / Grid / List |
-| `merchFilterProvider` | `EventDetailScreen` | All / HAVE / WANT / Missing |
+| `merchFilterProvider` | `EventDetailScreen` | All / HAVE / WANT / TRADE / Missing (HAVE == 0) |
 | `inventoryDisplayModeProvider` | `EventDetailScreen` | Just HAVE / WANT & TRADE / All |
 | `itemSearchQueryProvider` | `EventDetailScreen` | Item search query |
 | `messagesProvider` | `ChatScreen` | Chat messages for a match |
