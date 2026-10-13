@@ -46,14 +46,18 @@ void main() {
       );
     });
 
-    test('missing is HAVE == 0 && WANT == 0 (TRADE ignored)', () {
+    test('missing is HAVE == 0 regardless of WANT / TRADE (#590)', () {
       expect(
         matchesMerchFilter(MerchFilter.missing, have: 0, want: 0, trade: 0),
         isTrue,
       );
-      // Existing semantics: trade-only stock still counts as "missing" owned.
       expect(
         matchesMerchFilter(MerchFilter.missing, have: 0, want: 0, trade: 3),
+        isTrue,
+      );
+      // Wanted-but-not-owned items are still missing.
+      expect(
+        matchesMerchFilter(MerchFilter.missing, have: 0, want: 1, trade: 0),
         isTrue,
       );
       expect(
@@ -61,7 +65,7 @@ void main() {
         isFalse,
       );
       expect(
-        matchesMerchFilter(MerchFilter.missing, have: 0, want: 1, trade: 0),
+        matchesMerchFilter(MerchFilter.missing, have: 2, want: 1, trade: 1),
         isFalse,
       );
     });

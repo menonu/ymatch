@@ -34,8 +34,8 @@ final itemSearchQueryProvider = StateProvider.autoDispose.family<String, int>(
 
 /// Whether [item] inventory quantities pass [filter] (#472).
 ///
-/// [missing] keeps pre-existing semantics: HAVE == 0 && WANT == 0 (TRADE is
-/// ignored). TRADE-only stock therefore still matches Missing.
+/// [missing] matches every item not owned (HAVE == 0), regardless of WANT /
+/// TRADE quantities (#590).
 bool matchesMerchFilter(
   MerchFilter filter, {
   required int have,
@@ -52,7 +52,7 @@ bool matchesMerchFilter(
     case MerchFilter.trade:
       return trade > 0;
     case MerchFilter.missing:
-      return have == 0 && want == 0;
+      return have == 0;
   }
 }
 
