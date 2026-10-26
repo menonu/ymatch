@@ -1,0 +1,135 @@
+name: OS Update
+
+# #592: OS package/security updates for the OCI VMs.
+#
+# Two layers:
+#   1. Daily, on-host: unattended-upgrades (security pockets only, Docker
+#      blacklisted, no auto-reboot). Config is (re)installed by every
+#      non-check run of scripts/oci_os_update.sh.
+#   2. Weekly, supervised (this workflow): full upgrade incl. Docker Engine,
+#      reboot only when /var/run/reboot-required, staging first and
+#      production only if staging comes back healthy.
+#
+# Manual: Actions → OS Update → Run workflow (target / mode / reboot).
+# Failures post to Discord via notify-main-failure.yml.
+
+on:
+  schedule:
+    # Weekly, Monday 19:30 UTC (Tuesday 04:30 JST) — low traffic, and after
+    # the 18:00 UTC database backup.
+    - cron: '30 19 * * 1'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Hosts to update'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - staging
+          - production
+      mode:
+        description: 'check = list pending only; security = security pockets only; full = full-upgrade incl. Docker'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - security
+          - check
+      reboot:
+        description: 'Reboot policy'
+        required: true
+        default: 'if-required'
+        type: choice
+        options:
+          - if-required
+          - never
+          - always
+
+concurrency:
+  group: os-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Scheduled runs have no inputs; fall back to the weekly defaults.
+  MODE: ${{ inputs.mode || 'full' }}
+  REBOOT: ${{ inputs.reboot || 'if-required' }}
+
+jobs:
+  staging:
+    name: Staging
+    if: github.event_name == 'schedule' || inputs.target != 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Update staging host
+        id: update
+        uses: ./.github/actions/os-update-host
+        with:
+          environment: staging
+          host: ${{ secrets.OCI_STAGING_VM_HOST }}
+          ssh-key: ${{ secrets.OCI_STAGING_SSH_PRIVATE_KEY }}
+          domain: ${{ vars.OCI_DOMAIN_STAGING }}
+          mode: ${{ env.MODE }}
+          reboot: ${{ env.REBOOT }}
+
+      - name: Report to New Relic
+        if: always()
+        uses: ./.github/actions/os-update-nr-event
+        with:
+          environment: staging
+          status: ${{ job.status }}
+          mode: ${{ env.MODE }}
+          pending: ${{ steps.update.outputs.pending }}
+          pending-security: ${{ steps.update.outputs.pending-security }}
+          reboot-required: ${{ steps.update.outputs.reboot-required }}
+          rebooted: ${{ steps.update.outputs.rebooted }}
+          account-id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+          license-key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+
+  production:
+    name: Production
+    needs: staging
+    # Runs when targeted and staging either succeeded or was not targeted.
+    if: >
+      always() &&
+      (github.event_name == 'schedule' || inputs.target != 'staging') &&
+      (needs.staging.result == 'success' || needs.staging.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Update production host
+        id: update
+        uses: ./.github/actions/os-update-host
+        with:
+          environment: production
+          host: ${{ secrets.OCI_VM_HOST }}
+          ssh-key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          domain: ${{ vars.OCI_DOMAIN }}
+          mode: ${{ env.MODE }}
+          reboot: ${{ env.REBOOT }}
+
+      - name: Report to New Relic
+        if: always()
+        uses: ./.github/actions/os-update-nr-event
+        with:
+          environment: production
+          status: ${{ job.status }}
+          mode: ${{ env.MODE }}
+          pending: ${{ steps.update.outputs.pending }}
+          pending-security: ${{ steps.update.outputs.pending-security }}
+          reboot-required: ${{ steps.update.outputs.reboot-required }}
+          rebooted: ${{ steps.update.outputs.rebooted }}
+          account-id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+          license-key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}

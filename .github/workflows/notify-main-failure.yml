@@ -14,6 +14,7 @@ on:
       - Frontend E2E
       - Backend Coverage
       - Frontend Coverage
+      - OS Update
     types: [completed]
     # Filter on the head branch of the *triggering* run so manual
     # workflow_dispatch on a PR branch never notifies.

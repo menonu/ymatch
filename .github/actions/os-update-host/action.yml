@@ -1,0 +1,141 @@
+name: OS update (single OCI host)
+description: >
+  Pipe scripts/oci_os_update.sh to one OCI VM over SSH, wait out any reboot it
+  schedules, then health-check the public app URL (#592).
+
+inputs:
+  environment:
+    description: Display label (staging / production)
+    required: true
+  host:
+    description: SSH host (FQDN or IP) — pass from a secret
+    required: true
+  ssh-key:
+    description: SSH private key — pass from a secret
+    required: true
+  domain:
+    description: Public app FQDN for the post-update health check
+    required: true
+  mode:
+    description: check | security | full
+    required: true
+  reboot:
+    description: if-required | never | always
+    required: true
+
+outputs:
+  pending:
+    description: Upgradable packages before the run
+    value: ${{ steps.update.outputs.pending }}
+  pending-security:
+    description: Upgradable security packages before the run
+    value: ${{ steps.update.outputs.pending-security }}
+  reboot-required:
+    description: yes / no (after the run)
+    value: ${{ steps.update.outputs.reboot-required }}
+  rebooted:
+    description: yes / no
+    value: ${{ steps.update.outputs.reboot-scheduled }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup SSH
+      shell: bash
+      env:
+        HOST: ${{ inputs.host }}
+        SSH_KEY: ${{ inputs.ssh-key }}
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/os_update_key
+        chmod 600 ~/.ssh/os_update_key
+        ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+    - name: Run OS update (${{ inputs.environment }})
+      id: update
+      shell: bash
+      env:
+        HOST: ${{ inputs.host }}
+        MODE: ${{ inputs.mode }}
+        REBOOT: ${{ inputs.reboot }}
+      run: |
+        set -euo pipefail
+        LOG="$RUNNER_TEMP/os-update-${{ inputs.environment }}.log"
+        ssh -i ~/.ssh/os_update_key -o ServerAliveInterval=30 "ubuntu@$HOST" \
+          "sudo bash -s -- --mode '$MODE' --reboot '$REBOOT'" \
+          < "$GITHUB_WORKSPACE/scripts/oci_os_update.sh" | tee "$LOG"
+
+        val() { grep "^$1=" "$LOG" | tail -1 | cut -d= -f2; }
+        {
+          echo "pending=$(val OS_UPDATE_PENDING)"
+          echo "pending-security=$(val OS_UPDATE_PENDING_SECURITY)"
+          echo "reboot-required=$(val OS_UPDATE_REBOOT_REQUIRED)"
+          echo "reboot-scheduled=$(val OS_UPDATE_REBOOT_SCHEDULED)"
+        } >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### OS update — ${{ inputs.environment }}"
+          echo ""
+          echo "| mode | pending (security) | reboot required | rebooted |"
+          echo "|---|---|---|---|"
+          echo "| $MODE | $(val OS_UPDATE_PENDING) ($(val OS_UPDATE_PENDING_SECURITY)) | $(val OS_UPDATE_REBOOT_REQUIRED) | $(val OS_UPDATE_REBOOT_SCHEDULED) |"
+          echo ""
+          echo "<details><summary>Pending packages</summary>"
+          echo ""
+          echo '```'
+          grep '^Inst ' "$LOG" | cut -d' ' -f2- || echo "(none)"
+          echo '```'
+          echo "</details>"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Wait for reboot
+      if: steps.update.outputs.reboot-scheduled == 'yes'
+      shell: bash
+      env:
+        HOST: ${{ inputs.host }}
+      run: |
+        set -euo pipefail
+        SSH=(ssh -i ~/.ssh/os_update_key -o ConnectTimeout=5 -o BatchMode=yes "ubuntu@$HOST")
+        echo "⏳ Waiting for $HOST to go down..."
+        for _ in $(seq 1 24); do
+          "${SSH[@]}" true 2>/dev/null || break
+          sleep 5
+        done
+        echo "⏳ Waiting for $HOST to come back..."
+        for i in $(seq 1 60); do
+          if "${SSH[@]}" 'systemctl is-system-running --wait >/dev/null 2>&1; uptime' 2>/dev/null; then
+            echo "✅ Host back after reboot (attempt $i)"
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "::error::${{ inputs.environment }} host did not come back within 10 minutes"
+        exit 1
+
+    - name: Health check (${{ inputs.environment }})
+      shell: bash
+      env:
+        DOMAIN: ${{ inputs.domain }}
+      run: |
+        set -euo pipefail
+        if [ -z "$DOMAIN" ]; then
+          echo "::error::App domain for ${{ inputs.environment }} is not set"
+          exit 1
+        fi
+        for i in $(seq 1 36); do
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN}/api/v1/system/status" || true)
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ ${{ inputs.environment }} backend healthy (attempt $i)"
+            exit 0
+          fi
+          echo "⏳ Waiting for ${{ inputs.environment }} backend... (attempt $i, status: $STATUS)"
+          sleep 5
+        done
+        echo "::error::${{ inputs.environment }} backend unhealthy after OS update"
+        exit 1
+
+    - name: Cleanup SSH key
+      if: always()
+      shell: bash
+      run: rm -f ~/.ssh/os_update_key
