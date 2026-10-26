@@ -32,7 +32,9 @@ jobs:
     # Defense in depth: branches: [main] above plus an explicit job
     # filter. Notify only on hard failures (not cancelled/skipped).
     if: >
-      contains(fromJSON('["failure", "timed_out"]'), github.event.workflow_run.conclusion)
+      (contains(fromJSON('["failure", "timed_out"]'), github.event.workflow_run.conclusion)
+       || (github.event.workflow_run.name == 'OS Update'
+           && github.event.workflow_run.conclusion == 'cancelled'))
       && github.event.workflow_run.head_branch == 'main'
     steps:
       - name: Post failure to Discord

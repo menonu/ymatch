@@ -30,7 +30,7 @@ on:
           - staging
           - production
       mode:
-        description: 'check = list pending only; security = security pockets only; full = full-upgrade incl. Docker'
+        description: 'check = list pending only (refreshes package lists); security = security pockets only; full = full-upgrade incl. Docker'
         required: true
         default: 'full'
         type: choice
@@ -54,9 +54,10 @@ concurrency:
 
 # Each job also joins its host's deploy concurrency group so an upgrade
 # (Docker restart / reboot) never overlaps `docker compose up`. Caveat:
-# GitHub keeps one *pending* run per group, so if a deploy is already
-# waiting behind a running deploy when this job queues, that pending deploy
-# is replaced — re-run it (staging redeploys on the next main merge anyway).
+# GitHub keeps one *pending* run per group, and a newer arrival replaces it,
+# in either direction: a pending deploy can be displaced by this job, or a
+# pending OS update by a deploy. A cancelled OS Update run alerts Discord
+# (notify-main-failure.yml) so a skipped weekly patch is never silent.
 
 permissions:
   contents: read

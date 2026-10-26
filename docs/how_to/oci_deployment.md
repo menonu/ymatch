@@ -247,7 +247,7 @@ upgrade happens.
 **Manual run:** Actions → **OS Update** → *Run workflow*, or:
 
 ```bash
-# Dry run: list pending upgrades on both hosts, change nothing
+# Dry run: list pending upgrades on both hosts (only refreshes package lists)
 gh workflow run os-update.yml -f target=both -f mode=check -f reboot=never
 
 # Urgent security fix on staging, then production
@@ -258,16 +258,17 @@ gh workflow run os-update.yml -f target=production -f mode=security -f reboot=if
 | Input | Values | Default |
 |-------|--------|---------|
 | `target` | `both` · `staging` · `production` | `both` |
-| `mode` | `check` (read-only) · `security` · `full` | `full` |
+| `mode` | `check` (read-only except refreshing package lists) · `security` · `full` | `full` |
 | `reboot` | `if-required` · `never` · `always` | `if-required` |
 
 The job summary lists pending packages and reboot status. Each host posts an
 `OsUpdate` event to New Relic, and failures alert Discord through
 `notify-main-failure.yml`. Each job joins its host's deploy concurrency group
 (`deploy-staging` / `deploy-production`), so it never overlaps a deploy. It
-waits instead. One caveat: GitHub keeps only one *pending* run per group, so
-a deploy already queued behind a running deploy can be replaced. If that
-happens, re-run the deploy.
+waits instead. One caveat: GitHub keeps only one *pending* run per group, and
+a newer run replaces it. A deploy queued behind a running deploy can be
+displaced by an OS update, and a queued OS update can be displaced by a deploy.
+A cancelled OS Update run alerts Discord; re-run whichever run was displaced.
 
 On the VM:
 

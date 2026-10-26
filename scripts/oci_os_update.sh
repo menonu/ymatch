@@ -6,7 +6,8 @@
 #   ssh ubuntu@HOST "sudo bash -s -- --mode full --reboot if-required" < scripts/oci_os_update.sh
 #
 # Modes:
-#   check     list pending upgrades only (no config write, no upgrade, no reboot)
+#   check     list pending upgrades only; refreshes package lists, but no config
+#             write, no upgrade, no reboot
 #   security  refresh managed unattended-upgrades config, apply security updates now
 #   full      refresh managed config, apt-get full-upgrade (incl. Docker Engine)
 #

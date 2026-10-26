@@ -110,7 +110,10 @@ runs:
         OLD_BOOT_ID: ${{ steps.update.outputs.boot-id }}
       run: |
         set -euo pipefail
-        SSH=(ssh -i ~/.ssh/os_update_key -o ConnectTimeout=5 -o BatchMode=yes "ubuntu@$HOST")
+        # timeout + keepalives bound each probe so a session opened mid-shutdown
+        # (or a boot stuck in "starting") cannot outlive the polling window.
+        SSH=(timeout 60 ssh -i ~/.ssh/os_update_key -o ConnectTimeout=5 -o BatchMode=yes
+          -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "ubuntu@$HOST")
         # A changed kernel boot_id is the proof of reboot; SSH dropping and
         # returning alone could be a network blip or a reboot that never ran.
         if [ -z "$OLD_BOOT_ID" ] || [ "$OLD_BOOT_ID" = "unknown" ]; then
