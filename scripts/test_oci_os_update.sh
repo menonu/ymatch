@@ -27,6 +27,7 @@ pass() {
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+echo "11111111-2222-3333-4444-555555555555" >"$WORK/boot_id"
 
 # ---------------------------------------------------------------------------
 # Mocks: every system command appends its argv to $CMD_LOG.
@@ -60,6 +61,7 @@ run_update() {
       CMD_LOG="$CASE_DIR/cmd.log" \
       APT_CONF_DIR="$CASE_DIR/apt.conf.d" \
       REBOOT_REQUIRED_FILE="$CASE_DIR/reboot-required" \
+      BOOT_ID_FILE="$WORK/boot_id" \
       OCI_OS_UPDATE_SKIP_ROOT_CHECK=1 \
       bash "$UPDATE" "$@" 2>&1
   )"
@@ -92,6 +94,8 @@ run_update check --mode check --reboot always
 [[ "$OUT" == *"OS_UPDATE_PENDING=2"* ]] || fail "expected OS_UPDATE_PENDING=2, got: $OUT"
 [[ "$OUT" == *"OS_UPDATE_PENDING_SECURITY=1"* ]] || fail "expected OS_UPDATE_PENDING_SECURITY=1, got: $OUT"
 [[ "$OUT" == *"OS_UPDATE_REBOOT_SCHEDULED=no"* ]] || fail "expected REBOOT_SCHEDULED=no, got: $OUT"
+[[ "$OUT" == *"OS_UPDATE_BOOT_ID=11111111-2222-3333-4444-555555555555"* ]] \
+  || fail "expected OS_UPDATE_BOOT_ID from boot_id file, got: $OUT"
 pass "check mode is read-only and reports pending counts"
 
 # ---------------------------------------------------------------------------
@@ -114,6 +118,10 @@ grep -q 'APT::Periodic::Update-Package-Lists "1"' "$AUTO" || fail "daily list re
 [[ "$CMDS" != *"full-upgrade -y"* ]] || fail "security mode must not full-upgrade, got: $CMDS"
 [[ "$CMDS" == *"systemctl enable --now apt-daily.timer apt-daily-upgrade.timer"* ]] \
   || fail "apt timers must be enabled, got: $CMDS"
+# unattended-upgrade ignores DPkg::Lock::Timeout, so the lock must be
+# re-checked immediately before it (apt timers may have just started).
+before_uu="$(grep -B1 '^unattended-upgrade -v' "$CASE_DIR/cmd.log" | head -1)"
+[[ "$before_uu" == fuser* ]] || fail "must wait for apt lock right before unattended-upgrade, got: $before_uu"
 pass "security mode installs managed config and runs unattended-upgrade"
 
 # Idempotent: a second run produces byte-identical config.

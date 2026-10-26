@@ -23,6 +23,8 @@ set -euo pipefail
 
 APT_CONF_DIR="${APT_CONF_DIR:-/etc/apt/apt.conf.d}"
 REBOOT_REQUIRED_FILE="${REBOOT_REQUIRED_FILE:-/var/run/reboot-required}"
+# Emitted so the workflow can prove a scheduled reboot actually happened.
+BOOT_ID_FILE="${BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}"
 APT_LOCK_TIMEOUT="${APT_LOCK_TIMEOUT:-600}"
 
 # Docker Engine restarts dockerd (and every app container) on upgrade, so it is
@@ -53,6 +55,10 @@ usage() {
 
 # Wait for apt-daily / cloud-init / a concurrent apt run to release dpkg.
 wait_for_apt_lock() {
+  if ! command -v fuser >/dev/null 2>&1; then
+    log "fuser not found; relying on DPkg::Lock::Timeout"
+    return 0
+  fi
   local waited=0
   while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; do
     [ "$waited" -lt "$APT_LOCK_TIMEOUT" ] || die "apt lock still held after ${APT_LOCK_TIMEOUT}s"
@@ -156,6 +162,7 @@ main() {
   fi
   local pending_count security_count
   pending_count="$(printf '%s' "$pending" | grep -c '^Inst ' || true)"
+  # Heuristic: Inst lines whose candidate comes from a *-security pocket.
   security_count="$(printf '%s' "$pending" | grep -c -- '-security' || true)"
 
   case "$mode" in
@@ -166,6 +173,9 @@ main() {
     security)
       ensure_unattended_upgrades
       log "applying security updates (unattended-upgrade)"
+      # unattended-upgrade ignores DPkg::Lock::Timeout; re-check right before
+      # it in case the apt timers enabled above just started.
+      wait_for_apt_lock
       unattended-upgrade -v
       ;;
     full)
@@ -192,6 +202,7 @@ main() {
   echo "OS_UPDATE_PENDING_SECURITY=$security_count"
   echo "OS_UPDATE_REBOOT_REQUIRED=$reboot_required"
   echo "OS_UPDATE_REBOOT_SCHEDULED=$reboot_scheduled"
+  echo "OS_UPDATE_BOOT_ID=$(cat "$BOOT_ID_FILE" 2>/dev/null || echo unknown)"
 }
 
 main "$@"

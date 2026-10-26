@@ -263,8 +263,11 @@ gh workflow run os-update.yml -f target=production -f mode=security -f reboot=if
 
 The job summary lists pending packages and reboot status. Each host posts an
 `OsUpdate` event to New Relic, and failures alert Discord through
-`notify-main-failure.yml`. Avoid dispatching while a deploy is running,
-because a Docker upgrade restarts the containers mid-deploy.
+`notify-main-failure.yml`. Each job joins its host's deploy concurrency group
+(`deploy-staging` / `deploy-production`), so it never overlaps a deploy. It
+waits instead. One caveat: GitHub keeps only one *pending* run per group, so
+a deploy already queued behind a running deploy can be replaced. If that
+happens, re-run the deploy.
 
 On the VM:
 

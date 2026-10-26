@@ -52,6 +52,12 @@ concurrency:
   group: os-update
   cancel-in-progress: false
 
+# Each job also joins its host's deploy concurrency group so an upgrade
+# (Docker restart / reboot) never overlaps `docker compose up`. Caveat:
+# GitHub keeps one *pending* run per group, so if a deploy is already
+# waiting behind a running deploy when this job queues, that pending deploy
+# is replaced — re-run it (staging redeploys on the next main merge anyway).
+
 permissions:
   contents: read
 
@@ -63,6 +69,9 @@ env:
 jobs:
   staging:
     name: Staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     if: github.event_name == 'schedule' || inputs.target != 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -97,6 +106,9 @@ jobs:
 
   production:
     name: Production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     needs: staging
     # Runs when targeted and staging either succeeded or was not targeted.
     if: >

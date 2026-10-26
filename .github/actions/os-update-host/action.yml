@@ -60,24 +60,32 @@ runs:
         MODE: ${{ inputs.mode }}
         REBOOT: ${{ inputs.reboot }}
       run: |
-        set -euo pipefail
+        set -uo pipefail
         LOG="$RUNNER_TEMP/os-update-${{ inputs.environment }}.log"
         ssh -i ~/.ssh/os_update_key -o ServerAliveInterval=30 "ubuntu@$HOST" \
           "sudo bash -s -- --mode '$MODE' --reboot '$REBOOT'" \
           < "$GITHUB_WORKSPACE/scripts/oci_os_update.sh" | tee "$LOG"
+        rc=${PIPESTATUS[0]}
 
-        val() { grep "^$1=" "$LOG" | tail -1 | cut -d= -f2; }
+        # Outputs + summary are written even on failure so the failing run
+        # (the one someone has to debug) still shows what was pending.
+        val() { grep "^$1=" "$LOG" | tail -1 | cut -d= -f2 || true; }
         {
           echo "pending=$(val OS_UPDATE_PENDING)"
           echo "pending-security=$(val OS_UPDATE_PENDING_SECURITY)"
           echo "reboot-required=$(val OS_UPDATE_REBOOT_REQUIRED)"
           echo "reboot-scheduled=$(val OS_UPDATE_REBOOT_SCHEDULED)"
+          echo "boot-id=$(val OS_UPDATE_BOOT_ID)"
         } >> "$GITHUB_OUTPUT"
 
         {
           echo "### OS update — ${{ inputs.environment }}"
           echo ""
-          echo "| mode | pending (security) | reboot required | rebooted |"
+          if [ "$rc" -ne 0 ]; then
+            echo "❌ **update script failed (exit $rc)** — see the step log."
+            echo ""
+          fi
+          echo "| mode | pending (≈security) | reboot required | rebooted |"
           echo "|---|---|---|---|"
           echo "| $MODE | $(val OS_UPDATE_PENDING) ($(val OS_UPDATE_PENDING_SECURITY)) | $(val OS_UPDATE_REBOOT_REQUIRED) | $(val OS_UPDATE_REBOOT_SCHEDULED) |"
           echo ""
@@ -89,28 +97,36 @@ runs:
           echo "</details>"
         } >> "$GITHUB_STEP_SUMMARY"
 
+        if [ "$rc" -ne 0 ]; then
+          echo "::error::OS update script failed on ${{ inputs.environment }} (exit $rc)"
+        fi
+        exit "$rc"
+
     - name: Wait for reboot
       if: steps.update.outputs.reboot-scheduled == 'yes'
       shell: bash
       env:
         HOST: ${{ inputs.host }}
+        OLD_BOOT_ID: ${{ steps.update.outputs.boot-id }}
       run: |
         set -euo pipefail
         SSH=(ssh -i ~/.ssh/os_update_key -o ConnectTimeout=5 -o BatchMode=yes "ubuntu@$HOST")
-        echo "⏳ Waiting for $HOST to go down..."
-        for _ in $(seq 1 24); do
-          "${SSH[@]}" true 2>/dev/null || break
-          sleep 5
-        done
-        echo "⏳ Waiting for $HOST to come back..."
-        for i in $(seq 1 60); do
-          if "${SSH[@]}" 'systemctl is-system-running --wait >/dev/null 2>&1; uptime' 2>/dev/null; then
-            echo "✅ Host back after reboot (attempt $i)"
+        # A changed kernel boot_id is the proof of reboot; SSH dropping and
+        # returning alone could be a network blip or a reboot that never ran.
+        if [ -z "$OLD_BOOT_ID" ] || [ "$OLD_BOOT_ID" = "unknown" ]; then
+          echo "::error::no pre-reboot boot_id from the update script; cannot verify the reboot"
+          exit 1
+        fi
+        echo "⏳ Waiting for ${{ inputs.environment }} to reboot (old boot_id ${OLD_BOOT_ID})..."
+        for i in $(seq 1 72); do
+          NEW_BOOT_ID="$("${SSH[@]}" 'systemctl is-system-running --wait >/dev/null 2>&1; cat /proc/sys/kernel/random/boot_id' 2>/dev/null || true)"
+          if [ -n "$NEW_BOOT_ID" ] && [ "$NEW_BOOT_ID" != "$OLD_BOOT_ID" ]; then
+            echo "✅ Host rebooted (new boot_id ${NEW_BOOT_ID}, attempt $i)"
             exit 0
           fi
           sleep 10
         done
-        echo "::error::${{ inputs.environment }} host did not come back within 10 minutes"
+        echo "::error::${{ inputs.environment }} host did not complete a reboot within 12 minutes"
         exit 1
 
     - name: Health check (${{ inputs.environment }})
@@ -124,7 +140,7 @@ runs:
           exit 1
         fi
         for i in $(seq 1 36); do
-          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN}/api/v1/system/status" || true)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/api/v1/system/status" || true)
           if [ "$STATUS" = "200" ]; then
             echo "✅ ${{ inputs.environment }} backend healthy (attempt $i)"
             exit 0
