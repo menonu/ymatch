@@ -14,6 +14,9 @@ name: OS Update
 # Failures post to Discord via notify-main-failure.yml.
 
 on:
+  # TEMP(#592): branch-only staging verification. Reverted before merge.
+  push:
+    branches: [ops/592-os-updates]
   schedule:
     # Weekly, Monday 19:30 UTC (Tuesday 04:30 JST) — low traffic, and after
     # the 18:00 UTC database backup.
@@ -64,7 +67,7 @@ permissions:
 env:
   # Scheduled runs have no inputs; fall back to the weekly defaults.
   MODE: ${{ inputs.mode || 'full' }}
-  REBOOT: ${{ inputs.reboot || 'if-required' }}
+  REBOOT: ${{ github.event_name == 'push' && 'always' || inputs.reboot || 'if-required' }}
 
 jobs:
   staging:
@@ -113,6 +116,7 @@ jobs:
     # Runs when targeted and staging either succeeded or was not targeted.
     if: >
       always() &&
+      github.event_name != 'push' &&
       (github.event_name == 'schedule' || inputs.target != 'staging') &&
       (needs.staging.result == 'success' || needs.staging.result == 'skipped')
     runs-on: ubuntu-latest
