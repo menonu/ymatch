@@ -163,3 +163,16 @@ jobs:
 
       - name: Test deploy prune helper and compose logging
         run: scripts/test_oci_disk_hygiene.sh
+
+  oci-os-update:
+    # Regression guard for #592: OS update script (mocked apt/systemd) —
+    # check mode read-only, Docker blacklisted, no auto-reboot, reboot policy.
+    name: OCI OS Update
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Test OS update script
+        run: scripts/test_oci_os_update.sh

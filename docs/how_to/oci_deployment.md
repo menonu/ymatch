@@ -225,6 +225,59 @@ docker builder prune --all --force --keep-storage=8GB
 docker system df
 ```
 
+### OS Package & Security Updates
+
+Both VMs are patched by two layers (issue #592):
+
+| Layer | When | What | Reboot |
+|-------|------|------|--------|
+| `unattended-upgrades` (on host) | Daily (`apt-daily-upgrade.timer`) | Ubuntu security + ESM pockets only; Docker Engine / containerd **blacklisted** so `dockerd` never restarts unattended | Never |
+| **OS Update** workflow (`.github/workflows/os-update.yml`) | Weekly, Mon 19:30 UTC (Tue 04:30 JST) | `apt-get full-upgrade` incl. Docker, autoremove; staging first, production only if staging is healthy afterwards | Only if `/var/run/reboot-required` |
+
+Both layers run `scripts/oci_os_update.sh`, which the workflow pipes to the VM
+over SSH (`sudo bash -s`), so the host never runs a stale checkout. Every
+non-`check` run re-installs the managed config
+(`/etc/apt/apt.conf.d/20auto-upgrades`, `52ymatch-unattended-upgrades`), so
+new or recreated VMs pick it up on the first workflow run.
+Containers use `restart: unless-stopped` and come back after a reboot; the
+workflow then waits for SSH and checks `https://$DOMAIN/api/v1/system/status`.
+Expect roughly 1–3 minutes of downtime per host when a reboot or Docker
+upgrade happens.
+
+**Manual run:** Actions → **OS Update** → *Run workflow*, or:
+
+```bash
+# Dry run: list pending upgrades on both hosts (only refreshes package lists)
+gh workflow run os-update.yml -f target=both -f mode=check -f reboot=never
+
+# Urgent security fix on staging, then production
+gh workflow run os-update.yml -f target=staging -f mode=security -f reboot=if-required
+gh workflow run os-update.yml -f target=production -f mode=security -f reboot=if-required
+```
+
+| Input | Values | Default |
+|-------|--------|---------|
+| `target` | `both` · `staging` · `production` | `both` |
+| `mode` | `check` (read-only except refreshing package lists) · `security` · `full` | `full` |
+| `reboot` | `if-required` · `never` · `always` | `if-required` |
+
+The job summary lists pending packages and reboot status. Each host posts an
+`OsUpdate` event to New Relic, and failures alert Discord through
+`notify-main-failure.yml`. Each job joins its host's deploy concurrency group
+(`deploy-staging` / `deploy-production`), so it never overlaps a deploy. It
+waits instead. One caveat: GitHub keeps only one *pending* run per group, and
+a newer run replaces it. A deploy queued behind a running deploy can be
+displaced by an OS update, and a queued OS update can be displaced by a deploy.
+A cancelled OS Update run alerts Discord; re-run whichever run was displaced.
+
+On the VM:
+
+```bash
+sudo unattended-upgrade --dry-run -d | head -20    # effective origins + blacklist
+cat /var/log/unattended-upgrades/unattended-upgrades.log
+cat /var/run/reboot-required 2>/dev/null || echo "no reboot pending"
+```
+
 ## GitHub Secrets Management
 
 > **Broader map:** local Terraform `.env`, GitHub Secrets, remote state,

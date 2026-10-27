@@ -1,0 +1,56 @@
+name: OS update New Relic event
+description: Post one OsUpdate custom event to New Relic (#592). Never fails the job.
+
+inputs:
+  environment:
+    required: true
+  status:
+    required: true
+  mode:
+    required: true
+  pending:
+    required: false
+    default: '0'
+  pending-security:
+    required: false
+    default: '0'
+  reboot-required:
+    required: false
+    default: 'unknown'
+  rebooted:
+    required: false
+    default: 'no'
+  account-id:
+    required: true
+  license-key:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Post OsUpdate event
+      shell: bash
+      env:
+        NR_ACCOUNT_ID: ${{ inputs.account-id }}
+        NR_LICENSE_KEY: ${{ inputs.license-key }}
+        EVENT_JSON: >-
+          [{
+          "eventType": "OsUpdate",
+          "environment": "${{ inputs.environment }}",
+          "status": "${{ inputs.status }}",
+          "mode": "${{ inputs.mode }}",
+          "pending": ${{ inputs.pending || 0 }},
+          "pendingSecurity": ${{ inputs.pending-security || 0 }},
+          "rebootRequired": "${{ inputs.reboot-required || 'unknown' }}",
+          "rebooted": "${{ inputs.rebooted || 'no' }}",
+          "trigger": "${{ github.event_name }}"
+          }]
+      run: |
+        if [ -z "$NR_ACCOUNT_ID" ] || [ -z "$NR_LICENSE_KEY" ]; then
+          echo "New Relic secrets not set; skipping"
+          exit 0
+        fi
+        curl -s -X POST "https://insights-collector.newrelic.com/v1/accounts/${NR_ACCOUNT_ID}/events" \
+          -H "Api-Key: ${NR_LICENSE_KEY}" \
+          -H "Content-Type: application/json" \
+          -d "$EVENT_JSON" || true
