@@ -167,11 +167,13 @@ pub async fn get_user_details(
     // plain caller cannot enumerate device tokens by sequential id.
     require_global(&state, query.user_id, Permission::UserRead).await?;
 
-    let user = state
+    let mut user = state
         .users
         .get_by_id(target_id)
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
+    // The UUID is the target's login credential; staff never need it.
+    user.uuid = None;
     Ok(Json(user))
 }
 

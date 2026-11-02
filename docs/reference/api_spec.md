@@ -68,7 +68,7 @@ User directory for member pickers and the admin users tab (#491).
   - Any **active** caller receives a **lean** directory (`id`, `username` only).
   - Callers with global `user.read` (moderator/admin) also receive `role` and
     ban fields. `device_token` and `uuid` are **never** returned on this list
-    (use `GET /admin/users/:id` for detail inspection).
+    (`GET /admin/users/:id` returns `device_token` for detail inspection).
 - **Response**: `200 OK`
 
   Lean (non-staff):
@@ -92,6 +92,23 @@ User directory for member pickers and the admin users tab (#491).
   ```
 - **Errors**: `400` if `user_id` missing; `403` if caller is banned; `404` if
   caller does not exist.
+
+### PUT /api/v1/users/:id
+
+Rename the caller's own account.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1, "username": "new-name" }
+  ```
+  `user_id` must equal `:id`.
+- **Response**: `200 OK` with the updated user row (abridged below). `uuid` is
+  never included; only the `auth/*` endpoints return it.
+  ```json
+  { "id": 1, "username": "new-name", "role": "user" }
+  ```
+- **Errors**: `400` if `username` is empty; `403` if `user_id` ≠ `:id`; `404`
+  if the user does not exist.
 
 ---
 
@@ -705,6 +722,8 @@ Delete a match.
 ### GET /api/v1/admin/users/:id
 
 Get detailed user information (includes sensitive fields such as `device_token`).
+`uuid` (the user's login credential) is never returned; only the `auth/*`
+endpoints return it.
 
 - **Query Parameters**:
   | Param     | Type | Description                         |

@@ -439,3 +439,23 @@ async fn test_banned_user_cannot_create_event(pool: PgPool) {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+#[sqlx::test]
+async fn test_update_username_response_omits_uuid(pool: PgPool) {
+    let user_id = login_guest(&pool, "rename-self", "tok").await;
+    let resp = put_json(
+        &pool,
+        &format!("/api/v1/users/{user_id}"),
+        &format!(r#"{{"userId": {user_id}, "username": "renamed-self"}}"#),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let user: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(user["username"], "renamed-self");
+    // Only the login endpoints hand back the UUID (the login credential).
+    assert!(
+        user.get("uuid").is_none_or(|v| v.is_null()),
+        "uuid must not be returned: {user}"
+    );
+}
