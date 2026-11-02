@@ -210,7 +210,10 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     // The response omits `uuid` (only the login endpoints return it); keep
     // the session's so the Profile restore key stays available.
     final current = state.value;
-    if (!user.hasUuid() && current != null && current.hasUuid()) {
+    if (!user.hasUuid() &&
+        current != null &&
+        current.id == user.id &&
+        current.hasUuid()) {
       user.uuid = current.uuid;
     }
     state = AsyncValue.data(user);

@@ -163,7 +163,7 @@ pub async fn get_user_details(
     axum::extract::Query(query): axum::extract::Query<UserIdQuery>,
 ) -> Result<Json<User>, AppError> {
     // #376: the full User proto includes sensitive fields (device_token,
-    // ban state, role). `uuid` is stripped below. Gate on the global `user.read` permission so a
+    // ban state, role). Gate on the global `user.read` permission so a
     // plain caller cannot enumerate device tokens by sequential id.
     require_global(&state, query.user_id, Permission::UserRead).await?;
 

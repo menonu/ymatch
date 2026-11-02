@@ -93,6 +93,23 @@ User directory for member pickers and the admin users tab (#491).
 - **Errors**: `400` if `user_id` missing; `403` if caller is banned; `404` if
   caller does not exist.
 
+### PUT /api/v1/users/:id
+
+Rename the caller's own account.
+
+- **Request Body**:
+  ```json
+  { "user_id": 1, "username": "new-name" }
+  ```
+  `user_id` must equal `:id`.
+- **Response**: `200 OK` with the updated user. `uuid` is never included; only
+  the `auth/*` endpoints return it.
+  ```json
+  { "id": 1, "username": "new-name", "role": "user" }
+  ```
+- **Errors**: `400` if `username` is empty; `403` if `user_id` ≠ `:id`; `404`
+  if the user does not exist.
+
 ---
 
 ## 2. Events
