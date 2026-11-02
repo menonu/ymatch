@@ -85,8 +85,9 @@ pub async fn signup(
 /// Requires an active caller via `?user_id=`.
 /// - Callers with global `user.read` (moderator/admin) get the full admin
 ///   directory fields (role, ban state) but **never** `device_token` or
-///   `uuid` (restore key) on this list — use `GET /admin/users/:id` for
-///   detail inspection.
+///   `uuid` (restore key) on this list. `GET /admin/users/:id` keeps
+///   `device_token` for detail inspection; `uuid` is returned only by the
+///   auth endpoints.
 /// - Other active users get a **lean directory** (`id` + `username` only)
 ///   for self-service member pickers.
 pub async fn list_users(
@@ -153,10 +154,12 @@ pub async fn update_username(
     if username.is_empty() {
         return Err(AppError::bad_request("Username cannot be empty"));
     }
-    let user = state
+    let mut user = state
         .users
         .update_username(id, &username)
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
+    // The UUID is the login credential; only the auth endpoints return it.
+    user.uuid = None;
     Ok(Json(user))
 }
