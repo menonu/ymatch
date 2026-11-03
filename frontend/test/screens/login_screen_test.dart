@@ -221,12 +221,6 @@ class MockAuthController extends StateNotifier<AsyncValue<User?>>
   Future<void> restoreAccount(String uuid) async {}
 
   @override
-  Future<void> login(String username, String password) async {}
-
-  @override
-  Future<void> signup(String username, String password) async {}
-
-  @override
   void logout() {}
 
   @override

@@ -220,56 +220,11 @@ void main() {
   });
 
   group('AuthController', () {
-    test('login sets state to the returned user', () async {
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' &&
-              request.url.path == '/api/v1/auth/login') {
-            return _ok({'id': 1, 'username': 'alice', 'uuid': 'u-1'});
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
-
-      await container.read(authProvider.notifier).login('alice', 'pw');
-
-      final state = container.read(authProvider);
-      expect(state.hasError, isFalse);
-      expect(state.value?.id, 1);
-      expect(state.value?.username, 'alice');
-      // currentUserProvider derives from authProvider.
-      expect(container.read(currentUserProvider)?.id, 1);
-    });
-
-    test('login failure sets state to error', () async {
-      final api = _apiWith(
-        client: MockClient((request) async {
-          if (request.method == 'POST' &&
-              request.url.path == '/api/v1/auth/login') {
-            return http.Response('Bad Request', 400);
-          }
-          return _okEmpty();
-        }),
-      );
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api)],
-      );
-      addTearDown(container.dispose);
-
-      await container.read(authProvider.notifier).login('alice', 'wrong');
-
-      expect(container.read(authProvider).hasError, isTrue);
-    });
-
     test('logout clears state to null', () async {
       final api = _apiWith(
         client: MockClient((request) async {
           if (request.method == 'POST' &&
-              request.url.path == '/api/v1/auth/login') {
+              request.url.path == '/api/v1/auth/guest') {
             return _ok({'id': 1, 'username': 'alice', 'uuid': 'u-1'});
           }
           return _okEmpty();
@@ -280,9 +235,11 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // login first to populate state, then logout.
-      await container.read(authProvider.notifier).login('alice', 'pw');
+      // Log in first to populate state, then logout.
+      await container.read(authProvider.notifier).guestLogin('u-1');
       expect(container.read(authProvider).value?.id, 1);
+      // currentUserProvider derives from authProvider.
+      expect(container.read(currentUserProvider)?.id, 1);
 
       // logout() is `void ... async` (fire-and-forget); pump the microtask
       // queue until its body has cleared the state.

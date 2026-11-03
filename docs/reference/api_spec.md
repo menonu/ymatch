@@ -8,40 +8,11 @@ All request and response bodies use JSON (`Content-Type: application/json`).
 
 ## 1. Authentication & Users
 
-### POST /api/v1/auth/signup
-
-Create a new user account.
-
-- **Request Body**:
-  ```json
-  {
-    "username": "user123",
-    "password": "securepassword",
-    "device_token": "fcm_token_..."   // optional
-  }
-  ```
-- **Response**: `201 Created`
-  ```json
-  { "user_id": 1, "username": "user123" }
-  ```
-
-### POST /api/v1/auth/login
-
-Login with username and password.
-
-- **Request Body**:
-  ```json
-  { "username": "user123", "password": "securepassword" }
-  ```
-- **Response**: `200 OK`
-  ```json
-  { "user_id": 1, "username": "user123", "role": "user" }
-  ```
-- **Error**: `403 Forbidden` if the user is banned (response includes `ban_reason` and `banned_until`).
-
 ### POST /api/v1/auth/guest
 
-Guest login by device UUID. Creates the guest account on first use.
+Guest login by device UUID. Creates the guest account on first use. This is
+the only way to create or log in to an account; there is no username/password
+signup or login.
 
 - **Request Body**:
   ```json

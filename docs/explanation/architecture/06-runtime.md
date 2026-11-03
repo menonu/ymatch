@@ -19,8 +19,8 @@ views live as D2→SVG in sections 03, 05, and 07.
 
 ## Auth and session
 
-No bearer/JWT middleware. Login and guest endpoints return a `User`; the client
-reuses that identity by sending `user_id` on later calls.
+No bearer/JWT middleware. Guest login is the only login: it returns a `User`,
+and the client reuses that identity by sending `user_id` on later calls.
 
 ```mermaid
 sequenceDiagram
@@ -28,15 +28,9 @@ sequenceDiagram
   participant API as Backend
   participant DB as PostgreSQL
 
-  alt Guest
-    U->>API: POST /api/v1/auth/guest { uuid }
-    API->>DB: find or create guest user + roles
-    API-->>U: User JSON
-  else Registered
-    U->>API: POST /api/v1/auth/login
-    API->>DB: verify credentials
-    API-->>U: User JSON
-  end
+  U->>API: POST /api/v1/auth/guest { uuid }
+  API->>DB: find or create guest user + roles
+  API-->>U: User JSON
   Note over U: Client stores User locally
   U->>API: later call with user_id in body or query
   Note over API: Privileged catalog/admin paths: active/ban gate + RBAC
