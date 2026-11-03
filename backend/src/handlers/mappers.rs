@@ -26,6 +26,32 @@ pub fn empty_to_none(s: Option<String>) -> Option<String> {
     s.filter(|v| !v.is_empty())
 }
 
+/// Drops the credentials (`uuid`, `device_token`) and keeps every other field,
+/// including staff-only ones (role, ban state). For the caller's own record and
+/// staff lists; use [`directory_user_view`] for other users' records shown to
+/// non-staff callers. Only the `auth/*` endpoints return `uuid`.
+pub fn credential_free_user_view(mut user: User) -> User {
+    user.uuid = None;
+    user.device_token = None;
+    user
+}
+
+/// [`User`] for staff detail views (`user.read`): keeps `device_token` for
+/// inspection, but never the login credential (`uuid`).
+pub fn staff_user_view(mut user: User) -> User {
+    user.uuid = None;
+    user
+}
+
+/// Lean directory entry for non-staff callers: `id` and `username` only.
+pub fn directory_user_view(user: User) -> User {
+    User {
+        id: user.id,
+        username: user.username,
+        ..User::default()
+    }
+}
+
 /// Map a `users` table row to the [`User`] proto message.
 ///
 /// Required columns: `id, username, uuid, device_token, created_at, role,
@@ -96,6 +122,52 @@ pub fn group_from_row(row: &sqlx::postgres::PgRow) -> MerchandiseGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn full_user() -> User {
+        User {
+            id: 1,
+            username: "u".into(),
+            uuid: Some("secret-uuid".into()),
+            device_token: Some("push-token".into()),
+            created_at: Some("2026-01-01T00:00:00+00:00".into()),
+            role: Some("user".into()),
+            is_banned: Some(false),
+            ban_reason: None,
+            banned_until: None,
+        }
+    }
+
+    #[test]
+    fn credential_free_user_view_drops_uuid_and_device_token() {
+        let u = credential_free_user_view(full_user());
+        assert_eq!(u.uuid, None);
+        assert_eq!(u.device_token, None);
+        assert_eq!(u.id, 1);
+        assert_eq!(u.username, "u");
+        assert_eq!(u.role.as_deref(), Some("user"));
+        assert_eq!(u.is_banned, Some(false));
+    }
+
+    #[test]
+    fn directory_user_view_keeps_only_id_and_username() {
+        let u = directory_user_view(full_user());
+        assert_eq!(
+            u,
+            User {
+                id: 1,
+                username: "u".into(),
+                ..User::default()
+            }
+        );
+    }
+
+    #[test]
+    fn staff_user_view_drops_uuid_but_keeps_device_token() {
+        let u = staff_user_view(full_user());
+        assert_eq!(u.uuid, None);
+        assert_eq!(u.device_token.as_deref(), Some("push-token"));
+        assert_eq!(u.role.as_deref(), Some("user"));
+    }
 
     #[test]
     fn to_rfc3339_none_passes_through() {

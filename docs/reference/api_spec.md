@@ -102,8 +102,9 @@ Rename the caller's own account.
   { "user_id": 1, "username": "new-name" }
   ```
   `user_id` must equal `:id`.
-- **Response**: `200 OK` with the updated user row (abridged below). `uuid` is
-  never included; only the `auth/*` endpoints return it.
+- **Response**: `200 OK` with the updated user row (abridged below). `uuid`
+  and `device_token` are never included; only the `auth/*` endpoints return
+  them.
   ```json
   { "id": 1, "username": "new-name", "role": "user" }
   ```

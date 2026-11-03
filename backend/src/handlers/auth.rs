@@ -1,6 +1,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::UserIdQuery;
+use crate::handlers::mappers::{credential_free_user_view, directory_user_view};
 use crate::repositories::user::UsernameLookup;
 use crate::routes::AppState;
 use crate::services::rbac::{Permission, Scope};
@@ -113,33 +114,13 @@ pub async fn list_users(
     };
 
     if is_staff {
-        let staff_view = all
-            .into_iter()
-            .map(|mut u| {
-                // Strip secrets even for staff list; detail endpoint retains them.
-                u.device_token = None;
-                u.uuid = None;
-                u
-            })
-            .collect();
+        // Even staff lists carry no secrets; the detail endpoint keeps
+        // `device_token` (see `staff_user_view`).
+        let staff_view = all.into_iter().map(credential_free_user_view).collect();
         return Ok(Json(staff_view));
     }
 
-    let lean = all
-        .into_iter()
-        .map(|u| User {
-            id: u.id,
-            username: u.username,
-            uuid: None,
-            device_token: None,
-            created_at: None,
-            role: None,
-            is_banned: None,
-            ban_reason: None,
-            banned_until: None,
-        })
-        .collect();
-    Ok(Json(lean))
+    Ok(Json(all.into_iter().map(directory_user_view).collect()))
 }
 
 pub async fn update_username(
@@ -154,12 +135,10 @@ pub async fn update_username(
     if username.is_empty() {
         return Err(AppError::bad_request("Username cannot be empty"));
     }
-    let mut user = state
+    let user = state
         .users
         .update_username(id, &username)
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
-    // The UUID is the login credential; only the auth endpoints return it.
-    user.uuid = None;
-    Ok(Json(user))
+    Ok(Json(credential_free_user_view(user)))
 }
