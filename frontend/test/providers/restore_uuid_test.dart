@@ -170,4 +170,107 @@ void main() {
       expect(container.read(authProvider).value, isNull);
     });
   });
+
+  group('AuthController.restoreAccount', () {
+    const savedId = '0b5c3a2e-4f1d-4c7a-9e8b-1a2b3c4d5e6f';
+    const knownId = '550e8400-e29b-41d4-a716-446655440000';
+    const unknownId = '7d9f1e2a-3b4c-4d5e-8f60-718293a4b5c6';
+
+    late List<Map<String, dynamic>> guestBodies;
+
+    ApiClient api() => _apiWith(
+      client: MockClient((request) async {
+        if (request.method == 'POST' &&
+            request.url.path == '/api/v1/auth/guest') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          guestBodies.add(body);
+          final uuid = body['uuid'] as String;
+          if (uuid == unknownId) {
+            return http.Response('{"error":"Account not found"}', 404);
+          }
+          return http.Response(
+            jsonEncode({'id': uuid == savedId ? 1 : 2, 'uuid': uuid}),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+
+    Future<ProviderContainer> loggedInAsSaved() async {
+      SharedPreferences.setMockInitialValues({'user_uuid': savedId});
+      enableDevSessionOverrides = false;
+      currentAppUri = () => Uri.parse('https://ymatch.example/');
+      guestBodies = [];
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api())],
+      );
+      addTearDown(container.dispose);
+      container.read(authProvider);
+      for (
+        var i = 0;
+        i < 50 && container.read(authProvider).value == null;
+        i++
+      ) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(container.read(authProvider).value?.uuid, savedId);
+      return container;
+    }
+
+    tearDown(() {
+      currentAppUri = () => Uri.base;
+      enableDevSessionOverrides = true;
+    });
+
+    test('unknown key keeps the saved key and reports failure', () async {
+      final container = await loggedInAsSaved();
+
+      await container.read(authProvider.notifier).restoreAccount(unknownId);
+
+      expect(guestBodies.last['existingOnly'], isTrue);
+      expect(
+        container.read(authProvider).error,
+        isA<AccountRestoreException>(),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_uuid'), savedId);
+    });
+
+    test('known key logs in and replaces the saved key', () async {
+      final container = await loggedInAsSaved();
+
+      await container.read(authProvider.notifier).restoreAccount(knownId);
+
+      expect(guestBodies.last['existingOnly'], isTrue);
+      expect(container.read(authProvider).value?.uuid, knownId);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_uuid'), knownId);
+    });
+
+    test('unknown restore_uuid falls back to the saved account', () async {
+      SharedPreferences.setMockInitialValues({'user_uuid': savedId});
+      enableDevSessionOverrides = false;
+      currentAppUri = () =>
+          Uri.parse('https://ymatch.example/?restore_uuid=$unknownId');
+      guestBodies = [];
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api())],
+      );
+      addTearDown(container.dispose);
+      container.read(authProvider);
+      for (
+        var i = 0;
+        i < 50 && container.read(authProvider).value == null;
+        i++
+      ) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(guestBodies.map((b) => b['uuid']), [unknownId, savedId]);
+      expect(container.read(authProvider).value?.uuid, savedId);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_uuid'), savedId);
+    });
+  });
 }

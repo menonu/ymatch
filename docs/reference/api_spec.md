@@ -47,7 +47,8 @@ Guest login by device UUID. Creates the guest account on first use.
   ```json
   {
     "uuid": "550e8400-e29b-41d4-a716-446655440000",
-    "device_token": "fcm_token_..."   // optional
+    "device_token": "fcm_token_...",  // optional
+    "existingOnly": true               // optional; restore an existing account only
   }
   ```
 - **Response**: `200 OK`
@@ -56,8 +57,9 @@ Guest login by device UUID. Creates the guest account on first use.
   ```
 - **Errors**: `400 Bad Request` if no account has this `uuid` and it is not a
   lowercase hyphenated UUID v4 (new guests must present one; existing accounts log in
-  with the uuid they already have). `403 Forbidden` if the guest account is
-  banned.
+  with the uuid they already have). `404 Not Found` if `existingOnly` is `true`
+  and no account has this `uuid` (account restore never creates an account).
+  `403 Forbidden` if the guest account is banned.
 
 ### GET /api/v1/users
 

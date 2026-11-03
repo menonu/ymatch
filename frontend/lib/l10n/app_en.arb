@@ -80,6 +80,10 @@
   "@restoreAccount": {
     "description": "Restore account title and button label"
   },
+  "restoreAccountFailed": "Could not restore the account. Check the key and try again.",
+  "@restoreAccountFailed": {
+    "description": "Shown when account restore fails (unknown or unusable key)"
+  },
   "startAsNewUser": "Start as New User",
   "@startAsNewUser": {
     "description": "Button to start a new guest session"

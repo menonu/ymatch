@@ -72,6 +72,12 @@ String? parseRestoreUuidFromUri(Uri uri) {
   return isGuestRestoreUuid(trimmed) ? trimmed : null;
 }
 
+/// Account restore failed: the key matches no account that can log in.
+class AccountRestoreException implements Exception {
+  @override
+  String toString() => 'Account restore failed';
+}
+
 class AuthController extends StateNotifier<AsyncValue<User?>> {
   final ApiClient client;
 
@@ -88,7 +94,8 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       final restoreUuid = parseRestoreUuidFromUri(currentAppUri());
       if (restoreUuid != null) {
         await restoreAccount(restoreUuid);
-        return;
+        // An unknown key falls back to this device's saved account.
+        if (state.error is! AccountRestoreException) return;
       }
     } catch (_) {
       // Malformed URI / non-web — fall through to normal flow.
@@ -124,7 +131,9 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     await guestLogin(newUuid);
   }
 
-  Future<void> guestLogin(String uuid) async {
+  Future<void> guestLogin(String uuid) => _guestLogin(uuid);
+
+  Future<void> _guestLogin(String uuid, {bool existingOnly = false}) async {
     state = const AsyncValue.loading();
     try {
       // Use a mock device token for the guest session.
@@ -134,6 +143,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       final payload = GuestLoginRequest()
         ..uuid = uuid
         ..deviceToken = mockDeviceToken;
+      if (existingOnly) payload.existingOnly = true;
       final json = await client.post(
         '/api/v1/auth/guest',
         payload.toProto3Json() as Map<String, dynamic>,
@@ -145,10 +155,23 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
+  /// Log in to the existing account for [uuid]; never creates one. The key
+  /// replaces this device's saved key only after the login succeeds, so a
+  /// mistyped key cannot strand the current account.
   Future<void> restoreAccount(String uuid) async {
+    await _guestLogin(uuid, existingOnly: true);
+    final current = state;
+    if (current.hasError) {
+      if (current.error is! BackendUnavailableException) {
+        state = AsyncValue.error(
+          AccountRestoreException(),
+          current.stackTrace ?? StackTrace.current,
+        );
+      }
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_uuid', uuid);
-    await guestLogin(uuid);
   }
 
   // Keep legacy login for admin/debug if needed, but not primary

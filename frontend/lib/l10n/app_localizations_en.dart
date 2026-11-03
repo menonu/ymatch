@@ -66,6 +66,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get restoreAccount => 'Restore Account';
 
   @override
+  String get restoreAccountFailed =>
+      'Could not restore the account. Check the key and try again.';
+
+  @override
   String get startAsNewUser => 'Start as New User';
 
   @override
