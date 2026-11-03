@@ -17,6 +17,12 @@
 library;
 
 import 'package:frontend/services/api_client.dart';
+import 'package:uuid/uuid.dart';
+
+/// Fresh UUID v4 for a new guest. The backend only creates guests for
+/// canonical v4 UUIDs (the seeded users above are pre-inserted, so their
+/// fixed non-v4 uuids still log in).
+String newGuestUuid() => const Uuid().v4();
 
 /// Fixed uuid of the seeded E2E admin (global/admin + users.role='admin').
 const String e2eAdminUuid = 'e2e-bootstrap-admin';
@@ -44,11 +50,10 @@ Future<int> loginE2EModerator(ApiClient api) async {
 }
 
 /// Create a fresh guest user (no elevated role) for "regular user" E2E
-/// scenarios. [uuid] should be unique per call to avoid collisions across
-/// re-runs on the same DB.
-Future<int> createE2EGuest(ApiClient api, String uuid) async {
+/// scenarios, with a new random UUID v4.
+Future<int> createE2EGuest(ApiClient api) async {
   final r = await api.post('/api/v1/auth/guest', {
-    'uuid': uuid,
+    'uuid': newGuestUuid(),
     'deviceToken': 'e2e-guest',
   });
   return (r as Map)['id'] as int;

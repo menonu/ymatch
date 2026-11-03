@@ -10,9 +10,10 @@ async fn test_guest_login_creates_user(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"uuid": "test-uuid-1234", "deviceToken": "tok123"}"#,
-                ))
+                .body(Body::from(format!(
+                    r#"{{"uuid": "{}", "deviceToken": "tok123"}}"#,
+                    guest_uuid("test-uuid-1234")
+                )))
                 .unwrap(),
         )
         .await
@@ -23,7 +24,7 @@ async fn test_guest_login_creates_user(pool: PgPool) {
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert!(json["id"].as_i64().unwrap() > 0);
     assert!(json["username"].as_str().unwrap().contains("Guest_"));
-    assert_eq!(json["uuid"].as_str().unwrap(), "test-uuid-1234");
+    assert_eq!(json["uuid"].as_str().unwrap(), guest_uuid("test-uuid-1234"));
 }
 
 #[sqlx::test]
@@ -36,7 +37,7 @@ async fn test_guest_login_returns_existing_user(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "reuse-uuid-5678"}"#))
+                .body(Body::from(guest_body("reuse-uuid-5678")))
                 .unwrap(),
         )
         .await
@@ -51,7 +52,7 @@ async fn test_guest_login_returns_existing_user(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "reuse-uuid-5678"}"#))
+                .body(Body::from(guest_body("reuse-uuid-5678")))
                 .unwrap(),
         )
         .await
@@ -255,7 +256,7 @@ async fn test_banned_user_cannot_login(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "ban-test-uuid"}"#))
+                .body(Body::from(guest_body("ban-test-uuid")))
                 .unwrap(),
         )
         .await
@@ -279,7 +280,7 @@ async fn test_banned_user_cannot_login(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "ban-test-uuid"}"#))
+                .body(Body::from(guest_body("ban-test-uuid")))
                 .unwrap(),
         )
         .await
@@ -297,7 +298,7 @@ async fn test_update_user_role(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "role-admin-test"}"#))
+                .body(Body::from(guest_body("role-admin-test")))
                 .unwrap(),
         )
         .await
@@ -315,7 +316,7 @@ async fn test_update_user_role(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "role-target-test"}"#))
+                .body(Body::from(guest_body("role-target-test")))
                 .unwrap(),
         )
         .await
@@ -356,7 +357,7 @@ async fn test_update_user_role(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "role-target-test"}"#))
+                .body(Body::from(guest_body("role-target-test")))
                 .unwrap(),
         )
         .await
@@ -377,7 +378,7 @@ async fn test_user_response_includes_role(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "role-check-uuid"}"#))
+                .body(Body::from(guest_body("role-check-uuid")))
                 .unwrap(),
         )
         .await
@@ -399,7 +400,7 @@ async fn test_banned_user_cannot_create_event(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "ban-create-test"}"#))
+                .body(Body::from(guest_body("ban-create-test")))
                 .unwrap(),
         )
         .await
@@ -463,4 +464,58 @@ async fn test_update_username_response_omits_credentials(pool: PgPool) {
         user.get("deviceToken").is_none_or(|v| v.is_null()),
         "device_token must not be returned: {user}"
     );
+}
+
+#[sqlx::test]
+async fn test_new_guest_requires_uuid_v4(pool: PgPool) {
+    for bad in [
+        "short",
+        "test-uuid-1234",
+        // A valid UUID, but version 1 (time-based) rather than random.
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+        // v4, but not in the canonical hyphenated form.
+        "4b2f3a8e9c1d4e7fa0b1c2d3e4f5a6b7",
+        "{4b2f3a8e-9c1d-4e7f-a0b1-c2d3e4f5a6b7}",
+    ] {
+        let resp = post_json(
+            &pool,
+            "/api/v1/auth/guest",
+            &format!(r#"{{"uuid": "{bad}"}}"#),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "{bad}");
+    }
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0, "no account may be created for a rejected uuid");
+}
+
+#[sqlx::test]
+async fn test_new_guest_rejects_uppercase_uuid_v4(pool: PgPool) {
+    // Uuids are matched as exact text, so only the lowercase form may create
+    // an account; otherwise one UUID value could map to two accounts.
+    let upper = guest_uuid("upper-case").to_uppercase();
+    let resp = post_json(
+        &pool,
+        "/api/v1/auth/guest",
+        &format!(r#"{{"uuid": "{upper}"}}"#),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test]
+async fn test_existing_non_v4_uuid_account_can_still_log_in(pool: PgPool) {
+    // Accounts created before v4 was required keep their stored uuid.
+    sqlx::query("INSERT INTO users (username, uuid) VALUES ('legacy', 'legacy-key')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let resp = post_json(&pool, "/api/v1/auth/guest", r#"{"uuid": "legacy-key"}"#).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let json: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(json["username"], "legacy");
 }

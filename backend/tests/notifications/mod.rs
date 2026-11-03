@@ -10,7 +10,7 @@ async fn test_messages_empty_list(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "msg-user-1"}"#))
+                .body(Body::from(guest_body("msg-user-1")))
                 .unwrap(),
         )
         .await
@@ -26,7 +26,7 @@ async fn test_messages_empty_list(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "msg-user-2"}"#))
+                .body(Body::from(guest_body("msg-user-2")))
                 .unwrap(),
         )
         .await
@@ -63,7 +63,7 @@ async fn test_messages_empty_list(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "msg-outsider"}"#))
+                .body(Body::from(guest_body("msg-outsider")))
                 .unwrap(),
         )
         .await

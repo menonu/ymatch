@@ -121,7 +121,7 @@ Future<bool> _waitForBackend(ApiClient api) async {
 
 Future<int> _guestLogin(ApiClient api) async {
   final r = await api.post('/api/v1/auth/guest', {
-    'uuid': 'e2e-${DateTime.now().microsecondsSinceEpoch}-${api.hashCode}',
+    'uuid': newGuestUuid(),
     'deviceToken': 'e2e-device',
   });
   return (r as Map)['id'] as int;

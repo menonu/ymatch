@@ -78,7 +78,7 @@ async fn test_event_view_per_user_and_per_event(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "view-iso-b"}"#))
+                .body(Body::from(guest_body("view-iso-b")))
                 .unwrap(),
         )
         .await

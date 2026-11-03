@@ -20,6 +20,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
   final config = ConfigService();
@@ -78,7 +79,7 @@ void main() {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      final uuid = 'e2e-auth-guest-${DateTime.now().microsecondsSinceEpoch}';
+      final uuid = newGuestUuid();
       await container.read(authProvider.notifier).guestLogin(uuid);
 
       final state = container.read(authProvider);
@@ -146,7 +147,7 @@ void main() {
       addTearDown(container.dispose);
 
       // Use guest login (easiest way to get a userId without signup).
-      final uuid = 'e2e-auth-upd-${DateTime.now().microsecondsSinceEpoch}';
+      final uuid = newGuestUuid();
       await container.read(authProvider.notifier).guestLogin(uuid);
       final userId = container.read(authProvider).value!.id;
 

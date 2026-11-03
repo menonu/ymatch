@@ -63,11 +63,8 @@ final Uri _baseUrl = Uri.parse(
   Platform.environment['E2E_API_URL'] ?? 'http://localhost:3000',
 );
 
-/// Monotonic nonce so two guest logins in the same microsecond never
-/// collide on the `uuid` (which would silently return the same user).
+/// Monotonic nonce so events created by different scenarios get unique names.
 int _nonce = 0;
-String _uniqueUuid(String tag) =>
-    'e2e-neg-${DateTime.now().microsecondsSinceEpoch}-${_nonce++}-$tag';
 
 /// `http.Client` that records the status code of the last response. The
 /// `ApiClient` discards the raw response (it returns the parsed body or
@@ -176,9 +173,9 @@ Future<bool> _waitForBackend(ApiClient api) async {
   return false;
 }
 
-Future<int> _guestLogin(ApiClient api, {required String tag}) async {
+Future<int> _guestLogin(ApiClient api) async {
   final r = await api.post('/api/v1/auth/guest', {
-    'uuid': _uniqueUuid(tag),
+    'uuid': newGuestUuid(),
     'deviceToken': 'e2e-neg-device',
   });
   return (r as Map)['id'] as int;
@@ -263,7 +260,7 @@ Future<_Match> _provisionPendingMatch(
   final modId = await loginE2EModerator(api);
   final eventId = await _createEvent(
     api,
-    name: 'neg-event-$tag-$_nonce',
+    name: 'neg-event-$tag-${_nonce++}',
     creatorId: modId,
   );
   final cardA = await _createMerch(
@@ -281,8 +278,8 @@ Future<_Match> _provisionPendingMatch(
     groupName: 'neg-$tag',
   );
 
-  final u1 = await _guestLogin(api, tag: '${tag}_u1');
-  final u2 = await _guestLogin(api, tag: '${tag}_u2');
+  final u1 = await _guestLogin(api);
+  final u2 = await _guestLogin(api);
   expect(u2, isNot(u1));
 
   await _setInventory(
@@ -693,7 +690,7 @@ void main() {
       final a = _newApi();
       final m = await _provisionPendingMatch(a.api, tag: 'authz');
       // A third user who is not part of this match.
-      final outsider = await _guestLogin(a.api, tag: 'authz_outsider');
+      final outsider = await _guestLogin(a.api);
       expect(outsider, isNot(m.u1));
       expect(outsider, isNot(m.u2));
 

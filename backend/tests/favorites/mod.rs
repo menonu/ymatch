@@ -93,7 +93,7 @@ async fn test_event_favorite_per_user_independence(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "fav-iso-b"}"#))
+                .body(Body::from(guest_body("fav-iso-b")))
                 .unwrap(),
         )
         .await

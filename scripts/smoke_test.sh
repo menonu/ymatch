@@ -9,7 +9,10 @@ else
   API_URL="http://localhost:3000/api/v1"
   DISPLAY_NAME="PRODUCTION"
 fi
-TEST_UUID="smoke-test-${ENV}-$(date +%s)"
+# New guests must present a random UUID v4.
+# /proc is Linux-only; `uuidgen` (random v4 by default on macOS and Linux)
+# covers the rest. New guests need the lowercase form.
+TEST_UUID="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen | tr '[:upper:]' '[:lower:]')"
 
 echo "Starting YMatch API Smoke Tests ($DISPLAY_NAME)..."
 echo "API URL: $API_URL"
