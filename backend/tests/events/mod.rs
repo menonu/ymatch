@@ -10,7 +10,7 @@ async fn test_create_and_list_events(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "event-test-user"}"#))
+                .body(Body::from(guest_body("event-test-user")))
                 .unwrap(),
         )
         .await
@@ -100,7 +100,7 @@ async fn test_update_event_non_owner_forbidden(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "update-event-intruder"}"#))
+                .body(Body::from(guest_body("update-event-intruder")))
                 .unwrap(),
         )
         .await
@@ -176,7 +176,7 @@ async fn test_publish_draft_event_transitions_to_published(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "publish-draft-creator"}"#))
+                .body(Body::from(guest_body("publish-draft-creator")))
                 .unwrap(),
         )
         .await
@@ -247,7 +247,7 @@ async fn test_publish_event_non_owner_forbidden(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "publish-event-intruder"}"#))
+                .body(Body::from(guest_body("publish-event-intruder")))
                 .unwrap(),
         )
         .await
@@ -291,7 +291,7 @@ async fn test_search_returns_results(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "search-test-user"}"#))
+                .body(Body::from(guest_body("search-test-user")))
                 .unwrap(),
         )
         .await
@@ -348,7 +348,7 @@ async fn test_search_excludes_draft_events(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "search-draft-test"}"#))
+                .body(Body::from(guest_body("search-draft-test")))
                 .unwrap(),
         )
         .await
@@ -407,7 +407,7 @@ async fn test_admin_delete_event(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "admin-del-test"}"#))
+                .body(Body::from(guest_body("admin-del-test")))
                 .unwrap(),
         )
         .await
@@ -466,7 +466,7 @@ async fn test_draft_event_visibility(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "draft-creator"}"#))
+                .body(Body::from(guest_body("draft-creator")))
                 .unwrap(),
         )
         .await
@@ -482,7 +482,7 @@ async fn test_draft_event_visibility(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "draft-viewer"}"#))
+                .body(Body::from(guest_body("draft-viewer")))
                 .unwrap(),
         )
         .await

@@ -96,7 +96,7 @@ void main() {
   /// Create a regular user for ban/role/delete tests.
   Future<int> createRegularUser() async {
     final r = await api.post('/api/v1/auth/guest', {
-      'uuid': 'e2e_admin_target_${DateTime.now().microsecondsSinceEpoch}',
+      'uuid': newGuestUuid(),
       'deviceToken': 'e2e-admin-target',
     });
     return (r as Map)['id'] as int;

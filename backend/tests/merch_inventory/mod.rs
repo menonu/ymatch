@@ -10,7 +10,7 @@ async fn test_create_and_list_merch(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "merch-test-user"}"#))
+                .body(Body::from(guest_body("merch-test-user")))
                 .unwrap(),
         )
         .await
@@ -250,7 +250,7 @@ async fn test_inventory_upsert(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "inv-test-user"}"#))
+                .body(Body::from(guest_body("inv-test-user")))
                 .unwrap(),
         )
         .await
@@ -415,7 +415,7 @@ async fn test_draft_merch_visibility(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "draft-merch-user"}"#))
+                .body(Body::from(guest_body("draft-merch-user")))
                 .unwrap(),
         )
         .await
@@ -515,7 +515,7 @@ async fn test_soft_delete_merch_with_inventory(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "softdel-user"}"#))
+                .body(Body::from(guest_body("softdel-user")))
                 .unwrap(),
         )
         .await
@@ -635,7 +635,7 @@ async fn test_soft_delete_merch_without_inventory(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "softdel-noinv-user"}"#))
+                .body(Body::from(guest_body("softdel-noinv-user")))
                 .unwrap(),
         )
         .await

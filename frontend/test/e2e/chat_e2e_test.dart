@@ -100,14 +100,8 @@ void main() {
     cardA = await createMerch('cardA');
     cardB = await createMerch('cardB');
 
-    user1Id = await createE2EGuest(
-      api,
-      'e2e_chat_u1_${DateTime.now().microsecondsSinceEpoch}',
-    );
-    user2Id = await createE2EGuest(
-      api,
-      'e2e_chat_u2_${DateTime.now().microsecondsSinceEpoch}',
-    );
+    user1Id = await createE2EGuest(api);
+    user2Id = await createE2EGuest(api);
     expect(user2Id, isNot(user1Id));
 
     Future<void> setInventory(int userId, int merchId, String status) async {

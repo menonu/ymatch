@@ -66,8 +66,6 @@ final Uri _baseUrl = Uri.parse(
 /// Monotonic nonce so two guest logins in the same microsecond never
 /// collide on the `uuid` (which would silently return the same user).
 int _nonce = 0;
-String _uniqueUuid(String tag) =>
-    'e2e-neg-${DateTime.now().microsecondsSinceEpoch}-${_nonce++}-$tag';
 
 /// `http.Client` that records the status code of the last response. The
 /// `ApiClient` discards the raw response (it returns the parsed body or
@@ -178,7 +176,7 @@ Future<bool> _waitForBackend(ApiClient api) async {
 
 Future<int> _guestLogin(ApiClient api, {required String tag}) async {
   final r = await api.post('/api/v1/auth/guest', {
-    'uuid': _uniqueUuid(tag),
+    'uuid': newGuestUuid(),
     'deviceToken': 'e2e-neg-device',
   });
   return (r as Map)['id'] as int;
@@ -263,7 +261,7 @@ Future<_Match> _provisionPendingMatch(
   final modId = await loginE2EModerator(api);
   final eventId = await _createEvent(
     api,
-    name: 'neg-event-$tag-$_nonce',
+    name: 'neg-event-$tag-${_nonce++}',
     creatorId: modId,
   );
   final cardA = await _createMerch(

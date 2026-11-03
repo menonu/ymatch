@@ -148,7 +148,7 @@ async fn test_admin_update_user_role_invalid_role_rejected(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "admin-role-target"}"#))
+                .body(Body::from(guest_body("admin-role-target")))
                 .unwrap(),
         )
         .await
@@ -191,7 +191,7 @@ async fn test_admin_update_user_role_moderator_forbidden(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "admin-role-target-2"}"#))
+                .body(Body::from(guest_body("admin-role-target-2")))
                 .unwrap(),
         )
         .await
@@ -233,7 +233,7 @@ async fn test_admin_update_user_role_succeeds(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "admin-role-promote"}"#))
+                .body(Body::from(guest_body("admin-role-promote")))
                 .unwrap(),
         )
         .await
@@ -566,7 +566,7 @@ async fn test_admin_ban_unban_user(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "admin-ban-test"}"#))
+                .body(Body::from(guest_body("admin-ban-test")))
                 .unwrap(),
         )
         .await
@@ -584,7 +584,7 @@ async fn test_admin_ban_unban_user(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "target-ban-test"}"#))
+                .body(Body::from(guest_body("target-ban-test")))
                 .unwrap(),
         )
         .await
@@ -739,7 +739,7 @@ async fn test_non_admin_cannot_ban(pool: PgPool) {
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"uuid": "nonadmin-ban-test"}"#))
+                .body(Body::from(guest_body("nonadmin-ban-test")))
                 .unwrap(),
         )
         .await

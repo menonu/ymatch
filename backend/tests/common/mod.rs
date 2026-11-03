@@ -8,6 +8,28 @@ pub use tower::ServiceExt;
 // Shared test helpers — moved out of the old monolithic api_tests.rs.
 // Made `pub` so each per-domain module can pull them in via `use crate::common::*;`.
 
+/// Deterministic UUID v4 for a human-readable test label. New guests must
+/// present a canonical v4 UUID, so fixtures keep naming guests by label
+/// (`"admin-ban-test"`) and map them through this.
+pub fn guest_uuid(label: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut bytes = [0u8; 16];
+    for (i, chunk) in bytes.chunks_mut(8).enumerate() {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (i, label).hash(&mut h);
+        chunk.copy_from_slice(&h.finish().to_le_bytes());
+    }
+    uuid::Builder::from_random_bytes(bytes)
+        .into_uuid()
+        .hyphenated()
+        .to_string()
+}
+
+/// `POST /api/v1/auth/guest` body for a test label (see [`guest_uuid`]).
+pub fn guest_body(label: &str) -> String {
+    format!(r#"{{"uuid": "{}"}}"#, guest_uuid(label))
+}
+
 /// Helper to read an integer from a JSON object, treating a missing
 /// proto3-default-zero field as 0.
 pub fn json_i64(value: &serde_json::Value, key: &str) -> i64 {
@@ -33,7 +55,7 @@ pub async fn create_test_user_and_event(pool: PgPool, uuid: &str, event_name: &s
                 .method("POST")
                 .uri("/api/v1/auth/guest")
                 .header("content-type", "application/json")
-                .body(Body::from(format!(r#"{{"uuid": "{}"}}"#, uuid)))
+                .body(Body::from(guest_body(uuid)))
                 .unwrap(),
         )
         .await
@@ -71,7 +93,8 @@ pub async fn create_test_user_and_event(pool: PgPool, uuid: &str, event_name: &s
 pub async fn login_guest(pool: &PgPool, uuid: &str, device_token: &str) -> i64 {
     let body = format!(
         r#"{{"uuid": "{}", "deviceToken": "{}"}}"#,
-        uuid, device_token
+        guest_uuid(uuid),
+        device_token
     );
     let resp = post_json(pool, "/api/v1/auth/guest", &body).await;
     assert_eq!(resp.status(), StatusCode::OK, "guest login failed");

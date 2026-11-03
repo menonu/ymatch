@@ -30,6 +30,12 @@ pub async fn guest_login(
         return Ok(Json(user));
     }
 
+    // The uuid is the account's only credential: a new guest must present a
+    // random (v4) UUID. Existing accounts above keep logging in as-is.
+    if !is_canonical_uuid_v4(&payload.uuid) {
+        return Err(AppError::bad_request("uuid must be a UUID v4"));
+    }
+
     let suffix_len = std::cmp::min(8, payload.uuid.len());
     let uuid_suffix = &payload.uuid[payload.uuid.len() - suffix_len..];
     let unique_id = uuid::Uuid::new_v4().to_string()[..6].to_string();
@@ -43,6 +49,15 @@ pub async fn guest_login(
         )
         .await?;
     Ok(Json(user))
+}
+
+/// True for a hyphenated (8-4-4-4-12) RFC 4122 version-4 UUID, any case.
+fn is_canonical_uuid_v4(s: &str) -> bool {
+    s.len() == 36
+        && uuid::Uuid::try_parse(s).is_ok_and(|u| {
+            u.get_version() == Some(uuid::Version::Random)
+                && u.get_variant() == uuid::Variant::RFC4122
+        })
 }
 
 pub async fn login(
@@ -141,4 +156,35 @@ pub async fn update_username(
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
     Ok(Json(credential_free_user_view(user)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_canonical_uuid_v4;
+
+    #[test]
+    fn accepts_hyphenated_v4_in_any_case() {
+        assert!(is_canonical_uuid_v4("550e8400-e29b-41d4-a716-446655440000"));
+        assert!(is_canonical_uuid_v4("550E8400-E29B-41D4-A716-446655440000"));
+    }
+
+    #[test]
+    fn rejects_other_versions_variants_and_forms() {
+        for bad in [
+            "",
+            "test-uuid-1234",
+            // version 1
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+            // v4 nibble but non-RFC4122 variant
+            "550e8400-e29b-41d4-c716-446655440000",
+            // simple / braced / urn forms of a v4
+            "550e8400e29b41d4a716446655440000",
+            "{550e8400-e29b-41d4-a716-446655440000}",
+            "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+            // nil
+            "00000000-0000-0000-0000-000000000000",
+        ] {
+            assert!(!is_canonical_uuid_v4(bad), "{bad}");
+        }
+    }
 }

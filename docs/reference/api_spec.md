@@ -46,7 +46,7 @@ Guest login by device UUID. Creates the guest account on first use.
 - **Request Body**:
   ```json
   {
-    "uuid": "device-uuid-string",
+    "uuid": "550e8400-e29b-41d4-a716-446655440000",
     "device_token": "fcm_token_..."   // optional
   }
   ```
@@ -54,7 +54,10 @@ Guest login by device UUID. Creates the guest account on first use.
   ```json
   { "user_id": 2, "username": "guest_abc123", "role": "user" }
   ```
-- **Error**: `403 Forbidden` if the guest account is banned.
+- **Errors**: `400 Bad Request` if no account has this `uuid` and it is not a
+  hyphenated UUID v4 (new guests must present one; existing accounts log in
+  with the uuid they already have). `403 Forbidden` if the guest account is
+  banned.
 
 ### GET /api/v1/users
 
