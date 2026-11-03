@@ -36,20 +36,6 @@ pub struct VerifiedUser {
     pub is_banned: bool,
 }
 
-/// Lookup modes supported by [`UserRepository::get_by_username`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UsernameLookup {
-    /// Standard account lookup; returns the password hash alongside the
-    /// user (used by `auth::login`).
-    WithPassword,
-    /// Profile lookup; omits the password hash.
-    Public,
-}
-
-/// Result of [`UserRepository::get_by_username`]: the user plus an optional
-/// password hash (only present in [`UsernameLookup::WithPassword`] mode).
-pub type UserWithHash = (User, Option<String>);
-
 pub struct UserRepository {
     pool: PgPool,
 }
@@ -66,40 +52,6 @@ impl UserRepository {
             .fetch_optional(&self.pool)
             .await?;
         Ok(row.as_ref().map(user_from_row))
-    }
-
-    /// Fetch a user by username.
-    ///
-    /// With [`UsernameLookup::WithPassword`] returns `(User, Option<String>)`
-    /// where the `Option<String>` is the password hash (`None` for guest /
-    /// OAuth-style accounts). With [`UsernameLookup::Public`] returns
-    /// `(User, ())` — the hash is never read.
-    pub async fn get_by_username(
-        &self,
-        username: &str,
-        mode: UsernameLookup,
-    ) -> Result<Option<UserWithHash>, AppError> {
-        let sql = match mode {
-            UsernameLookup::WithPassword => format!(
-                "SELECT {}, password_hash FROM users WHERE username = $1",
-                USER_COLUMNS
-            ),
-            UsernameLookup::Public => {
-                format!("SELECT {} FROM users WHERE username = $1", USER_COLUMNS)
-            }
-        };
-        let row = sqlx::query(&sql)
-            .bind(username)
-            .fetch_optional(&self.pool)
-            .await?;
-        Ok(row.map(|r| {
-            let user = user_from_row(&r);
-            let password_hash = match mode {
-                UsernameLookup::WithPassword => r.get("password_hash"),
-                UsernameLookup::Public => None,
-            };
-            (user, password_hash)
-        }))
     }
 
     /// Fetch a user by their device-bound UUID. Used by guest login.
@@ -127,25 +79,6 @@ impl UserRepository {
         ))
         .bind(username)
         .bind(uuid)
-        .bind(device_token)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(user_from_row(&row))
-    }
-
-    /// Create a user with a password.
-    pub async fn create_with_password(
-        &self,
-        username: &str,
-        password_hash: &str,
-        device_token: Option<&str>,
-    ) -> Result<User, AppError> {
-        let row = sqlx::query(&format!(
-            "INSERT INTO users (username, password_hash, device_token) VALUES ($1, $2, $3) RETURNING {}",
-            USER_COLUMNS
-        ))
-        .bind(username)
-        .bind(password_hash)
         .bind(device_token)
         .fetch_one(&self.pool)
         .await?;

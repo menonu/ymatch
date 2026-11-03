@@ -1,8 +1,6 @@
 // Part of #230: comprehensive E2E coverage for all user-facing
-// features. This file covers the Auth area — four endpoints:
+// features. This file covers the Auth area — two endpoints:
 //   - POST /api/v1/auth/guest  (guestLogin)
-//   - POST /api/v1/auth/login   (login)
-//   - POST /api/v1/auth/signup  (signup)
 //   - PUT  /api/v1/users/{id}   (updateUsername)
 //
 // Each test calls the provider method directly (not hand-built
@@ -20,6 +18,7 @@ import 'package:frontend/providers/providers.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/config_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'helpers/e2e_users.dart';
 
 ApiClient _api() {
@@ -91,62 +90,11 @@ void main() {
   );
 
   test(
-    'AuthController.signup posts to /auth/signup and sets the user',
-    () async {
-      final container = makeContainer();
-      addTearDown(container.dispose);
-
-      final username = _uniqueUsername();
-      await container
-          .read(authProvider.notifier)
-          .signup(username, 'test-password-1234');
-
-      final state = container.read(authProvider);
-      expect(state.hasValue, isTrue);
-      expect(state.value, isNotNull);
-      expect(state.value!.username, username);
-    },
-  );
-
-  test(
-    'AuthController.login posts to /auth/login with the right body',
-    () async {
-      final container = makeContainer();
-      addTearDown(container.dispose);
-
-      final username = _uniqueUsername();
-      final password = 'test-password-1234';
-
-      // Signup first (login needs an existing user).
-      await container.read(authProvider.notifier).signup(username, password);
-      final afterSignup = container.read(authProvider).value;
-      expect(afterSignup, isNotNull);
-
-      // Now logout (clears state) and login.
-      container.read(authProvider.notifier).logout();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(
-        container.read(authProvider).value,
-        isNull,
-        reason: 'logout should clear the user',
-      );
-
-      await container.read(authProvider.notifier).login(username, password);
-      final afterLogin = container.read(authProvider);
-      expect(afterLogin.hasValue, isTrue);
-      expect(afterLogin.value, isNotNull);
-      expect(afterLogin.value!.id, afterSignup!.id);
-      expect(afterLogin.value!.username, username);
-    },
-  );
-
-  test(
     'AuthController.updateUsername Puts to /users/{id} and updates the state',
     () async {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      // Use guest login (easiest way to get a userId without signup).
       final uuid = newGuestUuid();
       await container.read(authProvider.notifier).guestLogin(uuid);
       final userId = container.read(authProvider).value!.id;

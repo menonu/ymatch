@@ -65,106 +65,22 @@ async fn test_guest_login_returns_existing_user(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_signup_and_login(pool: PgPool) {
-    // Signup
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/signup")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"username": "testuser_api", "password": "pass123"}"#,
-                ))
-                .unwrap(),
+async fn test_password_auth_routes_are_removed(pool: PgPool) {
+    // Accounts are guest-only: no route may create a user without a uuid.
+    for uri in ["/api/v1/auth/signup", "/api/v1/auth/login"] {
+        let resp = post_json(
+            &pool,
+            uri,
+            r#"{"username": "pw-user", "password": "pass123"}"#,
         )
+        .await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{uri}");
+    }
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = body_to_string(response.into_body()).await;
-    let user: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(user["username"].as_str().unwrap(), "testuser_api");
-
-    // Login with correct password
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/login")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"username": "testuser_api", "password": "pass123"}"#,
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Login with wrong password
-    let app = backend::routes::create_router(pool, test_storage());
-    let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/login")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"username": "testuser_api", "password": "wrong"}"#,
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-}
-
-/// #266: duplicate username must be 409 Conflict with a safe body, not a
-/// 500 that leaks the Postgres unique-constraint text.
-#[sqlx::test]
-async fn test_signup_duplicate_username_returns_409(pool: PgPool) {
-    let app = backend::routes::create_router(pool.clone(), test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/signup")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"username": "dup_user_266", "password": "pass123"}"#,
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-
-    let app = backend::routes::create_router(pool, test_storage());
-    let resp = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/signup")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"username": "dup_user_266", "password": "other"}"#,
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
-    let body = body_to_string(resp.into_body()).await;
-    assert!(
-        !body.contains("duplicate key") && !body.contains("users_username"),
-        "client body must not leak SQL detail, got: {body}"
-    );
-    assert!(
-        body.to_lowercase().contains("already exists") || body.contains("Conflict"),
-        "expected a conflict-style message, got: {body}"
-    );
+    assert_eq!(count, 0);
 }
 
 #[sqlx::test]

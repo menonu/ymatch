@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
 import '../services/api_client.dart';
 import '../models/models.dart';
 
@@ -180,44 +181,6 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_uuid', uuid);
-  }
-
-  // Keep legacy login for admin/debug if needed, but not primary
-  Future<void> login(String username, String password) async {
-    state = const AsyncValue.loading();
-    try {
-      final payload = LoginRequest()
-        ..username = username
-        ..password = password;
-      final json = await client.post(
-        '/api/v1/auth/login',
-        payload.toProto3Json() as Map<String, dynamic>,
-      );
-      final user = User()..mergeFromProto3Json(json);
-      // Also save UUID if this user has one? For now just session.
-      state = AsyncValue.data(user);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-
-  Future<void> signup(String username, String password) async {
-    // ... legacy signup ...
-    state = const AsyncValue.loading();
-    try {
-      final payload = CreateUserRequest()
-        ..username = username
-        ..password = password
-        ..deviceToken = 'web-v1';
-      final json = await client.post(
-        '/api/v1/auth/signup',
-        payload.toProto3Json() as Map<String, dynamic>,
-      );
-      final user = User()..mergeFromProto3Json(json);
-      state = AsyncValue.data(user);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
   }
 
   void logout() async {
