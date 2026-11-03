@@ -98,7 +98,9 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
         // A failed link intentionally falls back to this device's saved
         // account: the link is a one-shot migration aid, and the user keeps
         // their current session rather than landing on an error page.
-        if (state.error is! AccountRestoreException) return;
+        if (!state.hasError || state.error is BackendUnavailableException) {
+          return;
+        }
       }
     } catch (_) {
       // Malformed URI / non-web — fall through to normal flow.
@@ -162,6 +164,10 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   /// replaces this device's saved key only after the login succeeds, so a
   /// mistyped key cannot strand the current account.
   Future<void> restoreAccount(String uuid) async {
+    if (!isGuestRestoreUuid(uuid)) {
+      state = AsyncValue.error(AccountRestoreException(), StackTrace.current);
+      return;
+    }
     await _guestLogin(uuid, existingOnly: true);
     final current = state;
     if (current.hasError) {

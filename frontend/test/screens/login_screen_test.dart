@@ -5,6 +5,7 @@ import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/providers.dart';
+import 'package:frontend/services/api_client.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/widgets/how_to_trade.dart';
 
@@ -39,6 +40,24 @@ void main() {
     expect(find.text(_restoreFailedText), findsOneWidget);
     // The user can still start fresh or try another key.
     expect(find.text('Start as New User'), findsOneWidget);
+  });
+
+  testWidgets('LoginScreen shows other login errors', (
+    WidgetTester tester,
+  ) async {
+    final auth = MockAuthController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [authProvider.overrideWith((ref) => auth)],
+        child: _localized(const LoginScreen()),
+      ),
+    );
+
+    auth.state = AsyncValue.error(ApiException(500, 'boom'), StackTrace.empty);
+    await tester.pump();
+
+    expect(find.text('Error: API Error: 500 boom'), findsOneWidget);
+    expect(find.text(_restoreFailedText), findsNothing);
   });
 
   testWidgets(

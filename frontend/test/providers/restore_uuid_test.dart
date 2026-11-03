@@ -253,6 +253,21 @@ void main() {
       expect(prefs.getString('user_uuid'), savedId);
     });
 
+    test('malformed key is a bad key and never reaches the server', () async {
+      final container = await loggedInAsSaved();
+      final callsBefore = guestBodies.length;
+
+      await container.read(authProvider.notifier).restoreAccount('abc');
+
+      expect(guestBodies.length, callsBefore);
+      expect(
+        container.read(authProvider).error,
+        isA<AccountRestoreException>(),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_uuid'), savedId);
+    });
+
     test('known key logs in and replaces the saved key', () async {
       final container = await loggedInAsSaved();
 
@@ -264,29 +279,34 @@ void main() {
       expect(prefs.getString('user_uuid'), knownId);
     });
 
-    test('unknown restore_uuid falls back to the saved account', () async {
-      SharedPreferences.setMockInitialValues({'user_uuid': savedId});
-      enableDevSessionOverrides = false;
-      currentAppUri = () =>
-          Uri.parse('https://ymatch.example/?restore_uuid=$unknownId');
-      guestBodies = [];
-      final container = ProviderContainer(
-        overrides: [apiClientProvider.overrideWith((ref) => api())],
-      );
-      addTearDown(container.dispose);
-      container.read(authProvider);
-      for (
-        var i = 0;
-        i < 50 && container.read(authProvider).value == null;
-        i++
-      ) {
-        await Future<void>.delayed(Duration.zero);
-      }
+    for (final failingId in [unknownId, brokenId]) {
+      test(
+        'failed restore_uuid ($failingId) falls back to the saved account',
+        () async {
+          SharedPreferences.setMockInitialValues({'user_uuid': savedId});
+          enableDevSessionOverrides = false;
+          currentAppUri = () =>
+              Uri.parse('https://ymatch.example/?restore_uuid=$failingId');
+          guestBodies = [];
+          final container = ProviderContainer(
+            overrides: [apiClientProvider.overrideWith((ref) => api())],
+          );
+          addTearDown(container.dispose);
+          container.read(authProvider);
+          for (
+            var i = 0;
+            i < 50 && container.read(authProvider).value == null;
+            i++
+          ) {
+            await Future<void>.delayed(Duration.zero);
+          }
 
-      expect(guestBodies.map((b) => b['uuid']), [unknownId, savedId]);
-      expect(container.read(authProvider).value?.uuid, savedId);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('user_uuid'), savedId);
-    });
+          expect(guestBodies.map((b) => b['uuid']), [failingId, savedId]);
+          expect(container.read(authProvider).value?.uuid, savedId);
+          final prefs = await SharedPreferences.getInstance();
+          expect(prefs.getString('user_uuid'), savedId);
+        },
+      );
+    }
   });
 }

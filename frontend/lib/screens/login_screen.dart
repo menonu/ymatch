@@ -81,6 +81,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: TextStyle(color: Colors.red.shade700),
                           ),
                           const SizedBox(height: 16),
+                        ] else if (authState.hasError && !isBackendError) ...[
+                          Text(
+                            l10n.errorPrefix(authState.error.toString()),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                          const SizedBox(height: 16),
                         ],
                         if (isBackendError) ...[
                           Container(
