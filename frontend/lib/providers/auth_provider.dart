@@ -72,7 +72,8 @@ String? parseRestoreUuidFromUri(Uri uri) {
   return isGuestRestoreUuid(trimmed) ? trimmed : null;
 }
 
-/// Account restore failed: the key matches no account that can log in.
+/// Account restore failed: no account has the key (404) or that account may
+/// not log in (403).
 class AccountRestoreException implements Exception {
   @override
   String toString() => 'Account restore failed';
@@ -94,7 +95,9 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       final restoreUuid = parseRestoreUuidFromUri(currentAppUri());
       if (restoreUuid != null) {
         await restoreAccount(restoreUuid);
-        // An unknown key falls back to this device's saved account.
+        // A failed link intentionally falls back to this device's saved
+        // account: the link is a one-shot migration aid, and the user keeps
+        // their current session rather than landing on an error page.
         if (state.error is! AccountRestoreException) return;
       }
     } catch (_) {
@@ -162,7 +165,9 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     await _guestLogin(uuid, existingOnly: true);
     final current = state;
     if (current.hasError) {
-      if (current.error is! BackendUnavailableException) {
+      final error = current.error;
+      if (error is ApiException &&
+          (error.statusCode == 404 || error.statusCode == 403)) {
         state = AsyncValue.error(
           AccountRestoreException(),
           current.stackTrace ?? StackTrace.current,

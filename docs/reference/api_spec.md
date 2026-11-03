@@ -47,7 +47,7 @@ Guest login by device UUID. Creates the guest account on first use.
   ```json
   {
     "uuid": "550e8400-e29b-41d4-a716-446655440000",
-    "device_token": "fcm_token_...",  // optional
+    "deviceToken": "fcm_token_...",   // optional
     "existingOnly": true               // optional; restore an existing account only
   }
   ```

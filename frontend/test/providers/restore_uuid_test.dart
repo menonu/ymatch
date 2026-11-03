@@ -175,6 +175,7 @@ void main() {
     const savedId = '0b5c3a2e-4f1d-4c7a-9e8b-1a2b3c4d5e6f';
     const knownId = '550e8400-e29b-41d4-a716-446655440000';
     const unknownId = '7d9f1e2a-3b4c-4d5e-8f60-718293a4b5c6';
+    const brokenId = '2e4c6a8b-1d3f-4a5b-9c7d-8e9fa0b1c2d3';
 
     late List<Map<String, dynamic>> guestBodies;
 
@@ -187,6 +188,9 @@ void main() {
           final uuid = body['uuid'] as String;
           if (uuid == unknownId) {
             return http.Response('{"error":"Account not found"}', 404);
+          }
+          if (uuid == brokenId) {
+            return http.Response('{"error":"Internal"}', 500);
           }
           return http.Response(
             jsonEncode({'id': uuid == savedId ? 1 : 2, 'uuid': uuid}),
@@ -233,6 +237,18 @@ void main() {
         container.read(authProvider).error,
         isA<AccountRestoreException>(),
       );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_uuid'), savedId);
+    });
+
+    test('server error is not reported as a bad key', () async {
+      final container = await loggedInAsSaved();
+
+      await container.read(authProvider.notifier).restoreAccount(brokenId);
+
+      final error = container.read(authProvider).error;
+      expect(error, isNotNull);
+      expect(error, isNot(isA<AccountRestoreException>()));
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('user_uuid'), savedId);
     });
