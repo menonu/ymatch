@@ -96,7 +96,7 @@ Two ping monitors run from `AP_NORTHEAST_1` (Tokyo) every 15 minutes:
 
 | Condition | Threshold | Duration |
 |-----------|-----------|----------|
-| High CPU Usage | > 85% | 5 min |
+| High CPU Usage | > 85% | 15 min |
 | High Memory Usage | > 90% | 5 min |
 | High Disk Usage | > 80% | 5 min |
 | Docker Container Not Running | < 4 containers | 5 min |
