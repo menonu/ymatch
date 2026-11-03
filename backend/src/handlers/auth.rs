@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::UserIdQuery;
-use crate::handlers::mappers::public_user_view;
+use crate::handlers::mappers::{credential_free_user_view, directory_user_view};
 use crate::repositories::user::UsernameLookup;
 use crate::routes::AppState;
 use crate::services::rbac::{Permission, Scope};
@@ -116,25 +116,11 @@ pub async fn list_users(
     if is_staff {
         // Even staff lists carry no secrets; the detail endpoint keeps
         // `device_token` (see `staff_user_view`).
-        let staff_view = all.into_iter().map(public_user_view).collect();
+        let staff_view = all.into_iter().map(credential_free_user_view).collect();
         return Ok(Json(staff_view));
     }
 
-    let lean = all
-        .into_iter()
-        .map(|u| User {
-            id: u.id,
-            username: u.username,
-            uuid: None,
-            device_token: None,
-            created_at: None,
-            role: None,
-            is_banned: None,
-            ban_reason: None,
-            banned_until: None,
-        })
-        .collect();
-    Ok(Json(lean))
+    Ok(Json(all.into_iter().map(directory_user_view).collect()))
 }
 
 pub async fn update_username(
@@ -154,5 +140,5 @@ pub async fn update_username(
         .update_username(id, &username)
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
-    Ok(Json(public_user_view(user)))
+    Ok(Json(credential_free_user_view(user)))
 }

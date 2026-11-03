@@ -26,10 +26,11 @@ pub fn empty_to_none(s: Option<String>) -> Option<String> {
     s.filter(|v| !v.is_empty())
 }
 
-/// [`User`] for any non-login response: drops the login credential (`uuid`)
-/// and the push token (`device_token`). Only the `auth/*` endpoints return a
-/// user with its `uuid`.
-pub fn public_user_view(mut user: User) -> User {
+/// Drops the credentials (`uuid`, `device_token`) and keeps every other field,
+/// including staff-only ones (role, ban state). For the caller's own record and
+/// staff lists; use [`directory_user_view`] for other users' records shown to
+/// non-staff callers. Only the `auth/*` endpoints return `uuid`.
+pub fn credential_free_user_view(mut user: User) -> User {
     user.uuid = None;
     user.device_token = None;
     user
@@ -40,6 +41,15 @@ pub fn public_user_view(mut user: User) -> User {
 pub fn staff_user_view(mut user: User) -> User {
     user.uuid = None;
     user
+}
+
+/// Lean directory entry for non-staff callers: `id` and `username` only.
+pub fn directory_user_view(user: User) -> User {
+    User {
+        id: user.id,
+        username: user.username,
+        ..User::default()
+    }
 }
 
 /// Map a `users` table row to the [`User`] proto message.
@@ -128,14 +138,27 @@ mod tests {
     }
 
     #[test]
-    fn public_user_view_drops_uuid_and_device_token() {
-        let u = public_user_view(full_user());
+    fn credential_free_user_view_drops_uuid_and_device_token() {
+        let u = credential_free_user_view(full_user());
         assert_eq!(u.uuid, None);
         assert_eq!(u.device_token, None);
         assert_eq!(u.id, 1);
         assert_eq!(u.username, "u");
         assert_eq!(u.role.as_deref(), Some("user"));
         assert_eq!(u.is_banned, Some(false));
+    }
+
+    #[test]
+    fn directory_user_view_keeps_only_id_and_username() {
+        let u = directory_user_view(full_user());
+        assert_eq!(
+            u,
+            User {
+                id: 1,
+                username: "u".into(),
+                ..User::default()
+            }
+        );
     }
 
     #[test]

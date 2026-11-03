@@ -26,7 +26,9 @@ async fn test_admin_get_user_details_returns_user(pool: PgPool) {
     let user: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(user["id"], target);
     assert!(user["username"].as_str().is_some());
-    // The UUID is the target's login credential; staff views never carry it.
+    // Staff detail keeps the push token for inspection...
+    assert_eq!(user["deviceToken"], "t");
+    // ...but never the target's login credential (UUID).
     assert!(
         user.get("uuid").is_none_or(|v| v.is_null()),
         "uuid must not be returned: {user}"
