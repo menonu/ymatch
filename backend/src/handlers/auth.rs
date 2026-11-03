@@ -2,7 +2,6 @@ use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::UserIdQuery;
 use crate::handlers::mappers::{credential_free_user_view, directory_user_view};
-use crate::repositories::user::UsernameLookup;
 use crate::routes::AppState;
 use crate::services::rbac::{Permission, Scope};
 use axum::{Json, extract::Path, extract::Query, extract::State};
@@ -65,42 +64,6 @@ fn is_canonical_uuid_v4(s: &str) -> bool {
             && u.get_variant() == uuid::Variant::RFC4122
             && u.hyphenated().to_string() == s
     })
-}
-
-pub async fn login(
-    State(state): State<AppState>,
-    Json(payload): Json<LoginRequest>,
-) -> Result<Json<User>, AppError> {
-    let (user, password_hash) = state
-        .users
-        .get_by_username(&payload.username, UsernameLookup::WithPassword)
-        .await?
-        .ok_or_else(|| AppError::unauthorized("Invalid credentials"))?;
-
-    if password_hash.as_deref() != Some(&payload.password) {
-        return Err(AppError::unauthorized("Invalid credentials"));
-    }
-
-    if user.is_banned.unwrap_or(false) {
-        return Err(AppError::forbidden("User is banned"));
-    }
-
-    Ok(Json(user))
-}
-
-pub async fn signup(
-    State(state): State<AppState>,
-    Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<User>, AppError> {
-    let user = state
-        .users
-        .create_with_password(
-            &payload.username,
-            &payload.password,
-            payload.device_token.as_deref(),
-        )
-        .await?;
-    Ok(Json(user))
 }
 
 /// List users for member pickers and the admin users tab (#491).

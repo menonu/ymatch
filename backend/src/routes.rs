@@ -307,8 +307,6 @@ pub fn create_router(pool: PgPool, storage: Arc<dyn ImageStorage>) -> Router {
     });
 
     let auth_routes: Router<AppState> = Router::new()
-        .route("/api/v1/auth/signup", post(handlers::signup))
-        .route("/api/v1/auth/login", post(handlers::login))
         .route("/api/v1/auth/guest", post(handlers::guest_login))
         .layer(middleware::from_fn_with_state(
             auth_limiter.clone(),
