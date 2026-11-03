@@ -1,6 +1,7 @@
 use crate::error::AppError;
 use crate::generated::ymatch::*;
 use crate::handlers::common::{TransferCreatorRequest, UserIdQuery, require_global};
+use crate::handlers::mappers::staff_user_view;
 use crate::routes::AppState;
 use crate::services::event::TransferCaller as EventTransferCaller;
 use crate::services::group::TransferCaller as GroupTransferCaller;
@@ -167,14 +168,12 @@ pub async fn get_user_details(
     // plain caller cannot enumerate device tokens by sequential id.
     require_global(&state, query.user_id, Permission::UserRead).await?;
 
-    let mut user = state
+    let user = state
         .users
         .get_by_id(target_id)
         .await?
         .ok_or_else(|| AppError::not_found("User not found"))?;
-    // The UUID is the target's login credential; staff never need it.
-    user.uuid = None;
-    Ok(Json(user))
+    Ok(Json(staff_user_view(user)))
 }
 
 /// Validate that `new_creator_id` exists and is not banned (#432).

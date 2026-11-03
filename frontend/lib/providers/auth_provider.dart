@@ -207,14 +207,15 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
       payload.toProto3Json() as Map<String, dynamic>,
     );
     final user = User()..mergeFromProto3Json(data);
-    // The response omits `uuid` (only the login endpoints return it); keep
-    // the session's so the Profile restore key stays available.
+    // The response omits `uuid` and `deviceToken` (only the login endpoints
+    // return them); keep the session's so the Profile restore key stays
+    // available.
     final current = state.value;
-    if (!user.hasUuid() &&
-        current != null &&
-        current.id == user.id &&
-        current.hasUuid()) {
-      user.uuid = current.uuid;
+    if (current != null && current.id == user.id) {
+      if (!user.hasUuid() && current.hasUuid()) user.uuid = current.uuid;
+      if (!user.hasDeviceToken() && current.hasDeviceToken()) {
+        user.deviceToken = current.deviceToken;
+      }
     }
     state = AsyncValue.data(user);
   }

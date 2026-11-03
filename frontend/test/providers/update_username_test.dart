@@ -25,38 +25,48 @@ void main() {
     enableDevSessionOverrides = true;
   });
 
-  test('updateUsername keeps the session uuid the server omits', () async {
-    final config = ConfigService()..setBaseUrlForTest('http://localhost:3000');
-    final api = ApiClient(
-      config,
-      client: MockClient((request) async {
-        if (request.url.path == '/api/v1/auth/guest') {
-          return http.Response(
-            jsonEncode({'id': 7, 'username': 'Guest_x', 'uuid': _uuid}),
-            200,
-          );
-        }
-        if (request.url.path == '/api/v1/users/7') {
-          // The server no longer returns `uuid` from this endpoint.
-          return http.Response(
-            jsonEncode({'id': 7, 'username': 'renamed'}),
-            200,
-          );
-        }
-        return http.Response('[]', 200);
-      }),
-    );
-    final container = ProviderContainer(
-      overrides: [apiClientProvider.overrideWith((ref) => api)],
-    );
-    addTearDown(container.dispose);
+  test(
+    'updateUsername keeps the session uuid/deviceToken the server omits',
+    () async {
+      final config = ConfigService()
+        ..setBaseUrlForTest('http://localhost:3000');
+      final api = ApiClient(
+        config,
+        client: MockClient((request) async {
+          if (request.url.path == '/api/v1/auth/guest') {
+            return http.Response(
+              jsonEncode({
+                'id': 7,
+                'username': 'Guest_x',
+                'uuid': _uuid,
+                'deviceToken': 'push-token',
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/api/v1/users/7') {
+            // The server returns neither `uuid` nor `deviceToken` here.
+            return http.Response(
+              jsonEncode({'id': 7, 'username': 'renamed'}),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
 
-    final auth = container.read(authProvider.notifier);
-    await auth.restoreAccount(_uuid);
-    await auth.updateUsername(7, 'renamed');
+      final auth = container.read(authProvider.notifier);
+      await auth.restoreAccount(_uuid);
+      await auth.updateUsername(7, 'renamed');
 
-    final user = container.read(authProvider).value!;
-    expect(user.username, 'renamed');
-    expect(user.uuid, _uuid);
-  });
+      final user = container.read(authProvider).value!;
+      expect(user.username, 'renamed');
+      expect(user.uuid, _uuid);
+      expect(user.deviceToken, 'push-token');
+    },
+  );
 }

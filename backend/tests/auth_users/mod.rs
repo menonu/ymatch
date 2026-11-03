@@ -441,7 +441,7 @@ async fn test_banned_user_cannot_create_event(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_update_username_response_omits_uuid(pool: PgPool) {
+async fn test_update_username_response_omits_credentials(pool: PgPool) {
     let user_id = login_guest(&pool, "rename-self", "tok").await;
     let resp = put_json(
         &pool,
@@ -457,5 +457,10 @@ async fn test_update_username_response_omits_uuid(pool: PgPool) {
     assert!(
         user.get("uuid").is_none_or(|v| v.is_null()),
         "uuid must not be returned: {user}"
+    );
+    // The push token is not needed to confirm a rename.
+    assert!(
+        user.get("deviceToken").is_none_or(|v| v.is_null()),
+        "device_token must not be returned: {user}"
     );
 }
