@@ -2,7 +2,8 @@
 -- and login no longer exist.
 --
 -- Fill any missing uuid first so the NOT NULL constraint cannot fail at
--- startup. Such accounts are only reachable by restoring with the new key.
+-- startup. Such accounts become unreachable (the generated key is never
+-- issued); none are expected in deployed environments.
 UPDATE users SET uuid = gen_random_uuid()::text WHERE uuid IS NULL;
 ALTER TABLE users ALTER COLUMN uuid SET NOT NULL;
 

@@ -56,7 +56,8 @@ async fn migration_requires_uuid_and_drops_password_hash(pool: PgPool) {
         .execute(&pool)
         .await
         .expect_err("uuid is required");
-    assert!(err.to_string().contains("null value"), "{err}");
+    let code = err.as_database_error().and_then(|e| e.code());
+    assert_eq!(code.as_deref(), Some("23502"), "{err}"); // not_null_violation
 
     // password_hash is gone.
     let has_column: bool = sqlx::query_scalar(
