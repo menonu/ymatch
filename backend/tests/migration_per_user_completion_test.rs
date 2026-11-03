@@ -31,7 +31,7 @@ async fn migration_backfills_completed_matches_for_both_users(pool: PgPool) {
     prior.run(&pool).await.expect("prior migrations apply");
 
     for name in ["done-u1", "done-u2"] {
-        sqlx::query("INSERT INTO users (username, password_hash) VALUES ($1, 'x')")
+        sqlx::query("INSERT INTO users (username, uuid) VALUES ($1, $1)")
             .bind(name)
             .execute(&pool)
             .await

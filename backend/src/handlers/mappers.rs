@@ -55,9 +55,7 @@ pub fn directory_user_view(user: User) -> User {
 /// Map a `users` table row to the [`User`] proto message.
 ///
 /// Required columns: `id, username, uuid, device_token, created_at, role,
-/// is_banned, ban_reason, banned_until`. `password_hash` is intentionally
-/// NOT included here; auth handlers that need it select it explicitly and
-/// drop it before calling this mapper (or return their own type).
+/// is_banned, ban_reason, banned_until`.
 ///
 /// ADR 0006: `role` is no longer a stored `users` column — it is the alias of
 /// the derivation subquery in [`crate::repositories::user::USER_COLUMNS`]

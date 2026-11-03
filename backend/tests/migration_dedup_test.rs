@@ -37,11 +37,11 @@ async fn migration_dedups_duplicate_live_merch_names_before_unique_index(pool: P
 
     // 2. Seed: two users, an event, and two LIVE merch rows colliding on
     //    (event_id, group_name='G', name='a'). Lowest id is the survivor.
-    sqlx::query("INSERT INTO users (username, password_hash) VALUES ('dedup-user', 'x')")
+    sqlx::query("INSERT INTO users (username, uuid) VALUES ('dedup-user', 'dedup-user')")
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO users (username, password_hash) VALUES ('dedup-peer', 'x')")
+    sqlx::query("INSERT INTO users (username, uuid) VALUES ('dedup-peer', 'dedup-peer')")
         .execute(&pool)
         .await
         .unwrap();

@@ -9,10 +9,9 @@ erDiagram
     users {
         SERIAL id PK
         TEXT username "NOT NULL UNIQUE"
-        TEXT password_hash "nullable, legacy (unused)"
         TEXT device_token
         TIMESTAMPTZ created_at
-        TEXT uuid "UNIQUE"
+        TEXT uuid "UNIQUE, NOT NULL"
         TEXT role "NOT NULL DEFAULT 'user'"
         BOOLEAN is_banned "NOT NULL DEFAULT FALSE"
         TEXT ban_reason
@@ -123,10 +122,9 @@ erDiagram
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
-    password_hash TEXT,                          -- legacy; no endpoint reads or writes it
     device_token TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    uuid TEXT UNIQUE,                            -- persistent guest identifier
+    uuid TEXT UNIQUE NOT NULL,                   -- persistent guest identifier (login key)
     role TEXT NOT NULL DEFAULT 'user',           -- 'user', 'moderator', 'admin'
     is_banned BOOLEAN NOT NULL DEFAULT FALSE,
     ban_reason TEXT,

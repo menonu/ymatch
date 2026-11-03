@@ -492,7 +492,7 @@ mod tests {
 
         // Two users; user1 is the event creator, user2 will become an editor.
         for name in ["mem-creator", "mem-editor"] {
-            sqlx::query("INSERT INTO users (username) VALUES ($1)")
+            sqlx::query("INSERT INTO users (username, uuid) VALUES ($1, gen_random_uuid()::text)")
                 .bind(name)
                 .execute(&pool)
                 .await
@@ -587,7 +587,7 @@ mod tests {
         let rbac = RbacRepository::new(pool.clone());
 
         for name in ["gmem-creator", "gmem-editor"] {
-            sqlx::query("INSERT INTO users (username) VALUES ($1)")
+            sqlx::query("INSERT INTO users (username, uuid) VALUES ($1, gen_random_uuid()::text)")
                 .bind(name)
                 .execute(&pool)
                 .await

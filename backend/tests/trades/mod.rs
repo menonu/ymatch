@@ -1323,13 +1323,13 @@ async fn test_match_carries_group_display_name(pool: PgPool) {
 #[sqlx::test]
 async fn test_match_unique_canonical_pair_group_enforced_by_db(pool: PgPool) {
     let (u1,): (i32,) = sqlx::query_as(
-        "INSERT INTO users (username, password_hash) VALUES ('uniq-u1', 'x') RETURNING id",
+        "INSERT INTO users (username, uuid) VALUES ('uniq-u1', 'uniq-u1') RETURNING id",
     )
     .fetch_one(&pool)
     .await
     .unwrap();
     let (u2,): (i32,) = sqlx::query_as(
-        "INSERT INTO users (username, password_hash) VALUES ('uniq-u2', 'x') RETURNING id",
+        "INSERT INTO users (username, uuid) VALUES ('uniq-u2', 'uniq-u2') RETURNING id",
     )
     .fetch_one(&pool)
     .await
