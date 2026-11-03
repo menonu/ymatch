@@ -104,7 +104,7 @@ mod tests {
 
     #[sqlx::test]
     async fn verify_returns_user_when_present(pool: PgPool) {
-        sqlx::query("INSERT INTO users (id, username) VALUES (1, 'test')")
+        sqlx::query("INSERT INTO users (id, username, uuid) VALUES (1, 'test', 'test-uuid')")
             .execute(&pool)
             .await
             .unwrap();
@@ -116,7 +116,7 @@ mod tests {
 
     #[sqlx::test]
     async fn verify_active_rejects_banned(pool: PgPool) {
-        sqlx::query("INSERT INTO users (id, username, is_banned) VALUES (1, 'test', true)")
+        sqlx::query("INSERT INTO users (id, username, uuid, is_banned) VALUES (1, 'test', 'test-uuid', true)")
             .execute(&pool)
             .await
             .unwrap();
@@ -128,7 +128,7 @@ mod tests {
 
     #[sqlx::test]
     async fn verify_active_passes_for_active(pool: PgPool) {
-        sqlx::query("INSERT INTO users (id, username) VALUES (1, 'test')")
+        sqlx::query("INSERT INTO users (id, username, uuid) VALUES (1, 'test', 'test-uuid')")
             .execute(&pool)
             .await
             .unwrap();

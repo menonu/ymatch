@@ -848,7 +848,7 @@ mod tests {
 
         // Four users: admin, moderator, plain user, and a future editor.
         for name in ["rbac-admin", "rbac-mod", "rbac-user", "rbac-editor"] {
-            sqlx::query("INSERT INTO users (username) VALUES ($1)")
+            sqlx::query("INSERT INTO users (username, uuid) VALUES ($1, gen_random_uuid()::text)")
                 .bind(name)
                 .execute(&pool)
                 .await

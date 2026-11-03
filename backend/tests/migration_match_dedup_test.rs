@@ -41,11 +41,11 @@ async fn migration_dedups_duplicate_matches_before_unique_index(pool: PgPool) {
     prior.run(&pool).await.expect("prior migrations apply");
 
     // 2. Seed: two users, an event, and a merch row (for match_items legs).
-    sqlx::query("INSERT INTO users (username, password_hash) VALUES ('dedup-u1', 'x')")
+    sqlx::query("INSERT INTO users (username, uuid) VALUES ('dedup-u1', 'dedup-u1')")
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO users (username, password_hash) VALUES ('dedup-u2', 'x')")
+    sqlx::query("INSERT INTO users (username, uuid) VALUES ('dedup-u2', 'dedup-u2')")
         .execute(&pool)
         .await
         .unwrap();
