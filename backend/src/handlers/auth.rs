@@ -51,13 +51,15 @@ pub async fn guest_login(
     Ok(Json(user))
 }
 
-/// True for a hyphenated (8-4-4-4-12) RFC 4122 version-4 UUID, any case.
+/// True for an RFC 4122 version-4 UUID in canonical form: lowercase,
+/// hyphenated (8-4-4-4-12). Uuids are matched as exact text, so only one
+/// spelling of a UUID value may create an account.
 fn is_canonical_uuid_v4(s: &str) -> bool {
-    s.len() == 36
-        && uuid::Uuid::try_parse(s).is_ok_and(|u| {
-            u.get_version() == Some(uuid::Version::Random)
-                && u.get_variant() == uuid::Variant::RFC4122
-        })
+    uuid::Uuid::try_parse(s).is_ok_and(|u| {
+        u.get_version() == Some(uuid::Version::Random)
+            && u.get_variant() == uuid::Variant::RFC4122
+            && u.hyphenated().to_string() == s
+    })
 }
 
 pub async fn login(
@@ -163,15 +165,17 @@ mod tests {
     use super::is_canonical_uuid_v4;
 
     #[test]
-    fn accepts_hyphenated_v4_in_any_case() {
+    fn accepts_lowercase_hyphenated_v4() {
         assert!(is_canonical_uuid_v4("550e8400-e29b-41d4-a716-446655440000"));
-        assert!(is_canonical_uuid_v4("550E8400-E29B-41D4-A716-446655440000"));
     }
 
     #[test]
     fn rejects_other_versions_variants_and_forms() {
         for bad in [
             "",
+            // upper / mixed case
+            "550E8400-E29B-41D4-A716-446655440000",
+            "550e8400-E29B-41d4-a716-446655440000",
             "test-uuid-1234",
             // version 1
             "6ba7b810-9dad-11d1-80b4-00c04fd430c8",

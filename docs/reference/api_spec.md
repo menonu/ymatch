@@ -55,7 +55,7 @@ Guest login by device UUID. Creates the guest account on first use.
   { "user_id": 2, "username": "guest_abc123", "role": "user" }
   ```
 - **Errors**: `400 Bad Request` if no account has this `uuid` and it is not a
-  hyphenated UUID v4 (new guests must present one; existing accounts log in
+  lowercase hyphenated UUID v4 (new guests must present one; existing accounts log in
   with the uuid they already have). `403 Forbidden` if the guest account is
   banned.
 

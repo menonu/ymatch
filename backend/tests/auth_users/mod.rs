@@ -493,7 +493,9 @@ async fn test_new_guest_requires_uuid_v4(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_new_guest_accepts_uppercase_uuid_v4(pool: PgPool) {
+async fn test_new_guest_rejects_uppercase_uuid_v4(pool: PgPool) {
+    // Uuids are matched as exact text, so only the lowercase form may create
+    // an account; otherwise one UUID value could map to two accounts.
     let upper = guest_uuid("upper-case").to_uppercase();
     let resp = post_json(
         &pool,
@@ -501,7 +503,7 @@ async fn test_new_guest_accepts_uppercase_uuid_v4(pool: PgPool) {
         &format!(r#"{{"uuid": "{upper}"}}"#),
     )
     .await;
-    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
 #[sqlx::test]

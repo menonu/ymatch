@@ -136,8 +136,9 @@ browser tab as a different guest. **This only works in Flutter debug builds**
 http://localhost:8081/#/?dev_user=<uuid>
 ```
 
-Use a UUID v4 for a new guest (e.g. `uuidgen -r`; the backend rejects other
-formats for new accounts), or an existing guest's UUID. The tab logs in as that guest without writing
+Use a lowercase UUID v4 for a new guest (e.g. `uuidgen | tr A-Z a-z`; the
+backend rejects other formats for new accounts), or an existing guest's UUID.
+The tab logs in as that guest without writing
 to `SharedPreferences`, so each tab keeps an independent session.
 
 **Production note:** release builds never honor `dev_user` and never show the

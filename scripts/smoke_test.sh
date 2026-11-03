@@ -10,7 +10,9 @@ else
   DISPLAY_NAME="PRODUCTION"
 fi
 # New guests must present a random UUID v4.
-TEST_UUID="$(cat /proc/sys/kernel/random/uuid)"
+# /proc is Linux-only; `uuidgen` (random v4 by default on macOS and Linux)
+# covers the rest. New guests need the lowercase form.
+TEST_UUID="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen | tr '[:upper:]' '[:lower:]')"
 
 echo "Starting YMatch API Smoke Tests ($DISPLAY_NAME)..."
 echo "API URL: $API_URL"
