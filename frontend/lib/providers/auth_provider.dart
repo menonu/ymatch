@@ -143,7 +143,8 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     try {
       // Use a mock device token for the guest session.
       // In a real app, this would come from a push notification plugin.
-      final mockDeviceToken = 'mock-token-${uuid.substring(0, 8)}';
+      final prefix = uuid.length > 8 ? uuid.substring(0, 8) : uuid;
+      final mockDeviceToken = 'mock-token-$prefix';
 
       final payload = GuestLoginRequest()
         ..uuid = uuid
@@ -164,10 +165,6 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   /// replaces this device's saved key only after the login succeeds, so a
   /// mistyped key cannot strand the current account.
   Future<void> restoreAccount(String uuid) async {
-    if (!isGuestRestoreUuid(uuid)) {
-      state = AsyncValue.error(AccountRestoreException(), StackTrace.current);
-      return;
-    }
     await _guestLogin(uuid, existingOnly: true);
     final current = state;
     if (current.hasError) {

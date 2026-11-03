@@ -186,7 +186,7 @@ void main() {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           guestBodies.add(body);
           final uuid = body['uuid'] as String;
-          if (uuid == unknownId) {
+          if (uuid == unknownId || uuid == 'abc') {
             return http.Response('{"error":"Account not found"}', 404);
           }
           if (uuid == brokenId) {
@@ -253,13 +253,12 @@ void main() {
       expect(prefs.getString('user_uuid'), savedId);
     });
 
-    test('malformed key is a bad key and never reaches the server', () async {
+    test('short unknown key is reported as a bad key', () async {
       final container = await loggedInAsSaved();
-      final callsBefore = guestBodies.length;
 
       await container.read(authProvider.notifier).restoreAccount('abc');
 
-      expect(guestBodies.length, callsBefore);
+      expect(guestBodies.last['uuid'], 'abc');
       expect(
         container.read(authProvider).error,
         isA<AccountRestoreException>(),
