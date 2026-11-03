@@ -519,3 +519,41 @@ async fn test_existing_non_v4_uuid_account_can_still_log_in(pool: PgPool) {
         serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
     assert_eq!(json["username"], "legacy");
 }
+
+#[sqlx::test]
+async fn test_existing_only_unknown_uuid_is_not_found(pool: PgPool) {
+    // Account restore must never create an account from a mistyped key.
+    let uuid = guest_uuid("restore-unknown");
+    let resp = post_json(
+        &pool,
+        "/api/v1/auth/guest",
+        &format!(r#"{{"uuid": "{uuid}", "existingOnly": true}}"#),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0, "restore must not create an account");
+}
+
+#[sqlx::test]
+async fn test_existing_only_logs_in_to_existing_account(pool: PgPool) {
+    let uuid = guest_uuid("restore-existing");
+    let created = post_json(&pool, "/api/v1/auth/guest", &guest_body("restore-existing")).await;
+    assert_eq!(created.status(), StatusCode::OK);
+    let created: serde_json::Value =
+        serde_json::from_str(&body_to_string(created.into_body()).await).unwrap();
+
+    let resp = post_json(
+        &pool,
+        "/api/v1/auth/guest",
+        &format!(r#"{{"uuid": "{uuid}", "existingOnly": true}}"#),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let json: serde_json::Value =
+        serde_json::from_str(&body_to_string(resp.into_body()).await).unwrap();
+    assert_eq!(json["id"], created["id"]);
+}

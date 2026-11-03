@@ -132,6 +132,8 @@ message MatchItem {
 message GuestLoginRequest {
   string uuid = 1;
   optional string device_token = 2;
+  // Log in to an existing account only; never create one (account restore).
+  optional bool existing_only = 3;
 }
 
 message LoginRequest {

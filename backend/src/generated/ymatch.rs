@@ -232,6 +232,9 @@ pub struct GuestLoginRequest {
     pub uuid: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "2")]
     pub device_token: ::core::option::Option<::prost::alloc::string::String>,
+    /// Log in to an existing account only; never create one (account restore).
+    #[prost(bool, optional, tag = "3")]
+    pub existing_only: ::core::option::Option<bool>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

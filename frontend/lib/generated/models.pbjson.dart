@@ -678,16 +678,27 @@ const GuestLoginRequest$json = {
       '10': 'deviceToken',
       '17': true
     },
+    {
+      '1': 'existing_only',
+      '3': 3,
+      '4': 1,
+      '5': 8,
+      '9': 1,
+      '10': 'existingOnly',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_device_token'},
+    {'1': '_existing_only'},
   ],
 };
 
 /// Descriptor for `GuestLoginRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List guestLoginRequestDescriptor = $convert.base64Decode(
     'ChFHdWVzdExvZ2luUmVxdWVzdBISCgR1dWlkGAEgASgJUgR1dWlkEiYKDGRldmljZV90b2tlbh'
-    'gCIAEoCUgAUgtkZXZpY2VUb2tlbogBAUIPCg1fZGV2aWNlX3Rva2Vu');
+    'gCIAEoCUgAUgtkZXZpY2VUb2tlbogBARIoCg1leGlzdGluZ19vbmx5GAMgASgISAFSDGV4aXN0'
+    'aW5nT25seYgBAUIPCg1fZGV2aWNlX3Rva2VuQhAKDl9leGlzdGluZ19vbmx5');
 
 @$core.Deprecated('Use loginRequestDescriptor instead')
 const LoginRequest$json = {
