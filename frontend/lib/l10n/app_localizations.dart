@@ -206,6 +206,12 @@ abstract class AppLocalizations {
   /// **'Restore Account'**
   String get restoreAccount;
 
+  /// Shown when account restore fails (unknown or unusable key)
+  ///
+  /// In en, this message translates to:
+  /// **'Could not restore the account. Check the key and try again.'**
+  String get restoreAccountFailed;
+
   /// Button to start a new guest session
   ///
   /// In en, this message translates to:

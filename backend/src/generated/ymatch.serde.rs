@@ -1483,12 +1483,18 @@ impl serde::Serialize for GuestLoginRequest {
         if self.device_token.is_some() {
             len += 1;
         }
+        if self.existing_only.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("ymatch.GuestLoginRequest", len)?;
         if !self.uuid.is_empty() {
             struct_ser.serialize_field("uuid", &self.uuid)?;
         }
         if let Some(v) = self.device_token.as_ref() {
             struct_ser.serialize_field("deviceToken", v)?;
+        }
+        if let Some(v) = self.existing_only.as_ref() {
+            struct_ser.serialize_field("existingOnly", v)?;
         }
         struct_ser.end()
     }
@@ -1503,12 +1509,15 @@ impl<'de> serde::Deserialize<'de> for GuestLoginRequest {
             "uuid",
             "device_token",
             "deviceToken",
+            "existing_only",
+            "existingOnly",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Uuid,
             DeviceToken,
+            ExistingOnly,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1532,6 +1541,7 @@ impl<'de> serde::Deserialize<'de> for GuestLoginRequest {
                         match value {
                             "uuid" => Ok(GeneratedField::Uuid),
                             "deviceToken" | "device_token" => Ok(GeneratedField::DeviceToken),
+                            "existingOnly" | "existing_only" => Ok(GeneratedField::ExistingOnly),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1553,6 +1563,7 @@ impl<'de> serde::Deserialize<'de> for GuestLoginRequest {
             {
                 let mut uuid__ = None;
                 let mut device_token__ = None;
+                let mut existing_only__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Uuid => {
@@ -1567,11 +1578,18 @@ impl<'de> serde::Deserialize<'de> for GuestLoginRequest {
                             }
                             device_token__ = map_.next_value()?;
                         }
+                        GeneratedField::ExistingOnly => {
+                            if existing_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("existingOnly"));
+                            }
+                            existing_only__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(GuestLoginRequest {
                     uuid: uuid__.unwrap_or_default(),
                     device_token: device_token__,
+                    existing_only: existing_only__,
                 })
             }
         }

@@ -11,6 +11,15 @@ class BackendUnavailableException implements Exception {
   String toString() => message;
 }
 
+/// A non-success HTTP response other than 502/503.
+class ApiException implements Exception {
+  final int statusCode;
+  final String body;
+  ApiException(this.statusCode, this.body);
+  @override
+  String toString() => 'API Error: $statusCode $body';
+}
+
 class ApiClient {
   final ConfigService config;
   final http.Client _client;
@@ -205,7 +214,7 @@ class ApiClient {
         'Backend service unavailable (${response.statusCode})',
       );
     } else {
-      throw Exception('API Error: ${response.statusCode} ${response.body}');
+      throw ApiException(response.statusCode, response.body);
     }
   }
 }

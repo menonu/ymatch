@@ -21,6 +21,7 @@
   "loginBackendErrorBody": "サービスが一時停止中の可能性があります。\nしばらく経ってから再試行してください。",
   "loggingIn": "ログイン中...",
   "restoreAccount": "アカウントを復元",
+  "restoreAccountFailed": "アカウントを復元できませんでした。キーを確認して、もう一度お試しください。",
   "startAsNewUser": "新規ユーザーとして開始",
   "restoreExistingAccount": "既存のアカウントを復元",
 

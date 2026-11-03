@@ -1311,10 +1311,12 @@ class GuestLoginRequest extends $pb.GeneratedMessage {
   factory GuestLoginRequest({
     $core.String? uuid,
     $core.String? deviceToken,
+    $core.bool? existingOnly,
   }) {
     final result = create();
     if (uuid != null) result.uuid = uuid;
     if (deviceToken != null) result.deviceToken = deviceToken;
+    if (existingOnly != null) result.existingOnly = existingOnly;
     return result;
   }
 
@@ -1333,6 +1335,7 @@ class GuestLoginRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'uuid')
     ..aOS(2, _omitFieldNames ? '' : 'deviceToken')
+    ..aOB(3, _omitFieldNames ? '' : 'existingOnly')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1371,6 +1374,16 @@ class GuestLoginRequest extends $pb.GeneratedMessage {
   $core.bool hasDeviceToken() => $_has(1);
   @$pb.TagNumber(2)
   void clearDeviceToken() => $_clearField(2);
+
+  /// Log in to an existing account only; never create one (account restore).
+  @$pb.TagNumber(3)
+  $core.bool get existingOnly => $_getBF(2);
+  @$pb.TagNumber(3)
+  set existingOnly($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExistingOnly() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExistingOnly() => $_clearField(3);
 }
 
 class LoginRequest extends $pb.GeneratedMessage {

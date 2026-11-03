@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/auth_provider.dart';
 import '../providers/providers.dart';
 import '../services/api_client.dart';
 import '../widgets/how_to_trade.dart';
@@ -73,6 +74,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 48),
 
+                        if (authState.error is AccountRestoreException) ...[
+                          Text(
+                            l10n.restoreAccountFailed,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                          const SizedBox(height: 16),
+                        ] else if (authState.hasError && !isBackendError) ...[
+                          Text(
+                            l10n.errorPrefix(authState.error.toString()),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         if (isBackendError) ...[
                           Container(
                             padding: const EdgeInsets.all(16),

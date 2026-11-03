@@ -66,6 +66,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get restoreAccount => 'アカウントを復元';
 
   @override
+  String get restoreAccountFailed => 'アカウントを復元できませんでした。キーを確認して、もう一度お試しください。';
+
+  @override
   String get startAsNewUser => '新規ユーザーとして開始';
 
   @override

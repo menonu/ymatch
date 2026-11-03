@@ -63,6 +63,21 @@ void main() {
       expect(response, {'success': true});
     });
 
+    test('non-success responses throw ApiException with the status', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response('{"error":"Account not found"}', 404);
+      });
+
+      final apiClient = ApiClient(config, client: mockClient);
+
+      expect(
+        () async => await apiClient.post('/api/test', {}),
+        throwsA(
+          isA<ApiException>().having((e) => e.statusCode, 'statusCode', 404),
+        ),
+      );
+    });
+
     test('post() throws exception on failure', () async {
       final mockClient = MockClient((request) async {
         return http.Response('Bad Request', 400);

@@ -30,6 +30,11 @@ pub async fn guest_login(
         return Ok(Json(user));
     }
 
+    // Account restore: an unknown key must not silently create an account.
+    if payload.existing_only.unwrap_or(false) {
+        return Err(AppError::not_found("Account not found"));
+    }
+
     // The uuid is the account's only credential: a new guest must present a
     // random (v4) UUID. Existing accounts above keep logging in as-is.
     if !is_canonical_uuid_v4(&payload.uuid) {
